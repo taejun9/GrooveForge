@@ -15,14 +15,24 @@ const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformAr
 const args = process.argv.slice(2);
 const force = args.includes("--force");
 const syntheticSuccessSmoke = args.includes("--success-smoke");
+const syntheticPreflightSmoke = args.includes("--preflight-smoke");
+const preflightOnly = args.includes("--preflight") || syntheticPreflightSmoke;
 const reportStem = syntheticSuccessSmoke
   ? "release-channel-apply-private-env-success-smoke"
+  : syntheticPreflightSmoke
+    ? "release-channel-apply-private-env-preflight-smoke"
+    : preflightOnly
+      ? "release-channel-apply-private-env-preflight"
   : "release-channel-apply-private-env";
 const reportArtifactSuffixes = [
   "release-channel-apply-private-env.md",
   "release-channel-apply-private-env.json",
   "release-channel-apply-private-env-success-smoke.md",
-  "release-channel-apply-private-env-success-smoke.json"
+  "release-channel-apply-private-env-success-smoke.json",
+  "release-channel-apply-private-env-preflight.md",
+  "release-channel-apply-private-env-preflight.json",
+  "release-channel-apply-private-env-preflight-smoke.md",
+  "release-channel-apply-private-env-preflight-smoke.json"
 ];
 const configuredLocalEnvFileKey = "GROOVEFORGE_DISTRIBUTION_ENV_FILE";
 const notClaimedSummary =
@@ -315,11 +325,15 @@ function buildMarkdown(report) {
 ## Summary
 
 - Apply ready: ${readyLabel(report.releaseChannelPrivateEnvApplyReady)}
+- Preflight only: ${readyLabel(report.preflightOnly)}
+- Preflight ready: ${readyLabel(report.releaseChannelPrivateEnvApplyPreflightReady)}
 - Synthetic success smoke: ${readyLabel(report.syntheticSuccessSmoke)}
+- Synthetic preflight smoke: ${readyLabel(report.syntheticPreflightSmoke)}
 - Force overwrite requested: ${readyLabel(report.forceOverwrite)}
 - Local env file loaded: ${readyLabel(report.localEnvFileLoaded)}
 - Local env modified: ${readyLabel(report.localEnvModified)}
 - Real local env modified: ${readyLabel(report.realLocalEnvModified)}
+- Would apply rows: ${report.wouldApplyKeyCount}
 - Applied rows: ${report.appliedKeyCount}
 - Skipped current rows: ${report.skippedCurrentKeyCount}
 - Blocked rows: ${report.blockedKeyCount}
@@ -350,7 +364,7 @@ ${formatAfterRows(report.afterApplyRows)}
 
 ## Next Proof
 
-Run \`${report.recommendedOperatorProofCommand}\` after this apply command reports 4/4 current-ready rows. The strict proof chain starts with \`${report.firstStrictProofCommand}\`, then runs the downstream post-edit proof, progress refresh, and private-value leak audit.
+Run \`${report.reportCommand}\`${report.preflightOnly ? " first to verify process env readiness, then `npm run release:channel-apply-private-env` to write the ignored local env file." : " to write the ignored local env file."} Run \`${report.recommendedOperatorProofCommand}\` after the apply command reports 4/4 current-ready rows. The strict proof chain starts with \`${report.firstStrictProofCommand}\`, then runs the downstream post-edit proof, progress refresh, and private-value leak audit.
 
 ## Not Recorded
 
@@ -389,7 +403,7 @@ async function main() {
   let afterLines = beforeLines;
   let localEnvModified = false;
 
-  if (applyAllowed) {
+  if (applyAllowed && preflightOnly === false) {
     const applied = applyRowsToLines(beforeLines, planRows, inputValues);
     afterLines = applied.nextLines;
     localEnvModified = applied.modified;
@@ -403,10 +417,17 @@ async function main() {
   const afterEntries = localEnvFileLoaded ? parseEnvEntries(afterText.split(/\r?\n/), filePath) : [];
   const afterRows = buildAfterRows(afterEntries);
   const currentReadyKeyCount = afterRows.filter((row) => row.currentReady === true).length;
-  const appliedRows = planRows.filter((row) => row.shouldApply === true);
+  const wouldApplyRows = planRows.filter((row) => row.shouldApply === true);
+  const appliedRows = preflightOnly ? [] : planRows.filter((row) => row.shouldApply === true);
   const skippedCurrentRows = planRows.filter((row) => row.skippedCurrent === true);
   const currentPlaceholderKeys = afterRows.filter((row) => row.placeholder === true).map((row) => row.key);
   const privateValueCandidates = privateValues({ inputValues, beforeEntries, afterEntries });
+  const preflightReady =
+    preflightOnly === true &&
+    localEnvFileLoaded === true &&
+    blockedRows.length === 0 &&
+    inputRows.every((row) => row.inputShapeReady === true) &&
+    planRows.every((row) => row.shouldApply === true || row.skippedCurrent === true);
   const report = {
     appName,
     bundleId,
@@ -417,10 +438,16 @@ async function main() {
     platformArch,
     reportCommand: syntheticSuccessSmoke
       ? "npm run release:channel-apply-private-env-success-smoke"
+      : syntheticPreflightSmoke
+        ? "npm run release:channel-apply-private-env-preflight-smoke"
+        : preflightOnly
+          ? "npm run release:channel-apply-private-env-preflight"
       : "npm run release:channel-apply-private-env",
     releaseChannelPrivateEnvApplyMarkdownPath: relative(markdownPath),
     releaseChannelPrivateEnvApplyJsonPath: relative(jsonPath),
     syntheticSuccessSmoke,
+    syntheticPreflightSmoke,
+    preflightOnly,
     forceOverwrite: force,
     localEnvRootOverrideEnabled: Boolean(localEnvRootOverride),
     localEnvRootRelativePath: localEnvRootOverride ? relativeLocalEnvRoot : ".",
@@ -438,6 +465,8 @@ async function main() {
     inputShapeInvalidKeys: inputRows.filter((row) => row.inputPresent === true && row.inputPlaceholder === false && row.inputShapeReady !== true).map((row) => row.key),
     applyPlanRows: planRows.map(({ lineIndex, ...row }) => row),
     applyPlanRowCount: planRows.length,
+    wouldApplyKeyCount: wouldApplyRows.length,
+    wouldApplyKeys: wouldApplyRows.map((row) => row.key),
     appliedKeyCount: appliedRows.length,
     appliedKeys: appliedRows.map((row) => row.key),
     skippedCurrentKeyCount: skippedCurrentRows.length,
@@ -463,7 +492,9 @@ async function main() {
         : localEnvFileLoaded
           ? `Current release-channel metadata still has ${releaseChannelMetadataKeys.length - currentReadyKeyCount} non-ready rows.`
           : "Ignored local distribution env file is not loaded.",
+    releaseChannelPrivateEnvApplyPreflightReady: preflightReady,
     releaseChannelPrivateEnvApplyReady:
+      preflightOnly === false &&
       localEnvFileLoaded === true &&
       blockedRows.length === 0 &&
       currentReadyKeyCount === releaseChannelMetadataKeys.length &&
@@ -519,14 +550,30 @@ async function main() {
     check(report.currentReadyKeyCount === 4, "release-channel apply success smoke should produce four current-ready rows");
     check(report.currentPlaceholderKeyCount === 0, "release-channel apply success smoke should clear placeholders");
   }
+  if (syntheticPreflightSmoke) {
+    check(report.localEnvRootOverrideEnabled === true, "release-channel apply preflight smoke should use a local env root override");
+    check(report.preflightOnly === true, "release-channel apply preflight smoke should mark preflight-only mode");
+    check(report.realLocalEnvRead === false, "release-channel apply preflight smoke should not read the real local env");
+    check(report.localEnvModified === false, "release-channel apply preflight smoke should not modify local env");
+    check(report.realLocalEnvModified === false, "release-channel apply preflight smoke should not modify the real local env");
+    check(report.releaseChannelPrivateEnvApplyPreflightReady === true, "release-channel apply preflight smoke should prove ready inputs");
+    check(report.releaseChannelPrivateEnvApplyReady === false, "release-channel apply preflight smoke should not claim apply completion");
+    check(report.wouldApplyKeyCount === 4, "release-channel apply preflight smoke should identify four would-apply keys");
+    check(report.appliedKeyCount === 0, "release-channel apply preflight smoke should not apply keys");
+    check(report.currentReadyKeyCount === 0, "release-channel apply preflight smoke should not mutate placeholders into current-ready rows");
+  }
 
   await writeReport(report, privateValueCandidates);
 
-  if (failures.length > 0 || report.releaseChannelPrivateEnvApplyReady !== true) {
-    console.error("GrooveForge release-channel private env apply failed.");
+  const commandReady = preflightOnly ? report.releaseChannelPrivateEnvApplyPreflightReady : report.releaseChannelPrivateEnvApplyReady;
+  if (failures.length > 0 || commandReady !== true) {
+    console.error(preflightOnly ? "GrooveForge release-channel private env apply preflight failed." : "GrooveForge release-channel private env apply failed.");
     console.error(`- Markdown: ${relative(markdownPath)}`);
     console.error(`- JSON: ${relative(jsonPath)}`);
+    console.error(`- Preflight only: ${report.preflightOnly ? "yes" : "no"}`);
+    console.error(`- Preflight ready: ${report.releaseChannelPrivateEnvApplyPreflightReady ? "yes" : "no"}`);
     console.error(`- Local env file loaded: ${report.localEnvFileLoaded ? "yes" : "no"}`);
+    console.error(`- Would apply rows: ${report.wouldApplyKeyCount}`);
     console.error(`- Applied rows: ${report.appliedKeyCount}`);
     console.error(`- Blocked rows: ${report.blockedKeyCount}`);
     console.error(`- Current ready rows: ${report.currentReadyKeyCount}/${report.currentRequiredKeyCount}`);
@@ -543,13 +590,17 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("GrooveForge release-channel private env apply passed.");
+  console.log(preflightOnly ? "GrooveForge release-channel private env apply preflight passed." : "GrooveForge release-channel private env apply passed.");
   console.log(`- Markdown: ${relative(markdownPath)}`);
   console.log(`- JSON: ${relative(jsonPath)}`);
+  console.log(`- Preflight only: ${report.preflightOnly ? "yes" : "no"}`);
+  console.log(`- Preflight ready: ${report.releaseChannelPrivateEnvApplyPreflightReady ? "yes" : "no"}`);
   console.log(`- Synthetic success smoke: ${report.syntheticSuccessSmoke ? "yes" : "no"}`);
+  console.log(`- Synthetic preflight smoke: ${report.syntheticPreflightSmoke ? "yes" : "no"}`);
   console.log(`- Local env file loaded: ${report.localEnvFileLoaded ? "yes" : "no"}`);
   console.log(`- Local env modified: ${report.localEnvModified ? "yes" : "no"}`);
   console.log(`- Real local env modified: ${report.realLocalEnvModified ? "yes" : "no"}`);
+  console.log(`- Would apply rows: ${report.wouldApplyKeyCount}`);
   console.log(`- Applied rows: ${report.appliedKeyCount}`);
   console.log(`- Skipped current rows: ${report.skippedCurrentKeyCount}`);
   console.log(`- Current ready rows: ${report.currentReadyKeyCount}/${report.currentRequiredKeyCount}`);

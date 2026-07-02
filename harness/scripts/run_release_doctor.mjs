@@ -24,6 +24,7 @@ const releaseChannelMetadataKeys = [
   "GROOVEFORGE_SUPPORT_URL"
 ];
 const privateEditStrictProofCommand = "npm run release:private-edit-strict-proof";
+const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const releaseChannelEnvKeyGuidance = {
   GROOVEFORGE_DISTRIBUTION_CHANNEL: "Use one of direct-download, private-beta, or managed-release.",
@@ -496,7 +497,7 @@ function buildCurrentAction({
       currentActionLabel: "Create ignored local distribution env",
       currentActionNextCommand: "npm run release:prepare-env",
       currentActionFirstBlocker: "Ignored local distribution env file is not loaded.",
-      currentActionOperatorAction: `Run \`npm run release:prepare-env\` to create ${currentEnvEditTarget}, then set private release-channel process env values and run \`${releaseChannelApplyPrivateEnvCommand}\`.`,
+      currentActionOperatorAction: `Run \`npm run release:prepare-env\` to create ${currentEnvEditTarget}, then set private release-channel process env values, run \`${releaseChannelApplyPrivateEnvPreflightCommand}\`, and run \`${releaseChannelApplyPrivateEnvCommand}\`.`,
       currentActionRequiredKeys: releaseChannelMetadataKeys,
       currentActionPlaceholderKeys: [],
       currentActionPrerequisiteCommands: [],
@@ -507,7 +508,7 @@ function buildCurrentAction({
   if (releaseChannelPlaceholderKeys.length > 0) {
     const keySummary = releaseChannelPlaceholderKeys.join(", ");
     const checklist = [
-      `Set private process env values for the current release-channel keys, then run \`${releaseChannelApplyPrivateEnvCommand}\` to update ${currentEnvEditTarget}: ${keySummary}.`,
+      `Set private process env values for the current release-channel keys, run \`${releaseChannelApplyPrivateEnvPreflightCommand}\`, then run \`${releaseChannelApplyPrivateEnvCommand}\` to update ${currentEnvEditTarget}: ${keySummary}.`,
       "Use real operator-owned release/support URLs and one allowed distribution channel value through process env.",
       "Keep real values out of committed files and generated reports.",
       "Rerun `npm run release:current-blocker` after applying metadata to refresh the value-free blocker evidence.",
@@ -518,7 +519,7 @@ function buildCurrentAction({
       currentActionLabel: "Replace release-channel metadata placeholders",
       currentActionNextCommand: "npm run release:doctor",
       currentActionFirstBlocker: `Current release-channel metadata still contains ${releaseChannelPlaceholderKeys.length} placeholder keys.`,
-      currentActionOperatorAction: `Set private process env values for the current release-channel keys (${releaseChannelPlaceholderKeys.length}), then run ${releaseChannelApplyPrivateEnvCommand} to update ${currentEnvEditTarget}: ${keySummary}.`,
+      currentActionOperatorAction: `Set private process env values for the current release-channel keys (${releaseChannelPlaceholderKeys.length}), run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${currentEnvEditTarget}: ${keySummary}.`,
       currentActionPostEditProofCommand: privateEditStrictProofCommand,
       currentActionPostEditProofRole: "Run the strict value-free proof chain after applying release-channel metadata through the private env helper.",
       currentActionRequiredKeys: releaseChannelMetadataKeys,

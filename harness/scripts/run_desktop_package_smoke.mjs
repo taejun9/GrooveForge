@@ -61,6 +61,72 @@ function readJson(relativePath) {
   }
 }
 
+function runCommand(command, args, options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: root,
+      env: { ...process.env, NO_COLOR: "1" },
+      stdio: ["ignore", "pipe", "pipe"],
+      ...options
+    });
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      child.kill("SIGTERM");
+      reject(new Error(`${command} timed out after ${timeoutMs}ms\n${stdout}\n${stderr}`));
+    }, timeoutMs);
+
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.on("exit", (code, signal) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      if (code !== 0) {
+        reject(new Error(`${command} ${args.join(" ")} failed with code ${code ?? "null"} signal ${signal ?? "null"}\n${stdout}\n${stderr}`));
+        return;
+      }
+      resolve({ stdout, stderr });
+    });
+  });
+}
+
+function signatureEvidence(details) {
+  const flagsLine = details
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.startsWith("CodeDirectory") && line.includes("flags="));
+
+  return {
+    identifier: details.match(/Identifier=([^\n]+)/)?.[1] ?? null,
+    flagsLine: flagsLine ?? null,
+    isAdHoc: details.includes("Signature=adhoc") || /\bflags=[^\n]*\badhoc\b/.test(flagsLine ?? ""),
+    hasDeveloperIdAuthority: details.includes("Authority=Developer ID"),
+    valueRecorded: false
+  };
+}
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
@@ -538,6 +604,31 @@ async function packageMacApp() {
   };
 }
 
+async function signPackagedAppForLocalLaunch(paths) {
+  const signArgs = ["--force", "--deep", "--sign", "-", paths.packagedApp];
+  const verifyArgs = ["--verify", "--deep", "--strict", "--verbose=2", paths.packagedApp];
+
+  await runCommand("codesign", signArgs);
+  await runCommand("codesign", verifyArgs);
+  const appDisplay = await runCommand("codesign", ["--display", "--verbose=4", paths.packagedApp]);
+  const signature = signatureEvidence(`${appDisplay.stdout}\n${appDisplay.stderr}`);
+
+  check(signature.identifier === bundleId, `package-smoke launch signature should preserve ${bundleId}`);
+  check(signature.isAdHoc, "package-smoke launch signature should be local ad-hoc");
+  check(!signature.hasDeveloperIdAuthority, "package-smoke launch signature should not claim Developer ID authority");
+
+  return {
+    signed: true,
+    verified: true,
+    signCommand: "codesign --force --deep --sign -",
+    verifyCommand: "codesign --verify --deep --strict --verbose=2",
+    identifier: signature.identifier,
+    isAdHoc: signature.isAdHoc,
+    hasDeveloperIdAuthority: signature.hasDeveloperIdAuthority,
+    valueRecorded: false
+  };
+}
+
 async function checkPackagedApp(paths) {
   check(existsSync(paths.packagedApp), "packaged GrooveForge.app should exist");
   check(existsSync(paths.executable), "packaged app executable should be renamed to GrooveForge");
@@ -732,6 +823,11 @@ if (!paths || failures.length > 0) {
   fail("Packaged app assembly failed.", failures.map((failure) => `- ${failure}`).join("\n"));
 }
 
+paths.localLaunchSignature = await signPackagedAppForLocalLaunch(paths);
+if (failures.length > 0) {
+  fail("Packaged app local launch signature validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
+}
+
 await checkPackagedApp(paths);
 if (failures.length > 0) {
   fail("Packaged app structure validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
@@ -753,6 +849,9 @@ console.log(
 );
 console.log(
   `- Dyld framework loadability: ${paths.frameworkDependencies.dyldLoadableDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} loadable via ${paths.frameworkDependencies.rpathCount} dyld rpaths`
+);
+console.log(
+  `- Launch signature: local ad-hoc ${paths.localLaunchSignature.verified ? "verified" : "not verified"} with ${paths.localLaunchSignature.verifyCommand}; Developer ID not claimed`
 );
 console.log(
   `- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors`

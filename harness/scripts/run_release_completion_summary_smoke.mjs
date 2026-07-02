@@ -19,6 +19,9 @@ const sourceJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}
 const readoutMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${readoutStem}.md`);
 const readoutJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${readoutStem}.json`);
 const failures = [];
+const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
+const releaseChannelApplyPrivateEnvPreflightRole =
+  "verify operator-owned release-channel process env values before writing the ignored local env";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const releaseChannelApplyPrivateEnvRole =
   "apply operator-owned release-channel process env values into the ignored local env before strict proof";
@@ -172,6 +175,13 @@ function buildReport(source) {
     completionBlockerFocusRows,
     completionBlockerFocusRowCount: integerValue(summary.completionBlockerFocusRowCount),
     completionBlockerFocusRowsValueFree: summary.completionBlockerFocusRowsValueFree === true && valueFreeRows(completionBlockerFocusRows),
+    releaseChannelPrivateEnvApplyPreflightCommand: textValue(summary.releaseChannelPrivateEnvApplyPreflightCommand, releaseChannelApplyPrivateEnvPreflightCommand),
+    releaseChannelPrivateEnvApplyPreflightRole: textValue(summary.releaseChannelPrivateEnvApplyPreflightRole, releaseChannelApplyPrivateEnvPreflightRole),
+    releaseChannelPrivateEnvApplyPreflightBeforeApply:
+      summary.releaseChannelPrivateEnvApplyPreflightBeforeApply === true ||
+      (textValue(summary.releaseChannelPrivateEnvApplyPreflightCommand, releaseChannelApplyPrivateEnvPreflightCommand) === releaseChannelApplyPrivateEnvPreflightCommand &&
+        textValue(summary.releaseChannelPrivateEnvApplyCommand, releaseChannelApplyPrivateEnvCommand) === releaseChannelApplyPrivateEnvCommand),
+    releaseChannelPrivateEnvApplyPreflightValueRecorded: summary.releaseChannelPrivateEnvApplyPreflightValueRecorded === true ? true : false,
     releaseChannelPrivateEnvApplyCommand: textValue(summary.releaseChannelPrivateEnvApplyCommand, releaseChannelApplyPrivateEnvCommand),
     releaseChannelPrivateEnvApplyRole: textValue(summary.releaseChannelPrivateEnvApplyRole, releaseChannelApplyPrivateEnvRole),
     releaseChannelPrivateEnvApplyBeforeStrictProof:
@@ -263,6 +273,8 @@ function buildMarkdown(report) {
 - Completion blocker action rows: ${report.completionBlockerActionRowCount}
 - Completion blocker focus receipt ready: ${readyLabel(report.completionBlockerFocusReceiptReady)}
 - Completion blocker focus rows: ${report.completionBlockerFocusRowCount}
+- Private env apply preflight command: \`${report.releaseChannelPrivateEnvApplyPreflightCommand}\`
+- Private env apply preflight before apply: ${readyLabel(report.releaseChannelPrivateEnvApplyPreflightBeforeApply)}
 - Private env apply command: \`${report.releaseChannelPrivateEnvApplyCommand}\`
 - Private env apply before strict proof: ${readyLabel(report.releaseChannelPrivateEnvApplyBeforeStrictProof)}
 - First proof after private edits: \`${report.releaseChannelFirstProofCommandAfterPrivateEdits}\`
@@ -355,6 +367,10 @@ function validateReport(report, markdown) {
   check(report.completionBlockerFocusRowsValueFree === true, "release completion summary blocker focus rows should be value-free");
   check(report.completionBlockerFocusRows.every((row) => row.valueRecorded === false), "release completion summary blocker focus rows should not record values");
   check(report.completionBlockerFocusRows.every((row) => report.currentRequiredKeys.includes(row.key)), "release completion summary blocker focus rows should match required keys");
+  check(report.releaseChannelPrivateEnvApplyPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release completion summary should expose private env apply preflight command");
+  check(report.releaseChannelPrivateEnvApplyPreflightRole === releaseChannelApplyPrivateEnvPreflightRole, "release completion summary should describe private env apply preflight role");
+  check(report.releaseChannelPrivateEnvApplyPreflightBeforeApply === true, "release completion summary should place private env apply preflight before apply");
+  check(report.releaseChannelPrivateEnvApplyPreflightValueRecorded === false, "release completion summary private env apply preflight command should be value-free");
   check(report.releaseChannelPrivateEnvApplyCommand === releaseChannelApplyPrivateEnvCommand, "release completion summary should expose private env apply command");
   check(report.releaseChannelPrivateEnvApplyRole === releaseChannelApplyPrivateEnvRole, "release completion summary should describe private env apply role");
   check(report.releaseChannelPrivateEnvApplyBeforeStrictProof === true, "release completion summary should place private env apply before strict proof");
@@ -418,6 +434,8 @@ console.log(`- Final handoff success-redaction ready: ${report.finalHandoffSucce
 console.log(`- Completion blocker action receipt ready: ${report.completionBlockerActionReceiptReady ? "yes" : "no"}`);
 console.log(`- Completion blocker action rows: ${report.completionBlockerActionRowCount}`);
 console.log(`- Completion blocker focus rows: ${report.completionBlockerFocusRowCount}`);
+console.log(`- Private env apply preflight command: ${report.releaseChannelPrivateEnvApplyPreflightCommand}`);
+console.log(`- Private env apply preflight before apply: ${report.releaseChannelPrivateEnvApplyPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Private env apply command: ${report.releaseChannelPrivateEnvApplyCommand}`);
 console.log(`- Private env apply before strict proof: ${report.releaseChannelPrivateEnvApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);

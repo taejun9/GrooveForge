@@ -21,6 +21,9 @@ const operatorCompletionBriefJsonPath = path.join(packageRoot, `${appName}-${pac
 const refreshMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${refreshStem}.md`);
 const refreshJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${refreshStem}.json`);
 const failures = [];
+const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
+const releaseChannelApplyPrivateEnvPreflightRole =
+  "verify operator-owned release-channel process env values before writing the ignored local env";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const releaseChannelApplyPrivateEnvRole =
   "apply operator-owned release-channel process env values into the ignored local env before strict proof";
@@ -405,6 +408,12 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     completionBlockerFocusRows,
     completionBlockerFocusRowCount: completionBlockerFocusRows.length,
     completionBlockerFocusRowsValueFree: valueFreeRows(completionBlockerFocusRows),
+    releaseChannelPrivateEnvApplyPreflightCommand: releaseChannelApplyPrivateEnvPreflightCommand,
+    releaseChannelPrivateEnvApplyPreflightRole: releaseChannelApplyPrivateEnvPreflightRole,
+    releaseChannelPrivateEnvApplyPreflightBeforeApply:
+      releaseChannelApplyPrivateEnvPreflightCommand === "npm run release:channel-apply-private-env-preflight" &&
+      releaseChannelApplyPrivateEnvCommand === "npm run release:channel-apply-private-env",
+    releaseChannelPrivateEnvApplyPreflightValueRecorded: false,
     releaseChannelPrivateEnvApplyCommand: releaseChannelApplyPrivateEnvCommand,
     releaseChannelPrivateEnvApplyRole: releaseChannelApplyPrivateEnvRole,
     releaseChannelPrivateEnvApplyBeforeStrictProof:
@@ -511,6 +520,10 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     completionBlockerFocusRows,
     completionBlockerFocusRowCount: completionBlockerFocusRows.length,
     completionBlockerFocusRowsValueFree: valueFreeRows(completionBlockerFocusRows),
+    releaseChannelPrivateEnvApplyPreflightCommand: completionSummary.releaseChannelPrivateEnvApplyPreflightCommand,
+    releaseChannelPrivateEnvApplyPreflightRole: completionSummary.releaseChannelPrivateEnvApplyPreflightRole,
+    releaseChannelPrivateEnvApplyPreflightBeforeApply: completionSummary.releaseChannelPrivateEnvApplyPreflightBeforeApply,
+    releaseChannelPrivateEnvApplyPreflightValueRecorded: completionSummary.releaseChannelPrivateEnvApplyPreflightValueRecorded,
     releaseChannelPrivateEnvApplyCommand: completionSummary.releaseChannelPrivateEnvApplyCommand,
     releaseChannelPrivateEnvApplyRole: completionSummary.releaseChannelPrivateEnvApplyRole,
     releaseChannelPrivateEnvApplyBeforeStrictProof: completionSummary.releaseChannelPrivateEnvApplyBeforeStrictProof,
@@ -646,6 +659,8 @@ function buildMarkdown(report) {
 - Completion blocker action rows: ${report.completionSummary.completionBlockerActionRowCount}
 - Completion blocker focus receipt ready: ${readyLabel(report.completionSummary.completionBlockerFocusReceiptReady)}
 - Completion blocker focus rows: ${report.completionSummary.completionBlockerFocusRowCount}
+- Private env apply preflight command: \`${report.completionSummary.releaseChannelPrivateEnvApplyPreflightCommand}\`
+- Private env apply preflight before apply: ${readyLabel(report.completionSummary.releaseChannelPrivateEnvApplyPreflightBeforeApply)}
 - Private env apply command: \`${report.completionSummary.releaseChannelPrivateEnvApplyCommand}\`
 - Private env apply before strict proof: ${readyLabel(report.completionSummary.releaseChannelPrivateEnvApplyBeforeStrictProof)}
 - First proof after private edits: \`${report.completionSummary.releaseChannelFirstProofCommandAfterPrivateEdits}\`
@@ -836,6 +851,18 @@ function validateReport(report, markdown) {
     "release progress refresh summary should expose release-channel first proof command"
   );
   check(
+    report.completionSummary.releaseChannelPrivateEnvApplyPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand,
+    "release progress refresh summary should expose release-channel private env apply preflight command"
+  );
+  check(
+    report.completionSummary.releaseChannelPrivateEnvApplyPreflightBeforeApply === true,
+    "release progress refresh summary should place private env apply preflight before apply"
+  );
+  check(
+    report.completionSummary.releaseChannelPrivateEnvApplyPreflightValueRecorded === false,
+    "release progress refresh private env apply preflight command should be value-free"
+  );
+  check(
     report.completionSummary.releaseChannelPrivateEnvApplyCommand === releaseChannelApplyPrivateEnvCommand,
     "release progress refresh summary should expose release-channel private env apply command"
   );
@@ -850,6 +877,10 @@ function validateReport(report, markdown) {
   check(
     report.completionSummary.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits === "npm run release:private-edit-strict-proof",
     "release progress refresh summary should expose recommended private edit proof chain"
+  );
+  check(
+    report.releaseChannelPrivateEnvApplyPreflightCommand === report.completionSummary.releaseChannelPrivateEnvApplyPreflightCommand,
+    "release progress refresh alias should mirror private env apply preflight command"
   );
   check(
     report.releaseChannelPrivateEnvApplyCommand === report.completionSummary.releaseChannelPrivateEnvApplyCommand,
@@ -992,6 +1023,8 @@ console.log(`- Operator post-clearance next action: ${report.operatorCompletionB
 console.log(`- Completion blocker action receipt ready: ${report.completionBlockerActionReceiptReady ? "yes" : "no"}`);
 console.log(`- Completion blocker action rows: ${report.completionBlockerActionRowCount}`);
 console.log(`- Completion blocker focus rows: ${report.completionBlockerFocusRowCount}`);
+console.log(`- Private env apply preflight command: ${report.releaseChannelPrivateEnvApplyPreflightCommand}`);
+console.log(`- Private env apply preflight before apply: ${report.releaseChannelPrivateEnvApplyPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Private env apply command: ${report.releaseChannelPrivateEnvApplyCommand}`);
 console.log(`- Private env apply before strict proof: ${report.releaseChannelPrivateEnvApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);

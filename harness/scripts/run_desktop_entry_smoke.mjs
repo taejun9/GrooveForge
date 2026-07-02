@@ -166,7 +166,7 @@ function checkPackageScripts() {
       (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:packaged-project-io-smoke") &&
       (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:packaged-project-io-smoke") <
         (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:adhoc-sign-smoke"),
-    "package.json verify should run desktop:packaged-project-io-smoke after package smoke and before ad-hoc signing"
+    "package.json verify should run desktop:packaged-project-io-smoke after package smoke and before the dedicated hardened-runtime ad-hoc signing smoke"
   );
   check(
     (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:pkg-smoke") <

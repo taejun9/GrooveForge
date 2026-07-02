@@ -32,6 +32,7 @@ const refreshCommandsAfterSourceCheck = [
 ];
 const refreshCommands = [...refreshCommandsBeforeSourceCheck, ...refreshCommandsAfterSourceCheck];
 const recommendedPrivateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const releaseChannelMetadataKeys = [
   "GROOVEFORGE_DISTRIBUTION_CHANNEL",
@@ -1940,6 +1941,12 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentFirstBlocker: textValue(externalProofBundle.currentFirstBlocker),
     doctorFirstBlocker: textValue(releaseDoctor.currentActionFirstBlocker),
     currentOperatorAction: textValue(externalProofBundle.currentOperatorAction),
+    releaseChannelPrivateEnvApplyPreflightCommand: releaseChannelApplyPrivateEnvPreflightCommand,
+    releaseChannelPrivateEnvApplyPreflightRole: "verify operator-owned release-channel process env values before writing the ignored local env",
+    releaseChannelPrivateEnvApplyPreflightBeforeApply:
+      releaseChannelApplyPrivateEnvPreflightCommand === "npm run release:channel-apply-private-env-preflight" &&
+      releaseChannelApplyPrivateEnvCommand === "npm run release:channel-apply-private-env",
+    releaseChannelPrivateEnvApplyPreflightValueRecorded: false,
     releaseChannelPrivateEnvApplyCommand: releaseChannelApplyPrivateEnvCommand,
     releaseChannelPrivateEnvApplyRole: "apply operator-owned release-channel process env values into the ignored local env before strict proof",
     releaseChannelPrivateEnvApplyBeforeStrictProof:
@@ -3454,6 +3461,13 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.releaseChannelRecommendedOperatorProofCommandRole === "recommended strict-first proof chain after replacing the four private release-channel placeholders", "release current blocker should describe the strict proof chain role");
   check(report.releaseChannelRecommendedOperatorProofCommandValueRecorded === false, "release current blocker recommended operator proof command should not record values");
   check(report.releaseChannelPrivateEnvApplyCommand === releaseChannelApplyPrivateEnvCommand, "release current blocker should expose private env apply command");
+  check(report.releaseChannelPrivateEnvApplyPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release current blocker should expose private env apply preflight command");
+  check(
+    report.releaseChannelPrivateEnvApplyPreflightRole === "verify operator-owned release-channel process env values before writing the ignored local env",
+    "release current blocker should describe private env apply preflight role"
+  );
+  check(report.releaseChannelPrivateEnvApplyPreflightBeforeApply === true, "release current blocker should place private env apply preflight before apply");
+  check(report.releaseChannelPrivateEnvApplyPreflightValueRecorded === false, "release current blocker private env apply preflight command should not record values");
   check(
     report.releaseChannelPrivateEnvApplyRole === "apply operator-owned release-channel process env values into the ignored local env before strict proof",
     "release current blocker should describe private env apply role"
@@ -3530,6 +3544,8 @@ function buildMarkdown(report) {
     `- Current next command: \`${report.currentNextCommand}\``,
     `- Current first blocker: ${report.currentFirstBlocker}`,
     `- Doctor first blocker: ${report.doctorFirstBlocker}`,
+    `- Private env apply preflight command: \`${report.releaseChannelPrivateEnvApplyPreflightCommand}\``,
+    `- Private env apply preflight before apply: ${report.releaseChannelPrivateEnvApplyPreflightBeforeApply ? "yes" : "no"}`,
     `- Private env apply command: \`${report.releaseChannelPrivateEnvApplyCommand}\``,
     `- Private env apply before strict proof: ${report.releaseChannelPrivateEnvApplyBeforeStrictProof ? "yes" : "no"}`,
     `- Current env edit target: ${report.currentEnvEditTarget}`,
@@ -4362,6 +4378,8 @@ console.log(`- Refresh commands: ${report.refreshCommandCount}`);
 console.log(`- Current target: ${report.currentTarget}`);
 console.log(`- Current next command: ${report.currentNextCommand}`);
 console.log(`- Current first blocker: ${report.currentFirstBlocker}`);
+console.log(`- Private env apply preflight command: ${report.releaseChannelPrivateEnvApplyPreflightCommand}`);
+console.log(`- Private env apply preflight before apply: ${report.releaseChannelPrivateEnvApplyPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Private env apply command: ${report.releaseChannelPrivateEnvApplyCommand}`);
 console.log(`- Private env apply before strict proof: ${report.releaseChannelPrivateEnvApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);
