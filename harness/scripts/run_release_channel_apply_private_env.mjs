@@ -48,6 +48,11 @@ const releaseChannelMetadataKeys = [
   "GROOVEFORGE_RELEASE_NOTES_URL",
   "GROOVEFORGE_SUPPORT_URL"
 ];
+const privateEnvApplyPreflightCommand = "npm run release:channel-apply-private-env-preflight";
+const privateEnvApplyCommand = "npm run release:channel-apply-private-env";
+const guidedSetupFallbackCommand = "npm run release:channel-setup-wizard";
+const strictFirstProofCommand = "npm run release:channel-live-check-strict";
+const strictOperatorProofCommand = "npm run release:private-edit-strict-proof";
 const placeholderPattern = /^(|<[^>]+>|CHANGE_ME|REPLACE_ME|TODO|TBD|example|example-.+|your-.+|https:\/\/example\.com.*)$/i;
 const failures = [];
 
@@ -241,6 +246,57 @@ function buildPlanRows({ inputRows, existingEntries, filePath, forceOverwrite })
   });
 }
 
+function remediationForPlanRow(row, localEnvFileLoaded) {
+  if (localEnvFileLoaded !== true) {
+    return "create-ignored-env-scaffold";
+  }
+  if (row.inputPresent !== true) {
+    return "set-process-env";
+  }
+  if (row.inputPlaceholder === true) {
+    return "replace-process-env-placeholder";
+  }
+  if (row.inputShapeReady !== true) {
+    return "fix-process-env-shape";
+  }
+  if (row.skippedCurrent === true) {
+    return "already-current";
+  }
+  if (row.shouldApply === true) {
+    return "ready-to-apply";
+  }
+  return "review-input";
+}
+
+function nextCommandForRemediation(row, localEnvFileLoaded) {
+  if (localEnvFileLoaded !== true) {
+    return "npm run release:prepare-env";
+  }
+  if (row.inputPresent !== true || row.inputPlaceholder === true || row.inputShapeReady !== true) {
+    return privateEnvApplyPreflightCommand;
+  }
+  return privateEnvApplyCommand;
+}
+
+function buildPreflightRemediationRows({ planRows, localEnvFileLoaded }) {
+  return planRows.map((row) => ({
+    order: row.order,
+    key: row.key,
+    inputPresent: row.inputPresent,
+    inputPlaceholder: row.inputPlaceholder,
+    inputShapeReady: row.inputShapeReady,
+    expectedShape: row.expectedShape,
+    localEnvFileLoaded,
+    previousCurrentReady: row.previousCurrentReady,
+    remediation: remediationForPlanRow(row, localEnvFileLoaded),
+    nextCommand: nextCommandForRemediation(row, localEnvFileLoaded),
+    writeCommand: privateEnvApplyCommand,
+    guidedSetupFallbackCommand,
+    proofCommand: strictOperatorProofCommand,
+    valueRecorded: false
+  }));
+}
+
 function applyRowsToLines(lines, planRows, inputValues) {
   const nextLines = [...lines];
   let modified = false;
@@ -319,6 +375,15 @@ function formatAfterRows(rows) {
     .join("\n");
 }
 
+function formatPreflightRemediationRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.key)} | ${readyLabel(row.inputPresent)} | ${readyLabel(row.inputPlaceholder)} | ${readyLabel(row.inputShapeReady)} | ${escapeCell(row.expectedShape)} | ${readyLabel(row.localEnvFileLoaded)} | ${escapeCell(row.remediation)} | \`${escapeCell(row.nextCommand)}\` | \`${escapeCell(row.writeCommand)}\` | \`${escapeCell(row.proofCommand)}\` | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function buildMarkdown(report) {
   return `# ${appName} Release-Channel Private Env Apply
 
@@ -341,6 +406,9 @@ function buildMarkdown(report) {
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current required keys: ${report.currentRequiredKeyCount} (${report.currentRequiredKeySummary})
 - Current blocker after apply: ${report.currentFirstBlocker}
+- Preflight remediation rows: ${report.preflightRemediationRowCount}
+- Next write command: \`${report.nextWriteCommand}\`
+- Guided setup fallback command: \`${report.guidedSetupFallbackCommand}\`
 - First strict proof command: \`${report.firstStrictProofCommand}\`
 - Recommended operator proof chain: \`${report.recommendedOperatorProofCommand}\`
 - Private values recorded: no
@@ -356,6 +424,12 @@ function buildMarkdown(report) {
 |---:|---|---:|---:|---:|---:|---:|---:|---|---|---:|---:|
 ${formatPlanRows(report.applyPlanRows)}
 
+## Preflight Remediation Rows
+
+| order | key | input present | input placeholder | input shape ready | expected shape | local env loaded | remediation | next command | write command | proof command | value recorded |
+|---:|---|---:|---:|---:|---|---:|---|---|---|---|---:|
+${formatPreflightRemediationRows(report.preflightRemediationRows)}
+
 ## After Apply Rows
 
 | order | key | present | placeholder | shape ready | current ready | edit target | line | value recorded |
@@ -364,7 +438,7 @@ ${formatAfterRows(report.afterApplyRows)}
 
 ## Next Proof
 
-Run \`${report.reportCommand}\`${report.preflightOnly ? " first to verify process env readiness, then `npm run release:channel-apply-private-env` to write the ignored local env file." : " to write the ignored local env file."} Run \`${report.recommendedOperatorProofCommand}\` after the apply command reports 4/4 current-ready rows. The strict proof chain starts with \`${report.firstStrictProofCommand}\`, then runs the downstream post-edit proof, progress refresh, and private-value leak audit.
+Run \`${report.reportCommand}\`${report.preflightOnly ? ` first to verify process env readiness, then \`${report.nextWriteCommand}\` to write the ignored local env file.` : " to write the ignored local env file."} If interactive guidance is needed, run \`${report.guidedSetupFallbackCommand}\` as a separate fallback helper. Run \`${report.recommendedOperatorProofCommand}\` after the apply command reports 4/4 current-ready rows. The strict proof chain starts with \`${report.firstStrictProofCommand}\`, then runs the downstream post-edit proof, progress refresh, and private-value leak audit.
 
 ## Not Recorded
 
@@ -398,6 +472,7 @@ async function main() {
   const beforeLines = beforeText.length > 0 ? beforeText.split(/\r?\n/) : [];
   const beforeEntries = localEnvFileLoaded ? parseEnvEntries(beforeLines, filePath) : [];
   const planRows = buildPlanRows({ inputRows, existingEntries: beforeEntries, filePath, forceOverwrite: force });
+  const preflightRemediationRows = buildPreflightRemediationRows({ planRows, localEnvFileLoaded });
   const blockedRows = planRows.filter((row) => row.blocked === true);
   const applyAllowed = localEnvFileLoaded && blockedRows.length === 0;
   let afterLines = beforeLines;
@@ -479,11 +554,20 @@ async function main() {
     currentReadyKeys: afterRows.filter((row) => row.currentReady === true).map((row) => row.key),
     currentPlaceholderKeyCount: currentPlaceholderKeys.length,
     currentPlaceholderKeys,
+    preflightRemediationRows,
+    preflightRemediationRowCount: preflightRemediationRows.length,
+    preflightRemediationMissingInputCount: preflightRemediationRows.filter((row) => row.inputPresent !== true).length,
+    preflightRemediationPlaceholderInputCount: preflightRemediationRows.filter((row) => row.inputPlaceholder === true).length,
+    preflightRemediationInvalidShapeCount: preflightRemediationRows.filter((row) => row.inputPresent === true && row.inputPlaceholder === false && row.inputShapeReady !== true).length,
+    preflightRemediationReadyRowCount: preflightRemediationRows.filter((row) => row.remediation === "ready-to-apply" || row.remediation === "already-current").length,
     localEnvModified,
     realLocalEnvRead: resolvedLocalEnvRoot === root,
     realLocalEnvModified: resolvedLocalEnvRoot === root && localEnvModified === true,
-    firstStrictProofCommand: "npm run release:channel-live-check-strict",
-    recommendedOperatorProofCommand: "npm run release:private-edit-strict-proof",
+    currentOperatorFirstCommand: privateEnvApplyPreflightCommand,
+    nextWriteCommand: privateEnvApplyCommand,
+    guidedSetupFallbackCommand,
+    firstStrictProofCommand: strictFirstProofCommand,
+    recommendedOperatorProofCommand: strictOperatorProofCommand,
     currentBlockerCommand: "npm run release:current-blocker",
     hardGateCommand: "npm run release:external-check",
     currentFirstBlocker:
@@ -526,8 +610,14 @@ async function main() {
   check(report.currentRequiredKeyCount === 4, "release-channel private env apply should cover four metadata keys");
   check(report.inputKeyCount === 4, "release-channel private env apply should inspect four input keys");
   check(report.applyPlanRowCount === 4, "release-channel private env apply should create four plan rows");
+  check(report.preflightRemediationRowCount === 4, "release-channel private env apply should create four preflight remediation rows");
   check(report.afterApplyRowCount === 4 || report.localEnvFileLoaded === false, "release-channel private env apply should inspect four after rows when local env exists");
   check(report.applyPlanRows.every((row) => row.valueRecorded === false), "release-channel private env apply plan rows should be value-free");
+  check(report.preflightRemediationRows.every((row) => row.valueRecorded === false), "release-channel private env apply preflight remediation rows should be value-free");
+  check(report.preflightRemediationRows.every((row) => row.guidedSetupFallbackCommand === guidedSetupFallbackCommand), "release-channel private env apply should keep guided setup as a fallback command");
+  check(report.currentOperatorFirstCommand === privateEnvApplyPreflightCommand, "release-channel private env apply should keep preflight as the current first operator command");
+  check(report.nextWriteCommand === privateEnvApplyCommand, "release-channel private env apply should expose the private env write command");
+  check(report.guidedSetupFallbackCommand === guidedSetupFallbackCommand, "release-channel private env apply should expose the guided setup fallback command separately");
   check(report.afterApplyRows.every((row) => row.valueRecorded === false), "release-channel private env apply after rows should be value-free");
   check(report.privateValuesRecorded === false, "release-channel private env apply should not record private values");
   check(report.localEnvValueRecorded === false, "release-channel private env apply should not record local env values");
@@ -539,8 +629,8 @@ async function main() {
   check(report.notarySubmissionAttempted === false, "release-channel private env apply should not submit notarization");
   check(report.signingAttempted === false, "release-channel private env apply should not sign artifacts");
   check(report.releaseGateClaimedExternalDistribution === false, "release-channel private env apply should not claim external distribution");
-  check(report.firstStrictProofCommand === "npm run release:channel-live-check-strict", "release-channel private env apply should expose strict first proof");
-  check(report.recommendedOperatorProofCommand === "npm run release:private-edit-strict-proof", "release-channel private env apply should expose strict proof chain");
+  check(report.firstStrictProofCommand === strictFirstProofCommand, "release-channel private env apply should expose strict first proof");
+  check(report.recommendedOperatorProofCommand === strictOperatorProofCommand, "release-channel private env apply should expose strict proof chain");
   if (syntheticSuccessSmoke) {
     check(report.localEnvRootOverrideEnabled === true, "release-channel apply success smoke should use a local env root override");
     check(report.realLocalEnvRead === false, "release-channel apply success smoke should not read the real local env");
@@ -578,6 +668,12 @@ async function main() {
     console.error(`- Blocked rows: ${report.blockedKeyCount}`);
     console.error(`- Current ready rows: ${report.currentReadyKeyCount}/${report.currentRequiredKeyCount}`);
     console.error(`- Current env edit target: ${report.currentEnvEditTarget}`);
+    console.error(`- Preflight remediation rows: ${report.preflightRemediationRowCount}`);
+    console.error(`- Missing input rows: ${report.preflightRemediationMissingInputCount}`);
+    console.error(`- Placeholder input rows: ${report.preflightRemediationPlaceholderInputCount}`);
+    console.error(`- Shape-invalid input rows: ${report.preflightRemediationInvalidShapeCount}`);
+    console.error(`- Next write command: ${report.nextWriteCommand}`);
+    console.error(`- Guided setup fallback: ${report.guidedSetupFallbackCommand}`);
     console.error(`- Next proof after apply: ${report.recommendedOperatorProofCommand}`);
     console.error("- Private values recorded: no");
     console.error("- Network: no distribution channel probe, release upload, Apple notary submission, or signing attempted");
@@ -605,6 +701,12 @@ async function main() {
   console.log(`- Skipped current rows: ${report.skippedCurrentKeyCount}`);
   console.log(`- Current ready rows: ${report.currentReadyKeyCount}/${report.currentRequiredKeyCount}`);
   console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);
+  console.log(`- Preflight remediation rows: ${report.preflightRemediationRowCount}`);
+  console.log(`- Missing input rows: ${report.preflightRemediationMissingInputCount}`);
+  console.log(`- Placeholder input rows: ${report.preflightRemediationPlaceholderInputCount}`);
+  console.log(`- Shape-invalid input rows: ${report.preflightRemediationInvalidShapeCount}`);
+  console.log(`- Next write command: ${report.nextWriteCommand}`);
+  console.log(`- Guided setup fallback: ${report.guidedSetupFallbackCommand}`);
   console.log(`- Next proof after apply: ${report.recommendedOperatorProofCommand}`);
   console.log("- Private values recorded: no");
   console.log("- Network: no distribution channel probe, release upload, Apple notary submission, or signing attempted");
