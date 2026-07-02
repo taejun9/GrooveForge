@@ -95,6 +95,7 @@ function reportIsValueFree(report) {
     report.signingAttempted === false &&
     report.releaseGateClaimedExternalDistribution === false &&
     report.valueRecorded === false &&
+    rowsValueFree(report.processEnvInputChecklistRows) &&
     rowsValueFree(report.applyPlanRows) &&
     rowsValueFree(report.preflightRemediationRows) &&
     rowsValueFree(report.afterApplyRows)
@@ -120,6 +121,15 @@ function formatRows(rows) {
     .join("\n");
 }
 
+function formatProcessEnvInputRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.inputSource)} | ${readyLabel(row.inputPresent)} | ${readyLabel(row.inputPlaceholder)} | ${readyLabel(row.inputShapeReady)} | ${escapeCell(row.expectedShape)} | \`${escapeCell(row.preflightCommand)}\` | \`${escapeCell(row.writeCommand)}\` | \`${escapeCell(row.proofCommand)}\` | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function buildMarkdown(report) {
   return `# ${appName} Release-Channel Preflight Blocked Smoke
 
@@ -135,6 +145,7 @@ function buildMarkdown(report) {
 - Local env modified: ${readyLabel(report.localEnvModified)}
 - Real local env modified: ${readyLabel(report.realLocalEnvModified)}
 - Missing process env inputs: ${report.missingInputCount}/${report.requiredInputCount}
+- Process env checklist rows: ${report.processEnvInputChecklistRowCount}
 - Blocked rows: ${report.blockedKeyCount}
 - Preflight remediation rows: ${report.preflightRemediationRowCount}
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
@@ -147,6 +158,12 @@ function buildMarkdown(report) {
 - Apple notary submission attempted: no
 - Signing attempted: no
 - External distribution claimed: no
+
+## Process Env Input Checklist
+
+| order | key | input source | input present | input placeholder | input shape ready | expected shape | preflight command | write command | proof command | value recorded |
+|---:|---|---|---:|---:|---:|---|---|---|---|---:|
+${formatProcessEnvInputRows(report.processEnvInputChecklistRows)}
 
 ## Remediation Rows
 
@@ -200,6 +217,13 @@ check(report.appliedKeyCount === 0, "blocked preflight should apply zero keys");
 check(report.inputMissingKeys?.length === releaseChannelMetadataKeys.length, "blocked preflight should report four missing process env inputs");
 check(report.preflightRemediationMissingInputCount === releaseChannelMetadataKeys.length, "blocked preflight should include four missing-input remediation rows");
 check(report.preflightRemediationRowCount === releaseChannelMetadataKeys.length, "blocked preflight should include four preflight remediation rows");
+check(report.processEnvInputChecklistRowCount === releaseChannelMetadataKeys.length, "blocked preflight should include four process env input checklist rows");
+check(report.processEnvInputChecklistRows.every((row) => row.inputSource === "process.env"), "blocked preflight checklist rows should identify process.env as the input source");
+check(report.processEnvInputChecklistRows.every((row) => row.inputPresent === false), "blocked preflight checklist rows should show missing process env inputs");
+check(report.processEnvInputChecklistRows.every((row) => row.valueRecorded === false), "blocked preflight checklist rows should be value-free");
+check(report.processEnvInputChecklistRows.every((row) => row.preflightCommand === preflightCommand), "blocked preflight checklist rows should include the preflight command");
+check(report.processEnvInputChecklistRows.every((row) => row.writeCommand === applyCommand), "blocked preflight checklist rows should include the write command");
+check(report.processEnvInputChecklistRows.every((row) => row.proofCommand === strictProofCommand), "blocked preflight checklist rows should include the strict proof command");
 check(
   report.preflightRemediationRows.every((row) => [preflightCommand, prepareEnvCommand].includes(row.nextCommand)),
   "blocked preflight remediation rows should point to prepare-env when the ignored env is missing or preflight when process env inputs are missing"
@@ -235,6 +259,8 @@ const blockedReport = {
   requiredInputCount: releaseChannelMetadataKeys.length,
   missingInputCount: report.inputMissingKeys.length,
   missingInputKeys: report.inputMissingKeys,
+  processEnvInputChecklistRowCount: report.processEnvInputChecklistRowCount,
+  processEnvInputChecklistRows: report.processEnvInputChecklistRows,
   blockedKeyCount: report.blockedKeyCount,
   preflightRemediationRowCount: report.preflightRemediationRowCount,
   preflightRemediationRows: report.preflightRemediationRows,
@@ -288,6 +314,7 @@ console.log(`- Local env file loaded: ${report.localEnvFileLoaded ? "yes" : "no"
 console.log("- Local env modified: no");
 console.log("- Real local env modified: no");
 console.log(`- Missing process env inputs: ${report.inputMissingKeys.length}/${releaseChannelMetadataKeys.length}`);
+console.log(`- Process env checklist rows: ${report.processEnvInputChecklistRowCount}`);
 console.log(`- Preflight remediation rows: ${report.preflightRemediationRowCount}`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
 console.log(`- Next write command: ${report.nextWriteCommand}`);

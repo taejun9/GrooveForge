@@ -297,6 +297,23 @@ function buildPreflightRemediationRows({ planRows, localEnvFileLoaded }) {
   }));
 }
 
+function buildProcessEnvInputChecklistRows(inputRows) {
+  return inputRows.map((row) => ({
+    order: row.order,
+    key: row.key,
+    inputSource: "process.env",
+    inputPresent: row.inputPresent,
+    inputPlaceholder: row.inputPlaceholder,
+    inputShapeReady: row.inputShapeReady,
+    expectedShape: row.expectedShape,
+    preflightCommand: privateEnvApplyPreflightCommand,
+    writeCommand: privateEnvApplyCommand,
+    guidedSetupFallbackCommand,
+    proofCommand: strictOperatorProofCommand,
+    valueRecorded: false
+  }));
+}
+
 function applyRowsToLines(lines, planRows, inputValues) {
   const nextLines = [...lines];
   let modified = false;
@@ -384,6 +401,15 @@ function formatPreflightRemediationRows(rows) {
     .join("\n");
 }
 
+function formatProcessEnvInputChecklistRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.inputSource)} | ${readyLabel(row.inputPresent)} | ${readyLabel(row.inputPlaceholder)} | ${readyLabel(row.inputShapeReady)} | ${escapeCell(row.expectedShape)} | \`${escapeCell(row.preflightCommand)}\` | \`${escapeCell(row.writeCommand)}\` | \`${escapeCell(row.proofCommand)}\` | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function buildMarkdown(report) {
   return `# ${appName} Release-Channel Private Env Apply
 
@@ -406,6 +432,7 @@ function buildMarkdown(report) {
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current required keys: ${report.currentRequiredKeyCount} (${report.currentRequiredKeySummary})
 - Current blocker after apply: ${report.currentFirstBlocker}
+- Process env input checklist rows: ${report.processEnvInputChecklistRowCount}
 - Preflight remediation rows: ${report.preflightRemediationRowCount}
 - Next write command: \`${report.nextWriteCommand}\`
 - Guided setup fallback command: \`${report.guidedSetupFallbackCommand}\`
@@ -417,6 +444,12 @@ function buildMarkdown(report) {
 - Apple notary submission attempted: no
 - Signing attempted: no
 - External distribution claimed: no
+
+## Process Env Input Checklist
+
+| order | key | input source | input present | input placeholder | input shape ready | expected shape | preflight command | write command | proof command | value recorded |
+|---:|---|---|---:|---:|---:|---|---|---|---|---:|
+${formatProcessEnvInputChecklistRows(report.processEnvInputChecklistRows)}
 
 ## Apply Plan Rows
 
@@ -466,6 +499,7 @@ async function writeReport(report, privateValueCandidates) {
 async function main() {
   const filePath = localEnvCandidatePath();
   const inputRows = buildInputRows();
+  const processEnvInputChecklistRows = buildProcessEnvInputChecklistRows(inputRows);
   const inputValues = new Map(releaseChannelMetadataKeys.map((key) => [key, process.env[key]?.trim() ?? ""]));
   const localEnvFileLoaded = existsSync(filePath);
   const beforeText = localEnvFileLoaded ? await readFile(filePath, "utf8") : "";
@@ -538,6 +572,14 @@ async function main() {
     inputMissingKeys: inputRows.filter((row) => row.inputPresent !== true).map((row) => row.key),
     inputPlaceholderKeys: inputRows.filter((row) => row.inputPlaceholder === true).map((row) => row.key),
     inputShapeInvalidKeys: inputRows.filter((row) => row.inputPresent === true && row.inputPlaceholder === false && row.inputShapeReady !== true).map((row) => row.key),
+    processEnvInputChecklistRows,
+    processEnvInputChecklistRowCount: processEnvInputChecklistRows.length,
+    processEnvInputChecklistReadyCount: processEnvInputChecklistRows.filter((row) => row.inputShapeReady === true).length,
+    processEnvInputChecklistMissingCount: processEnvInputChecklistRows.filter((row) => row.inputPresent !== true).length,
+    processEnvInputChecklistPlaceholderCount: processEnvInputChecklistRows.filter((row) => row.inputPlaceholder === true).length,
+    processEnvInputChecklistInvalidShapeCount: processEnvInputChecklistRows.filter(
+      (row) => row.inputPresent === true && row.inputPlaceholder === false && row.inputShapeReady !== true
+    ).length,
     applyPlanRows: planRows.map(({ lineIndex, ...row }) => row),
     applyPlanRowCount: planRows.length,
     wouldApplyKeyCount: wouldApplyRows.length,
@@ -609,6 +651,12 @@ async function main() {
   check(notClaimedSummary.startsWith("Not claimed:"), "release-channel private env apply should expose a not-claimed summary");
   check(report.currentRequiredKeyCount === 4, "release-channel private env apply should cover four metadata keys");
   check(report.inputKeyCount === 4, "release-channel private env apply should inspect four input keys");
+  check(report.processEnvInputChecklistRowCount === 4, "release-channel private env apply should create four process env input checklist rows");
+  check(report.processEnvInputChecklistRows.every((row) => row.inputSource === "process.env"), "release-channel private env apply checklist rows should identify process.env as the input source");
+  check(report.processEnvInputChecklistRows.every((row) => row.valueRecorded === false), "release-channel private env apply checklist rows should be value-free");
+  check(report.processEnvInputChecklistRows.every((row) => row.preflightCommand === privateEnvApplyPreflightCommand), "release-channel private env apply checklist rows should carry the preflight command");
+  check(report.processEnvInputChecklistRows.every((row) => row.writeCommand === privateEnvApplyCommand), "release-channel private env apply checklist rows should carry the write command");
+  check(report.processEnvInputChecklistRows.every((row) => row.proofCommand === strictOperatorProofCommand), "release-channel private env apply checklist rows should carry the proof command");
   check(report.applyPlanRowCount === 4, "release-channel private env apply should create four plan rows");
   check(report.preflightRemediationRowCount === 4, "release-channel private env apply should create four preflight remediation rows");
   check(report.afterApplyRowCount === 4 || report.localEnvFileLoaded === false, "release-channel private env apply should inspect four after rows when local env exists");
@@ -668,6 +716,7 @@ async function main() {
     console.error(`- Blocked rows: ${report.blockedKeyCount}`);
     console.error(`- Current ready rows: ${report.currentReadyKeyCount}/${report.currentRequiredKeyCount}`);
     console.error(`- Current env edit target: ${report.currentEnvEditTarget}`);
+    console.error(`- Process env input checklist rows: ${report.processEnvInputChecklistRowCount}`);
     console.error(`- Preflight remediation rows: ${report.preflightRemediationRowCount}`);
     console.error(`- Missing input rows: ${report.preflightRemediationMissingInputCount}`);
     console.error(`- Placeholder input rows: ${report.preflightRemediationPlaceholderInputCount}`);
@@ -701,6 +750,7 @@ async function main() {
   console.log(`- Skipped current rows: ${report.skippedCurrentKeyCount}`);
   console.log(`- Current ready rows: ${report.currentReadyKeyCount}/${report.currentRequiredKeyCount}`);
   console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);
+  console.log(`- Process env input checklist rows: ${report.processEnvInputChecklistRowCount}`);
   console.log(`- Preflight remediation rows: ${report.preflightRemediationRowCount}`);
   console.log(`- Missing input rows: ${report.preflightRemediationMissingInputCount}`);
   console.log(`- Placeholder input rows: ${report.preflightRemediationPlaceholderInputCount}`);
