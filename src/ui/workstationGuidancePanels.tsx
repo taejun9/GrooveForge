@@ -333,22 +333,28 @@ export function createAudienceSessionQuickActions({
   onSelectAudience: (row: AudienceSessionReadoutRow) => void;
   summary: AudienceSessionReadoutSummary;
 }): QuickAction[] {
-  return summary.rows.map((row) => ({
-    id: `audience-session-enter-${row.id}`,
-    title: `${row.actionLabel}: ${row.label}`,
-    detail: [
-      `Audience Session ${row.label}`,
-      `Route ${row.actionDetail}`,
-      `Readiness ${row.status}: ${row.value}`,
-      `Context ${row.detail}`,
-      `Next ${row.nextCheck}`,
-      "Visible Audience Session action unchanged"
-    ].join(" / "),
-    group: "Project",
-    keywords: `audience session readout enter guided studio beginner first-time composer professional producer ${row.id} ${row.label} ${row.actionLabel} ${row.actionDetail} ${row.status} ${row.value} ${row.detail} ${row.nextCheck} direct beat workstation sample free`,
-    resultTargetId: row.id,
-    run: () => onSelectAudience(row)
-  }));
+  return summary.rows.map((row) => {
+    const routeKeywords =
+      row.id === "beginner"
+        ? "guide guided beginner first time first-time composer new composer first beat path"
+        : "guide studio professional producer pro producer scan review queue export preflight";
+    return {
+      id: `audience-session-enter-${row.id}`,
+      title: `${row.actionLabel}: ${row.label}`,
+      detail: [
+        `Audience Session ${row.label}`,
+        `Route ${row.actionDetail}`,
+        `Readiness ${row.status}: ${row.value}`,
+        `Context ${row.detail}`,
+        `Next ${row.nextCheck}`,
+        "Visible Audience Session action unchanged"
+      ].join(" / "),
+      group: "Project",
+      keywords: `audience session readout enter ${routeKeywords} ${row.id} ${row.label} ${row.actionLabel} ${row.actionDetail} ${row.status} ${row.value} ${row.detail} ${row.nextCheck} direct beat workstation sample free`,
+      resultTargetId: row.id,
+      run: () => onSelectAudience(row)
+    };
+  });
 }
 
 export function ReferenceAlignmentReadout({

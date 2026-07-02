@@ -351,7 +351,7 @@ export function quickActionMatchesQuery(action: QuickAction, query: string): boo
     return true;
   }
 
-  const terms = normalizedQuery.split(/\s+/);
+  const terms = normalizedQuery.split(/[^a-z0-9]+/).filter(Boolean);
   const tokens = quickActionSearchTokens(action);
   return terms.every((term) => tokens.some((token) => token.startsWith(term)));
 }
