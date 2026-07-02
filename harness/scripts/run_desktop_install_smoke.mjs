@@ -21,7 +21,7 @@ const installedApp = path.join(installRoot, `${appName}.app`);
 const installedExecutable = path.join(installedApp, "Contents", "MacOS", appName);
 const installedAppRoot = path.join(installedApp, "Contents", "Resources", "app");
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
-const timeoutMs = 120000;
+const timeoutMs = 210000;
 const failures = [];
 
 function check(condition, message) {

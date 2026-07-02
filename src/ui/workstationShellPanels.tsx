@@ -2538,6 +2538,10 @@ export function QuickActions({
     return null;
   }
 
+  const trimmedQuery = query.trim();
+  const visibleActionLimit = trimmedQuery.length > 0 ? 80 : 48;
+  const visibleActions = actions.slice(0, visibleActionLimit);
+  const hiddenActionCount = Math.max(0, actions.length - visibleActions.length);
   const firstRunnableAction = actions.find((action) => !action.disabled);
   const spotlight = createQuickActionSpotlightSummary(actions, firstRunnableAction, scope, scopeOptions, query);
   const searchRecovery = createQuickActionSearchRecovery(query, scope, scopeOptions, actions.length);
@@ -2694,7 +2698,9 @@ export function QuickActions({
           ))}
         </div>
         <div className="quick-actions-count" data-testid="quick-actions-count">
-          {actions.length} shown / {scopeOptions.find((option) => option.id === scope)?.count ?? 0} matching
+          {visibleActions.length} shown / {actions.length} result{actions.length === 1 ? "" : "s"} /{" "}
+          {scopeOptions.find((option) => option.id === scope)?.count ?? 0} matching
+          {hiddenActionCount > 0 ? ` / ${hiddenActionCount} more after search or scope filter` : ""}
         </div>
         {searchResult && <QuickActionSearchResultStrip result={searchResult} />}
         {searchHintResult && <QuickActionSearchHintResultStrip result={searchHintResult} />}
@@ -3077,7 +3083,7 @@ export function QuickActions({
               <span>No matching actions</span>
             </div>
           ) : (
-            actions.map((action) => {
+            visibleActions.map((action) => {
               const pinned = pinnedActionIds.includes(action.id);
               return (
                 <div className={`quick-action-row ${pinned ? "pinned" : ""}`} key={action.id}>

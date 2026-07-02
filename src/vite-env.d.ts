@@ -44,13 +44,39 @@ type MIDIOptions = {
   software?: boolean;
 };
 
+type GrooveforgeLaunchSmokeRouteEvidence = {
+  actionPresent: boolean;
+  countText: string;
+  resultMetricValue: string;
+  resultNextCheck: string;
+  resultStatus: string;
+  resultTitle: string;
+  scopeCountText: string;
+  searchMetricValue: string;
+  searchNextCheck: string;
+  spotlightAction: string;
+  spotlightTitle: string;
+};
+
+type GrooveforgeLaunchSmokePaletteEvidence = {
+  guided: GrooveforgeLaunchSmokeRouteEvidence;
+  opened: boolean;
+  producer: GrooveforgeLaunchSmokeRouteEvidence;
+  resultPresent: boolean;
+  searchPresent: boolean;
+};
+
 interface Window {
   grooveforge?: {
     platform: NodeJS.Platform;
     appKind: "desktop";
+    launchSmoke?: boolean;
     saveProject?: (contents: string, defaultName: string) => Promise<{ canceled: boolean; filePath?: string }>;
     openProject?: () => Promise<{ canceled: boolean; filePath?: string; contents?: string }>;
     onMenuCommand?: (callback: (command: NativeMenuCommand) => void) => () => void;
+  };
+  __grooveforgeLaunchSmoke?: {
+    collectAudienceSessionQuickActionEvidence: () => GrooveforgeLaunchSmokePaletteEvidence;
   };
   webkitAudioContext?: typeof AudioContext;
 }

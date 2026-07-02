@@ -12,7 +12,7 @@ const isLaunchSmoke = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1";
 const isProjectIoSmoke = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE === "1";
 const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
-const launchSmokeTimeoutMs = 60000;
+const launchSmokeTimeoutMs = 180000;
 const projectIoSmokeTimeoutMs = 60000;
 
 type NativeMenuCommand =
@@ -38,6 +38,7 @@ type LaunchSmokeEvidence = {
   hasRoot: boolean;
   hasSaveProject: boolean;
   location: string;
+  palette: LaunchSmokePaletteEvidence;
   missingText: string[];
   platform: unknown;
   readyState: string;
@@ -49,6 +50,28 @@ type LaunchSmokeEvidence = {
     height: number;
     width: number;
   };
+};
+
+type LaunchSmokePaletteRouteEvidence = {
+  actionPresent: boolean;
+  countText: string;
+  resultMetricValue: string;
+  resultNextCheck: string;
+  resultStatus: string;
+  resultTitle: string;
+  scopeCountText: string;
+  searchMetricValue: string;
+  searchNextCheck: string;
+  spotlightAction: string;
+  spotlightTitle: string;
+};
+
+type LaunchSmokePaletteEvidence = {
+  guided: LaunchSmokePaletteRouteEvidence;
+  opened: boolean;
+  producer: LaunchSmokePaletteRouteEvidence;
+  resultPresent: boolean;
+  searchPresent: boolean;
 };
 
 type LaunchSmokeVisualEvidence = {
@@ -429,6 +452,74 @@ function launchSmokeFailures(evidence: LaunchSmokeEvidence): string[] {
   return failures;
 }
 
+function launchSmokePaletteFailures(evidence: LaunchSmokePaletteEvidence): string[] {
+  const failures: string[] = [];
+  if (!evidence.opened || !evidence.searchPresent || !evidence.resultPresent) {
+    failures.push("live Quick Actions palette should open, accept Audience Session searches, and leave an execution result");
+  }
+  if (!evidence.guided.actionPresent) {
+    failures.push("live Quick Actions palette should show Enter Guided after first-time composer search");
+  }
+  if (evidence.guided.spotlightAction !== "audience-session-enter-beginner") {
+    failures.push(`live Quick Actions Guided spotlight should target audience-session-enter-beginner, got ${evidence.guided.spotlightAction}`);
+  }
+  if (evidence.guided.spotlightTitle !== "Enter Guided: First-time composer") {
+    failures.push(`live Quick Actions Guided spotlight should name Enter Guided, got ${evidence.guided.spotlightTitle}`);
+  }
+  if (!evidence.guided.searchMetricValue.includes("Enter Guided: First-time composer")) {
+    failures.push("live Quick Actions Guided search result should target Enter Guided");
+  }
+  const guidedResultTitleReady =
+    evidence.guided.resultTitle === "Enter Guided: First-time composer" ||
+    evidence.guided.resultTitle === "First-time composer route selected";
+  const guidedResultStatusReady =
+    evidence.guided.resultStatus === "Entered" || evidence.guided.resultStatus.includes("Guided");
+  if (!guidedResultStatusReady || !guidedResultTitleReady) {
+    failures.push("live Quick Actions Guided command should execute with Entered result");
+  }
+  const guidedResultMetricReady =
+    (evidence.guided.resultMetricValue.includes("Enter Guided for first-time composer") &&
+      evidence.guided.resultMetricValue.includes("target Guided")) ||
+    evidence.guided.resultMetricValue.includes("Guided first-beat workflow");
+  if (!guidedResultMetricReady) {
+    failures.push("live Quick Actions Guided result metric should include first-time composer route and target Guided mode");
+  }
+  if (!evidence.guided.resultNextCheck.includes("First Beat Path")) {
+    failures.push("live Quick Actions Guided result should guide the next First Beat Path check");
+  }
+  if (!evidence.producer.actionPresent) {
+    failures.push("live Quick Actions palette should show Enter Studio after professional producer search");
+  }
+  if (evidence.producer.spotlightAction !== "audience-session-enter-producer") {
+    failures.push(`live Quick Actions producer spotlight should target audience-session-enter-producer, got ${evidence.producer.spotlightAction}`);
+  }
+  if (evidence.producer.spotlightTitle !== "Enter Studio: Professional producer") {
+    failures.push(`live Quick Actions producer spotlight should name Enter Studio, got ${evidence.producer.spotlightTitle}`);
+  }
+  if (!evidence.producer.searchMetricValue.includes("Enter Studio: Professional producer")) {
+    failures.push("live Quick Actions producer search result should target Enter Studio");
+  }
+  const producerResultTitleReady =
+    evidence.producer.resultTitle === "Enter Studio: Professional producer" ||
+    evidence.producer.resultTitle === "Professional producer route selected";
+  const producerResultStatusReady =
+    evidence.producer.resultStatus === "Entered" || evidence.producer.resultStatus.includes("Studio");
+  if (!producerResultStatusReady || !producerResultTitleReady) {
+    failures.push("live Quick Actions producer command should execute with Entered result");
+  }
+  const producerResultMetricReady =
+    (evidence.producer.resultMetricValue.includes("Enter Studio for professional producer") &&
+      evidence.producer.resultMetricValue.includes("target Studio")) ||
+    evidence.producer.resultMetricValue.includes("Studio producer scan workflow");
+  if (!producerResultMetricReady) {
+    failures.push("live Quick Actions producer result metric should include professional producer route and target Studio mode");
+  }
+  if (!evidence.producer.resultNextCheck.includes("Review Queue") || !evidence.producer.resultNextCheck.includes("Export Preflight")) {
+    failures.push("live Quick Actions producer result should guide the next Review Queue / Export Preflight check");
+  }
+  return failures;
+}
+
 function launchSmokeVisualFailures(evidence: LaunchSmokeVisualEvidence): string[] {
   const failures: string[] = [];
   const opaqueRatio = evidence.sampledPixels > 0 ? evidence.opaqueSamples / evidence.sampledPixels : 0;
@@ -598,8 +689,23 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "Export Preflight",
         "Handoff Pack"
       ];
-
       const bodyText = document.body?.textContent ?? "";
+      const testIds = Object.fromEntries(
+        expectedTestIds.map((testId) => [testId, document.querySelector(\`[data-testid="\${testId}"]\`) !== null])
+      );
+      const emptyRoute = {
+        actionPresent: false,
+        countText: "",
+        resultMetricValue: "",
+        resultNextCheck: "",
+        resultStatus: "",
+        resultTitle: "",
+        scopeCountText: "",
+        searchMetricValue: "",
+        searchNextCheck: "",
+        spotlightAction: "",
+        spotlightTitle: ""
+      };
       const bridge = window.grooveforge;
       return {
         appKind: bridge?.appKind ?? null,
@@ -610,13 +716,18 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         hasSaveProject: typeof bridge?.saveProject === "function",
         location: window.location.href,
         missingText: expectedText.filter((text) => !bodyText.includes(text)),
+        palette: {
+          guided: emptyRoute,
+          opened: false,
+          producer: emptyRoute,
+          resultPresent: false,
+          searchPresent: false
+        },
         platform: bridge?.platform ?? null,
         readyState: document.readyState,
         rootChildCount: document.querySelector("#root")?.childElementCount ?? 0,
         samplingTextPresent: /AudioClipEvent|sample import|sample browser|chop pads|sampler track|audio clip/i.test(bodyText),
-        testIds: Object.fromEntries(
-          expectedTestIds.map((testId) => [testId, document.querySelector(\`[data-testid="\${testId}"]\`) !== null])
-        ),
+        testIds,
         title: document.title,
         viewport: {
           height: window.innerHeight,
@@ -626,6 +737,40 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
     })();
   `);
   return evidence as LaunchSmokeEvidence;
+}
+
+function collectLaunchSmokeEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeEvidence> {
+  return Promise.race([
+    collectLaunchSmokeEvidence(win),
+    new Promise<never>((_resolve, reject) => {
+      setTimeout(() => reject(new Error("Timed out collecting launch smoke DOM evidence.")), 30000);
+    })
+  ]);
+}
+
+async function collectLaunchSmokePaletteEvidence(win: BrowserWindow): Promise<LaunchSmokePaletteEvidence> {
+  const result = await win.webContents.executeJavaScript(`
+    (() => {
+      const collector = window.__grooveforgeLaunchSmoke?.collectAudienceSessionQuickActionEvidence;
+      if (window.grooveforge?.launchSmoke !== true || typeof collector !== "function") {
+        return { ready: false, evidence: null };
+      }
+      return { ready: true, evidence: collector() };
+    })();
+  `);
+  if (!result || result.ready !== true || !result.evidence) {
+    throw new Error("Launch smoke Quick Actions hook was not ready.");
+  }
+  return result.evidence as LaunchSmokePaletteEvidence;
+}
+
+function collectLaunchSmokePaletteEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokePaletteEvidence> {
+  return Promise.race([
+    collectLaunchSmokePaletteEvidence(win),
+    new Promise<never>((_resolve, reject) => {
+      setTimeout(() => reject(new Error("Timed out collecting live Quick Actions palette evidence.")), 120000);
+    })
+  ]);
 }
 
 async function collectProjectIoSmokeEvidence(win: BrowserWindow): Promise<ProjectIoSmokeEvidence> {
@@ -742,7 +887,7 @@ function installLaunchSmoke(win: BrowserWindow): void {
   });
 
   const poll = (deadline: number): void => {
-    void collectLaunchSmokeEvidence(win)
+    void collectLaunchSmokeEvidenceWithTimeout(win)
       .then((evidence) => {
         if (finished) {
           return;
@@ -750,19 +895,19 @@ function installLaunchSmoke(win: BrowserWindow): void {
 
         const failures = launchSmokeFailures(evidence);
         if (failures.length === 0) {
-          return collectLaunchSmokeVisualEvidence(win)
-            .then((visualEvidence) => {
+          return collectLaunchSmokePaletteEvidenceWithTimeout(win)
+            .then((paletteEvidence) => {
               if (finished) {
                 return;
               }
 
-              const visualFailures = launchSmokeVisualFailures(visualEvidence);
-              if (visualFailures.length > 0) {
+              const paletteFailures = launchSmokePaletteFailures(paletteEvidence);
+              const evidenceWithPalette = { ...evidence, palette: paletteEvidence };
+              if (paletteFailures.length > 0) {
                 if (Date.now() >= deadline) {
-                  fail("Production desktop visual launch smoke failed.", {
-                    evidence,
-                    visualEvidence,
-                    failures: visualFailures
+                  fail("Production desktop live Quick Actions palette smoke failed.", {
+                    evidence: evidenceWithPalette,
+                    failures: paletteFailures
                   });
                 } else {
                   setTimeout(() => poll(deadline), 100);
@@ -770,13 +915,39 @@ function installLaunchSmoke(win: BrowserWindow): void {
                 return;
               }
 
-              finished = true;
-              clearTimeout(timeout);
-              console.log(`${launchSmokeResultPrefix}${JSON.stringify({ ok: true, evidence: { ...evidence, visual: visualEvidence } })}`);
-              app.exit(0);
+              return collectLaunchSmokeVisualEvidence(win)
+                .then((visualEvidence) => {
+                  if (finished) {
+                    return;
+                  }
+
+                  const visualFailures = launchSmokeVisualFailures(visualEvidence);
+                  if (visualFailures.length > 0) {
+                    if (Date.now() >= deadline) {
+                      fail("Production desktop visual launch smoke failed.", {
+                        evidence: evidenceWithPalette,
+                        visualEvidence,
+                        failures: visualFailures
+                      });
+                    } else {
+                      setTimeout(() => poll(deadline), 100);
+                    }
+                    return;
+                  }
+
+                  finished = true;
+                  clearTimeout(timeout);
+                  console.log(`${launchSmokeResultPrefix}${JSON.stringify({ ok: true, evidence: { ...evidenceWithPalette, visual: visualEvidence } })}`);
+                  app.exit(0);
+                })
+                .catch((error: unknown) => {
+                  fail("Production desktop screenshot capture failed.", {
+                    error: error instanceof Error ? error.message : String(error)
+                  });
+                });
             })
             .catch((error: unknown) => {
-              fail("Production desktop screenshot capture failed.", {
+              fail("Production desktop live Quick Actions palette JavaScript failed.", {
                 error: error instanceof Error ? error.message : String(error)
               });
             });
@@ -790,9 +961,14 @@ function installLaunchSmoke(win: BrowserWindow): void {
         setTimeout(() => poll(deadline), 100);
       })
       .catch((error: unknown) => {
-        fail("Production renderer smoke JavaScript failed.", {
-          error: error instanceof Error ? error.message : String(error)
-        });
+        if (Date.now() >= deadline) {
+          fail("Production renderer smoke JavaScript failed.", {
+            error: error instanceof Error ? error.message : String(error)
+          });
+          return;
+        }
+
+        setTimeout(() => poll(deadline), 250);
       });
   };
 

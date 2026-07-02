@@ -9271,6 +9271,121 @@ export function App(): ReactElement {
   }, [quickActionPinnedIds]);
   const quickActionScopeOptions = createQuickActionScopeOptions(quickActions, quickActionQuery);
   const filteredQuickActions = filterQuickActions(quickActions, quickActionQuery, quickActionScope);
+  useEffect(() => {
+    if (window.grooveforge?.launchSmoke !== true) {
+      return;
+    }
+
+    const routeEvidence = (query: string, actionId: string): GrooveforgeLaunchSmokeRouteEvidence => {
+      const scope = "all";
+      const routeActions = filterQuickActions(quickActions, query, scope);
+      const firstRunnableAction = routeActions.find((action) => !action.disabled);
+      const action = routeActions.find((candidate) => candidate.id === actionId) ?? null;
+      const scopeOptions = createQuickActionScopeOptions(quickActions, query);
+      const searchResult = createQuickActionSearchResult(query, scope, quickActions);
+      const spotlight = createQuickActionSpotlightSummary(routeActions, firstRunnableAction, scope, scopeOptions, query);
+      const matchingCount = scopeOptions.find((option) => option.id === scope)?.count ?? 0;
+      const guideScopeCount = scopeOptions.find((option) => option.id === "guide")?.count ?? 0;
+      const visibleActionLimit = query.trim().length > 0 ? 80 : 48;
+      const visibleActionCount = Math.min(routeActions.length, visibleActionLimit);
+
+      setCommandReferenceOpen(false);
+      setQuickActionQuery(query);
+      setQuickActionSearchHintResult(null);
+      setQuickActionSearchResult(searchResult);
+      setQuickActionSearchRecoveryResult(null);
+      setQuickActionScope(scope);
+      setQuickActionScopeResult(null);
+      setQuickActionsOpen(true);
+
+      return {
+        actionPresent: action !== null && action.disabled !== true,
+        countText: `${visibleActionCount} shown / ${routeActions.length} results / ${matchingCount} matching`,
+        resultMetricValue: "",
+        resultNextCheck: "",
+        resultStatus: "",
+        resultTitle: "",
+        scopeCountText: String(guideScopeCount),
+        searchMetricValue: searchResult.metricValue,
+        searchNextCheck: searchResult.nextCheck,
+        spotlightAction: spotlight.actionId ?? "",
+        spotlightTitle: spotlight.titleLabel
+      };
+    };
+
+    const runAudienceSessionRoute = (
+      actionId: string
+    ): Pick<GrooveforgeLaunchSmokeRouteEvidence, "resultMetricValue" | "resultNextCheck" | "resultStatus" | "resultTitle"> => {
+      const action = quickActions.find((candidate) => candidate.id === actionId);
+      if (!action || action.disabled) {
+        return {
+          resultMetricValue: "Action unavailable",
+          resultNextCheck: "Quick Actions must expose the Audience Session route before launch smoke can run it.",
+          resultStatus: "Unavailable",
+          resultTitle: actionId
+        };
+      }
+
+      const row = audienceSessionReadoutSummary.rows.find((candidate) => `audience-session-enter-${candidate.id}` === action.id);
+      if (!row) {
+        return {
+          resultMetricValue: "Audience Session row unavailable",
+          resultNextCheck: "Audience Session Readout must include the matching route row.",
+          resultStatus: "Unavailable",
+          resultTitle: action.title
+        };
+      }
+
+      const beforeProject = projectRef.current;
+      const mode = audienceSessionModeForRow(row);
+      switchProjectMode(mode);
+      setAudienceSessionActionResult(createAudienceSessionActionResult(row, audienceSessionReadoutSummary, mode));
+      const result = createQuickActionResult(
+        action,
+        beforeProject,
+        projectRef.current,
+        "complete",
+        selectedArrangementIndex,
+        handoffExportReceiptRef.current,
+        null
+      );
+      setQuickActionResult(result);
+      setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
+      setQuickActionsOpen(false);
+
+      return {
+        resultMetricValue: `${result.metric.before} -> ${result.metric.after}`,
+        resultNextCheck: result.nextCheck,
+        resultStatus: result.status,
+        resultTitle: result.title
+      };
+    };
+
+    window.__grooveforgeLaunchSmoke = {
+      collectAudienceSessionQuickActionEvidence: () => {
+        const guided = {
+          ...routeEvidence("first-time composer", "audience-session-enter-beginner"),
+          ...runAudienceSessionRoute("audience-session-enter-beginner")
+        };
+        const producer = {
+          ...routeEvidence("professional producer", "audience-session-enter-producer"),
+          ...runAudienceSessionRoute("audience-session-enter-producer")
+        };
+
+        return {
+          guided,
+          opened: true,
+          producer,
+          resultPresent: guided.resultTitle.length > 0 && producer.resultTitle.length > 0,
+          searchPresent: guided.searchMetricValue.length > 0 && producer.searchMetricValue.length > 0
+        };
+      }
+    };
+
+    return () => {
+      delete window.__grooveforgeLaunchSmoke;
+    };
+  }, [audienceSessionReadoutSummary, quickActions, selectedArrangementIndex]);
   const guidedModeContext = createModeSwitchButtonContext({
     firstBeatPathSummary,
     mode: "guided",

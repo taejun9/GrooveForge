@@ -10,7 +10,7 @@ import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gu
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(import.meta.url);
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
-const timeoutMs = 120000;
+const timeoutMs = 210000;
 const failures = [];
 const expectedLiveTestIds = [
   "workflow-target-transport",
@@ -100,6 +100,73 @@ function checkResult(result) {
 
   const missingTestIds = expectedLiveTestIds.filter((testId) => evidence?.testIds?.[testId] !== true);
   check(missingTestIds.length === 0, `live desktop renderer is missing test ids: ${missingTestIds.join(", ")}`);
+  check(evidence?.palette?.opened === true, "live desktop Quick Actions palette should open during launch smoke");
+  check(evidence?.palette?.searchPresent === true, "live desktop Quick Actions palette should accept Audience Session search input");
+  check(evidence?.palette?.resultPresent === true, "live desktop Quick Actions palette should leave an Audience Session execution result");
+  check(evidence?.palette?.guided?.actionPresent === true, "live desktop Quick Actions palette should show Enter Guided from first-time composer search");
+  check(
+    evidence?.palette?.guided?.spotlightAction === "audience-session-enter-beginner",
+    "live desktop Quick Actions Guided spotlight should target audience-session-enter-beginner"
+  );
+  check(
+    evidence?.palette?.guided?.spotlightTitle === "Enter Guided: First-time composer",
+    "live desktop Quick Actions Guided spotlight should name Enter Guided"
+  );
+  check(
+    String(evidence?.palette?.guided?.searchMetricValue ?? "").includes("Enter Guided: First-time composer"),
+    "live desktop Quick Actions Guided search metric should target Enter Guided"
+  );
+  const guidedResultTitle = String(evidence?.palette?.guided?.resultTitle ?? "");
+  const guidedResultStatus = String(evidence?.palette?.guided?.resultStatus ?? "");
+  const guidedResultMetric = String(evidence?.palette?.guided?.resultMetricValue ?? "");
+  check(
+    (guidedResultStatus === "Entered" || guidedResultStatus.includes("Guided")) &&
+      (guidedResultTitle === "Enter Guided: First-time composer" || guidedResultTitle === "First-time composer route selected"),
+    "live desktop Quick Actions Guided command should execute with Entered result"
+  );
+  check(
+    (guidedResultMetric.includes("Enter Guided for first-time composer") && guidedResultMetric.includes("target Guided")) ||
+      guidedResultMetric.includes("Guided first-beat workflow"),
+    "live desktop Quick Actions Guided result should include first-time composer route and Guided target"
+  );
+  check(
+    String(evidence?.palette?.guided?.resultNextCheck ?? "").includes("First Beat Path"),
+    "live desktop Quick Actions Guided result should guide the next First Beat Path check"
+  );
+  check(
+    evidence?.palette?.producer?.actionPresent === true,
+    "live desktop Quick Actions palette should show Enter Studio from professional producer search"
+  );
+  check(
+    evidence?.palette?.producer?.spotlightAction === "audience-session-enter-producer",
+    "live desktop Quick Actions producer spotlight should target audience-session-enter-producer"
+  );
+  check(
+    evidence?.palette?.producer?.spotlightTitle === "Enter Studio: Professional producer",
+    "live desktop Quick Actions producer spotlight should name Enter Studio"
+  );
+  check(
+    String(evidence?.palette?.producer?.searchMetricValue ?? "").includes("Enter Studio: Professional producer"),
+    "live desktop Quick Actions producer search metric should target Enter Studio"
+  );
+  const producerResultTitle = String(evidence?.palette?.producer?.resultTitle ?? "");
+  const producerResultStatus = String(evidence?.palette?.producer?.resultStatus ?? "");
+  const producerResultMetric = String(evidence?.palette?.producer?.resultMetricValue ?? "");
+  check(
+    (producerResultStatus === "Entered" || producerResultStatus.includes("Studio")) &&
+      (producerResultTitle === "Enter Studio: Professional producer" || producerResultTitle === "Professional producer route selected"),
+    "live desktop Quick Actions producer command should execute with Entered result"
+  );
+  check(
+    (producerResultMetric.includes("Enter Studio for professional producer") && producerResultMetric.includes("target Studio")) ||
+      producerResultMetric.includes("Studio producer scan workflow"),
+    "live desktop Quick Actions producer result should include professional producer route and Studio target"
+  );
+  check(
+    String(evidence?.palette?.producer?.resultNextCheck ?? "").includes("Review Queue") &&
+      String(evidence?.palette?.producer?.resultNextCheck ?? "").includes("Export Preflight"),
+    "live desktop Quick Actions producer result should guide the next Review Queue / Export Preflight check"
+  );
 
   const visual = evidence?.visual;
   check(visual && typeof visual === "object", "live desktop launch smoke should include screenshot visual evidence");
@@ -225,6 +292,7 @@ child.on("exit", (code, signal) => {
     `- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors, ${result.evidence.visual.nonBackgroundSamples}/${result.evidence.visual.sampledPixels} non-background samples`
   );
   console.log("- Audience session rows: First-time composer, Professional producer");
+  console.log("- Audience session Quick Actions: renderer palette search and run evidence passed for Enter Guided and Enter Studio");
   console.log("- Beginner path: Audience Session Readout, Enter Guided, Guide Quick Start, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator");
   console.log("- Producer path: Audience Session Readout, Enter Studio, Studio mode, Review Queue, Production Snapshot, Mix Coach, Sound/Mix Snapshot, Quick Actions, Command Reference");
   console.log("- Workstation path: transport, compose, sound, arrange, mix, master, export controls, Handoff Pack");

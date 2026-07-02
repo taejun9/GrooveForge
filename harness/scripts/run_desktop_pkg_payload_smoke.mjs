@@ -23,7 +23,7 @@ const payloadRoot = path.join(packageRoot, "pkg-payload-smoke", "payload");
 const reportJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-pkg-payload-smoke.json`);
 const reportMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-pkg-payload-smoke.md`);
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
-const timeoutMs = 120000;
+const timeoutMs = 210000;
 const failures = [];
 
 const privateEnvKeys = [

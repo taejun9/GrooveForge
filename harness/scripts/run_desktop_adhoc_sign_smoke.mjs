@@ -21,7 +21,7 @@ const requiredEntitlements = [
   "com.apple.security.cs.allow-unsigned-executable-memory",
   "com.apple.security.cs.disable-library-validation"
 ];
-const timeoutMs = 120000;
+const timeoutMs = 210000;
 const failures = [];
 
 function check(condition, message) {
