@@ -111,6 +111,22 @@ function integerValue(value) {
   return Number.isInteger(value) ? value : 0;
 }
 
+function stringArrayValue(value) {
+  return Array.isArray(value) ? value.filter((item) => typeof item === "string" && item.trim().length > 0) : [];
+}
+
+function objectRows(value) {
+  return Array.isArray(value) ? value.filter((row) => row && typeof row === "object" && !Array.isArray(row)) : [];
+}
+
+function valueFreeRows(rows) {
+  return objectRows(rows).every((row) => row.valueRecorded === false);
+}
+
+function formatKeyList(keys) {
+  return keys.length > 0 ? keys.join(", ") : "none";
+}
+
 function parseNpmRunCommand(command) {
   const parts = command.trim().split(/\s+/);
   if (parts[0] !== "npm" || parts[1] !== "run" || !parts[2]) {
@@ -295,6 +311,24 @@ function formatUserFacingCompletionRows(rows) {
   return rows.map((row) => `| ${row.order} | ${escapeCell(row.field)} | ${escapeCell(row.value)} | ${row.valueRecorded ? "yes" : "no"} |`).join("\n");
 }
 
+function formatCompletionBlockerActionRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.item)} | ${readyLabel(row.ready === true)} | ${escapeCell(row.currentState)} | ${escapeCell(row.operatorAction)} | ${escapeCell(row.evidence)} | \`${escapeCell(row.proofCommand)}\` | ${escapeCell(row.sourceField)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
+function formatCompletionBlockerFocusRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.key)} | ${readyLabel(row.present === true)} | ${readyLabel(row.placeholder === true)} | ${readyLabel(row.shapeReady === true)} | ${readyLabel(row.currentReady === true)} | ${escapeCell(row.expectedSignal)} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.rerunCommand)}\` | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function buildReport({ progressRefresh, completionSummary, checkpoint, gitContext }) {
   const checkpointRequired = tenPlanCheckpointRequired(completionSummary);
   const checkpointReady = checkpointRequired ? checkpoint?.tenPlanCheckpointReady === true : false;
@@ -302,6 +336,8 @@ function buildReport({ progressRefresh, completionSummary, checkpoint, gitContex
   const userFacingRemainingPercent = percentNumber(completionSummary.remainingPercent);
   const userFacingCompletionLabel = percentLabel(completionSummary.completionPercent);
   const userFacingRemainingLabel = percentLabel(completionSummary.remainingPercent);
+  const completionBlockerActionRows = objectRows(completionSummary.completionBlockerActionRows);
+  const completionBlockerFocusRows = objectRows(completionSummary.completionBlockerFocusRows);
   const report = {
     appName,
     bundleId,
@@ -361,6 +397,24 @@ function buildReport({ progressRefresh, completionSummary, checkpoint, gitContex
     postClearanceProofCommand: textValue(completionSummary.postClearanceProofCommand),
     firstBlocker: textValue(completionSummary.firstBlocker),
     nextCommand: textValue(completionSummary.nextCommand),
+    currentEnvEditTarget: textValue(completionSummary.currentEnvEditTarget, ".env.distribution.local"),
+    currentRequiredKeyCount: integerValue(completionSummary.currentRequiredKeyCount),
+    currentRequiredKeys: stringArrayValue(completionSummary.currentRequiredKeys),
+    currentPlaceholderKeyCount: integerValue(completionSummary.currentPlaceholderKeyCount),
+    currentPlaceholderKeys: stringArrayValue(completionSummary.currentPlaceholderKeys),
+    currentPlaceholderEditLocationCount: integerValue(completionSummary.currentPlaceholderEditLocationCount),
+    currentPlaceholderEditLocationSummary: textValue(completionSummary.currentPlaceholderEditLocationSummary),
+    completionBlockerActionReceiptReady: completionSummary.completionBlockerActionReceiptReady === true,
+    completionBlockerActionRows,
+    completionBlockerActionRowCount: integerValue(completionSummary.completionBlockerActionRowCount),
+    completionBlockerActionRowsValueFree: completionSummary.completionBlockerActionRowsValueFree === true && valueFreeRows(completionBlockerActionRows),
+    completionBlockerFocusReceiptReady: completionSummary.completionBlockerFocusReceiptReady === true,
+    completionBlockerFocusCurrentReady: completionSummary.completionBlockerFocusCurrentReady === true,
+    completionBlockerFocusRows,
+    completionBlockerFocusRowCount: integerValue(completionSummary.completionBlockerFocusRowCount),
+    completionBlockerFocusRowsValueFree: completionSummary.completionBlockerFocusRowsValueFree === true && valueFreeRows(completionBlockerFocusRows),
+    releaseChannelFirstProofCommandAfterPrivateEdits: textValue(completionSummary.releaseChannelFirstProofCommandAfterPrivateEdits),
+    releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits: textValue(completionSummary.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits),
     hardGateReady: completionSummary.hardGateReady === true,
     hardGateWouldFail: completionSummary.hardGateWouldFail === true,
     tenPlanCheckpointRequired: checkpointRequired,
@@ -439,6 +493,16 @@ function buildMarkdown(report) {
 - Private-edit blocked smoke placeholders: ${report.privateEditBlockedSmokeCurrentPlaceholderKeyCount}/${report.releaseChannelCurrentRequiredKeyCount}
 - Final handoff success-redaction ready: ${readyLabel(report.finalHandoffSuccessRedactionReady)}
 - Current first blocker: ${report.firstBlocker}
+- Current env edit target: ${report.currentEnvEditTarget}
+- Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})
+- Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})
+- Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})
+- Completion blocker action receipt ready: ${readyLabel(report.completionBlockerActionReceiptReady)}
+- Completion blocker action rows: ${report.completionBlockerActionRowCount}
+- Completion blocker focus receipt ready: ${readyLabel(report.completionBlockerFocusReceiptReady)}
+- Completion blocker focus rows: ${report.completionBlockerFocusRowCount}
+- First proof after private edits: \`${report.releaseChannelFirstProofCommandAfterPrivateEdits}\`
+- Recommended operator proof chain: \`${report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits}\`
 - Git context ready: ${readyLabel(report.gitContextReady)}
 - Git branch: ${report.gitBranch}
 - Git HEAD: ${report.gitHeadShortSha}
@@ -460,6 +524,26 @@ ${formatCommandRows(report.refreshCommands)}
 - Progress refresh JSON: ${report.progressRefreshJsonPath}
 - Completion summary JSON: ${report.completionSummaryJsonPath}
 - 10-plan checkpoint JSON: ${report.tenPlanCheckpointJsonPath}
+
+## Completion Blocker Action Receipt
+
+- Receipt ready: ${readyLabel(report.completionBlockerActionReceiptReady)}
+- Action rows: ${report.completionBlockerActionRowCount}
+- Action rows value-free: ${readyLabel(report.completionBlockerActionRowsValueFree)}
+- Focus receipt ready: ${readyLabel(report.completionBlockerFocusReceiptReady)}
+- Focus current action ready: ${readyLabel(report.completionBlockerFocusCurrentReady)}
+- Focus rows: ${report.completionBlockerFocusRowCount}
+- Focus rows value-free: ${readyLabel(report.completionBlockerFocusRowsValueFree)}
+
+| order | item | ready | current state | operator action | evidence | proof command | source field | value recorded |
+|---:|---|---:|---|---|---|---|---|---:|
+${formatCompletionBlockerActionRows(report.completionBlockerActionRows)}
+
+## Completion Blocker Focus Rows
+
+| order | key | present | placeholder | shape ready | current ready | expected signal | proof command | rerun command | value recorded |
+|---:|---|---:|---:|---:|---:|---|---|---|---:|
+${formatCompletionBlockerFocusRows(report.completionBlockerFocusRows)}
 
 ## 10-Plan Checkpoint
 
@@ -553,6 +637,40 @@ function validateReport(report, markdown) {
   check(report.finalHandoffSuccessRedactionReady === true, "release completion summary refresh should expose final handoff success-redaction readiness");
   check(report.postClearanceNextAction === "auto-update-feed", "release completion summary refresh should keep auto-update-feed as post-clearance next action");
   check(report.postClearanceProofCommand === "npm run desktop:auto-update-readiness-smoke", "release completion summary refresh should keep auto-update readiness as post-clearance proof command");
+  check(report.currentEnvEditTarget !== "none", "release completion summary refresh should expose current env edit target");
+  check(report.currentRequiredKeyCount === 4, "release completion summary refresh should expose four current release-channel required keys");
+  check(report.currentRequiredKeys.length === report.currentRequiredKeyCount, "release completion summary refresh required keys should match count");
+  check(report.currentPlaceholderKeys.length === report.currentPlaceholderKeyCount, "release completion summary refresh placeholder keys should match count");
+  check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderKeyCount, "release completion summary refresh placeholder locations should match placeholders");
+  check(report.currentPlaceholderEditLocationSummary.includes(report.currentEnvEditTarget), "release completion summary refresh should expose value-free placeholder edit location summary");
+  check(report.completionBlockerActionReceiptReady === true, "release completion summary refresh should expose ready completion blocker action receipt");
+  check(report.completionBlockerActionRowCount === report.completionBlockerActionRows.length, "release completion summary refresh blocker action row count should match rows");
+  check(report.completionBlockerActionRowCount === 7, "release completion summary refresh blocker action receipt should include seven rows");
+  check(report.completionBlockerActionRowsValueFree === true, "release completion summary refresh blocker action rows should be value-free");
+  check(
+    report.completionBlockerActionRows.every((row) => row.ready === true && row.valueRecorded === false),
+    "release completion summary refresh blocker action rows should be ready and value-free"
+  );
+  check(
+    report.completionBlockerActionRows.some((row) => row.item === "Edit target" && row.evidence === report.currentEnvEditTarget),
+    "release completion summary refresh blocker action rows should include edit target"
+  );
+  check(
+    report.completionBlockerActionRows.some((row) => row.item === "First proof after edit" && row.proofCommand === "npm run release:channel-live-check"),
+    "release completion summary refresh blocker action rows should include first proof command"
+  );
+  check(
+    report.completionBlockerActionRows.some((row) => row.item === "Recommended proof chain" && row.proofCommand === "npm run release:private-edit-strict-proof"),
+    "release completion summary refresh blocker action rows should include strict proof chain"
+  );
+  check(report.completionBlockerFocusReceiptReady === true, "release completion summary refresh should expose ready blocker focus receipt");
+  check(report.completionBlockerFocusRowCount === report.completionBlockerFocusRows.length, "release completion summary refresh blocker focus row count should match rows");
+  check(report.completionBlockerFocusRowCount === 4, "release completion summary refresh blocker focus receipt should include four rows");
+  check(report.completionBlockerFocusRowsValueFree === true, "release completion summary refresh blocker focus rows should be value-free");
+  check(report.completionBlockerFocusRows.every((row) => row.valueRecorded === false), "release completion summary refresh blocker focus rows should not record values");
+  check(report.completionBlockerFocusRows.every((row) => report.currentRequiredKeys.includes(row.key)), "release completion summary refresh blocker focus rows should match required keys");
+  check(report.releaseChannelFirstProofCommandAfterPrivateEdits === "npm run release:channel-live-check", "release completion summary refresh should expose release-channel first proof command");
+  check(report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits === "npm run release:private-edit-strict-proof", "release completion summary refresh should expose recommended private edit proof chain");
   check(report.hardGateReady === false, "release completion summary refresh should keep hard gate unready");
   check(report.hardGateWouldFail === true, "release completion summary refresh should keep hard gate would-fail posture");
   check(report.privateValuesRecorded === false, "release completion summary refresh should not record private values");
@@ -624,6 +742,9 @@ function validateReport(report, markdown) {
   check(markdown.includes("## 10-Plan Checkpoint"), "release completion summary refresh Markdown should include checkpoint section");
   check(markdown.includes("## 10-Plan Checkpoint Rows"), "release completion summary refresh Markdown should include checkpoint rows");
   check(markdown.includes("Checkpoint proof/gate refresh ready:"), "release completion summary refresh Markdown should include checkpoint proof/gate readiness");
+  check(markdown.includes("## Completion Blocker Action Receipt"), "release completion summary refresh Markdown should include blocker action receipt section");
+  check(markdown.includes("## Completion Blocker Focus Rows"), "release completion summary refresh Markdown should include blocker focus rows");
+  check(markdown.includes("Completion blocker action receipt ready: yes"), "release completion summary refresh Markdown should include blocker action receipt readiness");
   check(markdown.includes("## Git Worktree Context"), "release completion summary refresh Markdown should include git context section");
   check(markdown.includes("## User-Facing Completion Aliases"), "release completion summary refresh Markdown should include user-facing completion alias section");
 }
@@ -686,6 +807,13 @@ async function main() {
     `- Private-edit blocked smoke placeholders: ${report.privateEditBlockedSmokeCurrentPlaceholderKeyCount}/${report.releaseChannelCurrentRequiredKeyCount}`
   );
   console.log(`- Final handoff success-redaction ready: ${report.finalHandoffSuccessRedactionReady ? "yes" : "no"}`);
+  console.log(`- Completion blocker action receipt ready: ${report.completionBlockerActionReceiptReady ? "yes" : "no"}`);
+  console.log(`- Completion blocker action rows: ${report.completionBlockerActionRowCount}`);
+  console.log(`- Completion blocker focus rows: ${report.completionBlockerFocusRowCount}`);
+  console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);
+  console.log(`- Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})`);
+  console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})`);
+  console.log(`- Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})`);
   console.log(`- Current first blocker: ${report.firstBlocker}`);
   console.log("- Private values recorded: no");
   console.log("- Network: no update feed probe, feed publish, distribution channel probe, release upload, Apple notary submission, or signing attempted");
