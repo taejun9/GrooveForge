@@ -235,6 +235,10 @@ function checkpointFieldRows(report) {
     ["post-delivery next report", report.postDeliveryNextTenPlanProgressReportAt],
     ["source ready", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointSourceReady) : "not due"],
     ["source labels match", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointSourceLabelsMatch) : "not due"],
+    ["proof/gate refresh ready", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointProofGateRefreshReady) : "not due"],
+    ["proof bundle refresh command", report.checkpointProofBundleRefreshCommand],
+    ["external gate refresh command", report.checkpointExternalGateRefreshCommand],
+    ["proof/gate rows value-free", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointProofGateRowsValueFree) : "not due"],
     ["rows value-free", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointRowsValueFree) : "not due"],
     ["private values recorded", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointPrivateValuesRecorded) : "not due"],
     ["auto-update claimed", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointClaimedAutoUpdate) : "not due"],
@@ -371,6 +375,11 @@ function buildReport({ progressRefresh, completionSummary, checkpoint, gitContex
     postDeliveryNextTenPlanProgressReportAt: checkpointRequired ? textValue(checkpoint?.postDeliveryNextTenPlanProgressReportAt) : "not due",
     checkpointSourceReady: checkpointRequired ? checkpoint?.sourceReady === true : false,
     checkpointSourceLabelsMatch: checkpointRequired ? checkpoint?.sourceLabelsMatch === true : false,
+    checkpointProofGateRefreshReady: checkpointRequired ? checkpoint?.sourceProofGateRefreshReady === true : false,
+    checkpointProofBundleRefreshCommand: checkpointRequired ? textValue(checkpoint?.sourceProofBundleRefreshCommand) : "not due",
+    checkpointExternalGateRefreshCommand: checkpointRequired ? textValue(checkpoint?.sourceExternalGateRefreshCommand) : "not due",
+    checkpointProofGateRefreshRowCount: checkpointRequired ? integerValue(checkpoint?.sourceProofGateRefreshRowCount) : 0,
+    checkpointProofGateRowsValueFree: checkpointRequired ? checkpoint?.sourceProofGateRefreshRowsValueFree === true : true,
     checkpointRowsValueFree: checkpointRequired ? checkpointRowsValueFree(checkpoint) : true,
     checkpointPrivateValuesRecorded: checkpointRequired ? checkpoint?.privateValuesRecorded === true || checkpoint?.valueRecorded === true : false,
     checkpointClaimedAutoUpdate: checkpointRequired ? checkpoint?.claimedAutoUpdate === true : false,
@@ -467,6 +476,10 @@ ${formatCommandRows(report.refreshCommands)}
 - Post-delivery next 10-plan report: ${report.postDeliveryNextTenPlanProgressReportAt}
 - Checkpoint source ready: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointSourceReady) : "not due"}
 - Checkpoint source labels match: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointSourceLabelsMatch) : "not due"}
+- Checkpoint proof/gate refresh ready: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointProofGateRefreshReady) : "not due"}
+- Checkpoint proof bundle refresh command: \`${report.checkpointProofBundleRefreshCommand}\`
+- Checkpoint external gate refresh command: \`${report.checkpointExternalGateRefreshCommand}\`
+- Checkpoint proof/gate rows value-free: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointProofGateRowsValueFree) : "not due"}
 - Checkpoint rows value-free: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointRowsValueFree) : "not due"}
 - Checkpoint private values recorded: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointPrivateValuesRecorded) : "not due"}
 - Checkpoint auto-update claimed: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointClaimedAutoUpdate) : "not due"}
@@ -579,6 +592,17 @@ function validateReport(report, markdown) {
     check(report.postDeliveryNextTenPlanProgressReportAt !== "not due", "release completion summary refresh checkpoint should expose post-delivery next report");
     check(report.checkpointSourceReady === true, "release completion summary refresh checkpoint source should be ready");
     check(report.checkpointSourceLabelsMatch === true, "release completion summary refresh checkpoint labels should match");
+    check(report.checkpointProofGateRefreshReady === true, "release completion summary refresh checkpoint should prove proof/gate refresh readiness");
+    check(
+      report.checkpointProofBundleRefreshCommand === "npm run release:proof-bundle",
+      "release completion summary refresh checkpoint should expose proof-bundle refresh command"
+    );
+    check(
+      report.checkpointExternalGateRefreshCommand === "npm run desktop:external-distribution-gate-smoke",
+      "release completion summary refresh checkpoint should expose external gate refresh command"
+    );
+    check(report.checkpointProofGateRefreshRowCount === 2, "release completion summary refresh checkpoint should expose two proof/gate rows");
+    check(report.checkpointProofGateRowsValueFree === true, "release completion summary refresh checkpoint proof/gate rows should be value-free");
     check(report.checkpointRowsValueFree === true, "release completion summary refresh checkpoint rows should be value-free");
     check(report.checkpointPrivateValuesRecorded === false, "release completion summary refresh checkpoint should not record private values");
     check(report.checkpointClaimedAutoUpdate === false, "release completion summary refresh checkpoint should not claim auto-update");
@@ -599,6 +623,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("npm run release:10-plan-checkpoint-smoke"), "release completion summary refresh Markdown should cite checkpoint command");
   check(markdown.includes("## 10-Plan Checkpoint"), "release completion summary refresh Markdown should include checkpoint section");
   check(markdown.includes("## 10-Plan Checkpoint Rows"), "release completion summary refresh Markdown should include checkpoint rows");
+  check(markdown.includes("Checkpoint proof/gate refresh ready:"), "release completion summary refresh Markdown should include checkpoint proof/gate readiness");
   check(markdown.includes("## Git Worktree Context"), "release completion summary refresh Markdown should include git context section");
   check(markdown.includes("## User-Facing Completion Aliases"), "release completion summary refresh Markdown should include user-facing completion alias section");
 }
@@ -647,6 +672,7 @@ async function main() {
   console.log(`- 10-plan checkpoint status: ${report.tenPlanCheckpointStatus}`);
   console.log(`- 10-plan checkpoint ready: ${checkpointReadyLabel(report)}`);
   console.log(`- 10-plan checkpoint artifact: ${report.tenPlanCheckpointJsonPath}`);
+  console.log(`- 10-plan checkpoint proof/gate refresh ready: ${report.tenPlanCheckpointRequired ? (report.checkpointProofGateRefreshReady ? "yes" : "no") : "not due"}`);
   console.log(`- Git context: ${report.gitBranch}@${report.gitHeadShortSha} (${report.gitWorktreeName}, dirty ${report.gitDirty ? "yes" : "no"})`);
   console.log(`- User-facing completion: ${report.userFacingCompletionLabel}`);
   console.log(`- Remaining completion: ${report.userFacingRemainingLabel}`);

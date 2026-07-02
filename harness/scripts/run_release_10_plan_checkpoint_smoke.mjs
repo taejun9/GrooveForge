@@ -18,6 +18,20 @@ const completedPlansDir = path.join(root, "docs", "exec_plans", "completed");
 const sourceJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${sourceStem}.json`);
 const checkpointMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${checkpointStem}.md`);
 const checkpointJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${checkpointStem}.json`);
+const expectedSourceRefreshCommandSummary =
+  "npm run release:proof-bundle -> npm run desktop:external-distribution-gate-smoke -> npm run release:update-feed-checkpoint-smoke -> npm run release:progress-smoke -> npm run release:current-blocker-smoke -> npm run release:completion-report-packet-smoke -> npm run release:progress-freshness-smoke -> npm run release:operator-completion-brief-smoke";
+const expectedProofGateRefreshCommands = [
+  {
+    order: 1,
+    command: "npm run release:proof-bundle",
+    role: "refresh external proof bundle and current release-channel proof rows before progress reads them"
+  },
+  {
+    order: 2,
+    command: "npm run desktop:external-distribution-gate-smoke",
+    role: "refresh external gate dry-run so it mirrors the current proof bundle rows"
+  }
+];
 const failures = [];
 
 function check(condition, message) {
@@ -47,6 +61,10 @@ function textValue(value, fallback = "none") {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
 }
 
+function escapeCell(value) {
+  return String(value ?? "none").replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+
 function integerValue(value) {
   return Number.isInteger(value) ? value : 0;
 }
@@ -61,6 +79,24 @@ async function readJsonRequired(filePath, label) {
     fail(`${label} artifact is missing.`, `Expected: ${relative(filePath)}\nRun npm run release:progress-refresh-smoke before npm run release:10-plan-checkpoint-smoke.`);
   }
   return JSON.parse(await readFile(filePath, "utf8"));
+}
+
+function buildProofGateRefreshRows(sourceCommandRows) {
+  return expectedProofGateRefreshCommands.map((expected) => {
+    const sourceRow = sourceCommandRows.find((row) => row?.order === expected.order) ?? {};
+    const command = textValue(sourceRow.command, "missing");
+    const role = textValue(sourceRow.role, "missing");
+    return {
+      order: expected.order,
+      command,
+      expectedCommand: expected.command,
+      role,
+      expectedRole: expected.role,
+      commandMatched: command === expected.command,
+      roleMatched: role === expected.role,
+      valueRecorded: sourceRow.valueRecorded === true
+    };
+  });
 }
 
 async function deriveCompletedPlanWindow() {
@@ -109,6 +145,19 @@ async function deriveCompletedPlanWindow() {
 
 function buildReport(source, localWindow) {
   const summary = source.completionSummary ?? {};
+  const sourceRefreshCommandRows = Array.isArray(source.refreshCommandRows) ? source.refreshCommandRows : [];
+  const sourceProofGateRefreshRows = buildProofGateRefreshRows(sourceRefreshCommandRows);
+  const sourceRefreshCommandsValueFree =
+    sourceRefreshCommandRows.length > 0 && sourceRefreshCommandRows.every((row) => row?.valueRecorded === false);
+  const sourceProofGateRefreshRowsValueFree = sourceProofGateRefreshRows.every((row) => row.valueRecorded === false);
+  const sourceProofGateRefreshReady =
+    source.releaseProgressRefreshReady === true &&
+    integerValue(source.refreshCommandCount) === 8 &&
+    textValue(source.refreshCommandSummary) === expectedSourceRefreshCommandSummary &&
+    sourceRefreshCommandsValueFree &&
+    sourceProofGateRefreshRows.length === 2 &&
+    sourceProofGateRefreshRows.every((row) => row.commandMatched === true && row.roleMatched === true) &&
+    sourceProofGateRefreshRowsValueFree;
   return {
     appName,
     bundleId,
@@ -129,6 +178,15 @@ function buildReport(source, localWindow) {
     sourceReady: source.releaseProgressRefreshReady === true,
     sourceSummaryReady: summary.ready === true,
     sourceLabelsMatch: source.labelsMatch === true,
+    sourceRefreshCommandCount: integerValue(source.refreshCommandCount),
+    sourceRefreshCommandSummary: textValue(source.refreshCommandSummary),
+    sourceRefreshCommandsValueFree,
+    sourceProofGateRefreshReady,
+    sourceProofGateRefreshRows,
+    sourceProofGateRefreshRowCount: sourceProofGateRefreshRows.length,
+    sourceProofGateRefreshRowsValueFree,
+    sourceProofBundleRefreshCommand: sourceProofGateRefreshRows[0]?.command ?? "missing",
+    sourceExternalGateRefreshCommand: sourceProofGateRefreshRows[1]?.command ?? "missing",
     sourceLatestPlanNumber: integerValue(summary.latestPlanNumber),
     sourceLatestPlan: textValue(summary.latestPlan),
     sourceTenPlanProgress: textValue(summary.tenPlanProgress),
@@ -195,6 +253,12 @@ function buildMarkdown(report) {
   const rows = report.tenPlanWindowRows
     .map((row) => `| ${row.label} | ${row.path} | ${readyLabel(!row.valueRecorded)} |`)
     .join("\n");
+  const proofGateRows = report.sourceProofGateRefreshRows
+    .map(
+      (row) =>
+        `| ${row.order} | \`${escapeCell(row.command)}\` | \`${escapeCell(row.expectedCommand)}\` | ${readyLabel(row.commandMatched)} | ${escapeCell(row.role)} | ${readyLabel(row.roleMatched)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
   return `# ${appName} ${report.version} ${report.platform}-${report.arch} Release 10-Plan Checkpoint Smoke
 
 ## Checkpoint
@@ -207,6 +271,10 @@ function buildMarkdown(report) {
 - Source ready: ${readyLabel(report.sourceReady)}
 - Source summary ready: ${readyLabel(report.sourceSummaryReady)}
 - Source labels match: ${readyLabel(report.sourceLabelsMatch)}
+- Source refresh command count: ${report.sourceRefreshCommandCount}
+- Source proof/gate refresh ready: ${readyLabel(report.sourceProofGateRefreshReady)}
+- Source proof bundle refresh command: \`${report.sourceProofBundleRefreshCommand}\`
+- Source external gate refresh command: \`${report.sourceExternalGateRefreshCommand}\`
 - Latest completed plan: ${report.localLatestPlan}
 - Source latest completed plan: ${report.sourceLatestPlan}
 - 10-plan progress: ${report.localTenPlanProgress}
@@ -233,6 +301,17 @@ function buildMarkdown(report) {
 - Auto-update claimed: ${readyLabel(report.claimedAutoUpdate)}
 - External distribution claimed: ${readyLabel(report.claimedExternalDistribution)}
 
+## Proof/Gate Refresh Evidence
+
+- Source refresh command summary: ${report.sourceRefreshCommandSummary}
+- Source refresh commands value-free: ${readyLabel(report.sourceRefreshCommandsValueFree)}
+- Source proof/gate refresh rows: ${report.sourceProofGateRefreshRowCount}
+- Source proof/gate rows value-free: ${readyLabel(report.sourceProofGateRefreshRowsValueFree)}
+
+| order | command | expected command | command matched | role | role matched | value recorded |
+|---:|---|---|---:|---|---:|---:|
+${proofGateRows}
+
 ## 10-Plan Window Rows
 
 | plan | path | value-free |
@@ -253,6 +332,22 @@ function validateReport(report, markdown) {
   check(report.sourceReady === true, "release 10-plan checkpoint should require ready progress refresh source");
   check(report.sourceSummaryReady === true, "release 10-plan checkpoint should require ready compact source summary");
   check(report.sourceLabelsMatch === true, "release 10-plan checkpoint should require matched source labels");
+  check(report.sourceRefreshCommandCount === 8, "release 10-plan checkpoint should require the full source refresh command sequence");
+  check(
+    report.sourceRefreshCommandSummary === expectedSourceRefreshCommandSummary,
+    "release 10-plan checkpoint should require proof bundle and external gate before progress refresh reads evidence"
+  );
+  check(report.sourceRefreshCommandsValueFree === true, "release 10-plan checkpoint source refresh commands should be value-free");
+  check(report.sourceProofGateRefreshReady === true, "release 10-plan checkpoint should require proof/gate refresh evidence");
+  check(report.sourceProofGateRefreshRowCount === 2, "release 10-plan checkpoint should include two proof/gate refresh rows");
+  check(report.sourceProofGateRefreshRows.every((row) => row.commandMatched === true), "release 10-plan checkpoint proof/gate commands should match expected commands");
+  check(report.sourceProofGateRefreshRows.every((row) => row.roleMatched === true), "release 10-plan checkpoint proof/gate roles should match expected roles");
+  check(report.sourceProofGateRefreshRowsValueFree === true, "release 10-plan checkpoint proof/gate rows should be value-free");
+  check(report.sourceProofBundleRefreshCommand === "npm run release:proof-bundle", "release 10-plan checkpoint should expose proof-bundle refresh command");
+  check(
+    report.sourceExternalGateRefreshCommand === "npm run desktop:external-distribution-gate-smoke",
+    "release 10-plan checkpoint should expose external gate refresh command"
+  );
   check(report.localLatestPlanNumber > 0, "release 10-plan checkpoint should include latest local completed plan number");
   check(report.sourceLatestPlanNumber === report.localLatestPlanNumber, "release 10-plan checkpoint should match source and local latest plan number");
   check(report.sourceLatestPlan === report.localLatestPlan, "release 10-plan checkpoint should match source and local latest plan label");
@@ -298,6 +393,8 @@ function validateReport(report, markdown) {
   check(!/https?:\/\//i.test(markdown), "release 10-plan checkpoint Markdown should not include URL values");
   check(markdown.includes("Release 10-Plan Checkpoint Smoke"), "release 10-plan checkpoint Markdown should include title");
   check(markdown.includes("10-plan checkpoint ready: yes"), "release 10-plan checkpoint Markdown should include readiness");
+  check(markdown.includes("Proof/Gate Refresh Evidence"), "release 10-plan checkpoint Markdown should include proof/gate refresh evidence");
+  check(markdown.includes("Source proof/gate refresh ready: yes"), "release 10-plan checkpoint Markdown should include proof/gate refresh readiness");
   check(markdown.includes(`| ${report.localLatestPlan} |`), "release 10-plan checkpoint Markdown should include the boundary plan row when current window completes");
 
   if (failures.length > 0) {
@@ -318,6 +415,7 @@ report.tenPlanCheckpointReady =
   report.sourceReady === true &&
   report.sourceSummaryReady === true &&
   report.sourceLabelsMatch === true &&
+  report.sourceProofGateRefreshReady === true &&
   report.sourceTenPlanReportDue === true &&
   report.sourceTenPlanCompletedCount === 10 &&
   report.localTenPlanCompletedCount === 10 &&
@@ -336,6 +434,9 @@ console.log(`- Markdown: ${relative(checkpointMarkdownPath)}`);
 console.log(`- JSON: ${relative(checkpointJsonPath)}`);
 console.log("- 10-plan checkpoint ready: yes");
 console.log(`- Source command: ${report.sourceCommand}`);
+console.log(`- Source proof/gate refresh ready: ${report.sourceProofGateRefreshReady ? "yes" : "no"}`);
+console.log(`- Source proof bundle refresh command: ${report.sourceProofBundleRefreshCommand}`);
+console.log(`- Source external gate refresh command: ${report.sourceExternalGateRefreshCommand}`);
 console.log(`- Latest completed plan: ${report.localLatestPlan}`);
 console.log(`- 10-plan progress: ${report.localTenPlanProgress}`);
 console.log(`- Current 10-plan report boundary: ${report.currentTenPlanReportBoundaryAt}`);
