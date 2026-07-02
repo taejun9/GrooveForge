@@ -948,9 +948,7 @@ function buildCurrentActionPostEditVerificationSummary({
   const currentActionPostEditVerificationRows = (Array.isArray(acceptanceRows) ? acceptanceRows : []).map((row, index) => {
     const evidence = currentActionAcceptanceEvidence(row.criterion, { currentActionSummary });
     const expectedSignal =
-      currentActionSummary.currentActionId === "release-channel-metadata" &&
-      index === 0 &&
-      !String(evidence.expectedSignal ?? "").includes("current placeholder key count is 0")
+      index === 0 && !String(evidence.expectedSignal ?? "").includes("current placeholder key count is 0")
         ? `${evidence.expectedSignal}; current placeholder key count is 0`
         : evidence.expectedSignal;
     return {
@@ -1547,13 +1545,112 @@ function buildReleaseChannelPostEditOperatorReceiptSummary({
     currentActionSummary.currentActionId === "release-channel-metadata" ? "npm run release:current-blocker" : proofCommand;
   const nextActionsRefreshCommand = "npm run release:next-actions";
   if (currentActionSummary.currentActionId !== "release-channel-metadata") {
+    const fallbackProofCommand = "npm run release:doctor";
+    const fallbackBlockerRefreshCommand = "npm run release:current-blocker";
+    const fallbackRows = [
+      {
+        order: 1,
+        step: "Edit target",
+        ready: true,
+        currentState: `current action ${currentActionSummary.currentActionId ?? "none"} is not the release-channel metadata edit`,
+        operatorAction: `Keep ${releaseChannelApplyPrivateEnvCommand} as the private value apply helper when release-channel metadata becomes current.`,
+        expectedPostEditSignal: "current placeholder key count is 0 after private release-channel values are applied",
+        command: releaseChannelApplyPrivateEnvCommand,
+        proofCommand: fallbackProofCommand,
+        rerunCommand: fallbackBlockerRefreshCommand,
+        sourceField: "currentActionId/currentEnvEditTarget",
+        valueRecorded: false
+      },
+      {
+        order: 2,
+        step: "Recommended strict proof chain",
+        ready: true,
+        currentState: `recommended operator proof chain ${recommendedPrivateEditOperatorProofCommand}`,
+        operatorAction: `Run ${recommendedPrivateEditOperatorProofCommand} after private release-channel metadata edits.`,
+        expectedPostEditSignal: "strict live-check, post-edit proof, progress refresh, and hard-gate boundary evidence are refreshed without recording values",
+        command: recommendedPrivateEditOperatorProofCommand,
+        proofCommand: recommendedPrivateEditOperatorProofCommand,
+        rerunCommand: fallbackBlockerRefreshCommand,
+        sourceField: "releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits",
+        valueRecorded: false
+      },
+      {
+        order: 3,
+        step: "Release doctor proof",
+        ready: true,
+        currentState: `lower-level release doctor proof command ${fallbackProofCommand}`,
+        operatorAction: `Run ${fallbackProofCommand} as the lower-level blocker refresh proof if the strict chain is inspected step-by-step.`,
+        expectedPostEditSignal: "release doctor reports release-channel metadata without placeholder blockers",
+        command: fallbackProofCommand,
+        proofCommand: fallbackProofCommand,
+        rerunCommand: fallbackBlockerRefreshCommand,
+        sourceField: "releaseChannelPostEditReceiptProofCommand",
+        valueRecorded: false
+      },
+      {
+        order: 4,
+        step: "Current blocker refresh",
+        ready: true,
+        currentState: `current blocker refresh command ${fallbackBlockerRefreshCommand}`,
+        operatorAction: `Run ${fallbackBlockerRefreshCommand} after ${recommendedPrivateEditOperatorProofCommand}.`,
+        expectedPostEditSignal: "current blocker no longer reports four release-channel metadata placeholders",
+        command: fallbackBlockerRefreshCommand,
+        proofCommand: fallbackProofCommand,
+        rerunCommand: fallbackBlockerRefreshCommand,
+        sourceField: "currentRerunCommand/currentCommandSequence",
+        valueRecorded: false
+      },
+      {
+        order: 5,
+        step: "Next-actions refresh",
+        ready: true,
+        currentState: `next-actions refresh command ${nextActionsRefreshCommand}`,
+        operatorAction: `Run ${nextActionsRefreshCommand} after the current blocker advances.`,
+        expectedPostEditSignal: "next priority action appears after release-channel metadata clears",
+        command: nextActionsRefreshCommand,
+        proofCommand: fallbackProofCommand,
+        rerunCommand: fallbackBlockerRefreshCommand,
+        sourceField: "nextActionsCommand/nextPriorityActionId",
+        valueRecorded: false
+      },
+      {
+        order: 6,
+        step: "Hard-gate boundary",
+        ready: true,
+        currentState: `hard gate remains ${hardExternalGateCommand}`,
+        operatorAction: "Keep the hard external distribution gate separate until downstream proofs are ready.",
+        expectedPostEditSignal: "external distribution remains unclaimed until the hard gate passes",
+        command: hardExternalGateCommand,
+        proofCommand: hardExternalGateCommand,
+        rerunCommand: fallbackBlockerRefreshCommand,
+        sourceField: "hardExternalGateCommand/releaseGateClaimedExternalDistribution",
+        valueRecorded: false
+      },
+      {
+        order: 7,
+        step: "Value redaction",
+        ready: true,
+        currentState: "post-edit receipt rows stay value-free while release-channel metadata is not current",
+        operatorAction: "Check receipts for readiness, counts, commands, and source fields only.",
+        expectedPostEditSignal: "private URL/channel values never appear in Markdown, JSON, or console output",
+        command: nextActionsRefreshCommand,
+        proofCommand: fallbackProofCommand,
+        rerunCommand: fallbackBlockerRefreshCommand,
+        sourceField: "releaseChannelPostEditReceiptValueRecorded",
+        valueRecorded: false
+      }
+    ];
     return {
       releaseChannelPostEditOperatorReceiptReady: true,
-      releaseChannelPostEditOperatorReceiptRowCount: 0,
-      releaseChannelPostEditOperatorReceiptSummary: "none",
-      releaseChannelPostEditOperatorReceiptRows: [],
-      releaseChannelPostEditOperatorReceiptProofCommand: proofCommand,
-      releaseChannelPostEditOperatorReceiptBlockerRefreshCommand: blockerRefreshCommand,
+      releaseChannelPostEditOperatorReceiptRowCount: fallbackRows.length,
+      releaseChannelPostEditOperatorReceiptSummary: `${fallbackRows.length} value-free release-channel post-edit operator receipt rows`,
+      releaseChannelPostEditOperatorReceiptRows: fallbackRows,
+      releaseChannelPostEditOperatorReceiptRecommendedProofCommand: recommendedPrivateEditOperatorProofCommand,
+      releaseChannelPostEditOperatorReceiptRecommendedProofCommandRole:
+        "recommended strict-first proof chain after replacing the four private release-channel placeholders",
+      releaseChannelPostEditOperatorReceiptRecommendedProofCommandValueRecorded: false,
+      releaseChannelPostEditOperatorReceiptProofCommand: fallbackProofCommand,
+      releaseChannelPostEditOperatorReceiptBlockerRefreshCommand: fallbackBlockerRefreshCommand,
       releaseChannelPostEditOperatorReceiptNextActionsCommand: nextActionsRefreshCommand,
       releaseChannelPostEditOperatorReceiptHardGateCommand: hardExternalGateCommand,
       releaseChannelPostEditOperatorReceiptValueRecorded: false
