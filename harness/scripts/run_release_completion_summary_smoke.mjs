@@ -135,6 +135,11 @@ function buildReport(source) {
     operatorBriefReady: summary.operatorBriefReady === true,
     releaseChannelMetadataBlocked: summary.releaseChannelMetadataBlocked === true,
     releaseChannelMetadataCleared: summary.releaseChannelMetadataCleared === true,
+    releaseChannelMetadataNeedsIgnoredEnv:
+      summary.releaseChannelMetadataNeedsIgnoredEnv === true ||
+      (summary.releaseChannelMetadataBlocked === true &&
+        integerValue(summary.releaseChannelCurrentReadyCount) < integerValue(summary.releaseChannelCurrentRequiredKeyCount) &&
+        integerValue(summary.releaseChannelCurrentPlaceholderKeyCount) === 0),
     releaseChannelCurrentReadyCount: integerValue(summary.releaseChannelCurrentReadyCount),
     releaseChannelCurrentRequiredKeyCount: integerValue(summary.releaseChannelCurrentRequiredKeyCount),
     releaseChannelCurrentPlaceholderKeyCount: integerValue(summary.releaseChannelCurrentPlaceholderKeyCount),
@@ -226,6 +231,7 @@ function buildMarkdown(report) {
 - Operator completion brief ready: ${readyLabel(report.operatorBriefReady)}
 - Release-channel metadata blocked: ${readyLabel(report.releaseChannelMetadataBlocked)}
 - Release-channel metadata cleared: ${readyLabel(report.releaseChannelMetadataCleared)}
+- Release-channel metadata needs ignored env: ${readyLabel(report.releaseChannelMetadataNeedsIgnoredEnv)}
 - Release-channel current ready rows: ${report.releaseChannelCurrentReadyCount}/${report.releaseChannelCurrentRequiredKeyCount}
 - Release-channel placeholders: ${report.releaseChannelCurrentPlaceholderKeyCount}/${report.releaseChannelCurrentRequiredKeyCount}
 - Operator proof command: \`${report.operatorProofCommand}\`
@@ -298,7 +304,12 @@ function validateReport(report, markdown) {
   check(report.missingArtifactCount === 0, "release completion summary should report zero missing artifacts");
   check(report.operatorBriefReady === true, "release completion summary should keep operator brief ready");
   check(report.releaseChannelMetadataBlocked !== report.releaseChannelMetadataCleared, "release completion summary should keep exactly one release-channel metadata posture");
-  check(!report.releaseChannelMetadataBlocked || report.releaseChannelCurrentPlaceholderKeyCount === 4, "release completion summary should keep four placeholders while blocked");
+  check(
+    !report.releaseChannelMetadataBlocked ||
+      report.releaseChannelCurrentPlaceholderKeyCount === 4 ||
+      report.releaseChannelMetadataNeedsIgnoredEnv,
+    "release completion summary should keep placeholders or require ignored env setup while blocked"
+  );
   check(!report.releaseChannelMetadataCleared || report.releaseChannelCurrentPlaceholderKeyCount === 0, "release completion summary should allow zero placeholders when cleared");
   check(report.operatorProofCommand === "npm run release:private-edit-strict-proof", "release completion summary should keep strict proof as operator proof command");
   check(report.strictProofHandoffReceiptReady === true, "release completion summary should expose strict proof handoff readiness");
@@ -312,7 +323,11 @@ function validateReport(report, markdown) {
   check(report.currentRequiredKeys.length === report.currentRequiredKeyCount, "release completion summary required keys should match count");
   check(report.currentPlaceholderKeys.length === report.currentPlaceholderKeyCount, "release completion summary placeholder keys should match count");
   check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderKeyCount, "release completion summary placeholder edit locations should match placeholders");
-  check(report.currentPlaceholderEditLocationSummary.includes(report.currentEnvEditTarget), "release completion summary should expose value-free edit location summary");
+  check(
+    report.currentPlaceholderEditLocationSummary.includes(report.currentEnvEditTarget) ||
+      (report.currentPlaceholderEditLocationCount === 0 && report.currentPlaceholderEditLocationSummary === "none"),
+    "release completion summary should expose value-free edit location summary or none before ignored env setup"
+  );
   check(report.completionBlockerActionReceiptReady === true, "release completion summary should expose ready blocker action receipt");
   check(report.completionBlockerActionRowCount === report.completionBlockerActionRows.length, "release completion summary blocker action row count should match rows");
   check(report.completionBlockerActionRowCount === 7, "release completion summary blocker action receipt should include seven rows");
@@ -376,6 +391,7 @@ console.log(`- Fresh artifacts: ${report.freshArtifactCount}`);
 console.log(`- Stale artifacts: ${report.staleArtifactCount}`);
 console.log(`- Missing artifacts: ${report.missingArtifactCount}`);
 console.log(`- Operator proof command: ${report.operatorProofCommand}`);
+console.log(`- Release-channel metadata needs ignored env: ${report.releaseChannelMetadataNeedsIgnoredEnv ? "yes" : "no"}`);
 console.log(`- Strict proof handoff ready: ${report.strictProofHandoffReceiptReady ? "yes" : "no"}`);
 console.log(`- Private-edit blocked smoke ready: ${report.privateEditBlockedSmokeReady ? "yes" : "no"}`);
 console.log(

@@ -25,6 +25,7 @@ const releaseChannelMetadataKeys = [
   "GROOVEFORGE_SUPPORT_URL"
 ];
 const recommendedOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const lowerLevelLiveCheckCommand = "npm run release:channel-live-check";
 const lowerLevelStrictProofCommand = "npm run release:channel-live-check-strict";
@@ -186,12 +187,18 @@ function operatorCommandRows(mode, currentEnvEditTarget) {
       ? [
           {
             order: 1,
+            command: releaseChannelSetupWizardCommand,
+            role: `guided local-only setup for the four private release-channel metadata values in ${currentEnvEditTarget}`,
+            valueRecorded: false
+          },
+          {
+            order: 2,
             command: "npm run release:prepare-env",
             role: "create the ignored local distribution env scaffold before private edits",
             valueRecorded: false
           },
           {
-            order: 2,
+            order: 3,
             command: releaseChannelApplyPrivateEnvCommand,
             role: `apply the four private release-channel metadata values from process env into ${currentEnvEditTarget}`,
             valueRecorded: false
@@ -200,6 +207,12 @@ function operatorCommandRows(mode, currentEnvEditTarget) {
       : [
           {
             order: 1,
+            command: releaseChannelSetupWizardCommand,
+            role: `guided local-only setup for the four private release-channel metadata values in ${currentEnvEditTarget}`,
+            valueRecorded: false
+          },
+          {
+            order: 2,
             command: releaseChannelApplyPrivateEnvCommand,
             role: `apply the four private release-channel metadata values from process env into ${currentEnvEditTarget}`,
             valueRecorded: false
@@ -345,6 +358,8 @@ function buildReport({ doctor, liveCheck, progress }) {
     operatorCommandRows: operatorRows,
     operatorCommandCount: operatorRows.length,
     operatorCommandSummary: commandSummary(operatorRows),
+    releaseChannelSetupWizardCommand,
+    releaseChannelSetupWizardCommandValueRecorded: false,
     releaseChannelApplyPrivateEnvCommand,
     releaseChannelRecommendedOperatorProofCommand: recommendedOperatorProofCommand,
     releaseChannelRecommendedOperatorProofCommandRole:
@@ -441,6 +456,7 @@ function buildMarkdown(report) {
 - Packet mode: ${report.releaseChannelEditPacketMode}
 - Refresh command order: ${report.refreshCommandSummary}
 - Operator command order: ${report.operatorCommandSummary}
+- Guided setup wizard command: \`${report.releaseChannelSetupWizardCommand}\`
 - First private metadata apply command: \`${report.releaseChannelApplyPrivateEnvCommand}\`
 - Recommended operator proof chain: \`${report.releaseChannelRecommendedOperatorProofCommand}\`
 - Recommended operator proof role: ${report.releaseChannelRecommendedOperatorProofCommandRole}
@@ -508,6 +524,10 @@ function validateReport(report, markdown) {
   check(report.operatorCommandCount >= 7, "release-channel edit packet should include operator proof commands");
   check(report.operatorCommandRows.every((row) => row.valueRecorded === false), "release-channel edit packet operator rows should be value-free");
   check(
+    report.operatorCommandRows.some((row) => row.command === releaseChannelSetupWizardCommand),
+    "release-channel edit packet should include the setup wizard"
+  );
+  check(
     report.operatorCommandRows.some((row) => row.command === releaseChannelApplyPrivateEnvCommand),
     "release-channel edit packet should include the private env apply helper"
   );
@@ -516,6 +536,8 @@ function validateReport(report, markdown) {
     "release-channel edit packet operator order should not use stale manual edit language"
   );
   check(report.releaseChannelApplyPrivateEnvCommand === releaseChannelApplyPrivateEnvCommand, "release-channel edit packet should expose the private env apply helper");
+  check(report.releaseChannelSetupWizardCommand === releaseChannelSetupWizardCommand, "release-channel edit packet should expose the setup wizard");
+  check(report.releaseChannelSetupWizardCommandValueRecorded === false, "release-channel edit packet setup wizard command should be value-free");
   check(
     report.operatorCommandRows.some((row) => row.command === recommendedOperatorProofCommand),
     "release-channel edit packet should include the recommended private-edit strict proof chain"

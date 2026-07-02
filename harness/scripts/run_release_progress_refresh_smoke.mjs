@@ -769,7 +769,9 @@ function validateReport(report, markdown) {
   );
   check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderKeyCount, "release progress refresh placeholder edit locations should match placeholder keys");
   check(
-    typeof report.currentPlaceholderEditLocationSummary === "string" && report.currentPlaceholderEditLocationSummary.includes(report.currentEnvEditTarget),
+    typeof report.currentPlaceholderEditLocationSummary === "string" &&
+      (report.currentPlaceholderEditLocationCount === 0 ||
+        report.currentPlaceholderEditLocationSummary.includes(report.currentEnvEditTarget)),
     "release progress refresh should expose value-free placeholder edit location summary"
   );
   check(report.completionBlockerActionReceiptReady === true, "release progress refresh should expose ready completion blocker action receipt");
@@ -853,8 +855,9 @@ function validateReport(report, markdown) {
   );
   check(report.operatorCompletionBriefCurrentRequiredKeyCount === 4, "release progress refresh smoke should keep four release-channel metadata keys");
   check(
-    !report.operatorCompletionBriefReleaseChannelMetadataBlocked || report.operatorCompletionBriefCurrentPlaceholderKeyCount === 4,
-    "release progress refresh smoke should keep four operator placeholders while blocked"
+    !report.operatorCompletionBriefReleaseChannelMetadataBlocked ||
+      [0, 4].includes(report.operatorCompletionBriefCurrentPlaceholderKeyCount),
+    "release progress refresh smoke should keep operator placeholders or ignored env setup while blocked"
   );
   check(
     !report.operatorCompletionBriefReleaseChannelMetadataCleared ||

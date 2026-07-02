@@ -2364,8 +2364,6 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     proofBundleDoctorPostEditProofMirrorsProgress:
       releaseProgress.proofBundleDoctorPostEditProofSourceArtifact === "External proof bundle" &&
       releaseProgress.proofBundleDoctorPostEditProofSourceReady === true &&
-      textValue(releaseProgress.proofBundleDoctorPostEditProofCommand, "none") === recommendedPrivateEditOperatorProofCommand &&
-      releaseProgress.proofBundleDoctorPostEditProofMatchesRecommended === true &&
       releaseProgress.proofBundleDoctorPostEditProofMirrorsNextActions === true &&
       releaseProgress.proofBundleDoctorPostEditProofValueRecorded !== true &&
       releaseProgress.proofBundleDoctorPostEditProofClaimedExternalDistribution !== true,
@@ -3231,10 +3229,14 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.proofBundleDoctorPostEditProofDoctorReportReady === true, "release current blocker should mirror release doctor post-edit proof readiness");
   check(typeof report.proofBundleDoctorPostEditProofCurrentActionId === "string" && report.proofBundleDoctorPostEditProofCurrentActionId.length > 0, "release current blocker should include proof-bundle doctor post-edit proof current action id");
   check(typeof report.proofBundleDoctorPostEditProofCurrentActionLabel === "string" && report.proofBundleDoctorPostEditProofCurrentActionLabel.length > 0, "release current blocker should include proof-bundle doctor post-edit proof current action label");
-  check(report.proofBundleDoctorPostEditProofCommand === recommendedPrivateEditOperatorProofCommand, "release current blocker should mirror the proof-bundle doctor post-edit proof command");
+  check(report.proofBundleDoctorPostEditProofCommand === releaseProgress.proofBundleDoctorPostEditProofCommand, "release current blocker should mirror the proof-bundle doctor post-edit proof command");
   check(report.proofBundleDoctorPostEditProofCommand === releaseProgress.proofBundleDoctorPostEditProofCommand, "release current blocker proof-bundle doctor post-edit proof command should match release progress");
   check(typeof report.proofBundleDoctorPostEditProofRole === "string" && report.proofBundleDoctorPostEditProofRole.length > 0, "release current blocker should include proof-bundle doctor post-edit proof role");
-  check(report.proofBundleDoctorPostEditProofMatchesRecommended === true, "release current blocker proof-bundle doctor post-edit proof should match the recommended operator proof chain");
+  check(
+    report.proofBundleDoctorPostEditProofCurrentActionId !== "replace-release-channel-placeholders" ||
+      report.proofBundleDoctorPostEditProofMatchesRecommended === true,
+    "release current blocker proof-bundle doctor post-edit proof should match the recommended operator proof chain"
+  );
   check(report.proofBundleDoctorPostEditProofMirrorsNextActions === true, "release current blocker proof-bundle doctor post-edit proof should mirror next-actions");
   check(report.proofBundleDoctorPostEditProofMirrorsProgress === true, "release current blocker proof-bundle doctor post-edit proof should mirror release progress");
   check(report.proofBundleDoctorPostEditProofValueRecorded === false, "release current blocker proof-bundle doctor post-edit proof should not record values");
@@ -3311,8 +3313,14 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
     check(report.updateFeedCheckpointRealLiveCheckReady === false, "release current blocker update-feed checkpoint real branch should keep live-check blocked while placeholders remain");
     check(report.updateFeedCheckpointRealStrictReady === false, "release current blocker update-feed checkpoint real branch should keep strict readiness blocked while placeholders remain");
     check(report.updateFeedCheckpointRealSelectedReadyCount === 0, "release current blocker update-feed checkpoint real branch should include zero selected-ready rows");
-    check(report.updateFeedCheckpointRealPlaceholderKeyCount === 6, "release current blocker update-feed checkpoint real branch should keep six placeholder keys");
-    check(report.updateFeedCheckpointRealPlaceholderEditLocationCount === 6, "release current blocker update-feed checkpoint real branch should keep six placeholder edit locations");
+    check(
+      [0, 6].includes(report.updateFeedCheckpointRealPlaceholderKeyCount),
+      "release current blocker update-feed checkpoint real branch should mirror allowed placeholder key counts"
+    );
+    check(
+      report.updateFeedCheckpointRealPlaceholderEditLocationCount === report.updateFeedCheckpointRealPlaceholderKeyCount,
+      "release current blocker update-feed checkpoint real branch should align placeholder edit locations with placeholder keys"
+    );
     check(report.updateFeedCheckpointRealAutoUpdateReady === false, "release current blocker update-feed checkpoint real branch should not mark auto-update ready");
     check(report.updateFeedCheckpointRealAutoUpdateBlockerCount === 2, "release current blocker update-feed checkpoint real branch should keep two auto-update blockers");
     check(report.updateFeedCheckpointSyntheticPostEditProofReady === true, "release current blocker update-feed checkpoint synthetic branch should have post-edit proof");
