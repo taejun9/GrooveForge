@@ -20,6 +20,7 @@ const completionReportPacketJsonPath = path.join(packageRoot, `${appName}-${pack
 const releaseProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-report.json`);
 const currentBlockerJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.json`);
 const progressFreshnessJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-freshness-smoke.json`);
+const releaseChannelPreflightBlockedJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-apply-private-env-preflight-blocked-smoke.json`);
 const reportCommand = "npm run release:operator-completion-brief-smoke";
 const completionPacketCommand = "npm run release:completion-report-packet-smoke";
 const progressCommand = "npm run release:progress-smoke";
@@ -283,6 +284,22 @@ function sanitizeEditRows(rows) {
   }));
 }
 
+function sanitizeProcessEnvInputChecklistRows(rows) {
+  return objectRows(rows).map((row, index) => ({
+    order: Number.isInteger(row.order) ? row.order : index + 1,
+    key: textValue(row.key),
+    inputSource: textValue(row.inputSource),
+    inputPresent: row.inputPresent === true,
+    inputPlaceholder: row.inputPlaceholder === true,
+    inputShapeReady: row.inputShapeReady === true,
+    expectedShape: textValue(row.expectedShape),
+    preflightCommand: textValue(row.preflightCommand),
+    writeCommand: textValue(row.writeCommand),
+    proofCommand: textValue(row.proofCommand),
+    valueRecorded: row.valueRecorded === false ? false : true
+  }));
+}
+
 function releaseChannelMetadataPosture({ completionReportPacket, currentBlocker }) {
   const requiredKeyCount = integerValueOr(
     currentBlocker.releaseChannelLiveCheckCurrentRequiredKeyCount,
@@ -432,6 +449,12 @@ function formatSourceRows(rows) {
     .join("\n");
 }
 
+function formatPreflightChecklistRows(rows) {
+  return rows
+    .map((row) => `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.inputSource)} | ${readyLabel(row.inputPresent)} | ${readyLabel(row.inputPlaceholder)} | ${readyLabel(row.inputShapeReady)} | ${escapeCell(row.expectedShape)} | \`${escapeCell(row.preflightCommand)}\` | \`${escapeCell(row.writeCommand)}\` | \`${escapeCell(row.proofCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatEditRows(rows) {
   return rows
     .map((row) => `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.location)} | \`${escapeCell(row.assignment)}\` | ${escapeCell(row.guidance)} | ${row.placeholder ? "yes" : "no"} | ${row.valueRecorded === false ? "no" : "yes"} |`)
@@ -485,6 +508,14 @@ function buildMarkdown(report) {
 - Operator brief first command matches current operator: ${readyLabel(report.operatorBriefFirstCommandMatchesCurrentOperator)}
 - Current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
 - Current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
+- Preflight process env checklist source ready: ${readyLabel(report.preflightProcessEnvChecklistSourceReady)}
+- Preflight process env checklist blocked smoke ready: ${readyLabel(report.preflightProcessEnvChecklistBlockedSmokeReady)}
+- Preflight process env checklist expected blocked exit observed: ${readyLabel(report.preflightProcessEnvChecklistExpectedBlockedExitObserved)}
+- Preflight process env checklist local env loaded: ${readyLabel(report.preflightProcessEnvChecklistLocalEnvFileLoaded)}
+- Preflight process env checklist source exit status: ${report.preflightProcessEnvChecklistSourceExitStatus}
+- Preflight process env checklist rows: ${report.preflightProcessEnvChecklistRowCount} (${report.preflightProcessEnvChecklistSummary})
+- Preflight process env checklist ready rows: ${report.preflightProcessEnvChecklistReadyCount}/${report.preflightProcessEnvChecklistRowCount}
+- Preflight process env checklist missing/placeholder/invalid rows: ${report.preflightProcessEnvChecklistMissingCount}/${report.preflightProcessEnvChecklistPlaceholderCount}/${report.preflightProcessEnvChecklistInvalidShapeCount}
 - Private-edit operator proof command: \`${report.privateEditOperatorProofCommand}\`
 - Post-clearance next action: ${report.postClearanceNextPriorityActionLabel}
 - Post-clearance proof command: \`${report.postClearanceNextActionPreviewProofCommand}\`
@@ -510,6 +541,12 @@ function buildMarkdown(report) {
 | label | path | command | present | ready | 10-plan | value recorded |
 |---|---|---|---:|---:|---|---:|
 ${formatSourceRows(report.sourceArtifactRows)}
+
+## Preflight Process Env Input Checklist
+
+| order | key | input source | input present | input placeholder | input shape ready | expected shape | preflight command | write command | proof command | value recorded |
+|---:|---|---|---:|---:|---:|---|---|---|---|---:|
+${formatPreflightChecklistRows(report.preflightProcessEnvChecklistRows)}
 
 ## Current Private Edit Rows
 
@@ -555,9 +592,33 @@ function outputLooksValueFree(text) {
   return !/https?:\/\//i.test(text) && !/:\/\/[^<\s]+/i.test(text);
 }
 
-function buildReport({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness }) {
+function buildReport({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness, releaseChannelPreflightBlocked }) {
   const latestTenPlanProgressLabel = textValue(completionReportPacket.latestTenPlanProgressLabel);
   const sourceRows = sourceArtifactRows({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness });
+  const preflightProcessEnvChecklistRows = sanitizeProcessEnvInputChecklistRows(releaseChannelPreflightBlocked.processEnvInputChecklistRows);
+  const preflightProcessEnvChecklistSourceReady =
+    releaseChannelPreflightBlocked.blockedSmokeReady === true &&
+    releaseChannelPreflightBlocked.expectedBlockedExitObserved === true &&
+    releaseChannelPreflightBlocked.sourceCommand === releaseChannelApplyPrivateEnvPreflightCommand &&
+    releaseChannelPreflightBlocked.currentOperatorFirstCommand === releaseChannelApplyPrivateEnvPreflightCommand &&
+    releaseChannelPreflightBlocked.nextWriteCommand === releaseChannelApplyPrivateEnvCommand &&
+    releaseChannelPreflightBlocked.recommendedOperatorProofCommand === privateEditOperatorProofCommand &&
+    releaseChannelPreflightBlocked.privateValuesRecorded === false &&
+    releaseChannelPreflightBlocked.localEnvValueRecorded === false &&
+    releaseChannelPreflightBlocked.releaseUrlValueRecorded === false &&
+    releaseChannelPreflightBlocked.supportUrlValueRecorded === false &&
+    releaseChannelPreflightBlocked.channelValueRecorded === false &&
+    releaseChannelPreflightBlocked.networkProbeAttempted === false &&
+    releaseChannelPreflightBlocked.releaseUploadAttempted === false &&
+    releaseChannelPreflightBlocked.signingAttempted === false &&
+    releaseChannelPreflightBlocked.notarySubmissionAttempted === false &&
+    releaseChannelPreflightBlocked.claimedExternalDistribution === false &&
+    preflightProcessEnvChecklistRows.length === 4 &&
+    preflightProcessEnvChecklistRows.every((row) => row.inputSource === "process.env") &&
+    preflightProcessEnvChecklistRows.every((row) => row.preflightCommand === releaseChannelApplyPrivateEnvPreflightCommand) &&
+    preflightProcessEnvChecklistRows.every((row) => row.writeCommand === releaseChannelApplyPrivateEnvCommand) &&
+    preflightProcessEnvChecklistRows.every((row) => row.proofCommand === privateEditOperatorProofCommand) &&
+    preflightProcessEnvChecklistRows.every((row) => row.valueRecorded === false);
   const currentEnvEditTarget = textValue(completionReportPacket.currentEnvEditTarget, currentBlocker.currentEnvEditTarget);
   const currentEnvEditRows = sanitizeEditRows(currentBlocker.currentEnvEditRows);
   const operatorRows = operatorBriefRows({ completionReportPacket, currentBlocker, progressFreshness, currentEnvEditTarget });
@@ -606,6 +667,7 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     integerValue(progressFreshness.missingArtifactCount) === 0 &&
     releaseChannelPosture.ready === true &&
     currentEditRowsReady === true &&
+    preflightProcessEnvChecklistSourceReady === true &&
     operatorRows.length === (releaseChannelPosture.needsIgnoredEnv === true ? 8 : 7) &&
     operatorRows.every((row) => row.valueRecorded === false) &&
     currentOperatorCommandSequenceReady === true &&
@@ -640,6 +702,26 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     sourceArtifactRowCount: sourceRows.length,
     sourceLabelsMatchLatestTenPlan: sourceLabelsMatchLatest(sourceRows, latestTenPlanProgressLabel),
     sourcePrivacyBoundaryReady: sourceBoundaryReady,
+    preflightProcessEnvChecklistSourceReady,
+    preflightProcessEnvChecklistArtifactPath: relative(releaseChannelPreflightBlockedJsonPath),
+    preflightProcessEnvChecklistReportCommand: textValue(releaseChannelPreflightBlocked.sourceCommand),
+    preflightProcessEnvChecklistPreflightOnly: true,
+    preflightProcessEnvChecklistBlockedSmokeReady: releaseChannelPreflightBlocked.blockedSmokeReady === true,
+    preflightProcessEnvChecklistExpectedBlockedExitObserved: releaseChannelPreflightBlocked.expectedBlockedExitObserved === true,
+    preflightProcessEnvChecklistLocalEnvFileLoaded: releaseChannelPreflightBlocked.localEnvFileLoaded === true,
+    preflightProcessEnvChecklistSourceExitStatus: integerValue(releaseChannelPreflightBlocked.sourceExitStatus),
+    preflightProcessEnvChecklistRows,
+    preflightProcessEnvChecklistRowCount: preflightProcessEnvChecklistRows.length,
+    preflightProcessEnvChecklistReadyCount: preflightProcessEnvChecklistRows.filter((row) => row.inputShapeReady === true).length,
+    preflightProcessEnvChecklistMissingCount: preflightProcessEnvChecklistRows.filter((row) => row.inputPresent !== true).length,
+    preflightProcessEnvChecklistPlaceholderCount: preflightProcessEnvChecklistRows.filter((row) => row.inputPlaceholder === true).length,
+    preflightProcessEnvChecklistInvalidShapeCount: preflightProcessEnvChecklistRows.filter(
+      (row) => row.inputPresent === true && row.inputPlaceholder === false && row.inputShapeReady !== true
+    ).length,
+    preflightProcessEnvChecklistSummary:
+      preflightProcessEnvChecklistRows.length > 0
+        ? `${preflightProcessEnvChecklistRows.length} value-free process.env input checklist rows`
+        : "none",
     releaseChannelMetadataPostureReady: releaseChannelPosture.ready,
     releaseChannelMetadataBlocked: releaseChannelPosture.blocked,
     releaseChannelMetadataCleared: releaseChannelPosture.cleared,
@@ -740,7 +822,8 @@ const completionReportPacket = await readJsonRequired(completionReportPacketJson
 const releaseProgress = await readJsonRequired(releaseProgressJsonPath, "Release progress report");
 const currentBlocker = await readJsonRequired(currentBlockerJsonPath, "Release current blocker");
 const progressFreshness = await readJsonRequired(progressFreshnessJsonPath, "Release progress freshness");
-const report = buildReport({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness });
+const releaseChannelPreflightBlocked = await readJsonRequired(releaseChannelPreflightBlockedJsonPath, "Release-channel private env preflight blocked smoke");
+const report = buildReport({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness, releaseChannelPreflightBlocked });
 const markdown = buildMarkdown(report);
 const jsonText = `${JSON.stringify(report, null, 2)}\n`;
 
@@ -749,6 +832,15 @@ check(report.sourceArtifactRowCount === 4, "release operator completion brief sh
 check(report.sourceArtifactRows.every((row) => row.ready === true && row.valueRecorded === false), "release operator completion brief source rows should be ready and value-free");
 check(report.sourceLabelsMatchLatestTenPlan === true, "release operator completion brief source labels should match latest 10-plan progress");
 check(report.sourcePrivacyBoundaryReady === true, "release operator completion brief source privacy boundaries should be ready");
+check(report.preflightProcessEnvChecklistSourceReady === true, "release operator completion brief should include ready private-env preflight checklist source");
+check(report.preflightProcessEnvChecklistBlockedSmokeReady === true, "release operator completion brief preflight checklist should come from the blocked preflight smoke");
+check(report.preflightProcessEnvChecklistExpectedBlockedExitObserved === true, "release operator completion brief preflight checklist should preserve expected blocked exit evidence");
+check(report.preflightProcessEnvChecklistRowCount === 4, "release operator completion brief preflight checklist should include four process env rows");
+check(report.preflightProcessEnvChecklistRows.every((row) => row.inputSource === "process.env"), "release operator completion brief preflight checklist rows should identify process.env input source");
+check(report.preflightProcessEnvChecklistRows.every((row) => row.preflightCommand === releaseChannelApplyPrivateEnvPreflightCommand), "release operator completion brief preflight checklist rows should carry preflight command");
+check(report.preflightProcessEnvChecklistRows.every((row) => row.writeCommand === releaseChannelApplyPrivateEnvCommand), "release operator completion brief preflight checklist rows should carry apply command");
+check(report.preflightProcessEnvChecklistRows.every((row) => row.proofCommand === privateEditOperatorProofCommand), "release operator completion brief preflight checklist rows should carry strict proof command");
+check(report.preflightProcessEnvChecklistRows.every((row) => row.valueRecorded === false), "release operator completion brief preflight checklist rows should be value-free");
 check(report.latestTenPlanProgressLabel === completionReportPacket.latestTenPlanProgressLabel, "release operator completion brief should mirror completion packet 10-plan progress");
 check(report.userFacingCompletionPercent === 99.999999, "release operator completion brief should keep user-facing completion percent");
 check(report.userFacingRemainingPercent === 0.000001, "release operator completion brief should keep remaining completion percent");
@@ -826,6 +918,7 @@ check(report.freshArtifactCount === report.freshnessRowCount, "release operator 
 check(report.staleArtifactCount === 0, "release operator completion brief should report zero stale artifacts");
 check(report.missingArtifactCount === 0, "release operator completion brief should report zero missing artifacts");
 check(rowsValueFree(report.sourceArtifactRows), "release operator completion brief source artifact rows should not record values");
+check(rowsValueFree(report.preflightProcessEnvChecklistRows), "release operator completion brief preflight checklist rows should not record values");
 check(rowsValueFree(report.currentEnvEditRows), "release operator completion brief current edit rows should not record values");
 check(rowsValueFree(report.operatorBriefRows), "release operator completion brief operator rows should not record values");
 check(rowsValueFree(report.currentOperatorCommandRows), "release operator completion brief current operator command rows should not record values");
@@ -845,6 +938,7 @@ check(report.claimedExternalDistribution === false, "release operator completion
 check(outputLooksValueFree(jsonText), "release operator completion brief JSON should not include URL values");
 check(outputLooksValueFree(markdown), "release operator completion brief Markdown should not include URL values");
 check(markdown.includes("Release Operator Completion Brief Smoke"), "release operator completion brief Markdown should include title");
+check(markdown.includes("Preflight Process Env Input Checklist"), "release operator completion brief Markdown should include preflight checklist");
 check(markdown.includes("Operator Brief Rows"), "release operator completion brief Markdown should include operator rows");
 check(markdown.includes("Current Operator Command Sequence"), "release operator completion brief Markdown should include current operator command sequence");
 check(markdown.includes("Current Private Edit Rows"), "release operator completion brief Markdown should include edit rows");
@@ -881,6 +975,14 @@ console.log(`- Operator brief first command: ${report.operatorBriefFirstCommand}
 console.log(`- Operator brief first command matches current operator: ${report.operatorBriefFirstCommandMatchesCurrentOperator ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
+console.log(`- Preflight process env checklist source ready: ${report.preflightProcessEnvChecklistSourceReady ? "yes" : "no"}`);
+console.log(`- Preflight process env checklist blocked smoke ready: ${report.preflightProcessEnvChecklistBlockedSmokeReady ? "yes" : "no"}`);
+console.log(`- Preflight process env checklist expected blocked exit observed: ${report.preflightProcessEnvChecklistExpectedBlockedExitObserved ? "yes" : "no"}`);
+console.log(`- Preflight process env checklist local env loaded: ${report.preflightProcessEnvChecklistLocalEnvFileLoaded ? "yes" : "no"}`);
+console.log(`- Preflight process env checklist source exit status: ${report.preflightProcessEnvChecklistSourceExitStatus}`);
+console.log(`- Preflight process env checklist rows: ${report.preflightProcessEnvChecklistRowCount} (${report.preflightProcessEnvChecklistSummary})`);
+console.log(`- Preflight process env checklist ready rows: ${report.preflightProcessEnvChecklistReadyCount}/${report.preflightProcessEnvChecklistRowCount}`);
+console.log(`- Preflight process env checklist missing/placeholder/invalid rows: ${report.preflightProcessEnvChecklistMissingCount}/${report.preflightProcessEnvChecklistPlaceholderCount}/${report.preflightProcessEnvChecklistInvalidShapeCount}`);
 console.log(`- Private-edit operator proof command: ${report.privateEditOperatorProofCommand}`);
 console.log(`- Post-clearance next action: ${report.postClearanceNextPriorityActionLabel}`);
 console.log(`- Post-clearance proof command: ${report.postClearanceNextActionPreviewProofCommand}`);
