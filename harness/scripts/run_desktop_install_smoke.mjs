@@ -178,6 +178,9 @@ async function checkInstalledApp() {
 
   const frameworkDependencies = await electronFrameworkDependencyReport(installedApp, { root, timeoutMs });
   check(frameworkDependencies.otoolReady, "installed app Electron Framework dependency scan should run");
+  check(frameworkDependencies.otoolLoadCommandsReady, "installed app Electron Framework rpath scan should run");
+  check(frameworkDependencies.appExecutableLoadCommandsReady, "installed app executable rpath scan should run");
+  check(frameworkDependencies.rpathScansReady, "installed app Electron dyld rpath scans should run");
   check(
     frameworkDependencies.allRequiredDependenciesReferenced,
     "installed app Electron Framework should reference Squirrel, ReactiveObjC, and Mantle through @rpath"
@@ -189,6 +192,10 @@ async function checkInstalledApp() {
   check(
     frameworkDependencies.allRequiredDependenciesCodeSigned,
     "installed app Electron runtime framework dependencies should pass codesign --verify --strict before launch"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesDyldLoadable,
+    "installed app Electron runtime framework dependencies should be dyld-loadable through @rpath before launch"
   );
   return frameworkDependencies;
 }
@@ -300,6 +307,9 @@ console.log("- Scope: local DMG mount, simulated Applications copy, ad-hoc signa
 console.log(`- Installed app: ${path.relative(root, installedApp)}`);
 console.log(
   `- Framework dependencies: ${frameworkDependencies.presentDependencyCount}/${frameworkDependencies.requiredDependencyCount} present, ${frameworkDependencies.signatureVerifiedDependencyCount}/${frameworkDependencies.requiredDependencyCount} code-signed`
+);
+console.log(
+  `- Dyld framework loadability: ${frameworkDependencies.dyldLoadableDependencyCount}/${frameworkDependencies.requiredDependencyCount} loadable via ${frameworkDependencies.rpathCount} dyld rpaths`
 );
 console.log(`- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors`);
 console.log("- Not claimed: real /Applications install, Developer ID signing, notarization, Gatekeeper approval, auto-update, app-store submission, or external distribution-channel QA");

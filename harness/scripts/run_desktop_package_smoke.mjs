@@ -593,6 +593,9 @@ async function checkPackagedApp(paths) {
 
   const frameworkDependencies = await electronFrameworkDependencyReport(paths.packagedApp, { root, timeoutMs });
   check(frameworkDependencies.otoolReady, "packaged app Electron Framework dependency scan should run");
+  check(frameworkDependencies.otoolLoadCommandsReady, "packaged app Electron Framework rpath scan should run");
+  check(frameworkDependencies.appExecutableLoadCommandsReady, "packaged app executable rpath scan should run");
+  check(frameworkDependencies.rpathScansReady, "packaged app Electron dyld rpath scans should run");
   check(
     frameworkDependencies.allRequiredDependenciesReferenced,
     "packaged app Electron Framework should reference Squirrel, ReactiveObjC, and Mantle through @rpath"
@@ -604,6 +607,10 @@ async function checkPackagedApp(paths) {
   check(
     frameworkDependencies.allRequiredDependenciesCodeSigned,
     "packaged app Electron runtime framework dependencies should pass codesign --verify --strict before launch"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesDyldLoadable,
+    "packaged app Electron runtime framework dependencies should be dyld-loadable through @rpath before launch"
   );
   paths.frameworkDependencies = frameworkDependencies;
 }
@@ -743,6 +750,9 @@ console.log(`- Entry: ${path.relative(root, path.join(paths.appRoot, "dist-elect
 console.log(`- Icon: ${path.basename(paths.icon.iconPath)}, ${paths.icon.iconBytes} bytes, GrooveForge bundle metadata`);
 console.log(
   `- Framework dependencies: ${paths.frameworkDependencies.presentDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} present, ${paths.frameworkDependencies.signatureVerifiedDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} code-signed`
+);
+console.log(
+  `- Dyld framework loadability: ${paths.frameworkDependencies.dyldLoadableDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} loadable via ${paths.frameworkDependencies.rpathCount} dyld rpaths`
 );
 console.log(
   `- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors`

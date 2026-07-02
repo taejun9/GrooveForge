@@ -233,8 +233,8 @@ ${formatCheckRows(report.requiredPayload)}
 
 ## Dyld Framework Dependency Checks
 
-| install name | referenced | present | code-signed | resolved path |
-|---|---:|---:|---:|---|
+| install name | referenced | present | code-signed | dyld-loadable | candidate count | resolved path |
+|---|---:|---:|---:|---:|---:|---|
 ${formatFrameworkDependencyRows(report.frameworkDependencies.requiredDependencyRows)}
 
 ## Not Recorded
@@ -323,6 +323,9 @@ async function checkExtractedApp(extractedApp) {
 
   const frameworkDependencies = await electronFrameworkDependencyReport(extractedApp, { root, timeoutMs });
   check(frameworkDependencies.otoolReady, "extracted app Electron Framework dependency scan should run");
+  check(frameworkDependencies.otoolLoadCommandsReady, "extracted app Electron Framework rpath scan should run");
+  check(frameworkDependencies.appExecutableLoadCommandsReady, "extracted app executable rpath scan should run");
+  check(frameworkDependencies.rpathScansReady, "extracted app Electron dyld rpath scans should run");
   check(
     frameworkDependencies.allRequiredDependenciesReferenced,
     "extracted app Electron Framework should reference Squirrel, ReactiveObjC, and Mantle through @rpath"
@@ -334,6 +337,10 @@ async function checkExtractedApp(extractedApp) {
   check(
     frameworkDependencies.allRequiredDependenciesCodeSigned,
     "extracted app Electron runtime framework dependencies should pass codesign --verify --strict before launch"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesDyldLoadable,
+    "extracted app Electron runtime framework dependencies should be dyld-loadable through @rpath before launch"
   );
 
   return { extractedExecutable, extractedAppRoot, requiredPayload, frameworkDependencies };
@@ -490,6 +497,7 @@ async function writeReport({ pkgStats, packageInfoPath, payloadArchive, extracte
   check(report.pkgPayloadSmokeReady === true, "PKG payload smoke report should be ready");
   check(report.frameworkDependencies.allRequiredDependenciesPresent === true, "PKG payload smoke should prove Electron framework dependencies are present");
   check(report.frameworkDependencies.allRequiredDependenciesCodeSigned === true, "PKG payload smoke should prove Electron framework dependencies pass strict code-sign verification");
+  check(report.frameworkDependencies.allRequiredDependenciesDyldLoadable === true, "PKG payload smoke should prove Electron framework dependencies are dyld-loadable through @rpath");
   check(report.pkg.signed === false, "PKG payload smoke should record unsigned package posture");
   check(report.realApplicationsInstallAttempted === false, "PKG payload smoke should not install into real Applications");
   check(report.pkgInstallerRunAttempted === false, "PKG payload smoke should not run macOS Installer");
@@ -543,6 +551,9 @@ console.log(`- SHA-256: ${report.pkg.sha256}`);
 console.log(`- Extracted app: ${report.payload.extractedAppPath}`);
 console.log(
   `- Framework dependencies: ${report.frameworkDependencies.presentDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} present, ${report.frameworkDependencies.signatureVerifiedDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} code-signed`
+);
+console.log(
+  `- Dyld framework loadability: ${report.frameworkDependencies.dyldLoadableDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} loadable via ${report.frameworkDependencies.rpathCount} dyld rpaths`
 );
 console.log(`- Visual: ${report.launch.visual.width}x${report.launch.visual.height}, ${report.launch.visual.pngBytes} PNG bytes, ${report.launch.visual.uniqueSampledColors} sampled colors`);
 console.log(`- Markdown: ${relative(reportMarkdownPath)}`);
