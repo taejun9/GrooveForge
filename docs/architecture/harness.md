@@ -112,6 +112,7 @@ npm run release:update-feed-post-edit-proof-success-smoke
 npm run release:update-metadata-publish-packet-smoke
 npm run release:developer-id-operator-packet-smoke
 npm run release:external-completion-run-packet-smoke
+npm run release:external-completion-resume-packet-smoke
 npm run release:update-feed-checkpoint-smoke
 npm run release:progress-refresh-smoke
 npm run release:completion-summary-refresh-smoke
@@ -156,6 +157,7 @@ npm run release:update-feed-post-edit-proof-success-smoke
 npm run release:update-metadata-publish-packet-smoke
 npm run release:developer-id-operator-packet-smoke
 npm run release:external-completion-run-packet-smoke
+npm run release:external-completion-resume-packet-smoke
 npm run release:update-feed-checkpoint-smoke
 npm run release:progress-refresh-smoke
 npm run release:progress-freshness-smoke
@@ -169,7 +171,7 @@ These commands validate the base structure, documentation rules, first-run React
 
 `npm run release:developer-id-operator-packet-smoke` writes a value-free operator handoff for Developer ID signing, notarization, stapled Gatekeeper evidence, manual QA, distribution-channel blockers, proof order, and hard-gate separation. `npm run release:developer-id-operator-packet-smoke` refreshes Developer ID readiness, conditional isolated signing/notarization/Gatekeeper evidence, manual QA, and distribution-channel QA, then reports Developer ID, notary, stapling, Gatekeeper, signed update artifact, manual QA, distribution-channel readiness rows without values. It conditionally refreshes isolated signing/notarization/Gatekeeper evidence only when local prerequisites exist, stays outside `npm run verify`, and keeps Developer ID identity labels, credentials, tokens, release/support/feed URLs, channel values, private beats, and real user audio out of JSON, Markdown, and console output.
 
-`npm run release:external-completion-run-packet-smoke` writes a value-free operator run receipt for the remaining external completion pass. It refreshes the completion summary, update feed edit packet, update metadata publish packet, and Developer ID operator packet in order, then reports source rows, blocker action/focus rows, current completion percentage, 10-plan progress, current blocker, current env edit target, and 12 ordered run rows from release-channel metadata through the hard gate without recording private values, probing networks, signing, submitting to Apple, publishing feeds, uploading releases, running the hard gate, or claiming auto-update/external distribution.
+`npm run release:external-completion-run-packet-smoke` writes a value-free operator run receipt for the remaining external completion pass. It refreshes the completion summary, update feed edit packet, update metadata publish packet, and Developer ID operator packet in order, then reports source rows, blocker action/focus rows, current completion percentage, 10-plan progress, current blocker, current env edit target, and 12 ordered run rows from release-channel metadata through the hard gate without recording private values, probing networks, signing, submitting to Apple, publishing feeds, uploading releases, running the hard gate, or claiming auto-update/external distribution. `npm run release:external-completion-resume-packet-smoke` refreshes the external completion run packet, then writes a value-free resume receipt with the first blocked run row and next resume command, next proof command, already-ready rows, remaining resume rows, blocker action/focus rows, and hard-gate posture without running the hard gate or claiming external distribution.
 
 `npm run release:private-value-leak-audit` treats generated YAML update metadata (`.yml`/`.yaml`) as scannable text evidence alongside Markdown, JSON, logs, scaffolds, and text files.
 
