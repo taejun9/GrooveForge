@@ -363,6 +363,33 @@ function formatCompletionBlockerFocusRows(rows) {
     .join("\n");
 }
 
+function formatProcessEnvInputRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.key)} | ${escapeCell(row.inputSource)} | ${readyLabel(row.inputPresent === true)} | ${readyLabel(row.inputPlaceholder === true)} | ${readyLabel(row.inputShapeReady === true)} | ${escapeCell(row.expectedShape)} | \`${escapeCell(row.preflightCommand)}\` | \`${escapeCell(row.writeCommand)}\` | \`${escapeCell(row.proofCommand)}\` | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
+function formatPreflightRemediationRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.key)} | ${readyLabel(row.inputPresent === true)} | ${readyLabel(row.inputPlaceholder === true)} | ${readyLabel(row.inputShapeReady === true)} | ${escapeCell(row.remediation)} | \`${escapeCell(row.nextCommand)}\` | \`${escapeCell(row.writeCommand)}\` | \`${escapeCell(row.proofCommand)}\` | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
+function formatPreflightOperatorReceiptRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.step)} | ${escapeCell(row.status)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.target)} | ${escapeCell(row.expectedEvidence)} | ${escapeCell(row.operatorAction)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function buildReport({ progressRefresh, completionSummary, externalResume, checkpoint, gitContext }) {
   const checkpointRequired = tenPlanCheckpointRequired(completionSummary);
   const checkpointReady = checkpointRequired ? checkpoint?.tenPlanCheckpointReady === true : false;
@@ -375,10 +402,18 @@ function buildReport({ progressRefresh, completionSummary, externalResume, check
   const currentOperatorCommandRows = objectRows(completionSummary.currentOperatorCommandRows);
   const externalResumeRows = objectRows(externalResume.resumeRows);
   const externalResumeAlreadyReadyRows = objectRows(externalResume.alreadyReadyRows);
+  const externalResumePreflightProcessEnvInputRows = objectRows(externalResume.privateEnvPreflightProcessEnvInputRows);
+  const externalResumePreflightRemediationRows = objectRows(externalResume.privateEnvPreflightRemediationRows);
+  const externalResumePreflightOperatorReceiptRows = objectRows(externalResume.privateEnvPreflightOperatorReceiptRows);
   const externalResumeReady =
     externalResume.externalCompletionResumePacketReady === true &&
     externalResume.sourcePacketReady === true &&
     externalResume.sourcePacketValueFree === true &&
+    externalResume.privateEnvPreflightBlockedReady === true &&
+    externalResume.privateEnvPreflightExpectedBlockedExitObserved === true &&
+    externalResume.privateEnvPreflightProcessEnvInputRowsValueFree === true &&
+    externalResume.privateEnvPreflightRemediationRowsValueFree === true &&
+    externalResume.privateEnvPreflightOperatorReceiptRowsValueFree === true &&
     externalResume.nextResumeMatchesCurrentOperatorFirstCommand === true &&
     externalResume.resumeRowsValueFree === true &&
     externalResume.alreadyReadyRowsValueFree === true &&
@@ -506,6 +541,63 @@ function buildReport({ progressRefresh, completionSummary, externalResume, check
     externalCompletionResumeSourceMode: textValue(externalResume.sourceMode),
     externalCompletionResumeSourcePacketReady: externalResume.sourcePacketReady === true,
     externalCompletionResumeSourcePacketValueFree: externalResume.sourcePacketValueFree === true,
+    externalCompletionResumePrivateEnvPreflightBlockedReady: externalResume.privateEnvPreflightBlockedReady === true,
+    externalCompletionResumePrivateEnvPreflightExpectedBlockedExitObserved:
+      externalResume.privateEnvPreflightExpectedBlockedExitObserved === true,
+    externalCompletionResumePrivateEnvPreflightSourceCommand: textValue(
+      externalResume.privateEnvPreflightSourceCommand,
+      releaseChannelApplyPrivateEnvPreflightCommand
+    ),
+    externalCompletionResumePrivateEnvPreflightSourceExitStatus: integerValue(externalResume.privateEnvPreflightSourceExitStatus),
+    externalCompletionResumePrivateEnvPreflightSourcePreflightReady: externalResume.privateEnvPreflightSourcePreflightReady === true,
+    externalCompletionResumePrivateEnvPreflightSourceApplyReady: externalResume.privateEnvPreflightSourceApplyReady === true,
+    externalCompletionResumePrivateEnvPreflightLocalEnvFileLoaded: externalResume.privateEnvPreflightLocalEnvFileLoaded === true,
+    externalCompletionResumePrivateEnvPreflightLocalEnvModified: externalResume.privateEnvPreflightLocalEnvModified === true,
+    externalCompletionResumePrivateEnvPreflightRealLocalEnvModified: externalResume.privateEnvPreflightRealLocalEnvModified === true,
+    externalCompletionResumePrivateEnvPreflightRequiredInputCount: integerValue(externalResume.privateEnvPreflightRequiredInputCount),
+    externalCompletionResumePrivateEnvPreflightMissingInputCount: integerValue(externalResume.privateEnvPreflightMissingInputCount),
+    externalCompletionResumePrivateEnvPreflightProcessEnvInputRows: externalResumePreflightProcessEnvInputRows,
+    externalCompletionResumePrivateEnvPreflightProcessEnvInputRowCount: integerValue(
+      externalResume.privateEnvPreflightProcessEnvInputRowCount
+    ),
+    externalCompletionResumePrivateEnvPreflightProcessEnvInputRowsValueFree:
+      externalResume.privateEnvPreflightProcessEnvInputRowsValueFree === true &&
+      valueFreeRows(externalResumePreflightProcessEnvInputRows),
+    externalCompletionResumePrivateEnvPreflightRemediationRows: externalResumePreflightRemediationRows,
+    externalCompletionResumePrivateEnvPreflightRemediationRowCount: integerValue(
+      externalResume.privateEnvPreflightRemediationRowCount
+    ),
+    externalCompletionResumePrivateEnvPreflightRemediationRowsValueFree:
+      externalResume.privateEnvPreflightRemediationRowsValueFree === true && valueFreeRows(externalResumePreflightRemediationRows),
+    externalCompletionResumePrivateEnvPreflightOperatorReceiptReady:
+      externalResume.privateEnvPreflightOperatorReceiptReady === true,
+    externalCompletionResumePrivateEnvPreflightOperatorReceiptRows: externalResumePreflightOperatorReceiptRows,
+    externalCompletionResumePrivateEnvPreflightOperatorReceiptRowCount: integerValue(
+      externalResume.privateEnvPreflightOperatorReceiptRowCount
+    ),
+    externalCompletionResumePrivateEnvPreflightOperatorReceiptRowsValueFree:
+      externalResume.privateEnvPreflightOperatorReceiptRowsValueFree === true &&
+      valueFreeRows(externalResumePreflightOperatorReceiptRows),
+    externalCompletionResumePrivateEnvPreflightCurrentOperatorFirstCommand: textValue(
+      externalResume.privateEnvPreflightCurrentOperatorFirstCommand,
+      releaseChannelApplyPrivateEnvPreflightCommand
+    ),
+    externalCompletionResumePrivateEnvPreflightNextWriteCommand: textValue(
+      externalResume.privateEnvPreflightNextWriteCommand,
+      releaseChannelApplyPrivateEnvCommand
+    ),
+    externalCompletionResumePrivateEnvPreflightRecommendedOperatorProofCommand: textValue(
+      externalResume.privateEnvPreflightRecommendedOperatorProofCommand,
+      "npm run release:private-edit-strict-proof"
+    ),
+    externalCompletionResumePrivateEnvPreflightHardGateCommand: textValue(
+      externalResume.privateEnvPreflightHardGateCommand,
+      "npm run release:external-check"
+    ),
+    externalCompletionResumePrivateEnvPreflightPrivateValuesRecorded:
+      externalResume.privateEnvPreflightPrivateValuesRecorded === true,
+    externalCompletionResumePrivateEnvPreflightClaimedExternalDistribution:
+      externalResume.privateEnvPreflightClaimedExternalDistribution === true,
     externalCompletionResumeLatestPlan: textValue(externalResume.latestPlan),
     externalCompletionResumeTenPlanProgress: textValue(externalResume.tenPlanProgress),
     externalCompletionResumeCurrentFirstBlocker: textValue(externalResume.currentFirstBlocker),
@@ -635,6 +727,9 @@ function buildMarkdown(report) {
 - Recommended operator proof chain: \`${report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits}\`
 - External resume packet ready: ${readyLabel(report.externalCompletionResumePacketReady)}
 - External resume source mode: ${report.externalCompletionResumeSourceMode}
+- External resume private-env preflight blocked ready: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightBlockedReady)}
+- External resume private-env missing inputs: ${report.externalCompletionResumePrivateEnvPreflightMissingInputCount}/${report.externalCompletionResumePrivateEnvPreflightRequiredInputCount}
+- External resume private-env expected blocked exit: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightExpectedBlockedExitObserved)}
 - External resume next command: \`${report.externalCompletionResumeNextCommand}\`
 - External resume next proof command: \`${report.externalCompletionResumeNextProofCommand}\`
 - External resume matches current operator first command: ${readyLabel(report.externalCompletionResumeMatchesCurrentOperatorFirstCommand)}
@@ -671,6 +766,26 @@ ${formatCommandRows(report.refreshCommands)}
 - Source mode: ${report.externalCompletionResumeSourceMode}
 - Source packet ready: ${readyLabel(report.externalCompletionResumeSourcePacketReady)}
 - Source packet value-free: ${readyLabel(report.externalCompletionResumeSourcePacketValueFree)}
+- Private-env preflight blocked ready: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightBlockedReady)}
+- Private-env preflight source command: \`${report.externalCompletionResumePrivateEnvPreflightSourceCommand}\`
+- Private-env preflight source exit status: ${report.externalCompletionResumePrivateEnvPreflightSourceExitStatus}
+- Private-env expected blocked exit observed: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightExpectedBlockedExitObserved)}
+- Private-env preflight ready: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightSourcePreflightReady)}
+- Private-env apply ready: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightSourceApplyReady)}
+- Private-env local env loaded: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightLocalEnvFileLoaded)}
+- Private-env local env modified: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightLocalEnvModified)}
+- Private-env real local env modified: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightRealLocalEnvModified)}
+- Private-env missing process env inputs: ${report.externalCompletionResumePrivateEnvPreflightMissingInputCount}/${report.externalCompletionResumePrivateEnvPreflightRequiredInputCount}
+- Private-env process env rows value-free: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightProcessEnvInputRowsValueFree)}
+- Private-env remediation rows value-free: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightRemediationRowsValueFree)}
+- Private-env operator receipt ready: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightOperatorReceiptReady)}
+- Private-env operator receipt rows value-free: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightOperatorReceiptRowsValueFree)}
+- Private-env current operator first command: \`${report.externalCompletionResumePrivateEnvPreflightCurrentOperatorFirstCommand}\`
+- Private-env next write command: \`${report.externalCompletionResumePrivateEnvPreflightNextWriteCommand}\`
+- Private-env recommended proof command: \`${report.externalCompletionResumePrivateEnvPreflightRecommendedOperatorProofCommand}\`
+- Private-env hard gate command: \`${report.externalCompletionResumePrivateEnvPreflightHardGateCommand}\`
+- Private-env private values recorded: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightPrivateValuesRecorded)}
+- Private-env external distribution claimed: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightClaimedExternalDistribution)}
 - Latest plan: ${report.externalCompletionResumeLatestPlan}
 - 10-plan progress: ${report.externalCompletionResumeTenPlanProgress}
 - Current first blocker: ${report.externalCompletionResumeCurrentFirstBlocker}
@@ -686,6 +801,24 @@ ${formatCommandRows(report.refreshCommands)}
 - Hard gate would fail: ${readyLabel(report.externalCompletionResumeHardGateWouldFail)}
 - Private values recorded: ${readyLabel(report.externalCompletionResumePrivateValuesRecorded)}
 - External distribution claimed: ${readyLabel(report.externalCompletionResumeClaimedExternalDistribution)}
+
+### Private Env Process Input Checklist
+
+| order | key | input source | input present | input placeholder | input shape ready | expected shape | preflight command | write command | proof command | value recorded |
+|---:|---|---|---:|---:|---:|---|---|---|---|---:|
+${formatProcessEnvInputRows(report.externalCompletionResumePrivateEnvPreflightProcessEnvInputRows)}
+
+### Private Env Preflight Remediation Rows
+
+| order | key | input present | input placeholder | input shape ready | remediation | next command | write command | proof command | value recorded |
+|---:|---|---:|---:|---:|---|---|---|---|---:|
+${formatPreflightRemediationRows(report.externalCompletionResumePrivateEnvPreflightRemediationRows)}
+
+### Private Env Preflight Operator Receipt
+
+| order | step | status | command | target | expected evidence | operator action | value recorded |
+|---:|---|---|---|---|---|---|---:|
+${formatPreflightOperatorReceiptRows(report.externalCompletionResumePrivateEnvPreflightOperatorReceiptRows)}
 
 ## Completion Blocker Action Receipt
 
@@ -870,6 +1003,124 @@ function validateReport(report, markdown) {
   check(report.externalCompletionResumeSourceMode === "existing-run-packet", "release completion summary refresh should use the non-recursive existing run packet resume mode");
   check(report.externalCompletionResumeSourcePacketReady === true, "release completion summary refresh should require a ready external completion run packet source");
   check(report.externalCompletionResumeSourcePacketValueFree === true, "release completion summary refresh should require a value-free external completion run packet source");
+  check(
+    report.externalCompletionResumePrivateEnvPreflightBlockedReady === true,
+    "release completion summary refresh should mirror ready blocked private-env preflight evidence"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightExpectedBlockedExitObserved === true,
+    "release completion summary refresh should prove the private-env preflight blocked exit was expected"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightSourceCommand === releaseChannelApplyPrivateEnvPreflightCommand,
+    "release completion summary refresh should cite private env preflight command"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightSourceExitStatus !== 0,
+    "release completion summary refresh should record blocked private-env preflight source status"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightSourcePreflightReady === false,
+    "release completion summary refresh should keep blocked private-env preflight unready"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightSourceApplyReady === false,
+    "release completion summary refresh should keep private-env apply unready"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightLocalEnvModified === false,
+    "release completion summary refresh should prove private-env preflight did not modify local env"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightRealLocalEnvModified === false,
+    "release completion summary refresh should prove private-env preflight did not modify the real local env"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightRequiredInputCount === 4,
+    "release completion summary refresh should require four private-env process inputs"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightMissingInputCount === 4,
+    "release completion summary refresh should mirror four missing private-env process inputs in blocked evidence"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightProcessEnvInputRows.length ===
+      report.externalCompletionResumePrivateEnvPreflightProcessEnvInputRowCount,
+    "release completion summary refresh private-env process input row count should match rows"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightProcessEnvInputRowCount === 4,
+    "release completion summary refresh should mirror four private-env process input rows"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightProcessEnvInputRowsValueFree === true,
+    "release completion summary refresh private-env process input rows should be value-free"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightProcessEnvInputRows.every(
+      (row) =>
+        row.inputSource === "process.env" &&
+        row.inputPresent === false &&
+        row.inputPlaceholder === false &&
+        row.inputShapeReady === false &&
+        row.preflightCommand === releaseChannelApplyPrivateEnvPreflightCommand &&
+        row.writeCommand === releaseChannelApplyPrivateEnvCommand &&
+        row.proofCommand === "npm run release:private-edit-strict-proof" &&
+        row.valueRecorded === false
+    ),
+    "release completion summary refresh private-env process input rows should describe missing value-free inputs"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightRemediationRows.length ===
+      report.externalCompletionResumePrivateEnvPreflightRemediationRowCount,
+    "release completion summary refresh private-env remediation row count should match rows"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightRemediationRowCount === 4,
+    "release completion summary refresh should mirror four private-env remediation rows"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightRemediationRowsValueFree === true,
+    "release completion summary refresh private-env remediation rows should be value-free"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightOperatorReceiptReady === true,
+    "release completion summary refresh should mirror ready private-env preflight operator receipt"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightOperatorReceiptRows.length ===
+      report.externalCompletionResumePrivateEnvPreflightOperatorReceiptRowCount,
+    "release completion summary refresh private-env operator receipt row count should match rows"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightOperatorReceiptRowCount === 6,
+    "release completion summary refresh private-env operator receipt should include six rows"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightOperatorReceiptRowsValueFree === true,
+    "release completion summary refresh private-env operator receipt rows should be value-free"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightNextWriteCommand === releaseChannelApplyPrivateEnvCommand,
+    "release completion summary refresh should mirror private-env write command"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightRecommendedOperatorProofCommand ===
+      "npm run release:private-edit-strict-proof",
+    "release completion summary refresh should mirror private-env recommended proof command"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightHardGateCommand === "npm run release:external-check",
+    "release completion summary refresh should mirror private-env hard gate command"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightPrivateValuesRecorded === false,
+    "release completion summary refresh private-env preflight should not record private values"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightClaimedExternalDistribution === false,
+    "release completion summary refresh private-env preflight should not claim external distribution"
+  );
   check(report.externalCompletionResumeLatestPlan === report.latestPlan, "release completion summary refresh should align resume latest plan");
   check(report.externalCompletionResumeTenPlanProgress === report.tenPlanProgress, "release completion summary refresh should align resume 10-plan progress");
   check(
@@ -997,6 +1248,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("Checkpoint proof/gate refresh ready:"), "release completion summary refresh Markdown should include checkpoint proof/gate readiness");
   check(markdown.includes("Checkpoint current operator sequence ready:"), "release completion summary refresh Markdown should include checkpoint current operator readiness");
   check(markdown.includes("## Completion Blocker Action Receipt"), "release completion summary refresh Markdown should include blocker action receipt section");
+  check(markdown.includes("Private Env Process Input Checklist"), "release completion summary refresh Markdown should include private-env process input checklist");
   check(markdown.includes("## Completion Blocker Focus Rows"), "release completion summary refresh Markdown should include blocker focus rows");
   check(markdown.includes("Completion blocker action receipt ready: yes"), "release completion summary refresh Markdown should include blocker action receipt readiness");
   check(markdown.includes("## Git Worktree Context"), "release completion summary refresh Markdown should include git context section");
@@ -1092,6 +1344,12 @@ async function main() {
   console.log(`- Private env apply command: ${report.releaseChannelPrivateEnvApplyCommand}`);
   console.log(`- Private env apply before strict proof: ${report.releaseChannelPrivateEnvApplyBeforeStrictProof ? "yes" : "no"}`);
   console.log(`- External resume packet ready: ${report.externalCompletionResumePacketReady ? "yes" : "no"}`);
+  console.log(
+    `- External resume private-env preflight missing inputs: ${report.externalCompletionResumePrivateEnvPreflightMissingInputCount}/${report.externalCompletionResumePrivateEnvPreflightRequiredInputCount}`
+  );
+  console.log(
+    `- External resume private-env preflight blocked ready: ${report.externalCompletionResumePrivateEnvPreflightBlockedReady ? "yes" : "no"}`
+  );
   console.log(`- External resume next command: ${report.externalCompletionResumeNextCommand}`);
   console.log(`- External resume next proof command: ${report.externalCompletionResumeNextProofCommand}`);
   console.log(

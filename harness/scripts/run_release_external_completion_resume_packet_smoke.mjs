@@ -14,10 +14,13 @@ const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
 const sourcePacketStem = "release-external-completion-run-packet-smoke";
 const sourcePacketJsonArtifactName = "release-external-completion-run-packet-smoke.json";
+const preflightBlockedStem = "release-channel-apply-private-env-preflight-blocked-smoke";
+const preflightBlockedJsonArtifactName = "release-channel-apply-private-env-preflight-blocked-smoke.json";
 const resumePacketStem = "release-external-completion-resume-packet-smoke";
 const resumePacketMarkdownArtifactName = "release-external-completion-resume-packet-smoke.md";
 const resumePacketJsonArtifactName = "release-external-completion-resume-packet-smoke.json";
 const sourcePacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${sourcePacketStem}.json`);
+const preflightBlockedJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${preflightBlockedStem}.json`);
 const resumePacketMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${resumePacketStem}.md`);
 const resumePacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${resumePacketStem}.json`);
 const failures = [];
@@ -31,10 +34,16 @@ const refreshCommands = [
     command: "npm run release:external-completion-run-packet-smoke",
     role: "refresh the ordered external completion run packet before deriving the current resume point",
     valueRecorded: false
+  },
+  {
+    order: 2,
+    command: "npm run release:channel-apply-private-env-preflight-blocked-smoke",
+    role: "refresh value-free blocked private-env preflight evidence for the current resume point",
+    valueRecorded: false
   }
 ];
 const fromExistingRunPacket = process.argv.includes("--from-existing-run-packet");
-const activeRefreshCommands = fromExistingRunPacket ? [] : refreshCommands;
+const activeRefreshCommands = fromExistingRunPacket ? refreshCommands.slice(1) : refreshCommands;
 
 function check(condition, message) {
   if (!condition) {
@@ -109,6 +118,50 @@ function commandRowFromSource(row, label) {
   };
 }
 
+function copyProcessEnvInputRow(row) {
+  return {
+    order: integerValue(row.order),
+    key: textValue(row.key),
+    inputSource: textValue(row.inputSource),
+    inputPresent: row.inputPresent === true,
+    inputPlaceholder: row.inputPlaceholder === true,
+    inputShapeReady: row.inputShapeReady === true,
+    expectedShape: textValue(row.expectedShape),
+    preflightCommand: textValue(row.preflightCommand),
+    writeCommand: textValue(row.writeCommand),
+    proofCommand: textValue(row.proofCommand),
+    valueRecorded: false
+  };
+}
+
+function copyPreflightRemediationRow(row) {
+  return {
+    order: integerValue(row.order),
+    key: textValue(row.key),
+    inputPresent: row.inputPresent === true,
+    inputPlaceholder: row.inputPlaceholder === true,
+    inputShapeReady: row.inputShapeReady === true,
+    remediation: textValue(row.remediation),
+    nextCommand: textValue(row.nextCommand),
+    writeCommand: textValue(row.writeCommand, releaseChannelApplyPrivateEnvCommand),
+    proofCommand: textValue(row.proofCommand, privateEditStrictProofCommand),
+    valueRecorded: false
+  };
+}
+
+function copyOperatorReceiptRow(row) {
+  return {
+    order: integerValue(row.order),
+    step: textValue(row.step),
+    status: textValue(row.status),
+    command: textValue(row.command),
+    target: textValue(row.target),
+    expectedEvidence: textValue(row.expectedEvidence),
+    operatorAction: textValue(row.operatorAction),
+    valueRecorded: false
+  };
+}
+
 function runNpmScript(command) {
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
   const [, , scriptName] = command.trim().split(/\s+/);
@@ -132,9 +185,12 @@ async function readJsonRequired(filePath, label) {
   return JSON.parse(await readFile(filePath, "utf8"));
 }
 
-function buildReport(sourcePacket) {
+function buildReport(sourcePacket, preflightBlocked) {
   const runRows = objectRows(sourcePacket.runRows);
   const currentOperatorCommandRows = objectRows(sourcePacket.currentOperatorCommandRows);
+  const preflightProcessEnvInputRows = objectRows(preflightBlocked.processEnvInputChecklistRows).map(copyProcessEnvInputRow);
+  const preflightRemediationRows = objectRows(preflightBlocked.preflightRemediationRows).map(copyPreflightRemediationRow);
+  const preflightOperatorReceiptRows = objectRows(preflightBlocked.operatorReceiptRows).map(copyOperatorReceiptRow);
   const currentOperatorPreflightCommand = textValue(
     sourcePacket.currentOperatorPreflightCommand,
     releaseChannelApplyPrivateEnvPreflightCommand
@@ -174,6 +230,36 @@ function buildReport(sourcePacket) {
     sourcePacketPresent: existsSync(sourcePacketJsonPath),
     sourcePacketReady: sourcePacket.externalCompletionRunPacketReady === true,
     sourcePacketValueFree: sourcePacket.privateValuesRecorded === false && sourcePacket.claimedExternalDistribution === false && valueFreeRows(sourcePacket.runRows),
+    privateEnvPreflightBlockedJsonArtifactName: preflightBlockedJsonArtifactName,
+    privateEnvPreflightBlockedPath: relative(preflightBlockedJsonPath),
+    privateEnvPreflightBlockedPresent: existsSync(preflightBlockedJsonPath),
+    privateEnvPreflightBlockedReady: preflightBlocked.blockedSmokeReady === true,
+    privateEnvPreflightExpectedBlockedExitObserved: preflightBlocked.expectedBlockedExitObserved === true,
+    privateEnvPreflightSourceCommand: textValue(preflightBlocked.sourceCommand, releaseChannelApplyPrivateEnvPreflightCommand),
+    privateEnvPreflightSourceExitStatus: integerValue(preflightBlocked.sourceExitStatus),
+    privateEnvPreflightSourcePreflightReady: preflightBlocked.sourcePreflightReady === true,
+    privateEnvPreflightSourceApplyReady: preflightBlocked.sourceApplyReady === true,
+    privateEnvPreflightLocalEnvFileLoaded: preflightBlocked.localEnvFileLoaded === true,
+    privateEnvPreflightLocalEnvModified: preflightBlocked.localEnvModified === true,
+    privateEnvPreflightRealLocalEnvModified: preflightBlocked.realLocalEnvModified === true,
+    privateEnvPreflightRequiredInputCount: integerValue(preflightBlocked.requiredInputCount),
+    privateEnvPreflightMissingInputCount: integerValue(preflightBlocked.missingInputCount),
+    privateEnvPreflightProcessEnvInputRows: preflightProcessEnvInputRows,
+    privateEnvPreflightProcessEnvInputRowCount: integerValue(preflightBlocked.processEnvInputChecklistRowCount),
+    privateEnvPreflightProcessEnvInputRowsValueFree: valueFreeRows(preflightProcessEnvInputRows),
+    privateEnvPreflightRemediationRows: preflightRemediationRows,
+    privateEnvPreflightRemediationRowCount: integerValue(preflightBlocked.preflightRemediationRowCount),
+    privateEnvPreflightRemediationRowsValueFree: valueFreeRows(preflightRemediationRows),
+    privateEnvPreflightOperatorReceiptReady: preflightBlocked.operatorReceiptReady === true,
+    privateEnvPreflightOperatorReceiptRows: preflightOperatorReceiptRows,
+    privateEnvPreflightOperatorReceiptRowCount: integerValue(preflightBlocked.operatorReceiptRowCount),
+    privateEnvPreflightOperatorReceiptRowsValueFree: valueFreeRows(preflightOperatorReceiptRows),
+    privateEnvPreflightCurrentOperatorFirstCommand: textValue(preflightBlocked.currentOperatorFirstCommand, releaseChannelApplyPrivateEnvPreflightCommand),
+    privateEnvPreflightNextWriteCommand: textValue(preflightBlocked.nextWriteCommand, releaseChannelApplyPrivateEnvCommand),
+    privateEnvPreflightRecommendedOperatorProofCommand: textValue(preflightBlocked.recommendedOperatorProofCommand, privateEditStrictProofCommand),
+    privateEnvPreflightHardGateCommand: textValue(preflightBlocked.hardGateCommand, "npm run release:external-check"),
+    privateEnvPreflightPrivateValuesRecorded: preflightBlocked.privateValuesRecorded === true,
+    privateEnvPreflightClaimedExternalDistribution: preflightBlocked.claimedExternalDistribution === true,
     latestPlan: textValue(sourcePacket.latestPlan),
     latestPlanNumber: integerValue(sourcePacket.latestPlanNumber),
     tenPlanProgress: textValue(sourcePacket.tenPlanProgress),
@@ -280,6 +366,33 @@ function formatCurrentOperatorCommandRows(rows) {
     .join("\n");
 }
 
+function formatProcessEnvInputRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.key)} | ${escapeCell(row.inputSource)} | ${readyLabel(row.inputPresent)} | ${readyLabel(row.inputPlaceholder)} | ${readyLabel(row.inputShapeReady)} | ${escapeCell(row.expectedShape)} | \`${escapeCell(row.preflightCommand)}\` | \`${escapeCell(row.writeCommand)}\` | \`${escapeCell(row.proofCommand)}\` | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
+function formatPreflightRemediationRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.key)} | ${readyLabel(row.inputPresent)} | ${readyLabel(row.inputPlaceholder)} | ${readyLabel(row.inputShapeReady)} | ${escapeCell(row.remediation)} | \`${escapeCell(row.nextCommand)}\` | \`${escapeCell(row.writeCommand)}\` | \`${escapeCell(row.proofCommand)}\` | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
+function formatPreflightOperatorReceiptRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.step)} | ${escapeCell(row.status)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.target)} | ${escapeCell(row.expectedEvidence)} | ${escapeCell(row.operatorAction)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function formatCompletionActionRows(rows) {
   return rows
     .map(
@@ -305,6 +418,10 @@ function buildMarkdown(report) {
 
 - External completion resume packet ready: ${readyLabel(report.externalCompletionResumePacketReady)}
 - Source packet ready: ${readyLabel(report.sourcePacketReady)}
+- Private-env preflight blocked smoke ready: ${readyLabel(report.privateEnvPreflightBlockedReady)}
+- Private-env preflight missing inputs: ${report.privateEnvPreflightMissingInputCount}/${report.privateEnvPreflightRequiredInputCount}
+- Private-env preflight source ready: ${readyLabel(report.privateEnvPreflightSourcePreflightReady)}
+- Private-env preflight expected blocked exit observed: ${readyLabel(report.privateEnvPreflightExpectedBlockedExitObserved)}
 - Latest completed plan: ${report.latestPlan}
 - 10-plan progress: ${report.tenPlanProgress}
 - User-facing completion: ${report.completionPercent}%
@@ -379,6 +496,48 @@ ${formatResumeRows(report.alreadyReadyRows)}
 |---:|---|---|---:|---:|
 ${formatCurrentOperatorCommandRows(report.currentOperatorCommandRows)}
 
+## Private Env Preflight Blocker
+
+- Blocked smoke ready: ${readyLabel(report.privateEnvPreflightBlockedReady)}
+- Artifact: ${report.privateEnvPreflightBlockedPath}
+- Source command: \`${report.privateEnvPreflightSourceCommand}\`
+- Source exit status: ${report.privateEnvPreflightSourceExitStatus}
+- Expected blocked exit observed: ${readyLabel(report.privateEnvPreflightExpectedBlockedExitObserved)}
+- Source preflight ready: ${readyLabel(report.privateEnvPreflightSourcePreflightReady)}
+- Source apply ready: ${readyLabel(report.privateEnvPreflightSourceApplyReady)}
+- Local env loaded: ${readyLabel(report.privateEnvPreflightLocalEnvFileLoaded)}
+- Local env modified: ${readyLabel(report.privateEnvPreflightLocalEnvModified)}
+- Real local env modified: ${readyLabel(report.privateEnvPreflightRealLocalEnvModified)}
+- Missing process env inputs: ${report.privateEnvPreflightMissingInputCount}/${report.privateEnvPreflightRequiredInputCount}
+- Process env rows value-free: ${readyLabel(report.privateEnvPreflightProcessEnvInputRowsValueFree)}
+- Remediation rows value-free: ${readyLabel(report.privateEnvPreflightRemediationRowsValueFree)}
+- Operator receipt ready: ${readyLabel(report.privateEnvPreflightOperatorReceiptReady)}
+- Operator receipt rows value-free: ${readyLabel(report.privateEnvPreflightOperatorReceiptRowsValueFree)}
+- Current operator first command: \`${report.privateEnvPreflightCurrentOperatorFirstCommand}\`
+- Next write command: \`${report.privateEnvPreflightNextWriteCommand}\`
+- Recommended proof command: \`${report.privateEnvPreflightRecommendedOperatorProofCommand}\`
+- Hard gate command: \`${report.privateEnvPreflightHardGateCommand}\`
+- Private values recorded: ${readyLabel(report.privateEnvPreflightPrivateValuesRecorded)}
+- External distribution claimed: ${readyLabel(report.privateEnvPreflightClaimedExternalDistribution)}
+
+### Process Env Input Checklist
+
+| order | key | input source | input present | input placeholder | input shape ready | expected shape | preflight command | write command | proof command | value recorded |
+|---:|---|---|---:|---:|---:|---|---|---|---|---:|
+${formatProcessEnvInputRows(report.privateEnvPreflightProcessEnvInputRows)}
+
+### Preflight Remediation Rows
+
+| order | key | input present | input placeholder | input shape ready | remediation | next command | write command | proof command | value recorded |
+|---:|---|---:|---:|---:|---|---|---|---|---:|
+${formatPreflightRemediationRows(report.privateEnvPreflightRemediationRows)}
+
+### Preflight Operator Receipt
+
+| order | step | status | command | target | expected evidence | operator action | value recorded |
+|---:|---|---|---|---|---|---|---:|
+${formatPreflightOperatorReceiptRows(report.privateEnvPreflightOperatorReceiptRows)}
+
 ## Current Completion Blocker Actions
 
 | order | item | ready | current state | operator action | evidence | proof command | source field | value recorded |
@@ -405,18 +564,95 @@ function validateReport(report, markdown) {
   check(report.sourceCommand === "npm run release:external-completion-run-packet-smoke", "external completion resume packet should cite source command");
   if (fromExistingRunPacket) {
     check(report.sourceMode === "existing-run-packet", "external completion resume packet should report existing run packet mode");
-    check(report.refreshCommandCount === 0, "external completion resume packet existing-run mode should not refresh source packets");
+    check(report.refreshCommandCount === 1, "external completion resume packet existing-run mode should refresh only blocked preflight evidence");
+    check(
+      report.refreshCommands[0]?.command === "npm run release:channel-apply-private-env-preflight-blocked-smoke",
+      "external completion resume packet existing-run mode should refresh blocked preflight evidence"
+    );
   } else {
     check(report.sourceMode === "refreshed-run-packet", "external completion resume packet should report refreshed run packet mode");
-    check(report.refreshCommandCount === 1, "external completion resume packet should refresh one source packet");
+    check(report.refreshCommandCount === 2, "external completion resume packet should refresh run packet and blocked preflight evidence");
     check(
       report.refreshCommands[0]?.command === "npm run release:external-completion-run-packet-smoke",
       "external completion resume packet should refresh the run packet first"
+    );
+    check(
+      report.refreshCommands[1]?.command === "npm run release:channel-apply-private-env-preflight-blocked-smoke",
+      "external completion resume packet should refresh blocked preflight evidence second"
     );
   }
   check(report.sourcePacketPresent === true, "external completion resume packet source packet should be present");
   check(report.sourcePacketReady === true, "external completion resume packet source packet should be ready");
   check(report.sourcePacketValueFree === true, "external completion resume packet source packet should be value-free");
+  check(report.privateEnvPreflightBlockedPresent === true, "external completion resume packet blocked preflight artifact should be present");
+  check(report.privateEnvPreflightBlockedReady === true, "external completion resume packet should include ready blocked preflight evidence");
+  check(report.privateEnvPreflightExpectedBlockedExitObserved === true, "external completion resume packet should prove expected blocked preflight exit");
+  check(report.privateEnvPreflightSourceCommand === releaseChannelApplyPrivateEnvPreflightCommand, "external completion resume packet should cite private env preflight command");
+  check(report.privateEnvPreflightSourceExitStatus !== 0, "external completion resume packet blocked preflight source should exit nonzero");
+  check(report.privateEnvPreflightSourcePreflightReady === false, "external completion resume packet blocked preflight should not be preflight ready");
+  check(report.privateEnvPreflightSourceApplyReady === false, "external completion resume packet blocked preflight should not be apply ready");
+  check(report.privateEnvPreflightLocalEnvModified === false, "external completion resume packet blocked preflight should not modify local env");
+  check(report.privateEnvPreflightRealLocalEnvModified === false, "external completion resume packet blocked preflight should not modify real local env");
+  check(report.privateEnvPreflightRequiredInputCount === 4, "external completion resume packet blocked preflight should require four process env inputs");
+  check(report.privateEnvPreflightMissingInputCount === 4, "external completion resume packet blocked preflight should prove four missing process env inputs");
+  check(
+    report.privateEnvPreflightProcessEnvInputRowCount === report.privateEnvPreflightProcessEnvInputRows.length,
+    "external completion resume packet blocked preflight process env row count should match rows"
+  );
+  check(report.privateEnvPreflightProcessEnvInputRowCount === 4, "external completion resume packet blocked preflight should include four process env rows");
+  check(report.privateEnvPreflightProcessEnvInputRowsValueFree === true, "external completion resume packet blocked preflight process env rows should be value-free");
+  check(
+    report.privateEnvPreflightProcessEnvInputRows.every(
+      (row) =>
+        row.inputSource === "process.env" &&
+        row.inputPresent === false &&
+        row.inputPlaceholder === false &&
+        row.inputShapeReady === false &&
+        row.preflightCommand === releaseChannelApplyPrivateEnvPreflightCommand &&
+        row.writeCommand === releaseChannelApplyPrivateEnvCommand &&
+        row.proofCommand === privateEditStrictProofCommand &&
+        row.valueRecorded === false
+    ),
+    "external completion resume packet blocked preflight process env rows should describe missing value-free inputs"
+  );
+  check(
+    report.privateEnvPreflightRemediationRowCount === report.privateEnvPreflightRemediationRows.length,
+    "external completion resume packet blocked preflight remediation row count should match rows"
+  );
+  check(report.privateEnvPreflightRemediationRowCount === 4, "external completion resume packet blocked preflight should include four remediation rows");
+  check(report.privateEnvPreflightRemediationRowsValueFree === true, "external completion resume packet blocked preflight remediation rows should be value-free");
+  check(
+    report.privateEnvPreflightRemediationRows.every(
+      (row) =>
+        row.writeCommand === releaseChannelApplyPrivateEnvCommand &&
+        row.proofCommand === privateEditStrictProofCommand &&
+        row.valueRecorded === false
+    ),
+    "external completion resume packet blocked preflight remediation rows should keep write/proof commands value-free"
+  );
+  check(report.privateEnvPreflightOperatorReceiptReady === true, "external completion resume packet blocked preflight should include ready operator receipt");
+  check(
+    report.privateEnvPreflightOperatorReceiptRowCount === report.privateEnvPreflightOperatorReceiptRows.length,
+    "external completion resume packet blocked preflight operator receipt count should match rows"
+  );
+  check(report.privateEnvPreflightOperatorReceiptRowCount === 6, "external completion resume packet blocked preflight operator receipt should include six rows");
+  check(report.privateEnvPreflightOperatorReceiptRowsValueFree === true, "external completion resume packet blocked preflight operator receipt rows should be value-free");
+  check(
+    report.privateEnvPreflightOperatorReceiptRows.some((row) => row.command === releaseChannelApplyPrivateEnvCommand),
+    "external completion resume packet blocked preflight operator receipt should include private env apply command"
+  );
+  check(
+    report.privateEnvPreflightOperatorReceiptRows.some((row) => row.command === privateEditStrictProofCommand),
+    "external completion resume packet blocked preflight operator receipt should include strict proof command"
+  );
+  check(report.privateEnvPreflightNextWriteCommand === releaseChannelApplyPrivateEnvCommand, "external completion resume packet blocked preflight should expose next write command");
+  check(
+    report.privateEnvPreflightRecommendedOperatorProofCommand === privateEditStrictProofCommand,
+    "external completion resume packet blocked preflight should expose recommended proof command"
+  );
+  check(report.privateEnvPreflightHardGateCommand === "npm run release:external-check", "external completion resume packet blocked preflight should expose hard gate command");
+  check(report.privateEnvPreflightPrivateValuesRecorded === false, "external completion resume packet blocked preflight should not record private values");
+  check(report.privateEnvPreflightClaimedExternalDistribution === false, "external completion resume packet blocked preflight should not claim external distribution");
   check(report.latestPlanNumber > 0, "external completion resume packet should include latest plan number");
   check(report.tenPlanTotal === 10, "external completion resume packet should keep ten-plan total");
   check(report.completionPercent === 99.999999, "external completion resume packet should preserve completion percent");
@@ -523,6 +759,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("## First Blocked Run Row"), "external completion resume packet Markdown should include first blocked row");
   check(markdown.includes("## Resume Rows"), "external completion resume packet Markdown should include resume rows");
   check(markdown.includes("## Current Operator Command Sequence"), "external completion resume packet Markdown should include current operator command sequence");
+  check(markdown.includes("## Private Env Preflight Blocker"), "external completion resume packet Markdown should include private env preflight blocker");
   check(markdown.includes("External distribution claimed: no"), "external completion resume packet Markdown should keep external distribution unclaimed");
 
   if (failures.length > 0) {
@@ -535,8 +772,11 @@ for (const step of activeRefreshCommands) {
   runNpmScript(step.command);
 }
 
-const sourcePacket = await readJsonRequired(sourcePacketJsonPath, "release external completion run packet");
-const report = buildReport(sourcePacket);
+const [sourcePacket, preflightBlocked] = await Promise.all([
+  readJsonRequired(sourcePacketJsonPath, "release external completion run packet"),
+  readJsonRequired(preflightBlockedJsonPath, "release-channel private env preflight blocked smoke")
+]);
+const report = buildReport(sourcePacket, preflightBlocked);
 report.externalCompletionResumePacketReady = true;
 const markdown = buildMarkdown(report);
 validateReport(report, markdown);
@@ -560,6 +800,9 @@ console.log(`- Current operator first command: ${report.currentOperatorFirstComm
 console.log(`- Next resume matches current operator first command: ${report.nextResumeMatchesCurrentOperatorFirstCommand ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
+console.log(`- Private-env preflight blocked smoke ready: ${report.privateEnvPreflightBlockedReady ? "yes" : "no"}`);
+console.log(`- Private-env preflight missing inputs: ${report.privateEnvPreflightMissingInputCount}/${report.privateEnvPreflightRequiredInputCount}`);
+console.log(`- Private-env preflight operator receipt rows: ${report.privateEnvPreflightOperatorReceiptRowCount}`);
 console.log(`- First blocked phase: ${report.firstBlockedPhase}`);
 console.log(`- Next resume command: ${report.nextResumeCommand}`);
 console.log(`- Next resume proof command: ${report.nextResumeProofCommand}`);
