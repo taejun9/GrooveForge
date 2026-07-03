@@ -64,6 +64,8 @@ const refreshCommands = [
     valueRecorded: false
   }
 ];
+const fromExistingCompletionSummary = process.argv.includes("--from-existing-completion-summary");
+const activeRefreshCommands = fromExistingCompletionSummary ? refreshCommands.slice(1) : refreshCommands;
 
 function check(condition, message) {
   if (!condition) {
@@ -311,15 +313,7 @@ function buildRunRows({ completionSummary, updateFeedPacket, updateMetadataPacke
 }
 
 function buildSourceRows({ completionSummaryRefresh, completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket }) {
-  return [
-    sourceRow(
-      "completion-summary-refresh",
-      completionSummaryRefreshJsonPath,
-      completionSummaryRefresh.completionSummaryRefreshReady === true &&
-        completionSummaryRefresh.privateValuesRecorded === false &&
-        completionSummaryRefresh.claimedExternalDistribution === false,
-      "npm run release:completion-summary-refresh-smoke"
-    ),
+  const rows = [
     sourceRow(
       "completion-summary",
       completionSummaryJsonPath,
@@ -353,6 +347,19 @@ function buildSourceRows({ completionSummaryRefresh, completionSummary, updateFe
       "npm run release:developer-id-operator-packet-smoke"
     )
   ];
+  if (!fromExistingCompletionSummary) {
+    rows.unshift(
+      sourceRow(
+        "completion-summary-refresh",
+        completionSummaryRefreshJsonPath,
+        completionSummaryRefresh?.completionSummaryRefreshReady === true &&
+          completionSummaryRefresh.privateValuesRecorded === false &&
+          completionSummaryRefresh.claimedExternalDistribution === false,
+        "npm run release:completion-summary-refresh-smoke"
+      )
+    );
+  }
+  return rows;
 }
 
 function buildReport({ completionSummaryRefresh, completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket }) {
@@ -385,8 +392,9 @@ function buildReport({ completionSummaryRefresh, completionSummary, updateFeedPa
     arch: process.arch,
     platformArch,
     reportCommand: "npm run release:external-completion-run-packet-smoke",
-    refreshCommands,
-    refreshCommandCount: refreshCommands.length,
+    sourceMode: fromExistingCompletionSummary ? "existing-completion-summary" : "refreshed-completion-summary",
+    refreshCommands: activeRefreshCommands,
+    refreshCommandCount: activeRefreshCommands.length,
     externalCompletionRunPacketMarkdownArtifactName: packetMarkdownArtifactName,
     externalCompletionRunPacketJsonArtifactName: packetJsonArtifactName,
     externalCompletionRunPacketMarkdownPath: relative(packetMarkdownPath),
@@ -640,13 +648,25 @@ function validateReport(report, markdown) {
   check(report.appName === appName, "external completion run packet should identify GrooveForge");
   check(report.bundleId === bundleId, `external completion run packet should identify ${bundleId}`);
   check(report.reportCommand === "npm run release:external-completion-run-packet-smoke", "external completion run packet should report its command");
-  check(report.refreshCommandCount === 4, "external completion run packet should refresh four source packets");
-  check(
-    report.refreshCommands.map((row) => row.command).join(" -> ") ===
-      "npm run release:completion-summary-refresh-smoke -> npm run release:update-feed-edit-packet-smoke -> npm run release:update-metadata-publish-packet-smoke -> npm run release:developer-id-operator-packet-smoke",
-    "external completion run packet should keep source refresh order"
-  );
-  check(report.sourceRowCount === 5, "external completion run packet should include five source rows");
+  if (fromExistingCompletionSummary) {
+    check(report.sourceMode === "existing-completion-summary", "external completion run packet should report existing completion summary mode");
+    check(report.refreshCommandCount === 3, "external completion run packet existing-summary mode should refresh three downstream packets");
+    check(
+      report.refreshCommands.map((row) => row.command).join(" -> ") ===
+        "npm run release:update-feed-edit-packet-smoke -> npm run release:update-metadata-publish-packet-smoke -> npm run release:developer-id-operator-packet-smoke",
+      "external completion run packet existing-summary mode should keep downstream refresh order"
+    );
+    check(report.sourceRowCount === 4, "external completion run packet existing-summary mode should include four source rows");
+  } else {
+    check(report.sourceMode === "refreshed-completion-summary", "external completion run packet should report refreshed completion summary mode");
+    check(report.refreshCommandCount === 4, "external completion run packet should refresh four source packets");
+    check(
+      report.refreshCommands.map((row) => row.command).join(" -> ") ===
+        "npm run release:completion-summary-refresh-smoke -> npm run release:update-feed-edit-packet-smoke -> npm run release:update-metadata-publish-packet-smoke -> npm run release:developer-id-operator-packet-smoke",
+      "external completion run packet should keep source refresh order"
+    );
+    check(report.sourceRowCount === 5, "external completion run packet should include five source rows");
+  }
   check(report.sourceRows.every((row) => row.present === true && row.ready === true), "external completion run packet source rows should be present and ready");
   check(report.sourceRowsValueFree === true, "external completion run packet source rows should be value-free");
   check(report.latestPlanNumber > 0, "external completion run packet should include latest plan number");
@@ -770,13 +790,13 @@ function validateReport(report, markdown) {
   }
 }
 
-for (const step of refreshCommands) {
+for (const step of activeRefreshCommands) {
   console.log(`Refreshing release external completion run packet evidence: ${step.command}`);
   runNpmScript(step.command);
 }
 
 const [completionSummaryRefresh, completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket] = await Promise.all([
-  readJsonRequired(completionSummaryRefreshJsonPath, "release completion summary refresh"),
+  fromExistingCompletionSummary ? Promise.resolve(null) : readJsonRequired(completionSummaryRefreshJsonPath, "release completion summary refresh"),
   readJsonRequired(completionSummaryJsonPath, "release completion summary"),
   readJsonRequired(updateFeedPacketJsonPath, "release update feed edit packet"),
   readJsonRequired(updateMetadataPacketJsonPath, "release update metadata publish packet"),

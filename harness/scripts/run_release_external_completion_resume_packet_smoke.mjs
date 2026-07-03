@@ -33,6 +33,8 @@ const refreshCommands = [
     valueRecorded: false
   }
 ];
+const fromExistingRunPacket = process.argv.includes("--from-existing-run-packet");
+const activeRefreshCommands = fromExistingRunPacket ? [] : refreshCommands;
 
 function check(condition, message) {
   if (!condition) {
@@ -159,8 +161,9 @@ function buildReport(sourcePacket) {
     platformArch,
     reportCommand: "npm run release:external-completion-resume-packet-smoke",
     sourceCommand: "npm run release:external-completion-run-packet-smoke",
-    refreshCommands,
-    refreshCommandCount: refreshCommands.length,
+    sourceMode: fromExistingRunPacket ? "existing-run-packet" : "refreshed-run-packet",
+    refreshCommands: activeRefreshCommands,
+    refreshCommandCount: activeRefreshCommands.length,
     externalCompletionResumePacketMarkdownArtifactName: resumePacketMarkdownArtifactName,
     externalCompletionResumePacketJsonArtifactName: resumePacketJsonArtifactName,
     externalCompletionResumePacketMarkdownPath: relative(resumePacketMarkdownPath),
@@ -400,8 +403,17 @@ function validateReport(report, markdown) {
   check(report.bundleId === bundleId, `external completion resume packet should identify ${bundleId}`);
   check(report.reportCommand === "npm run release:external-completion-resume-packet-smoke", "external completion resume packet should report its command");
   check(report.sourceCommand === "npm run release:external-completion-run-packet-smoke", "external completion resume packet should cite source command");
-  check(report.refreshCommandCount === 1, "external completion resume packet should refresh one source packet");
-  check(report.refreshCommands[0]?.command === "npm run release:external-completion-run-packet-smoke", "external completion resume packet should refresh the run packet first");
+  if (fromExistingRunPacket) {
+    check(report.sourceMode === "existing-run-packet", "external completion resume packet should report existing run packet mode");
+    check(report.refreshCommandCount === 0, "external completion resume packet existing-run mode should not refresh source packets");
+  } else {
+    check(report.sourceMode === "refreshed-run-packet", "external completion resume packet should report refreshed run packet mode");
+    check(report.refreshCommandCount === 1, "external completion resume packet should refresh one source packet");
+    check(
+      report.refreshCommands[0]?.command === "npm run release:external-completion-run-packet-smoke",
+      "external completion resume packet should refresh the run packet first"
+    );
+  }
   check(report.sourcePacketPresent === true, "external completion resume packet source packet should be present");
   check(report.sourcePacketReady === true, "external completion resume packet source packet should be ready");
   check(report.sourcePacketValueFree === true, "external completion resume packet source packet should be value-free");
@@ -518,7 +530,7 @@ function validateReport(report, markdown) {
   }
 }
 
-for (const step of refreshCommands) {
+for (const step of activeRefreshCommands) {
   console.log(`Refreshing release external completion resume packet evidence: ${step.command}`);
   runNpmScript(step.command);
 }

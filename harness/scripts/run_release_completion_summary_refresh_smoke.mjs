@@ -16,9 +16,13 @@ const receiptStem = "release-completion-summary-refresh-smoke";
 const progressRefreshStem = "release-progress-refresh-smoke";
 const completionSummaryStem = "release-completion-summary-smoke";
 const checkpointStem = "release-10-plan-checkpoint-smoke";
+const externalRunPacketStem = "release-external-completion-run-packet-smoke";
+const externalResumePacketStem = "release-external-completion-resume-packet-smoke";
 const progressRefreshJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${progressRefreshStem}.json`);
 const completionSummaryJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${completionSummaryStem}.json`);
 const checkpointJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${checkpointStem}.json`);
+const externalRunPacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${externalRunPacketStem}.json`);
+const externalResumePacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${externalResumePacketStem}.json`);
 const receiptMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${receiptStem}.md`);
 const receiptJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${receiptStem}.json`);
 const failures = [];
@@ -45,11 +49,27 @@ const requiredRefreshCommands = [
     condition: "always",
     skipped: false,
     valueRecorded: false
+  },
+  {
+    order: 3,
+    command: "npm run release:external-completion-run-packet-smoke -- --from-existing-completion-summary",
+    role: "refresh the ordered external completion run packet from the just-refreshed completion summary",
+    condition: "always",
+    skipped: false,
+    valueRecorded: false
+  },
+  {
+    order: 4,
+    command: "npm run release:external-completion-resume-packet-smoke -- --from-existing-run-packet",
+    role: "refresh the current external completion resume packet from the ordered run packet",
+    condition: "always",
+    skipped: false,
+    valueRecorded: false
   }
 ];
 
 const checkpointCommandRow = {
-  order: 3,
+  order: 5,
   command: "npm run release:10-plan-checkpoint-smoke",
   role: "emit the 10-plan checkpoint receipt at a completed report boundary",
   condition: "when 10-plan progress is 10/10",
@@ -343,7 +363,7 @@ function formatCompletionBlockerFocusRows(rows) {
     .join("\n");
 }
 
-function buildReport({ progressRefresh, completionSummary, checkpoint, gitContext }) {
+function buildReport({ progressRefresh, completionSummary, externalResume, checkpoint, gitContext }) {
   const checkpointRequired = tenPlanCheckpointRequired(completionSummary);
   const checkpointReady = checkpointRequired ? checkpoint?.tenPlanCheckpointReady === true : false;
   const userFacingCompletionPercent = percentNumber(completionSummary.completionPercent);
@@ -353,6 +373,18 @@ function buildReport({ progressRefresh, completionSummary, checkpoint, gitContex
   const completionBlockerActionRows = objectRows(completionSummary.completionBlockerActionRows);
   const completionBlockerFocusRows = objectRows(completionSummary.completionBlockerFocusRows);
   const currentOperatorCommandRows = objectRows(completionSummary.currentOperatorCommandRows);
+  const externalResumeRows = objectRows(externalResume.resumeRows);
+  const externalResumeAlreadyReadyRows = objectRows(externalResume.alreadyReadyRows);
+  const externalResumeReady =
+    externalResume.externalCompletionResumePacketReady === true &&
+    externalResume.sourcePacketReady === true &&
+    externalResume.sourcePacketValueFree === true &&
+    externalResume.nextResumeMatchesCurrentOperatorFirstCommand === true &&
+    externalResume.resumeRowsValueFree === true &&
+    externalResume.alreadyReadyRowsValueFree === true &&
+    externalResume.privateValuesRecorded === false &&
+    externalResume.claimedExternalDistribution === false &&
+    externalResume.valueRecorded === false;
   const report = {
     appName,
     bundleId,
@@ -367,11 +399,15 @@ function buildReport({ progressRefresh, completionSummary, checkpoint, gitContex
     tenPlanCheckpointCommand: checkpointCommandRow.command,
     progressRefreshJsonArtifactName: "release-progress-refresh-smoke.json",
     completionSummaryJsonArtifactName: "release-completion-summary-smoke.json",
+    externalCompletionRunPacketJsonArtifactName: "release-external-completion-run-packet-smoke.json",
+    externalCompletionResumePacketJsonArtifactName: "release-external-completion-resume-packet-smoke.json",
     tenPlanCheckpointJsonArtifactName: "release-10-plan-checkpoint-smoke.json",
     completionSummaryRefreshMarkdownArtifactName: "release-completion-summary-refresh-smoke.md",
     completionSummaryRefreshJsonArtifactName: "release-completion-summary-refresh-smoke.json",
     progressRefreshJsonPath: relative(progressRefreshJsonPath),
     completionSummaryJsonPath: relative(completionSummaryJsonPath),
+    externalCompletionRunPacketJsonPath: relative(externalRunPacketJsonPath),
+    externalCompletionResumePacketJsonPath: relative(externalResumePacketJsonPath),
     tenPlanCheckpointJsonPath: checkpointRequired ? relative(checkpointJsonPath) : "not due",
     completionSummaryRefreshMarkdownPath: relative(receiptMarkdownPath),
     completionSummaryRefreshJsonPath: relative(receiptJsonPath),
@@ -466,6 +502,30 @@ function buildReport({ progressRefresh, completionSummary, checkpoint, gitContex
     releaseChannelPrivateEnvApplyValueRecorded: completionSummary.releaseChannelPrivateEnvApplyValueRecorded === true ? true : false,
     releaseChannelFirstProofCommandAfterPrivateEdits: textValue(completionSummary.releaseChannelFirstProofCommandAfterPrivateEdits),
     releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits: textValue(completionSummary.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits),
+    externalCompletionResumePacketReady: externalResumeReady,
+    externalCompletionResumeSourceMode: textValue(externalResume.sourceMode),
+    externalCompletionResumeSourcePacketReady: externalResume.sourcePacketReady === true,
+    externalCompletionResumeSourcePacketValueFree: externalResume.sourcePacketValueFree === true,
+    externalCompletionResumeLatestPlan: textValue(externalResume.latestPlan),
+    externalCompletionResumeTenPlanProgress: textValue(externalResume.tenPlanProgress),
+    externalCompletionResumeCurrentFirstBlocker: textValue(externalResume.currentFirstBlocker),
+    externalCompletionResumeCurrentNextCommand: textValue(externalResume.currentNextCommand),
+    externalCompletionResumeFirstBlockedPhase: textValue(externalResume.firstBlockedPhase),
+    externalCompletionResumeNextCommand: textValue(externalResume.nextResumeCommand),
+    externalCompletionResumeNextProofCommand: textValue(externalResume.nextResumeProofCommand),
+    externalCompletionResumeMatchesCurrentOperatorFirstCommand: externalResume.nextResumeMatchesCurrentOperatorFirstCommand === true,
+    externalCompletionResumeRowCount: integerValue(externalResume.resumeRowCount),
+    externalCompletionResumeRows: externalResumeRows,
+    externalCompletionResumeRowsValueFree: externalResume.resumeRowsValueFree === true && valueFreeRows(externalResumeRows),
+    externalCompletionResumeAlreadyReadyRowCount: integerValue(externalResume.alreadyReadyRowCount),
+    externalCompletionResumeAlreadyReadyRows: externalResumeAlreadyReadyRows,
+    externalCompletionResumeAlreadyReadyRowsValueFree:
+      externalResume.alreadyReadyRowsValueFree === true && valueFreeRows(externalResumeAlreadyReadyRows),
+    externalCompletionResumeHardGateCommand: textValue(externalResume.hardGateCommand, "npm run release:external-check"),
+    externalCompletionResumeHardGateReady: externalResume.hardGateReady === true,
+    externalCompletionResumeHardGateWouldFail: externalResume.hardGateWouldFail === true,
+    externalCompletionResumePrivateValuesRecorded: externalResume.privateValuesRecorded === true,
+    externalCompletionResumeClaimedExternalDistribution: externalResume.claimedExternalDistribution === true,
     hardGateReady: completionSummary.hardGateReady === true,
     hardGateWouldFail: completionSummary.hardGateWouldFail === true,
     tenPlanCheckpointRequired: checkpointRequired,
@@ -573,6 +633,14 @@ function buildMarkdown(report) {
 - Private env apply before strict proof: ${readyLabel(report.releaseChannelPrivateEnvApplyBeforeStrictProof)}
 - First proof after private edits: \`${report.releaseChannelFirstProofCommandAfterPrivateEdits}\`
 - Recommended operator proof chain: \`${report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits}\`
+- External resume packet ready: ${readyLabel(report.externalCompletionResumePacketReady)}
+- External resume source mode: ${report.externalCompletionResumeSourceMode}
+- External resume next command: \`${report.externalCompletionResumeNextCommand}\`
+- External resume next proof command: \`${report.externalCompletionResumeNextProofCommand}\`
+- External resume matches current operator first command: ${readyLabel(report.externalCompletionResumeMatchesCurrentOperatorFirstCommand)}
+- External resume first blocked phase: ${report.externalCompletionResumeFirstBlockedPhase}
+- External resume rows: ${report.externalCompletionResumeRowCount}
+- External resume hard gate would fail: ${readyLabel(report.externalCompletionResumeHardGateWouldFail)}
 - Git context ready: ${readyLabel(report.gitContextReady)}
 - Git branch: ${report.gitBranch}
 - Git HEAD: ${report.gitHeadShortSha}
@@ -593,7 +661,31 @@ ${formatCommandRows(report.refreshCommands)}
 
 - Progress refresh JSON: ${report.progressRefreshJsonPath}
 - Completion summary JSON: ${report.completionSummaryJsonPath}
+- External completion run packet JSON: ${report.externalCompletionRunPacketJsonPath}
+- External completion resume packet JSON: ${report.externalCompletionResumePacketJsonPath}
 - 10-plan checkpoint JSON: ${report.tenPlanCheckpointJsonPath}
+
+## External Completion Resume Packet
+
+- Resume packet ready: ${readyLabel(report.externalCompletionResumePacketReady)}
+- Source mode: ${report.externalCompletionResumeSourceMode}
+- Source packet ready: ${readyLabel(report.externalCompletionResumeSourcePacketReady)}
+- Source packet value-free: ${readyLabel(report.externalCompletionResumeSourcePacketValueFree)}
+- Latest plan: ${report.externalCompletionResumeLatestPlan}
+- 10-plan progress: ${report.externalCompletionResumeTenPlanProgress}
+- Current first blocker: ${report.externalCompletionResumeCurrentFirstBlocker}
+- Current next command: \`${report.externalCompletionResumeCurrentNextCommand}\`
+- First blocked phase: ${report.externalCompletionResumeFirstBlockedPhase}
+- Next resume command: \`${report.externalCompletionResumeNextCommand}\`
+- Next resume proof command: \`${report.externalCompletionResumeNextProofCommand}\`
+- Next resume matches current operator first command: ${readyLabel(report.externalCompletionResumeMatchesCurrentOperatorFirstCommand)}
+- Resume rows value-free: ${readyLabel(report.externalCompletionResumeRowsValueFree)}
+- Already-ready rows value-free: ${readyLabel(report.externalCompletionResumeAlreadyReadyRowsValueFree)}
+- Hard gate command: \`${report.externalCompletionResumeHardGateCommand}\`
+- Hard gate ready: ${readyLabel(report.externalCompletionResumeHardGateReady)}
+- Hard gate would fail: ${readyLabel(report.externalCompletionResumeHardGateWouldFail)}
+- Private values recorded: ${readyLabel(report.externalCompletionResumePrivateValuesRecorded)}
+- External distribution claimed: ${readyLabel(report.externalCompletionResumeClaimedExternalDistribution)}
 
 ## Completion Blocker Action Receipt
 
@@ -774,6 +866,55 @@ function validateReport(report, markdown) {
   check(report.releaseChannelPrivateEnvApplyValueRecorded === false, "release completion summary refresh private env apply command should be value-free");
   check(report.releaseChannelFirstProofCommandAfterPrivateEdits === "npm run release:channel-live-check", "release completion summary refresh should expose release-channel first proof command");
   check(report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits === "npm run release:private-edit-strict-proof", "release completion summary refresh should expose recommended private edit proof chain");
+  check(report.externalCompletionResumePacketReady === true, "release completion summary refresh should refresh a ready external completion resume packet");
+  check(report.externalCompletionResumeSourceMode === "existing-run-packet", "release completion summary refresh should use the non-recursive existing run packet resume mode");
+  check(report.externalCompletionResumeSourcePacketReady === true, "release completion summary refresh should require a ready external completion run packet source");
+  check(report.externalCompletionResumeSourcePacketValueFree === true, "release completion summary refresh should require a value-free external completion run packet source");
+  check(report.externalCompletionResumeLatestPlan === report.latestPlan, "release completion summary refresh should align resume latest plan");
+  check(report.externalCompletionResumeTenPlanProgress === report.tenPlanProgress, "release completion summary refresh should align resume 10-plan progress");
+  check(
+    report.externalCompletionResumeCurrentFirstBlocker === report.firstBlocker,
+    "release completion summary refresh should align resume current first blocker"
+  );
+  check(
+    report.externalCompletionResumeCurrentNextCommand === report.nextCommand,
+    "release completion summary refresh should align resume current next command"
+  );
+  check(
+    report.externalCompletionResumeNextCommand === report.currentOperatorFirstCommand,
+    "release completion summary refresh should make resume next command match the current operator first command"
+  );
+  check(
+    report.externalCompletionResumeNextProofCommand === report.currentOperatorStrictProofCommand,
+    "release completion summary refresh should make resume proof command match the strict proof command"
+  );
+  check(
+    report.externalCompletionResumeMatchesCurrentOperatorFirstCommand === true,
+    "release completion summary refresh should prove resume command/current operator alignment"
+  );
+  check(report.externalCompletionResumeRowCount > 0, "release completion summary refresh should expose pending external resume rows");
+  check(report.externalCompletionResumeRows.length === report.externalCompletionResumeRowCount, "release completion summary refresh resume row count should match rows");
+  check(report.externalCompletionResumeRowsValueFree === true, "release completion summary refresh resume rows should be value-free");
+  check(
+    report.externalCompletionResumeRows[0]?.command === report.externalCompletionResumeNextCommand,
+    "release completion summary refresh first resume row should carry the next resume command"
+  );
+  check(
+    report.externalCompletionResumeAlreadyReadyRows.length === report.externalCompletionResumeAlreadyReadyRowCount,
+    "release completion summary refresh already-ready resume row count should match rows"
+  );
+  check(report.externalCompletionResumeAlreadyReadyRowsValueFree === true, "release completion summary refresh already-ready resume rows should be value-free");
+  check(
+    report.externalCompletionResumeHardGateCommand === "npm run release:external-check",
+    "release completion summary refresh should keep external hard gate command in resume packet"
+  );
+  check(report.externalCompletionResumeHardGateReady === false, "release completion summary refresh should keep resume hard gate unready");
+  check(report.externalCompletionResumeHardGateWouldFail === true, "release completion summary refresh should keep resume hard gate would-fail posture");
+  check(report.externalCompletionResumePrivateValuesRecorded === false, "release completion summary refresh resume packet should not record private values");
+  check(
+    report.externalCompletionResumeClaimedExternalDistribution === false,
+    "release completion summary refresh resume packet should not claim external distribution"
+  );
   check(report.hardGateReady === false, "release completion summary refresh should keep hard gate unready");
   check(report.hardGateWouldFail === true, "release completion summary refresh should keep hard gate would-fail posture");
   check(report.privateValuesRecorded === false, "release completion summary refresh should not record private values");
@@ -792,9 +933,9 @@ function validateReport(report, markdown) {
   check(report.gitStatusPathsRecorded === false, "release completion summary refresh should not record git status paths");
   check(report.gitContextRows.length === report.gitContextRowCount, "release completion summary refresh should count git context rows");
   check(report.gitContextRows.every((row) => row.valueRecorded === false), "release completion summary refresh git context rows should be value-free");
-  check(report.refreshCommands.length === 3, "release completion summary refresh should record required commands plus conditional checkpoint command");
+  check(report.refreshCommands.length === 5, "release completion summary refresh should record required commands, external resume commands, plus conditional checkpoint command");
   check(report.refreshCommands.every((row) => row.valueRecorded === false), "release completion summary refresh command rows should be value-free");
-  check(report.refreshCommands.slice(0, 2).every((row) => row.skipped === false), "release completion summary refresh should always run the first two commands");
+  check(report.refreshCommands.slice(0, 4).every((row) => row.skipped === false), "release completion summary refresh should always run the first four commands");
   check(Boolean(checkpointRow), "release completion summary refresh should include checkpoint command row");
   check(checkpointRow?.skipped === !checkpointExpected, "release completion summary refresh should skip checkpoint only when the 10-plan window is not due");
   check(report.tenPlanCheckpointRequired === checkpointExpected, "release completion summary refresh should derive checkpoint requirement from the refreshed 10-plan summary");
@@ -868,9 +1009,10 @@ async function main() {
     runNpmScript(step.command);
   }
 
-  const [progressRefresh, completionSummary] = await Promise.all([
+  const [progressRefresh, completionSummary, externalResume] = await Promise.all([
     readJsonRequired(progressRefreshJsonPath, "release progress refresh"),
-    readJsonRequired(completionSummaryJsonPath, "release completion summary")
+    readJsonRequired(completionSummaryJsonPath, "release completion summary"),
+    readJsonRequired(externalResumePacketJsonPath, "release external completion resume packet")
   ]);
 
   let checkpoint = null;
@@ -883,7 +1025,7 @@ async function main() {
   }
 
   const gitContext = buildGitContext();
-  const report = buildReport({ progressRefresh, completionSummary, checkpoint, gitContext });
+  const report = buildReport({ progressRefresh, completionSummary, externalResume, checkpoint, gitContext });
   report.completionSummaryRefreshReady = true;
   const markdown = buildMarkdown(report);
   validateReport(report, markdown);
@@ -949,6 +1091,12 @@ async function main() {
   console.log(`- Private env apply preflight before apply: ${report.releaseChannelPrivateEnvApplyPreflightBeforeApply ? "yes" : "no"}`);
   console.log(`- Private env apply command: ${report.releaseChannelPrivateEnvApplyCommand}`);
   console.log(`- Private env apply before strict proof: ${report.releaseChannelPrivateEnvApplyBeforeStrictProof ? "yes" : "no"}`);
+  console.log(`- External resume packet ready: ${report.externalCompletionResumePacketReady ? "yes" : "no"}`);
+  console.log(`- External resume next command: ${report.externalCompletionResumeNextCommand}`);
+  console.log(`- External resume next proof command: ${report.externalCompletionResumeNextProofCommand}`);
+  console.log(
+    `- External resume matches current operator first command: ${report.externalCompletionResumeMatchesCurrentOperatorFirstCommand ? "yes" : "no"}`
+  );
   console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);
   console.log(`- Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})`);
   console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})`);
