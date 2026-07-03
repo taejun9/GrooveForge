@@ -16,30 +16,47 @@ const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
 const args = process.argv.slice(2);
 const syntheticSuccessSmoke = args.includes("--success-smoke");
-const forceOverwrite = args.includes("--force") || syntheticSuccessSmoke;
+const privateInputFileSuccessSmoke = args.includes("--input-file-success-smoke");
+const syntheticRun = syntheticSuccessSmoke || privateInputFileSuccessSmoke;
+const forceOverwrite = args.includes("--force") || syntheticRun;
 const reportArtifactNames = {
   markdown: "release-channel-setup-wizard.md",
   json: "release-channel-setup-wizard.json",
   successSmokeMarkdown: "release-channel-setup-wizard-success-smoke.md",
-  successSmokeJson: "release-channel-setup-wizard-success-smoke.json"
+  successSmokeJson: "release-channel-setup-wizard-success-smoke.json",
+  inputFileSuccessSmokeMarkdown: "release-channel-setup-wizard-input-file-success-smoke.md",
+  inputFileSuccessSmokeJson: "release-channel-setup-wizard-input-file-success-smoke.json"
 };
-const reportStem = syntheticSuccessSmoke
+const reportStem = privateInputFileSuccessSmoke
+  ? "release-channel-setup-wizard-input-file-success-smoke"
+  : syntheticSuccessSmoke
   ? "release-channel-setup-wizard-success-smoke"
   : "release-channel-setup-wizard";
-const markdownArtifactName = syntheticSuccessSmoke ? reportArtifactNames.successSmokeMarkdown : reportArtifactNames.markdown;
-const jsonArtifactName = syntheticSuccessSmoke ? reportArtifactNames.successSmokeJson : reportArtifactNames.json;
+const markdownArtifactName = privateInputFileSuccessSmoke
+  ? reportArtifactNames.inputFileSuccessSmokeMarkdown
+  : syntheticSuccessSmoke
+    ? reportArtifactNames.successSmokeMarkdown
+    : reportArtifactNames.markdown;
+const jsonArtifactName = privateInputFileSuccessSmoke
+  ? reportArtifactNames.inputFileSuccessSmokeJson
+  : syntheticSuccessSmoke
+    ? reportArtifactNames.successSmokeJson
+    : reportArtifactNames.json;
 const markdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${markdownArtifactName}`);
 const jsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${jsonArtifactName}`);
 const setupRootOverride = process.env.GROOVEFORGE_RELEASE_CHANNEL_SETUP_ENV_ROOT?.trim() ?? "";
-const syntheticRoot = path.join(packageRoot, "release-channel-setup-wizard-success-smoke");
-const resolvedLocalEnvRoot = syntheticSuccessSmoke
+const syntheticRoot = path.join(packageRoot, reportStem);
+const resolvedLocalEnvRoot = syntheticRun
   ? syntheticRoot
   : setupRootOverride
     ? path.resolve(root, setupRootOverride)
     : root;
 const relativeLocalEnvRoot = path.relative(root, resolvedLocalEnvRoot);
 const configuredEnvFileKey = "GROOVEFORGE_DISTRIBUTION_ENV_FILE";
+const privateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
+const defaultPrivateInputFileName = ".env.release-channel.local";
 const configuredEnvFileName = process.env[configuredEnvFileKey]?.trim() || distributionLocalEnvDefaults.defaultEnvFileName;
+const configuredPrivateInputFileName = process.env[privateInputFileKey]?.trim() || defaultPrivateInputFileName;
 const releaseChannelMetadataKeys = [
   "GROOVEFORGE_DISTRIBUTION_CHANNEL",
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
@@ -54,7 +71,7 @@ const syntheticValues = {
 };
 const failures = [];
 
-if ((setupRootOverride || syntheticSuccessSmoke) && (relativeLocalEnvRoot.startsWith("..") || path.isAbsolute(relativeLocalEnvRoot))) {
+if ((setupRootOverride || syntheticRun) && (relativeLocalEnvRoot.startsWith("..") || path.isAbsolute(relativeLocalEnvRoot))) {
   console.error("GrooveForge release-channel setup wizard failed:");
   console.error("- Local env root override must stay inside the repository.");
   process.exit(1);
@@ -89,6 +106,19 @@ function localEnvCandidatePath() {
   return candidatePath;
 }
 
+function privateInputCandidatePath() {
+  return path.isAbsolute(configuredPrivateInputFileName)
+    ? configuredPrivateInputFileName
+    : path.resolve(resolvedLocalEnvRoot, configuredPrivateInputFileName);
+}
+
+function validatePrivateInputFilePath(filePath) {
+  const relativeCandidate = path.relative(resolvedLocalEnvRoot, filePath);
+  if (relativeCandidate.startsWith("..") || path.isAbsolute(relativeCandidate)) {
+    throw new Error("Configured private release-channel input file must stay inside the selected env root.");
+  }
+}
+
 function displayLocalEnvTarget(filePath) {
   const relativePath = path.relative(root, filePath);
   if (!relativePath.startsWith("..") && !path.isAbsolute(relativePath)) {
@@ -118,22 +148,20 @@ function expectedShapeForKey(key) {
   return key === "GROOVEFORGE_DISTRIBUTION_CHANNEL" ? "allowed release channel token" : "safe absolute HTTPS URL";
 }
 
-function inputSourceForKey(key) {
-  if (syntheticSuccessSmoke) {
-    return "synthetic-success-smoke";
-  }
-  return process.env[key]?.trim() ? "process-env" : "interactive";
-}
-
-function buildInputRows(inputValues) {
+function buildInputRows({ inputValues, inputSources, privateInputFile }) {
   return releaseChannelMetadataKeys.map((key, index) => {
     const value = inputValues.get(key) ?? "";
     const inputPresent = value.trim().length > 0;
     const inputShapeReady = inputPresent && shapeReadyForKey(key, value);
+    const inputSource = inputSources.get(key) ?? "missing";
     return {
       order: index + 1,
       key,
-      inputSource: inputSourceForKey(key),
+      inputSource,
+      processEnvPresent: inputSource === "process-env",
+      privateInputFilePresent: privateInputFile.present,
+      privateInputFileKeyPresent: inputSource === "private-input-file",
+      interactiveInputPresent: inputSource === "interactive",
       inputPresent,
       inputShapeReady,
       expectedShape: expectedShapeForKey(key),
@@ -142,14 +170,15 @@ function buildInputRows(inputValues) {
   });
 }
 
-async function promptForMissingInputs(existingValues) {
-  const values = new Map(existingValues);
+async function promptForMissingInputs({ inputValues, inputSources }) {
+  const values = new Map(inputValues);
+  const sources = new Map(inputSources);
   const missingKeys = releaseChannelMetadataKeys.filter((key) => !values.get(key));
   if (missingKeys.length === 0) {
-    return values;
+    return { inputValues: values, inputSources: sources };
   }
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    return values;
+    return { inputValues: values, inputSources: sources };
   }
 
   const reader = createInterface({ input: process.stdin, output: process.stdout });
@@ -157,30 +186,60 @@ async function promptForMissingInputs(existingValues) {
     for (const key of missingKeys) {
       const answer = await reader.question(`${key} (${expectedShapeForKey(key)}): `);
       values.set(key, answer.trim());
+      sources.set(key, answer.trim() ? "interactive" : "missing");
     }
   } finally {
     reader.close();
   }
-  return values;
+  return { inputValues: values, inputSources: sources };
 }
 
-async function collectInputValues() {
+async function collectInputValues(privateInputFile) {
   if (syntheticSuccessSmoke) {
-    return new Map(Object.entries(syntheticValues));
+    return {
+      inputValues: new Map(Object.entries(syntheticValues)),
+      inputSources: new Map(releaseChannelMetadataKeys.map((key) => [key, "synthetic-success-smoke"]))
+    };
   }
-  const fromProcessEnv = new Map(
-    releaseChannelMetadataKeys.map((key) => [key, process.env[key]?.trim() ?? ""])
-  );
-  return promptForMissingInputs(fromProcessEnv);
+  const inputValues = new Map();
+  const inputSources = new Map();
+  for (const key of releaseChannelMetadataKeys) {
+    const processEnvValue = privateInputFileSuccessSmoke ? "" : process.env[key]?.trim() ?? "";
+    const privateInputFileValue = privateInputFile.inputValues.get(key)?.trim() ?? "";
+    if (processEnvValue) {
+      inputValues.set(key, processEnvValue);
+      inputSources.set(key, "process-env");
+    } else if (privateInputFileValue) {
+      inputValues.set(key, privateInputFileValue);
+      inputSources.set(key, "private-input-file");
+    } else {
+      inputValues.set(key, "");
+      inputSources.set(key, "missing");
+    }
+  }
+  return promptForMissingInputs({ inputValues, inputSources });
 }
 
-function childEnvForApply(inputValues) {
-  return {
+function childEnvForApply({ inputValues, inputRows, privateInputFile }) {
+  const childEnv = {
     ...process.env,
-    ...Object.fromEntries(inputValues),
     GROOVEFORGE_RELEASE_CHANNEL_APPLY_ENV_ROOT: relativeLocalEnvRoot,
     [configuredEnvFileKey]: configuredEnvFileName
   };
+  for (const key of releaseChannelMetadataKeys) {
+    delete childEnv[key];
+  }
+  for (const row of inputRows) {
+    if (["process-env", "interactive", "synthetic-success-smoke"].includes(row.inputSource)) {
+      childEnv[row.key] = inputValues.get(row.key) ?? "";
+    }
+  }
+  if (privateInputFile.present || inputRows.some((row) => row.inputSource === "private-input-file")) {
+    childEnv[privateInputFileKey] = configuredPrivateInputFileName;
+  } else {
+    delete childEnv[privateInputFileKey];
+  }
+  return childEnv;
 }
 
 function childEnvForLiveCheck() {
@@ -190,7 +249,7 @@ function childEnvForLiveCheck() {
   }
   childEnv.GROOVEFORGE_RELEASE_CHANNEL_LIVE_CHECK_ENV_ROOT = relativeLocalEnvRoot;
   childEnv[configuredEnvFileKey] = configuredEnvFileName;
-  if (syntheticSuccessSmoke) {
+  if (syntheticRun) {
     childEnv.GROOVEFORGE_RELEASE_CHANNEL_LIVE_CHECK_REPORT_STEM = "release-channel-live-check-strict-success-smoke";
   }
   return childEnv;
@@ -224,23 +283,89 @@ async function ensureSyntheticEnv(filePath) {
   );
 }
 
+async function ensureSyntheticPrivateInputFile(filePath) {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(
+    filePath,
+    [
+      "# Synthetic ignored private input file for release-channel setup wizard.",
+      `GROOVEFORGE_DISTRIBUTION_CHANNEL=${syntheticValues.GROOVEFORGE_DISTRIBUTION_CHANNEL}`,
+      `GROOVEFORGE_RELEASE_DOWNLOAD_URL=${syntheticValues.GROOVEFORGE_RELEASE_DOWNLOAD_URL}`,
+      `GROOVEFORGE_RELEASE_NOTES_URL=${syntheticValues.GROOVEFORGE_RELEASE_NOTES_URL}`,
+      `GROOVEFORGE_SUPPORT_URL=${syntheticValues.GROOVEFORGE_SUPPORT_URL}`,
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+}
+
 function parseEnvLine(line) {
   const trimmed = line.trim();
   if (!trimmed || trimmed.startsWith("#")) {
     return null;
   }
-  const separatorIndex = trimmed.indexOf("=");
+  const withoutExport = trimmed.startsWith("export ") ? trimmed.slice("export ".length).trim() : trimmed;
+  const separatorIndex = withoutExport.indexOf("=");
   if (separatorIndex <= 0) {
     return null;
   }
+  const key = withoutExport.slice(0, separatorIndex).trim();
+  if (!/^[A-Z0-9_]+$/.test(key)) {
+    return null;
+  }
+  let value = withoutExport.slice(separatorIndex + 1).trim();
+  if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) {
+    value = value.slice(1, -1);
+  }
   return {
-    key: trimmed.slice(0, separatorIndex).trim(),
-    value: trimmed.slice(separatorIndex + 1).trim().replace(/^"|"$/g, "")
+    key,
+    value
   };
 }
 
+async function readPrivateInputFile(filePath) {
+  validatePrivateInputFilePath(filePath);
+  const displayPath = displayLocalEnvTarget(filePath);
+  const result = {
+    configuredFileKey: privateInputFileKey,
+    defaultFileName: defaultPrivateInputFileName,
+    filePath: displayPath,
+    present: existsSync(filePath),
+    inputValues: new Map(),
+    loadedKeys: [],
+    unknownKeys: [],
+    malformedLines: [],
+    valueRecorded: false
+  };
+
+  if (!result.present) {
+    return result;
+  }
+
+  const lines = (await readFile(filePath, "utf8")).split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    const parsed = parseEnvLine(line);
+    if (!parsed) {
+      if (line.trim() && !line.trim().startsWith("#")) {
+        result.malformedLines.push(`${displayPath}:${index + 1}`);
+      }
+      continue;
+    }
+    if (!releaseChannelMetadataKeys.includes(parsed.key)) {
+      result.unknownKeys.push(parsed.key);
+      continue;
+    }
+    result.inputValues.set(parsed.key, parsed.value.trim());
+    result.loadedKeys.push(parsed.key);
+  }
+
+  result.loadedKeys = [...new Set(result.loadedKeys)];
+  result.unknownKeys = [...new Set(result.unknownKeys)];
+  return result;
+}
+
 async function readSyntheticEnvRows(filePath) {
-  if (!syntheticSuccessSmoke || !existsSync(filePath)) {
+  if (!syntheticRun || !existsSync(filePath)) {
     return [];
   }
   const lines = (await readFile(filePath, "utf8")).split(/\r?\n/);
@@ -254,7 +379,7 @@ async function readSyntheticEnvRows(filePath) {
 }
 
 async function ensureRealLocalEnv(filePath) {
-  if (syntheticSuccessSmoke || existsSync(filePath)) {
+  if (syntheticRun || existsSync(filePath)) {
     return { prepareEnvRun: false, prepareEnvExitCode: null };
   }
   const result = runNodeScript("harness/scripts/run_release_prepare_env.mjs", ["--write-local"], process.env);
@@ -269,7 +394,7 @@ function formatInputRows(rows) {
   return rows
     .map(
       (row) =>
-        `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.inputSource)} | ${readyLabel(row.inputPresent)} | ${readyLabel(row.inputShapeReady)} | ${escapeCell(row.expectedShape)} | ${readyLabel(row.valueRecorded)} |`
+        `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.inputSource)} | ${readyLabel(row.processEnvPresent)} | ${readyLabel(row.privateInputFilePresent)} | ${readyLabel(row.privateInputFileKeyPresent)} | ${readyLabel(row.interactiveInputPresent)} | ${readyLabel(row.inputPresent)} | ${readyLabel(row.inputShapeReady)} | ${escapeCell(row.expectedShape)} | ${readyLabel(row.valueRecorded)} |`
     )
     .join("\n");
 }
@@ -289,10 +414,17 @@ function buildMarkdown(report) {
 
 - Setup wizard ready: ${readyLabel(report.releaseChannelSetupWizardReady)}
 - Synthetic success smoke: ${readyLabel(report.syntheticSuccessSmoke)}
+- Private input-file success smoke: ${readyLabel(report.privateInputFileSuccessSmoke)}
 - Local env file loaded: ${readyLabel(report.localEnvFileLoaded)}
 - Local env prepared by wizard: ${readyLabel(report.prepareEnvRun)}
 - Real local env read: ${readyLabel(report.realLocalEnvRead)}
 - Real local env modified: ${readyLabel(report.realLocalEnvModified)}
+- Private input file key: \`${report.privateInputFileKey}\`
+- Private input file default: \`${report.privateInputFileDefaultName}\`
+- Private input file path: ${report.privateInputFilePath}
+- Private input file present: ${readyLabel(report.privateInputFilePresent)}
+- Private input file loaded keys: ${report.privateInputFileLoadedKeyCount} (${report.privateInputFileLoadedKeySummary})
+- Private input source rows: ${report.privateInputSourceRowCount}
 - Preflight command exit code: ${report.preflightExitCode}
 - Apply command exit code: ${report.applyExitCode}
 - Strict live-check exit code: ${report.strictLiveCheckExitCode}
@@ -312,8 +444,8 @@ function buildMarkdown(report) {
 
 ## Wizard Input Rows
 
-| order | key | source | input present | shape ready | expected shape | value recorded |
-|---:|---|---|---:|---:|---|---:|
+| order | key | source | process env present | private input file present | private input file key present | interactive present | input present | shape ready | expected shape | value recorded |
+|---:|---|---|---:|---:|---:|---:|---:|---:|---|---:|
 ${formatInputRows(report.wizardInputRows)}
 
 ## Synthetic Fixture Rows
@@ -325,7 +457,7 @@ ${formatSyntheticRows(report.syntheticFixtureRows)}
 ## Command Chain
 
 1. \`${report.prepareEnvCommand}\` when the ignored local env is missing.
-2. \`${report.preflightCommand}\` to prove process-env private metadata is shape-ready before writing.
+2. \`${report.preflightCommand}\` to prove process-env or ignored private input-file metadata is shape-ready before writing.
 3. \`${report.applyCommand}\` to write shape-ready private metadata into the ignored local env after preflight passes.
 4. \`${report.firstProofCommand}\` to prove the four release-channel rows are strict-ready.
 5. \`${report.recommendedOperatorProofCommand}\` for the full value-free proof chain after setup succeeds.
@@ -355,12 +487,17 @@ async function writeReport(report, privateValueCandidates) {
 
 async function main() {
   const localEnvPath = localEnvCandidatePath();
-  if (syntheticSuccessSmoke) {
+  const privateInputFilePath = privateInputCandidatePath();
+  if (syntheticRun) {
     await ensureSyntheticEnv(localEnvPath);
   }
+  if (privateInputFileSuccessSmoke) {
+    await ensureSyntheticPrivateInputFile(privateInputFilePath);
+  }
 
-  const inputValues = await collectInputValues();
-  const inputRows = buildInputRows(inputValues);
+  const privateInputFile = await readPrivateInputFile(privateInputFilePath);
+  const { inputValues, inputSources } = await collectInputValues(privateInputFile);
+  const inputRows = buildInputRows({ inputValues, inputSources, privateInputFile });
   const inputReady = inputRows.every((row) => row.inputPresent === true && row.inputShapeReady === true);
   const privateValueCandidates = [...inputValues.values()].filter((value) => value.trim().length >= 8);
   const prepareResult = inputReady ? await ensureRealLocalEnv(localEnvPath) : { prepareEnvRun: false, prepareEnvExitCode: null };
@@ -369,15 +506,16 @@ async function main() {
   if (forceOverwrite) {
     preflightArgs.push("--force");
   }
+  const applyChildEnv = childEnvForApply({ inputValues, inputRows, privateInputFile });
   const preflightResult = inputReady && localEnvFileLoaded
-    ? runNodeScript("harness/scripts/run_release_channel_apply_private_env.mjs", preflightArgs, childEnvForApply(inputValues))
+    ? runNodeScript("harness/scripts/run_release_channel_apply_private_env.mjs", preflightArgs, applyChildEnv)
     : { status: 1, stdout: "", stderr: "" };
-  const applyArgs = syntheticSuccessSmoke ? ["--success-smoke"] : [];
+  const applyArgs = syntheticRun ? ["--success-smoke"] : [];
   if (forceOverwrite) {
     applyArgs.push("--force");
   }
   const applyResult = preflightResult.status === 0
-    ? runNodeScript("harness/scripts/run_release_channel_apply_private_env.mjs", applyArgs, childEnvForApply(inputValues))
+    ? runNodeScript("harness/scripts/run_release_channel_apply_private_env.mjs", applyArgs, applyChildEnv)
     : { status: 1, stdout: "", stderr: "" };
   const strictResult = applyResult.status === 0
     ? runNodeScript("harness/scripts/run_release_channel_live_check.mjs", ["--strict"], childEnvForLiveCheck())
@@ -387,10 +525,10 @@ async function main() {
   const strictOutput = `${strictResult.stdout ?? ""}\n${strictResult.stderr ?? ""}`;
   const childOutput = `${prepareResult.prepareEnvOutput ?? ""}\n${preflightOutput}\n${applyOutput}\n${strictOutput}`;
   const preflightReportStem = "release-channel-apply-private-env-preflight";
-  const applyReportStem = syntheticSuccessSmoke
+  const applyReportStem = syntheticRun
     ? "release-channel-apply-private-env-success-smoke"
     : "release-channel-apply-private-env";
-  const liveCheckReportStem = syntheticSuccessSmoke
+  const liveCheckReportStem = syntheticRun
     ? "release-channel-live-check-strict-success-smoke"
     : "release-channel-live-check-strict";
   const preflightJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${preflightReportStem}.json`);
@@ -413,17 +551,39 @@ async function main() {
     platformArch,
     reportCommand: syntheticSuccessSmoke
       ? "npm run release:channel-setup-wizard-success-smoke"
+      : privateInputFileSuccessSmoke
+        ? "npm run release:channel-setup-wizard-input-file-success-smoke"
       : "npm run release:channel-setup-wizard",
     releaseChannelSetupWizardMarkdownPath: relative(markdownPath),
     releaseChannelSetupWizardJsonPath: relative(jsonPath),
-    syntheticSuccessSmoke,
-    localEnvRootOverrideEnabled: Boolean(setupRootOverride) || syntheticSuccessSmoke,
+    syntheticSuccessSmoke: syntheticRun,
+    privateInputFileSuccessSmoke,
+    localEnvRootOverrideEnabled: Boolean(setupRootOverride) || syntheticRun,
     localEnvRootRelativePath: relativeLocalEnvRoot,
     currentEnvEditTarget: displayLocalEnvTarget(localEnvPath),
     currentRequiredKeyCount: releaseChannelMetadataKeys.length,
     currentRequiredKeys: releaseChannelMetadataKeys,
+    privateInputFileKey,
+    privateInputFileDefaultName: defaultPrivateInputFileName,
+    privateInputFilePath: privateInputFile.filePath,
+    privateInputFilePresent: privateInputFile.present,
+    privateInputFileConfigured: Boolean(process.env[privateInputFileKey]?.trim()),
+    privateInputFileLoadedKeys: privateInputFile.loadedKeys,
+    privateInputFileLoadedKeyCount: privateInputFile.loadedKeys.length,
+    privateInputFileLoadedKeySummary: privateInputFile.loadedKeys.length > 0 ? privateInputFile.loadedKeys.join(", ") : "none",
+    privateInputFileUnknownKeys: privateInputFile.unknownKeys,
+    privateInputFileUnknownKeyCount: privateInputFile.unknownKeys.length,
+    privateInputFileMalformedLines: privateInputFile.malformedLines,
+    privateInputFileMalformedLineCount: privateInputFile.malformedLines.length,
+    privateInputFileValueRecorded: false,
     wizardInputRows: inputRows,
     wizardInputRowCount: inputRows.length,
+    privateInputSourceRows: inputRows,
+    privateInputSourceRowCount: inputRows.length,
+    privateInputSourceReadyCount: inputRows.filter((row) => row.inputShapeReady === true).length,
+    privateInputSourceProcessEnvCount: inputRows.filter((row) => row.inputSource === "process-env").length,
+    privateInputSourceFileCount: inputRows.filter((row) => row.inputSource === "private-input-file").length,
+    privateInputSourceInteractiveCount: inputRows.filter((row) => row.inputSource === "interactive").length,
     inputReady,
     localEnvFileLoaded,
     prepareEnvRun: prepareResult.prepareEnvRun,
@@ -485,6 +645,11 @@ async function main() {
 
   check(report.wizardInputRowCount === 4, "release-channel setup wizard should inspect four input rows");
   check(report.wizardInputRows.every((row) => row.valueRecorded === false), "release-channel setup wizard input rows should be value-free");
+  check(report.privateInputFileKey === privateInputFileKey, "release-channel setup wizard should expose the private input file key");
+  check(report.privateInputFileDefaultName === defaultPrivateInputFileName, "release-channel setup wizard should expose the default private input file name");
+  check(report.privateInputFileValueRecorded === false, "release-channel setup wizard should not record private input file values");
+  check(report.privateInputSourceRowCount === 4, "release-channel setup wizard should expose four private input source rows");
+  check(report.privateInputSourceRows.every((row) => row.valueRecorded === false), "release-channel setup wizard source rows should be value-free");
   check(report.privateValuesRecorded === false, "release-channel setup wizard should not record private values");
   check(report.localEnvValueRecorded === false, "release-channel setup wizard should not record local env values");
   check(report.releaseUrlValueRecorded === false, "release-channel setup wizard should not record release URL values");
@@ -495,22 +660,32 @@ async function main() {
   check(report.notarySubmissionAttempted === false, "release-channel setup wizard should not submit to Apple");
   check(report.signingAttempted === false, "release-channel setup wizard should not sign artifacts");
   check(report.releaseGateClaimedExternalDistribution === false, "release-channel setup wizard should not claim external distribution");
-  check(!syntheticSuccessSmoke || report.realLocalEnvRead === false, "release-channel setup wizard success smoke should not read real local env");
-  check(!syntheticSuccessSmoke || report.realLocalEnvModified === false, "release-channel setup wizard success smoke should not modify real local env");
+  check(!syntheticRun || report.realLocalEnvRead === false, "release-channel setup wizard synthetic smoke should not read real local env");
+  check(!syntheticRun || report.realLocalEnvModified === false, "release-channel setup wizard synthetic smoke should not modify real local env");
   check(report.preflightCommand === "npm run release:channel-apply-private-env-preflight", "release-channel setup wizard should call the private env preflight helper");
   check(report.applyCommand === "npm run release:channel-apply-private-env", "release-channel setup wizard should call the private env apply helper");
   check(report.firstProofCommand === "npm run release:channel-live-check-strict", "release-channel setup wizard should run strict live check first");
   check(report.recommendedOperatorProofCommand === "npm run release:private-edit-strict-proof", "release-channel setup wizard should expose the full proof chain");
   check(!outputContainsValues(childOutput, privateValueCandidates), "release-channel setup wizard child output should not include private values");
   check(!/https?:\/\//i.test(childOutput), "release-channel setup wizard child output should not include URL values");
-  if (syntheticSuccessSmoke) {
-    check(report.releaseChannelSetupWizardReady === true, "release-channel setup wizard success smoke should be ready");
-    check(report.preflightReady === true, "release-channel setup wizard success smoke should prove preflight readiness");
-    check(report.applyReady === true, "release-channel setup wizard success smoke should prove apply readiness");
-    check(report.strictLiveCheckReady === true, "release-channel setup wizard success smoke should prove strict live-check readiness");
-    check(report.currentReadyKeyCount === 4, "release-channel setup wizard success smoke should produce four ready rows");
-    check(report.currentPlaceholderKeyCount === 0, "release-channel setup wizard success smoke should clear placeholders");
-    check(report.syntheticFixtureRows.every((row) => row.syntheticFixtureUpdated === true), "release-channel setup wizard success smoke should update synthetic fixture rows");
+  if (syntheticRun) {
+    check(report.releaseChannelSetupWizardReady === true, "release-channel setup wizard synthetic smoke should be ready");
+    check(report.preflightReady === true, "release-channel setup wizard synthetic smoke should prove preflight readiness");
+    check(report.applyReady === true, "release-channel setup wizard synthetic smoke should prove apply readiness");
+    check(report.strictLiveCheckReady === true, "release-channel setup wizard synthetic smoke should prove strict live-check readiness");
+    check(report.currentReadyKeyCount === 4, "release-channel setup wizard synthetic smoke should produce four ready rows");
+    check(report.currentPlaceholderKeyCount === 0, "release-channel setup wizard synthetic smoke should clear placeholders");
+    check(report.syntheticFixtureRows.every((row) => row.syntheticFixtureUpdated === true), "release-channel setup wizard synthetic smoke should update synthetic fixture rows");
+  }
+  if (privateInputFileSuccessSmoke) {
+    check(report.privateInputFilePresent === true, "release-channel setup wizard input-file smoke should load a private input file");
+    check(report.privateInputFileLoadedKeyCount === 4, "release-channel setup wizard input-file smoke should load four private input keys");
+    check(report.privateInputSourceFileCount === 4, "release-channel setup wizard input-file smoke should use four private input-file rows");
+    check(report.privateInputSourceProcessEnvCount === 0, "release-channel setup wizard input-file smoke should not use process env rows");
+    check(report.privateInputSourceInteractiveCount === 0, "release-channel setup wizard input-file smoke should not use interactive rows");
+    check(report.wizardInputRows.every((row) => row.inputSource === "private-input-file"), "release-channel setup wizard input-file smoke rows should come from the private input file");
+    check(preflightReport?.privateInputSourceFileCount === 4, "release-channel setup wizard input-file smoke preflight should use four private input-file rows");
+    check(applyReport?.privateInputSourceFileCount === 4, "release-channel setup wizard input-file smoke apply should use four private input-file rows");
   }
 
   await writeReport(report, privateValueCandidates);
@@ -520,8 +695,11 @@ async function main() {
     console.error(`- Markdown: ${relative(markdownPath)}`);
     console.error(`- JSON: ${relative(jsonPath)}`);
     console.error(`- Synthetic success smoke: ${readyLabel(report.syntheticSuccessSmoke)}`);
+    console.error(`- Private input-file success smoke: ${readyLabel(report.privateInputFileSuccessSmoke)}`);
     console.error(`- Input ready: ${readyLabel(report.inputReady)}`);
     console.error(`- Local env file loaded: ${readyLabel(report.localEnvFileLoaded)}`);
+    console.error(`- Private input file present: ${readyLabel(report.privateInputFilePresent)}`);
+    console.error(`- Private input file loaded keys: ${report.privateInputFileLoadedKeyCount}`);
     console.error(`- Real local env read: ${readyLabel(report.realLocalEnvRead)}`);
     console.error(`- Real local env modified: ${readyLabel(report.realLocalEnvModified)}`);
     console.error(`- Preflight ready: ${readyLabel(report.preflightReady)}`);
@@ -543,8 +721,12 @@ async function main() {
   console.log(`- Markdown: ${relative(markdownPath)}`);
   console.log(`- JSON: ${relative(jsonPath)}`);
   console.log(`- Synthetic success smoke: ${readyLabel(report.syntheticSuccessSmoke)}`);
+  console.log(`- Private input-file success smoke: ${readyLabel(report.privateInputFileSuccessSmoke)}`);
   console.log(`- Local env file loaded: ${readyLabel(report.localEnvFileLoaded)}`);
   console.log(`- Local env prepared by wizard: ${readyLabel(report.prepareEnvRun)}`);
+  console.log(`- Private input file present: ${readyLabel(report.privateInputFilePresent)}`);
+  console.log(`- Private input file loaded keys: ${report.privateInputFileLoadedKeyCount}`);
+  console.log(`- Private input source rows: ${report.privateInputSourceRowCount}`);
   console.log(`- Real local env read: ${readyLabel(report.realLocalEnvRead)}`);
   console.log(`- Real local env modified: ${readyLabel(report.realLocalEnvModified)}`);
   console.log(`- Preflight ready: ${readyLabel(report.preflightReady)}`);
