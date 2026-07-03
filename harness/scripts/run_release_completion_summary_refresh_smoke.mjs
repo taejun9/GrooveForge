@@ -32,6 +32,10 @@ const releaseChannelApplyPrivateEnvPreflightRole =
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const releaseChannelApplyPrivateEnvRole =
   "apply operator-owned release-channel process env values into the ignored local env before strict proof";
+const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
+const privateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
+const defaultPrivateInputFileName = ".env.release-channel.local";
+const blockedPrivateInputFilePathMode = "blocked-smoke-isolated-missing-input-file";
 
 const requiredRefreshCommands = [
   {
@@ -414,6 +418,8 @@ function buildReport({ progressRefresh, completionSummary, externalResume, check
     externalResume.privateEnvPreflightProcessEnvInputRowsValueFree === true &&
     externalResume.privateEnvPreflightRemediationRowsValueFree === true &&
     externalResume.privateEnvPreflightOperatorReceiptRowsValueFree === true &&
+    externalResume.privateEnvPreflightPrivateInputFileValueRecorded === false &&
+    externalResume.privateEnvPreflightGuidedSetupFallbackValueRecorded === false &&
     externalResume.nextResumeMatchesCurrentOperatorFirstCommand === true &&
     externalResume.resumeRowsValueFree === true &&
     externalResume.alreadyReadyRowsValueFree === true &&
@@ -556,6 +562,39 @@ function buildReport({ progressRefresh, completionSummary, externalResume, check
     externalCompletionResumePrivateEnvPreflightRealLocalEnvModified: externalResume.privateEnvPreflightRealLocalEnvModified === true,
     externalCompletionResumePrivateEnvPreflightRequiredInputCount: integerValue(externalResume.privateEnvPreflightRequiredInputCount),
     externalCompletionResumePrivateEnvPreflightMissingInputCount: integerValue(externalResume.privateEnvPreflightMissingInputCount),
+    externalCompletionResumePrivateEnvPreflightPrivateInputFileKey: textValue(
+      externalResume.privateEnvPreflightPrivateInputFileKey,
+      privateInputFileKey
+    ),
+    externalCompletionResumePrivateEnvPreflightPrivateInputFileDefaultName: textValue(
+      externalResume.privateEnvPreflightPrivateInputFileDefaultName,
+      defaultPrivateInputFileName
+    ),
+    externalCompletionResumePrivateEnvPreflightPrivateInputFilePath: textValue(
+      externalResume.privateEnvPreflightPrivateInputFilePath
+    ),
+    externalCompletionResumePrivateEnvPreflightPrivateInputFilePathMode: textValue(
+      externalResume.privateEnvPreflightPrivateInputFilePathMode,
+      blockedPrivateInputFilePathMode
+    ),
+    externalCompletionResumePrivateEnvPreflightPrivateInputFilePresent:
+      externalResume.privateEnvPreflightPrivateInputFilePresent === true,
+    externalCompletionResumePrivateEnvPreflightPrivateInputFileConfigured:
+      externalResume.privateEnvPreflightPrivateInputFileConfigured === true,
+    externalCompletionResumePrivateEnvPreflightPrivateInputFileLoadedKeyCount: integerValue(
+      externalResume.privateEnvPreflightPrivateInputFileLoadedKeyCount
+    ),
+    externalCompletionResumePrivateEnvPreflightPrivateInputFileLoadedKeySummary: textValue(
+      externalResume.privateEnvPreflightPrivateInputFileLoadedKeySummary
+    ),
+    externalCompletionResumePrivateEnvPreflightPrivateInputFileUnknownKeyCount: integerValue(
+      externalResume.privateEnvPreflightPrivateInputFileUnknownKeyCount
+    ),
+    externalCompletionResumePrivateEnvPreflightPrivateInputFileMalformedLineCount: integerValue(
+      externalResume.privateEnvPreflightPrivateInputFileMalformedLineCount
+    ),
+    externalCompletionResumePrivateEnvPreflightPrivateInputFileValueRecorded:
+      externalResume.privateEnvPreflightPrivateInputFileValueRecorded === true,
     externalCompletionResumePrivateEnvPreflightProcessEnvInputRows: externalResumePreflightProcessEnvInputRows,
     externalCompletionResumePrivateEnvPreflightProcessEnvInputRowCount: integerValue(
       externalResume.privateEnvPreflightProcessEnvInputRowCount
@@ -586,6 +625,12 @@ function buildReport({ progressRefresh, completionSummary, externalResume, check
       externalResume.privateEnvPreflightNextWriteCommand,
       releaseChannelApplyPrivateEnvCommand
     ),
+    externalCompletionResumePrivateEnvPreflightGuidedSetupFallbackCommand: textValue(
+      externalResume.privateEnvPreflightGuidedSetupFallbackCommand,
+      releaseChannelSetupWizardCommand
+    ),
+    externalCompletionResumePrivateEnvPreflightGuidedSetupFallbackValueRecorded:
+      externalResume.privateEnvPreflightGuidedSetupFallbackValueRecorded === true,
     externalCompletionResumePrivateEnvPreflightRecommendedOperatorProofCommand: textValue(
       externalResume.privateEnvPreflightRecommendedOperatorProofCommand,
       "npm run release:private-edit-strict-proof"
@@ -730,6 +775,12 @@ function buildMarkdown(report) {
 - External resume private-env preflight blocked ready: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightBlockedReady)}
 - External resume private-env missing inputs: ${report.externalCompletionResumePrivateEnvPreflightMissingInputCount}/${report.externalCompletionResumePrivateEnvPreflightRequiredInputCount}
 - External resume private-env expected blocked exit: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightExpectedBlockedExitObserved)}
+- External resume private input file key: \`${report.externalCompletionResumePrivateEnvPreflightPrivateInputFileKey}\`
+- External resume private input file default: \`${report.externalCompletionResumePrivateEnvPreflightPrivateInputFileDefaultName}\`
+- External resume private input file path: ${report.externalCompletionResumePrivateEnvPreflightPrivateInputFilePath}
+- External resume private input file present: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightPrivateInputFilePresent)}
+- External resume private input file loaded keys: ${report.externalCompletionResumePrivateEnvPreflightPrivateInputFileLoadedKeyCount} (${report.externalCompletionResumePrivateEnvPreflightPrivateInputFileLoadedKeySummary})
+- External resume guided setup fallback command: \`${report.externalCompletionResumePrivateEnvPreflightGuidedSetupFallbackCommand}\`
 - External resume next command: \`${report.externalCompletionResumeNextCommand}\`
 - External resume next proof command: \`${report.externalCompletionResumeNextProofCommand}\`
 - External resume matches current operator first command: ${readyLabel(report.externalCompletionResumeMatchesCurrentOperatorFirstCommand)}
@@ -776,12 +827,24 @@ ${formatCommandRows(report.refreshCommands)}
 - Private-env local env modified: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightLocalEnvModified)}
 - Private-env real local env modified: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightRealLocalEnvModified)}
 - Private-env missing process env inputs: ${report.externalCompletionResumePrivateEnvPreflightMissingInputCount}/${report.externalCompletionResumePrivateEnvPreflightRequiredInputCount}
+- Private-env private input file key: \`${report.externalCompletionResumePrivateEnvPreflightPrivateInputFileKey}\`
+- Private-env private input file default: \`${report.externalCompletionResumePrivateEnvPreflightPrivateInputFileDefaultName}\`
+- Private-env private input file path: ${report.externalCompletionResumePrivateEnvPreflightPrivateInputFilePath}
+- Private-env private input file path mode: ${report.externalCompletionResumePrivateEnvPreflightPrivateInputFilePathMode}
+- Private-env private input file present: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightPrivateInputFilePresent)}
+- Private-env private input file configured: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightPrivateInputFileConfigured)}
+- Private-env private input file loaded keys: ${report.externalCompletionResumePrivateEnvPreflightPrivateInputFileLoadedKeyCount} (${report.externalCompletionResumePrivateEnvPreflightPrivateInputFileLoadedKeySummary})
+- Private-env private input file unknown keys: ${report.externalCompletionResumePrivateEnvPreflightPrivateInputFileUnknownKeyCount}
+- Private-env private input file malformed lines: ${report.externalCompletionResumePrivateEnvPreflightPrivateInputFileMalformedLineCount}
+- Private-env private input file value recorded: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightPrivateInputFileValueRecorded)}
 - Private-env process env rows value-free: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightProcessEnvInputRowsValueFree)}
 - Private-env remediation rows value-free: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightRemediationRowsValueFree)}
 - Private-env operator receipt ready: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightOperatorReceiptReady)}
 - Private-env operator receipt rows value-free: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightOperatorReceiptRowsValueFree)}
 - Private-env current operator first command: \`${report.externalCompletionResumePrivateEnvPreflightCurrentOperatorFirstCommand}\`
 - Private-env next write command: \`${report.externalCompletionResumePrivateEnvPreflightNextWriteCommand}\`
+- Private-env guided setup fallback command: \`${report.externalCompletionResumePrivateEnvPreflightGuidedSetupFallbackCommand}\`
+- Private-env guided setup fallback value recorded: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightGuidedSetupFallbackValueRecorded)}
 - Private-env recommended proof command: \`${report.externalCompletionResumePrivateEnvPreflightRecommendedOperatorProofCommand}\`
 - Private-env hard gate command: \`${report.externalCompletionResumePrivateEnvPreflightHardGateCommand}\`
 - Private-env private values recorded: ${readyLabel(report.externalCompletionResumePrivateEnvPreflightPrivateValuesRecorded)}
@@ -1044,6 +1107,58 @@ function validateReport(report, markdown) {
     "release completion summary refresh should mirror four missing private-env process inputs in blocked evidence"
   );
   check(
+    report.externalCompletionResumePrivateEnvPreflightPrivateInputFileKey === privateInputFileKey,
+    "release completion summary refresh should mirror the private input file key"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightPrivateInputFileDefaultName === defaultPrivateInputFileName,
+    "release completion summary refresh should mirror the default private input file name"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightPrivateInputFilePath !== "none",
+    "release completion summary refresh should mirror the current private input file path"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightPrivateInputFilePathMode === blockedPrivateInputFilePathMode,
+    "release completion summary refresh should mirror the isolated missing input file path mode"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightPrivateInputFilePresent === false,
+    "release completion summary refresh should mirror absent private input file evidence"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightPrivateInputFileConfigured === true,
+    "release completion summary refresh should mirror the isolated private input file override"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightPrivateInputFileLoadedKeyCount === 0,
+    "release completion summary refresh should mirror zero loaded private input keys"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightPrivateInputFileLoadedKeySummary === "none",
+    "release completion summary refresh should mirror the private input loaded-key summary"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightPrivateInputFileUnknownKeyCount === 0,
+    "release completion summary refresh should mirror zero private input unknown keys"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightPrivateInputFileMalformedLineCount === 0,
+    "release completion summary refresh should mirror zero private input malformed lines"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightPrivateInputFileValueRecorded === false,
+    "release completion summary refresh should not record private input file values"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightGuidedSetupFallbackCommand === releaseChannelSetupWizardCommand,
+    "release completion summary refresh should mirror guided setup as a fallback command"
+  );
+  check(
+    report.externalCompletionResumePrivateEnvPreflightGuidedSetupFallbackValueRecorded === false,
+    "release completion summary refresh guided setup fallback should be value-free"
+  );
+  check(
     report.externalCompletionResumePrivateEnvPreflightProcessEnvInputRows.length ===
       report.externalCompletionResumePrivateEnvPreflightProcessEnvInputRowCount,
     "release completion summary refresh private-env process input row count should match rows"
@@ -1248,6 +1363,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("Checkpoint proof/gate refresh ready:"), "release completion summary refresh Markdown should include checkpoint proof/gate readiness");
   check(markdown.includes("Checkpoint current operator sequence ready:"), "release completion summary refresh Markdown should include checkpoint current operator readiness");
   check(markdown.includes("## Completion Blocker Action Receipt"), "release completion summary refresh Markdown should include blocker action receipt section");
+  check(markdown.includes("External resume private input file key:"), "release completion summary refresh Markdown should include external resume private input file guidance");
+  check(markdown.includes("External resume guided setup fallback command:"), "release completion summary refresh Markdown should include external resume guided setup fallback");
   check(markdown.includes("Private Env Process Input Checklist"), "release completion summary refresh Markdown should include private-env process input checklist");
   check(markdown.includes("## Completion Blocker Focus Rows"), "release completion summary refresh Markdown should include blocker focus rows");
   check(markdown.includes("Completion blocker action receipt ready: yes"), "release completion summary refresh Markdown should include blocker action receipt readiness");
@@ -1350,6 +1467,16 @@ async function main() {
   console.log(
     `- External resume private-env preflight blocked ready: ${report.externalCompletionResumePrivateEnvPreflightBlockedReady ? "yes" : "no"}`
   );
+  console.log(`- External resume private input file key: ${report.externalCompletionResumePrivateEnvPreflightPrivateInputFileKey}`);
+  console.log(`- External resume private input file default: ${report.externalCompletionResumePrivateEnvPreflightPrivateInputFileDefaultName}`);
+  console.log(`- External resume private input file path: ${report.externalCompletionResumePrivateEnvPreflightPrivateInputFilePath}`);
+  console.log(
+    `- External resume private input file present: ${report.externalCompletionResumePrivateEnvPreflightPrivateInputFilePresent ? "yes" : "no"}`
+  );
+  console.log(
+    `- External resume private input file loaded keys: ${report.externalCompletionResumePrivateEnvPreflightPrivateInputFileLoadedKeyCount}`
+  );
+  console.log(`- External resume guided setup fallback: ${report.externalCompletionResumePrivateEnvPreflightGuidedSetupFallbackCommand}`);
   console.log(`- External resume next command: ${report.externalCompletionResumeNextCommand}`);
   console.log(`- External resume next proof command: ${report.externalCompletionResumeNextProofCommand}`);
   console.log(
