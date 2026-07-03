@@ -35,6 +35,8 @@ const reportArtifactSuffixes = [
   "release-channel-apply-private-env-preflight-smoke.json"
 ];
 const configuredLocalEnvFileKey = "GROOVEFORGE_DISTRIBUTION_ENV_FILE";
+const privateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
+const defaultPrivateInputFileName = ".env.release-channel.local";
 const notClaimedSummary =
   "Not claimed: Developer ID signing, notarization, Gatekeeper approval, auto-update, manual QA approval, release upload, app-store submission, remote channel probing, or external distribution completion";
 const markdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${reportStem}.md`);
@@ -87,6 +89,21 @@ function localEnvCandidatePath() {
     return path.isAbsolute(configuredPath) ? configuredPath : path.resolve(resolvedLocalEnvRoot, configuredPath);
   }
   return path.join(resolvedLocalEnvRoot, distributionLocalEnvDefaults.defaultEnvFileName);
+}
+
+function privateInputCandidatePath() {
+  const configuredPath = process.env[privateInputFileKey]?.trim();
+  const rawPath = configuredPath || defaultPrivateInputFileName;
+  return path.isAbsolute(rawPath) ? rawPath : path.resolve(resolvedLocalEnvRoot, rawPath);
+}
+
+function validatePrivateInputFilePath(filePath) {
+  const relativePath = path.relative(resolvedLocalEnvRoot, filePath);
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    console.error("GrooveForge release-channel private env apply failed:");
+    console.error("- Private release-channel input file must stay inside the resolved local env root.");
+    process.exit(1);
+  }
 }
 
 function parseEnvLine(line) {
@@ -180,15 +197,72 @@ function parseEnvEntries(lines, filePath) {
   return entries;
 }
 
-function buildInputRows() {
+async function readPrivateInputFile(filePath) {
+  validatePrivateInputFilePath(filePath);
+  const displayPath = displayLocalEnvTarget(filePath);
+  const result = {
+    configuredFileKey: privateInputFileKey,
+    defaultFileName: defaultPrivateInputFileName,
+    filePath: displayPath,
+    present: existsSync(filePath),
+    entries: [],
+    inputValues: new Map(),
+    loadedKeys: [],
+    unknownKeys: [],
+    malformedLines: [],
+    valueRecorded: false
+  };
+
+  if (!result.present) {
+    return result;
+  }
+
+  const lines = (await readFile(filePath, "utf8")).split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    const parsed = parseEnvLine(line);
+    if (!parsed) {
+      if (line.trim() && !line.trim().startsWith("#")) {
+        result.malformedLines.push(`${displayPath}:${index + 1}`);
+      }
+      continue;
+    }
+    if (!releaseChannelMetadataKeys.includes(parsed.key)) {
+      result.unknownKeys.push(parsed.key);
+      continue;
+    }
+    result.entries.push({
+      key: parsed.key,
+      value: parsed.value,
+      file: displayPath,
+      line: index + 1,
+      valueRecorded: false
+    });
+    result.inputValues.set(parsed.key, parsed.value.trim());
+    result.loadedKeys.push(parsed.key);
+  }
+
+  result.loadedKeys = [...new Set(result.loadedKeys)];
+  result.unknownKeys = [...new Set(result.unknownKeys)];
+  return result;
+}
+
+function buildInputRows(privateInput) {
   return releaseChannelMetadataKeys.map((key, index) => {
-    const value = process.env[key]?.trim() ?? "";
+    const processEnvValue = process.env[key]?.trim() ?? "";
+    const privateInputValue = privateInput.inputValues.get(key)?.trim() ?? "";
+    const value = processEnvValue || privateInputValue;
+    const processEnvPresent = processEnvValue.length > 0;
+    const privateInputFileKeyPresent = privateInputValue.length > 0;
     const inputPresent = value.length > 0;
     const inputPlaceholder = inputPresent && isPlaceholderValue(value);
     const inputShapeReady = inputPresent && inputPlaceholder === false && shapeReadyForKey(key, value);
     return {
       order: index + 1,
       key,
+      inputSource: processEnvPresent ? "process.env" : privateInputFileKeyPresent ? "private-input-file" : "process.env",
+      processEnvPresent,
+      privateInputFilePresent: privateInput.present,
+      privateInputFileKeyPresent,
       inputPresent,
       inputPlaceholder,
       inputShapeReady,
@@ -301,7 +375,10 @@ function buildProcessEnvInputChecklistRows(inputRows) {
   return inputRows.map((row) => ({
     order: row.order,
     key: row.key,
-    inputSource: "process.env",
+    inputSource: row.inputSource,
+    processEnvPresent: row.processEnvPresent,
+    privateInputFilePresent: row.privateInputFilePresent,
+    privateInputFileKeyPresent: row.privateInputFileKeyPresent,
     inputPresent: row.inputPresent,
     inputPlaceholder: row.inputPlaceholder,
     inputShapeReady: row.inputShapeReady,
@@ -310,6 +387,21 @@ function buildProcessEnvInputChecklistRows(inputRows) {
     writeCommand: privateEnvApplyCommand,
     guidedSetupFallbackCommand,
     proofCommand: strictOperatorProofCommand,
+    valueRecorded: false
+  }));
+}
+
+function buildPrivateInputSourceRows(inputRows) {
+  return inputRows.map((row) => ({
+    order: row.order,
+    key: row.key,
+    inputSource: row.inputSource,
+    processEnvPresent: row.processEnvPresent,
+    privateInputFilePresent: row.privateInputFilePresent,
+    privateInputFileKeyPresent: row.privateInputFileKeyPresent,
+    inputPresent: row.inputPresent,
+    inputShapeReady: row.inputShapeReady,
+    expectedShape: row.expectedShape,
     valueRecorded: false
   }));
 }
@@ -332,12 +424,12 @@ function buildOperatorReceiptRows({
   return [
     {
       order: 1,
-      step: "process-env-inputs",
+      step: "private-release-channel-inputs",
       status: allInputsReady ? "ready" : "blocked",
       command: privateEnvApplyPreflightCommand,
-      target: "process.env",
+      target: "process.env or ignored private input file",
       expectedEvidence: `${inputReadyCount}/${inputRows.length} inputs shape-ready; missing ${missingInputCount}; placeholders ${placeholderInputCount}; invalid shape ${invalidShapeCount}`,
-      operatorAction: allInputsReady ? "rerun-preflight" : "set-four-process-env-inputs-with-allowed-channel-and-HTTPS-URL-shapes",
+      operatorAction: allInputsReady ? "rerun-preflight" : "set-four-private-inputs-with-allowed-channel-and-HTTPS-URL-shapes",
       valueRecorded: false
     },
     {
@@ -357,7 +449,7 @@ function buildOperatorReceiptRows({
       command: privateEnvApplyPreflightCommand,
       target: "release-channel private inputs",
       expectedEvidence: preflightReady ? "preflight ready without writing local env" : "preflight blocks before writing local env",
-      operatorAction: preflightReady ? "run-private-env-apply" : "fix-process-env-inputs-and-rerun-preflight",
+      operatorAction: preflightReady ? "run-private-env-apply" : "fix-private-inputs-and-rerun-preflight",
       valueRecorded: false
     },
     {
@@ -489,6 +581,15 @@ function formatProcessEnvInputChecklistRows(rows) {
     .join("\n");
 }
 
+function formatPrivateInputSourceRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.inputSource)} | ${readyLabel(row.processEnvPresent)} | ${readyLabel(row.privateInputFilePresent)} | ${readyLabel(row.privateInputFileKeyPresent)} | ${readyLabel(row.inputPresent)} | ${readyLabel(row.inputShapeReady)} | ${escapeCell(row.expectedShape)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function formatOperatorReceiptRows(rows) {
   return rows
     .map(
@@ -520,7 +621,15 @@ function buildMarkdown(report) {
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current required keys: ${report.currentRequiredKeyCount} (${report.currentRequiredKeySummary})
 - Current blocker after apply: ${report.currentFirstBlocker}
+- Private input file key: \`${report.privateInputFileKey}\`
+- Private input file default: \`${report.privateInputFileDefaultName}\`
+- Private input file path: ${report.privateInputFilePath}
+- Private input file present: ${readyLabel(report.privateInputFilePresent)}
+- Private input file loaded keys: ${report.privateInputFileLoadedKeyCount} (${report.privateInputFileLoadedKeySummary})
+- Private input file unknown keys: ${report.privateInputFileUnknownKeyCount}
+- Private input file malformed lines: ${report.privateInputFileMalformedLineCount}
 - Process env input checklist rows: ${report.processEnvInputChecklistRowCount}
+- Private input source rows: ${report.privateInputSourceRowCount}
 - Preflight remediation rows: ${report.preflightRemediationRowCount}
 - Operator receipt ready: ${readyLabel(report.operatorReceiptReady)}
 - Operator receipt rows: ${report.operatorReceiptRowCount}
@@ -541,6 +650,12 @@ function buildMarkdown(report) {
 | order | key | input source | input present | input placeholder | input shape ready | expected shape | preflight command | write command | proof command | value recorded |
 |---:|---|---|---:|---:|---:|---|---|---|---|---:|
 ${formatProcessEnvInputChecklistRows(report.processEnvInputChecklistRows)}
+
+## Private Input Sources
+
+| order | key | input source | process env present | private input file present | private input file key present | input present | input shape ready | expected shape | value recorded |
+|---:|---|---|---:|---:|---:|---:|---:|---|---:|
+${formatPrivateInputSourceRows(report.privateInputSourceRows)}
 
 ## Apply Plan Rows
 
@@ -568,7 +683,7 @@ ${formatAfterRows(report.afterApplyRows)}
 
 ## Next Proof
 
-Run \`${report.reportCommand}\`${report.preflightOnly ? ` first to verify process env readiness, then \`${report.nextWriteCommand}\` to write the ignored local env file.` : " to write the ignored local env file."} If interactive guidance is needed, run \`${report.guidedSetupFallbackCommand}\` as a separate fallback helper. Run \`${report.recommendedOperatorProofCommand}\` after the apply command reports 4/4 current-ready rows. The strict proof chain starts with \`${report.firstStrictProofCommand}\`, then runs the downstream post-edit proof, progress refresh, and private-value leak audit.
+Run \`${report.reportCommand}\`${report.preflightOnly ? ` first to verify private input readiness, then \`${report.nextWriteCommand}\` to write the ignored local env file.` : " to write the ignored local env file."} Inputs may come from \`process.env\` or the ignored private input file, with \`process.env\` taking precedence. If interactive guidance is needed, run \`${report.guidedSetupFallbackCommand}\` as a separate fallback helper. Run \`${report.recommendedOperatorProofCommand}\` after the apply command reports 4/4 current-ready rows. The strict proof chain starts with \`${report.firstStrictProofCommand}\`, then runs the downstream post-edit proof, progress refresh, and private-value leak audit.
 
 ## Not Recorded
 
@@ -595,9 +710,17 @@ async function writeReport(report, privateValueCandidates) {
 
 async function main() {
   const filePath = localEnvCandidatePath();
-  const inputRows = buildInputRows();
+  const privateInputFilePath = privateInputCandidatePath();
+  const privateInputFile = await readPrivateInputFile(privateInputFilePath);
+  const inputRows = buildInputRows(privateInputFile);
   const processEnvInputChecklistRows = buildProcessEnvInputChecklistRows(inputRows);
-  const inputValues = new Map(releaseChannelMetadataKeys.map((key) => [key, process.env[key]?.trim() ?? ""]));
+  const privateInputSourceRows = buildPrivateInputSourceRows(inputRows);
+  const inputValues = new Map(
+    releaseChannelMetadataKeys.map((key) => [
+      key,
+      process.env[key]?.trim() || privateInputFile.inputValues.get(key)?.trim() || ""
+    ])
+  );
   const localEnvFileLoaded = existsSync(filePath);
   const beforeText = localEnvFileLoaded ? await readFile(filePath, "utf8") : "";
   const beforeLines = beforeText.length > 0 ? beforeText.split(/\r?\n/) : [];
@@ -678,6 +801,19 @@ async function main() {
     currentRequiredKeyCount: releaseChannelMetadataKeys.length,
     currentRequiredKeys: releaseChannelMetadataKeys,
     currentRequiredKeySummary: summarizeKeys(releaseChannelMetadataKeys),
+    privateInputFileKey,
+    privateInputFileDefaultName: defaultPrivateInputFileName,
+    privateInputFilePath: privateInputFile.filePath,
+    privateInputFilePresent: privateInputFile.present,
+    privateInputFileConfigured: Boolean(process.env[privateInputFileKey]?.trim()),
+    privateInputFileLoadedKeys: privateInputFile.loadedKeys,
+    privateInputFileLoadedKeyCount: privateInputFile.loadedKeys.length,
+    privateInputFileLoadedKeySummary: summarizeKeys(privateInputFile.loadedKeys),
+    privateInputFileUnknownKeys: privateInputFile.unknownKeys,
+    privateInputFileUnknownKeyCount: privateInputFile.unknownKeys.length,
+    privateInputFileMalformedLines: privateInputFile.malformedLines,
+    privateInputFileMalformedLineCount: privateInputFile.malformedLines.length,
+    privateInputFileValueRecorded: false,
     inputKeyCount: inputRows.length,
     inputReadyKeyCount: inputRows.filter((row) => row.inputShapeReady === true).length,
     inputMissingKeys: inputRows.filter((row) => row.inputPresent !== true).map((row) => row.key),
@@ -691,6 +827,11 @@ async function main() {
     processEnvInputChecklistInvalidShapeCount: processEnvInputChecklistRows.filter(
       (row) => row.inputPresent === true && row.inputPlaceholder === false && row.inputShapeReady !== true
     ).length,
+    privateInputSourceRows,
+    privateInputSourceRowCount: privateInputSourceRows.length,
+    privateInputSourceReadyCount: privateInputSourceRows.filter((row) => row.inputShapeReady === true).length,
+    privateInputSourceProcessEnvCount: privateInputSourceRows.filter((row) => row.inputSource === "process.env" && row.inputPresent === true).length,
+    privateInputSourceFileCount: privateInputSourceRows.filter((row) => row.inputSource === "private-input-file").length,
     applyPlanRows: planRows.map(({ lineIndex, ...row }) => row),
     applyPlanRowCount: planRows.length,
     wouldApplyKeyCount: wouldApplyRows.length,
@@ -765,9 +906,17 @@ async function main() {
   check(reportArtifactSuffixes.includes(`${reportStem}.json`), "release-channel private env apply should use a documented JSON artifact suffix");
   check(notClaimedSummary.startsWith("Not claimed:"), "release-channel private env apply should expose a not-claimed summary");
   check(report.currentRequiredKeyCount === 4, "release-channel private env apply should cover four metadata keys");
+  check(report.privateInputFileKey === privateInputFileKey, "release-channel private env apply should expose the private input file key");
+  check(report.privateInputFileDefaultName === defaultPrivateInputFileName, "release-channel private env apply should expose the default private input file name");
+  check(report.privateInputFileValueRecorded === false, "release-channel private env apply should not record private input file values");
+  check(report.privateInputSourceRowCount === 4, "release-channel private env apply should create four private input source rows");
+  check(report.privateInputSourceRows.every((row) => row.valueRecorded === false), "release-channel private env apply source rows should be value-free");
   check(report.inputKeyCount === 4, "release-channel private env apply should inspect four input keys");
   check(report.processEnvInputChecklistRowCount === 4, "release-channel private env apply should create four process env input checklist rows");
-  check(report.processEnvInputChecklistRows.every((row) => row.inputSource === "process.env"), "release-channel private env apply checklist rows should identify process.env as the input source");
+  check(
+    report.processEnvInputChecklistRows.every((row) => ["process.env", "private-input-file"].includes(row.inputSource)),
+    "release-channel private env apply checklist rows should identify supported input sources"
+  );
   check(report.processEnvInputChecklistRows.every((row) => row.valueRecorded === false), "release-channel private env apply checklist rows should be value-free");
   check(report.processEnvInputChecklistRows.every((row) => row.preflightCommand === privateEnvApplyPreflightCommand), "release-channel private env apply checklist rows should carry the preflight command");
   check(report.processEnvInputChecklistRows.every((row) => row.writeCommand === privateEnvApplyCommand), "release-channel private env apply checklist rows should carry the write command");
@@ -838,6 +987,9 @@ async function main() {
     console.error(`- Blocked rows: ${report.blockedKeyCount}`);
     console.error(`- Current ready rows: ${report.currentReadyKeyCount}/${report.currentRequiredKeyCount}`);
     console.error(`- Current env edit target: ${report.currentEnvEditTarget}`);
+    console.error(`- Private input file present: ${report.privateInputFilePresent ? "yes" : "no"}`);
+    console.error(`- Private input file loaded keys: ${report.privateInputFileLoadedKeyCount}`);
+    console.error(`- Private input source rows: ${report.privateInputSourceRowCount}`);
     console.error(`- Process env input checklist rows: ${report.processEnvInputChecklistRowCount}`);
     console.error(`- Preflight remediation rows: ${report.preflightRemediationRowCount}`);
     console.error(`- Operator receipt rows: ${report.operatorReceiptRowCount}`);
@@ -873,6 +1025,9 @@ async function main() {
   console.log(`- Skipped current rows: ${report.skippedCurrentKeyCount}`);
   console.log(`- Current ready rows: ${report.currentReadyKeyCount}/${report.currentRequiredKeyCount}`);
   console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);
+  console.log(`- Private input file present: ${report.privateInputFilePresent ? "yes" : "no"}`);
+  console.log(`- Private input file loaded keys: ${report.privateInputFileLoadedKeyCount}`);
+  console.log(`- Private input source rows: ${report.privateInputSourceRowCount}`);
   console.log(`- Process env input checklist rows: ${report.processEnvInputChecklistRowCount}`);
   console.log(`- Preflight remediation rows: ${report.preflightRemediationRowCount}`);
   console.log(`- Operator receipt rows: ${report.operatorReceiptRowCount}`);

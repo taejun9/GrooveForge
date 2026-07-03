@@ -28,6 +28,12 @@ const prepareEnvCommand = "npm run release:prepare-env";
 const applyCommand = "npm run release:channel-apply-private-env";
 const strictProofCommand = "npm run release:private-edit-strict-proof";
 const hardGateCommand = "npm run release:external-check";
+const blockedPrivateInputFile = path.join(
+  "build",
+  "desktop",
+  `${appName}-${platformArch}`,
+  `release-channel-preflight-blocked-missing-input-${process.pid}.local`
+);
 const failures = [];
 
 function check(condition, message) {
@@ -74,6 +80,7 @@ function childEnvironment() {
     delete env[key];
   }
   delete env.GROOVEFORGE_RELEASE_CHANNEL_APPLY_ENV_ROOT;
+  env.GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE = blockedPrivateInputFile;
   delete env.GROOVEFORGE_DISTRIBUTION_ENV_FILE;
   return env;
 }
@@ -96,6 +103,7 @@ function reportIsValueFree(report) {
     report.releaseGateClaimedExternalDistribution === false &&
     report.valueRecorded === false &&
     rowsValueFree(report.processEnvInputChecklistRows) &&
+    rowsValueFree(report.privateInputSourceRows) &&
     rowsValueFree(report.applyPlanRows) &&
     rowsValueFree(report.preflightRemediationRows) &&
     rowsValueFree(report.operatorReceiptRows) &&
@@ -239,6 +247,9 @@ check(report.processEnvInputChecklistRowCount === releaseChannelMetadataKeys.len
 check(report.processEnvInputChecklistRows.every((row) => row.inputSource === "process.env"), "blocked preflight checklist rows should identify process.env as the input source");
 check(report.processEnvInputChecklistRows.every((row) => row.inputPresent === false), "blocked preflight checklist rows should show missing process env inputs");
 check(report.processEnvInputChecklistRows.every((row) => row.valueRecorded === false), "blocked preflight checklist rows should be value-free");
+check(report.privateInputFilePresent === false, "blocked preflight should not read an existing private input file");
+check(report.privateInputSourceRowCount === releaseChannelMetadataKeys.length, "blocked preflight should include four private input source rows");
+check(report.privateInputSourceRows.every((row) => row.valueRecorded === false), "blocked preflight private input source rows should be value-free");
 check(report.processEnvInputChecklistRows.every((row) => row.preflightCommand === preflightCommand), "blocked preflight checklist rows should include the preflight command");
 check(report.processEnvInputChecklistRows.every((row) => row.writeCommand === applyCommand), "blocked preflight checklist rows should include the write command");
 check(report.processEnvInputChecklistRows.every((row) => row.proofCommand === strictProofCommand), "blocked preflight checklist rows should include the strict proof command");
