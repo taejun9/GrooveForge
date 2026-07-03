@@ -30,6 +30,7 @@ const strictProofCommand = "npm run release:private-edit-strict-proof";
 const hardGateCommand = "npm run release:external-check";
 const privateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
 const defaultPrivateInputFileName = ".env.release-channel.local";
+const operatorPrivateInputFileDefaultPath = defaultPrivateInputFileName;
 const guidedSetupFallbackCommand = "npm run release:channel-setup-wizard";
 const blockedPrivateInputFilePathMode = "blocked-smoke-isolated-missing-input-file";
 const blockedPrivateInputFile = path.join(
@@ -169,6 +170,7 @@ function buildMarkdown(report) {
 - Missing process env inputs: ${report.missingInputCount}/${report.requiredInputCount}
 - Private input file key: \`${report.privateInputFileKey}\`
 - Private input file default: \`${report.privateInputFileDefaultName}\`
+- Operator private input file default path: \`${report.operatorPrivateInputFileDefaultPath}\`
 - Private input file path: ${report.privateInputFilePath}
 - Private input file path mode: ${report.privateInputFilePathMode}
 - Private input file present: ${readyLabel(report.privateInputFilePresent)}
@@ -266,6 +268,7 @@ check(report.processEnvInputChecklistRows.every((row) => row.writeCommand === ap
 check(report.processEnvInputChecklistRows.every((row) => row.proofCommand === strictProofCommand), "blocked preflight checklist rows should include the strict proof command");
 check(report.privateInputFileKey === privateInputFileKey, "blocked preflight should expose the private input file key");
 check(report.privateInputFileDefaultName === defaultPrivateInputFileName, "blocked preflight should expose the default private input file name");
+check(operatorPrivateInputFileDefaultPath === defaultPrivateInputFileName, "blocked preflight should expose the operator default private input file path");
 check(report.privateInputFilePath === blockedPrivateInputFile, "blocked preflight should expose the isolated missing private input file path");
 check(report.privateInputFilePresent === false, "blocked preflight should keep the isolated private input file absent");
 check(report.privateInputFileLoadedKeyCount === 0, "blocked preflight should load zero private input file keys");
@@ -316,6 +319,8 @@ const blockedReport = {
   missingInputKeys: report.inputMissingKeys,
   privateInputFileKey: report.privateInputFileKey,
   privateInputFileDefaultName: report.privateInputFileDefaultName,
+  operatorPrivateInputFileDefaultPath,
+  operatorPrivateInputFileDefaultPathValueRecorded: false,
   privateInputFilePath: report.privateInputFilePath,
   privateInputFilePathMode: blockedPrivateInputFilePathMode,
   privateInputFilePresent: report.privateInputFilePresent,
@@ -365,6 +370,14 @@ const blockedMarkdown = buildMarkdown(blockedReport);
 const blockedJson = `${JSON.stringify(blockedReport, null, 2)}\n`;
 const blockedCombined = `${blockedMarkdown}\n${blockedJson}`;
 check(!/https?:\/\//i.test(blockedCombined), "blocked preflight smoke artifacts should not include URL values");
+check(
+  blockedReport.operatorPrivateInputFileDefaultPath === operatorPrivateInputFileDefaultPath,
+  "blocked preflight smoke should record the operator default private input file path"
+);
+check(
+  blockedReport.operatorPrivateInputFileDefaultPathValueRecorded === false,
+  "blocked preflight smoke operator default private input file path should be value-free"
+);
 
 if (failures.length > 0) {
   fail("Validation failed.", childOutput);
@@ -387,6 +400,7 @@ console.log("- Real local env modified: no");
 console.log(`- Missing process env inputs: ${report.inputMissingKeys.length}/${releaseChannelMetadataKeys.length}`);
 console.log(`- Private input file key: ${report.privateInputFileKey}`);
 console.log(`- Private input file default: ${report.privateInputFileDefaultName}`);
+console.log(`- Operator private input file default path: ${operatorPrivateInputFileDefaultPath}`);
 console.log(`- Private input file path: ${report.privateInputFilePath}`);
 console.log(`- Private input file present: ${report.privateInputFilePresent ? "yes" : "no"}`);
 console.log(`- Private input file loaded keys: ${report.privateInputFileLoadedKeyCount}`);
