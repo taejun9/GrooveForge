@@ -90,6 +90,13 @@ npm run release:channel-setup-brief
 npm run release:channel-setup-brief-smoke
 ```
 
+Run the value-free release-channel placeholder input receipt when the ignored private input file exists but the operator needs to confirm which rows are still placeholders before preflight/apply:
+
+```sh
+npm run release:channel-placeholder-input-receipt
+npm run release:channel-placeholder-input-receipt-smoke
+```
+
 Run the guided local-only release-channel setup wizard when the operator wants the ignored env scaffold, private metadata apply helper, and strict live-check proof chained without recording URL/channel values:
 
 ```sh
