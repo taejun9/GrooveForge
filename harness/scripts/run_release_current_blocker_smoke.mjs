@@ -21,6 +21,10 @@ const releaseChannelPreflightBlockedJsonPath = path.join(
   packageRoot,
   `${appName}-${packageJson.version}-${platformArch}-release-channel-apply-private-env-preflight-blocked-smoke.json`
 );
+const releaseChannelPlaceholderInputReceiptJsonPath = path.join(
+  packageRoot,
+  `${appName}-${packageJson.version}-${platformArch}-release-channel-placeholder-input-receipt.json`
+);
 const currentBlockerMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.md`);
 const currentBlockerJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.json`);
 const fromExisting = process.argv.includes("--from-existing");
@@ -32,7 +36,8 @@ const refreshCommandsBeforeSourceCheck = [
 const refreshCommandsAfterSourceCheck = [
   ["run", "desktop:external-distribution-gate-smoke"],
   ["run", "release:update-feed-checkpoint-smoke"],
-  ["run", "release:progress-smoke"]
+  ["run", "release:progress-smoke"],
+  ["run", "release:channel-placeholder-input-receipt"]
 ];
 const refreshCommands = [...refreshCommandsBeforeSourceCheck, ...refreshCommandsAfterSourceCheck];
 const recommendedPrivateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
@@ -389,6 +394,57 @@ function formatPreflightProcessEnvChecklistRows(rows) {
     .map(
       (row) =>
         `| ${row.order ?? "?"} | ${escapeCell(row.key)} | ${escapeCell(row.inputSource)} | ${row.inputPresent ? "yes" : "no"} | ${row.inputPlaceholder ? "yes" : "no"} | ${row.inputShapeReady ? "yes" : "no"} | ${escapeCell(row.expectedShape)} | \`${escapeCell(row.preflightCommand)}\` | \`${escapeCell(row.writeCommand)}\` | \`${escapeCell(row.proofCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`
+    )
+    .join("\n");
+}
+
+function placeholderInputReceiptRows(values) {
+  return valueFreeObjectRows(values).map((row) => ({
+    order: integerValue(row.order),
+    key: textValue(row.key),
+    privateInputFilePath: displayEvidenceFile(row.privateInputFilePath),
+    privateInputFileLine: Number.isInteger(row.privateInputFileLine) ? row.privateInputFileLine : null,
+    privateInputFilePresent: row.privateInputFilePresent === true,
+    privateInputFileKeyPresent: row.privateInputFileKeyPresent === true,
+    privateInputFilePlaceholder: row.privateInputFilePlaceholder === true,
+    privateInputFileShapeReady: row.privateInputFileShapeReady === true,
+    inputSource: textValue(row.inputSource),
+    remediation: textValue(row.remediation),
+    expectedShape: textValue(row.expectedShape),
+    valueRecorded: false
+  }));
+}
+
+function placeholderInputCommandRows(values) {
+  return valueFreeObjectRows(values).map((row) => ({
+    order: integerValue(row.order),
+    command: textValue(row.command),
+    role: textValue(row.role),
+    requiredBeforeApply: row.requiredBeforeApply === true,
+    valueRecorded: false
+  }));
+}
+
+function formatPlaceholderInputReceiptRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | no | no | no | no | none | none | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order ?? "?"} | ${escapeCell(row.key)} | ${escapeCell(row.privateInputFilePath)} | ${escapeCell(row.privateInputFileLine ?? "none")} | ${row.privateInputFilePresent ? "yes" : "no"} | ${row.privateInputFileKeyPresent ? "yes" : "no"} | ${row.privateInputFilePlaceholder ? "yes" : "no"} | ${row.privateInputFileShapeReady ? "yes" : "no"} | ${escapeCell(row.inputSource)} | ${escapeCell(row.remediation)} | ${row.valueRecorded === false ? "no" : "yes"} |`
+    )
+    .join("\n");
+}
+
+function formatPlaceholderInputCommandRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | no | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order ?? "?"} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${row.requiredBeforeApply ? "yes" : "no"} | ${row.valueRecorded === false ? "no" : "yes"} |`
     )
     .join("\n");
 }
@@ -1629,7 +1685,15 @@ function hardGateRequirementRows(externalGate) {
   });
 }
 
-function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, externalGate, releaseProgress, releaseChannelPreflightBlocked }) {
+function buildReport({
+  releaseDoctor,
+  externalNextActions,
+  externalProofBundle,
+  externalGate,
+  releaseProgress,
+  releaseChannelPreflightBlocked,
+  releaseChannelPlaceholderInputReceipt
+}) {
   const doctorRequiredKeys = stringArrayValue(releaseDoctor.currentActionRequiredKeys);
   const proofRequiredKeys = stringArrayValue(externalProofBundle.currentRequiredKeys);
   const progressRequiredKeys = stringArrayValue(releaseProgress.externalProofBundleCurrentRequiredKeys);
@@ -1906,6 +1970,40 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     integerValue(releaseProgress.releaseChannelPostEditOperatorReceiptRowCount) === releaseChannelPostEditOperatorReceiptRows.length &&
     releaseChannelPostEditOperatorReceiptRows.length === 7 &&
     releaseChannelPostEditOperatorReceiptRows.every((row) => row.ready === true && row.valueRecorded === false);
+  const placeholderReceiptRows = placeholderInputReceiptRows(releaseChannelPlaceholderInputReceipt.privateInputFileLocationRows);
+  const placeholderReceiptCommandRows = placeholderInputCommandRows(releaseChannelPlaceholderInputReceipt.commandRows);
+  const placeholderReceiptModes = [
+    "missing-private-input-file",
+    "incomplete-private-input-file",
+    "placeholder-private-input-file",
+    "invalid-shape-private-input-file",
+    "ready-private-input-file",
+    "review-private-input-file"
+  ];
+  const placeholderInputReceiptReady =
+    releaseChannelPlaceholderInputReceipt.receiptReady === true &&
+    releaseChannelPlaceholderInputReceipt.reportCommand === "npm run release:channel-placeholder-input-receipt" &&
+    releaseChannelPlaceholderInputReceipt.syntheticSmoke === false &&
+    placeholderReceiptModes.includes(textValue(releaseChannelPlaceholderInputReceipt.receiptMode)) &&
+    [0, 1].includes(integerValue(releaseChannelPlaceholderInputReceipt.sourcePreflightExitStatus)) &&
+    releaseChannelPlaceholderInputReceipt.sourcePreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand &&
+    releaseChannelPlaceholderInputReceipt.privateValuesRecorded === false &&
+    releaseChannelPlaceholderInputReceipt.privateInputFileValueRecorded === false &&
+    releaseChannelPlaceholderInputReceipt.releaseUrlValueRecorded === false &&
+    releaseChannelPlaceholderInputReceipt.supportUrlValueRecorded === false &&
+    releaseChannelPlaceholderInputReceipt.channelValueRecorded === false &&
+    releaseChannelPlaceholderInputReceipt.networkProbeAttempted === false &&
+    releaseChannelPlaceholderInputReceipt.releaseUploadAttempted === false &&
+    releaseChannelPlaceholderInputReceipt.signingAttempted === false &&
+    releaseChannelPlaceholderInputReceipt.notarySubmissionAttempted === false &&
+    releaseChannelPlaceholderInputReceipt.releaseGateClaimedExternalDistribution === false &&
+    releaseChannelPlaceholderInputReceipt.localEnvModified === false &&
+    releaseChannelPlaceholderInputReceipt.realLocalEnvModified === false &&
+    placeholderReceiptRows.length === releaseChannelMetadataKeys.length &&
+    placeholderReceiptRows.every((row) => row.valueRecorded === false) &&
+    placeholderReceiptCommandRows.length === integerValue(releaseChannelPlaceholderInputReceipt.commandRowCount) &&
+    placeholderReceiptCommandRows.length >= 5 &&
+    placeholderReceiptCommandRows.every((row) => row.valueRecorded === false);
   const preflightProcessEnvRows = preflightProcessEnvChecklistRows(releaseChannelPreflightBlocked.processEnvInputChecklistRows);
   const preflightProcessEnvChecklistSourceReady =
     releaseChannelPreflightBlocked.blockedSmokeReady === true &&
@@ -2429,6 +2527,73 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     ),
     releaseChannelPostEditOperatorReceiptValueRecorded:
       releaseProgress.releaseChannelPostEditOperatorReceiptValueRecorded === true ? true : false,
+    placeholderInputReceiptReady,
+    placeholderInputReceiptArtifactPath: relative(releaseChannelPlaceholderInputReceiptJsonPath),
+    placeholderInputReceiptMode: textValue(releaseChannelPlaceholderInputReceipt.receiptMode),
+    placeholderInputReceiptReportCommand: textValue(
+      releaseChannelPlaceholderInputReceipt.reportCommand,
+      "npm run release:channel-placeholder-input-receipt"
+    ),
+    placeholderInputReceiptSourcePreflightCommand: textValue(
+      releaseChannelPlaceholderInputReceipt.sourcePreflightCommand,
+      releaseChannelApplyPrivateEnvPreflightCommand
+    ),
+    placeholderInputReceiptSourcePreflightExitStatus: integerValue(releaseChannelPlaceholderInputReceipt.sourcePreflightExitStatus),
+    placeholderInputReceiptSourcePreflightReady: releaseChannelPlaceholderInputReceipt.sourcePreflightReady === true,
+    placeholderInputReceiptLocalEnvFileLoaded: releaseChannelPlaceholderInputReceipt.localEnvFileLoaded === true,
+    placeholderInputReceiptPrivateInputFilePresent: releaseChannelPlaceholderInputReceipt.privateInputFilePresent === true,
+    placeholderInputReceiptPrivateInputFileKey: textValue(
+      releaseChannelPlaceholderInputReceipt.privateInputFileKey,
+      releaseChannelPrivateInputTemplatePrivateInputFileKey
+    ),
+    placeholderInputReceiptPrivateInputFileDefaultName: textValue(
+      releaseChannelPlaceholderInputReceipt.privateInputFileDefaultName,
+      releaseChannelPrivateInputTemplateDefaultPath
+    ),
+    placeholderInputReceiptPrivateInputFileLoadedKeyCount: integerValue(
+      releaseChannelPlaceholderInputReceipt.privateInputFileLoadedKeyCount
+    ),
+    placeholderInputReceiptPrivateInputFileLoadedKeySummary: textValue(
+      releaseChannelPlaceholderInputReceipt.privateInputFileLoadedKeySummary,
+      "none"
+    ),
+    placeholderInputReceiptPrivateInputFileMissingKeyCount: integerValue(
+      releaseChannelPlaceholderInputReceipt.privateInputFileMissingKeyCount
+    ),
+    placeholderInputReceiptPrivateInputFileMissingKeySummary: textValue(
+      releaseChannelPlaceholderInputReceipt.privateInputFileMissingKeySummary,
+      "none"
+    ),
+    placeholderInputReceiptPrivateInputFilePlaceholderKeyCount: integerValue(
+      releaseChannelPlaceholderInputReceipt.privateInputFilePlaceholderKeyCount
+    ),
+    placeholderInputReceiptPrivateInputFilePlaceholderKeySummary: textValue(
+      releaseChannelPlaceholderInputReceipt.privateInputFilePlaceholderKeySummary,
+      "none"
+    ),
+    placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount: integerValue(
+      releaseChannelPlaceholderInputReceipt.privateInputFileInvalidShapeKeyCount
+    ),
+    placeholderInputReceiptPrivateInputFileInvalidShapeKeySummary: textValue(
+      releaseChannelPlaceholderInputReceipt.privateInputFileInvalidShapeKeySummary,
+      "none"
+    ),
+    placeholderInputReceiptRows: placeholderReceiptRows,
+    placeholderInputReceiptRowCount: placeholderReceiptRows.length,
+    placeholderInputReceiptCommandRows: placeholderReceiptCommandRows,
+    placeholderInputReceiptCommandRowCount: placeholderReceiptCommandRows.length,
+    placeholderInputReceiptNextOperatorCommand: textValue(
+      releaseChannelPlaceholderInputReceipt.nextOperatorCommand,
+      releaseChannelApplyPrivateEnvPreflightCommand
+    ),
+    placeholderInputReceiptNextProofCommand: textValue(
+      releaseChannelPlaceholderInputReceipt.nextProofCommand,
+      recommendedPrivateEditOperatorProofCommand
+    ),
+    placeholderInputReceiptValueRecorded:
+      releaseChannelPlaceholderInputReceipt.valueRecorded === true ||
+      releaseChannelPlaceholderInputReceipt.privateValuesRecorded === true ||
+      releaseChannelPlaceholderInputReceipt.privateInputFileValueRecorded === true,
     preflightProcessEnvChecklistSourceReady,
     preflightProcessEnvChecklistArtifactPath: relative(releaseChannelPreflightBlockedJsonPath),
     preflightProcessEnvChecklistReportCommand: textValue(releaseChannelPreflightBlocked.sourceCommand, releaseChannelApplyPrivateEnvPreflightCommand),
@@ -3384,6 +3549,30 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.releaseChannelPostEditOperatorReceiptNextActionsCommand === "npm run release:next-actions", "release current blocker post-edit operator receipt should keep next-actions refresh command");
   check(report.releaseChannelPostEditOperatorReceiptHardGateCommand === report.hardGateCommand, "release current blocker post-edit operator receipt hard gate should match hard gate command");
   check(report.releaseChannelPostEditOperatorReceiptValueRecorded === false, "release current blocker post-edit operator receipt should not record values");
+  check(report.placeholderInputReceiptReady === true, "release current blocker should include ready placeholder input receipt source");
+  check(report.placeholderInputReceiptReportCommand === "npm run release:channel-placeholder-input-receipt", "release current blocker placeholder input receipt should use the real receipt command");
+  check(report.placeholderInputReceiptSourcePreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release current blocker placeholder input receipt should point to private env preflight");
+  check([0, 1].includes(report.placeholderInputReceiptSourcePreflightExitStatus), "release current blocker placeholder input receipt should preserve preflight exit 0 or expected blocked 1");
+  check(report.placeholderInputReceiptRowCount === releaseChannelMetadataKeys.length, "release current blocker placeholder input receipt should include four private input rows");
+  check(report.placeholderInputReceiptRows.every((row) => row.valueRecorded === false), "release current blocker placeholder input rows should be value-free");
+  check(report.placeholderInputReceiptCommandRows.every((row) => row.valueRecorded === false), "release current blocker placeholder input command rows should be value-free");
+  check(report.placeholderInputReceiptCommandRows.some((row) => row.command === releaseChannelPrivateInputTemplateCommand), "release current blocker placeholder input receipt should include the template command");
+  check(report.placeholderInputReceiptCommandRows.some((row) => row.command === releaseChannelApplyPrivateEnvPreflightCommand), "release current blocker placeholder input receipt should include the preflight command");
+  check(report.placeholderInputReceiptCommandRows.some((row) => row.command === releaseChannelApplyPrivateEnvCommand), "release current blocker placeholder input receipt should include the apply command");
+  check(report.placeholderInputReceiptNextProofCommand === recommendedPrivateEditOperatorProofCommand, "release current blocker placeholder input receipt should keep strict proof as next proof");
+  check(report.placeholderInputReceiptValueRecorded === false, "release current blocker placeholder input receipt should not record values");
+  if (report.placeholderInputReceiptPrivateInputFilePresent === true) {
+    check(
+      report.placeholderInputReceiptMode !== "missing-private-input-file",
+      "release current blocker placeholder input receipt should not call a present private input file missing"
+    );
+  }
+  if (report.placeholderInputReceiptPrivateInputFilePlaceholderKeyCount > 0) {
+    check(
+      report.placeholderInputReceiptMode === "placeholder-private-input-file",
+      "release current blocker placeholder input receipt should use placeholder mode while private input placeholders remain"
+    );
+  }
   check(report.preflightProcessEnvChecklistSourceReady === true, "release current blocker should include ready private-env preflight checklist source");
   check(report.preflightProcessEnvChecklistBlockedSmokeReady === true, "release current blocker preflight checklist should come from the blocked preflight smoke");
   check(report.preflightProcessEnvChecklistExpectedBlockedExitObserved === true, "release current blocker preflight checklist should preserve expected blocked exit evidence");
@@ -3879,6 +4068,12 @@ function buildMarkdown(report) {
     `- Release-channel post-edit operator proof command: \`${report.releaseChannelPostEditOperatorReceiptProofCommand}\``,
     `- Release-channel post-edit operator blocker refresh: \`${report.releaseChannelPostEditOperatorReceiptBlockerRefreshCommand}\``,
     `- Release-channel post-edit operator next-actions refresh: \`${report.releaseChannelPostEditOperatorReceiptNextActionsCommand}\``,
+    `- Placeholder input receipt ready: ${report.placeholderInputReceiptReady ? "yes" : "no"}`,
+    `- Placeholder input receipt mode: ${report.placeholderInputReceiptMode}`,
+    `- Placeholder private input file present: ${report.placeholderInputReceiptPrivateInputFilePresent ? "yes" : "no"}`,
+    `- Placeholder private input loaded keys: ${report.placeholderInputReceiptPrivateInputFileLoadedKeyCount} (${report.placeholderInputReceiptPrivateInputFileLoadedKeySummary})`,
+    `- Placeholder private input missing/placeholder/invalid rows: ${report.placeholderInputReceiptPrivateInputFileMissingKeyCount}/${report.placeholderInputReceiptPrivateInputFilePlaceholderKeyCount}/${report.placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount}`,
+    `- Placeholder input next operator command: \`${report.placeholderInputReceiptNextOperatorCommand}\``,
     `- Preflight process env checklist source ready: ${report.preflightProcessEnvChecklistSourceReady ? "yes" : "no"}`,
     `- Preflight process env checklist rows: ${report.preflightProcessEnvChecklistRowCount} (${report.preflightProcessEnvChecklistSummary})`,
     `- Preflight process env checklist ready rows: ${report.preflightProcessEnvChecklistReadyCount}/${report.preflightProcessEnvChecklistRowCount}`,
@@ -4057,6 +4252,37 @@ function buildMarkdown(report) {
     "| order | step | ready | current state | operator action | expected post-edit signal | command | proof command | rerun command | source | value recorded |",
     "|---:|---|---:|---|---|---|---|---|---|---|---:|",
     formatReleaseChannelPostEditOperatorReceiptRows(report.releaseChannelPostEditOperatorReceiptRows),
+    "",
+    "## Release-Channel Placeholder Input Receipt",
+    "",
+    `- Receipt ready: ${report.placeholderInputReceiptReady ? "yes" : "no"}`,
+    `- Artifact path: ${report.placeholderInputReceiptArtifactPath}`,
+    `- Receipt mode: ${report.placeholderInputReceiptMode}`,
+    `- Report command: \`${report.placeholderInputReceiptReportCommand}\``,
+    `- Source preflight command: \`${report.placeholderInputReceiptSourcePreflightCommand}\``,
+    `- Source preflight exit status: ${report.placeholderInputReceiptSourcePreflightExitStatus}`,
+    `- Source preflight ready: ${report.placeholderInputReceiptSourcePreflightReady ? "yes" : "no"}`,
+    `- Local env loaded: ${report.placeholderInputReceiptLocalEnvFileLoaded ? "yes" : "no"}`,
+    `- Private input file key: \`${report.placeholderInputReceiptPrivateInputFileKey}\``,
+    `- Private input file default: \`${report.placeholderInputReceiptPrivateInputFileDefaultName}\``,
+    `- Private input file present: ${report.placeholderInputReceiptPrivateInputFilePresent ? "yes" : "no"}`,
+    `- Private input loaded keys: ${report.placeholderInputReceiptPrivateInputFileLoadedKeyCount} (${report.placeholderInputReceiptPrivateInputFileLoadedKeySummary})`,
+    `- Private input missing/placeholder/invalid rows: ${report.placeholderInputReceiptPrivateInputFileMissingKeyCount}/${report.placeholderInputReceiptPrivateInputFilePlaceholderKeyCount}/${report.placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount}`,
+    `- Private input placeholder keys: ${report.placeholderInputReceiptPrivateInputFilePlaceholderKeyCount} (${report.placeholderInputReceiptPrivateInputFilePlaceholderKeySummary})`,
+    `- Private input invalid-shape keys: ${report.placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount} (${report.placeholderInputReceiptPrivateInputFileInvalidShapeKeySummary})`,
+    `- Next operator command: \`${report.placeholderInputReceiptNextOperatorCommand}\``,
+    `- Next proof command: \`${report.placeholderInputReceiptNextProofCommand}\``,
+    `- Value recorded: ${report.placeholderInputReceiptValueRecorded ? "yes" : "no"}`,
+    "",
+    "| order | key | file | line | file present | key present | placeholder | shape ready | input source | remediation | value recorded |",
+    "|---:|---|---|---:|---:|---:|---:|---:|---|---|---:|",
+    formatPlaceholderInputReceiptRows(report.placeholderInputReceiptRows),
+    "",
+    "### Placeholder Input Operator Commands",
+    "",
+    "| order | command | role | required before apply | value recorded |",
+    "|---:|---|---|---:|---:|",
+    formatPlaceholderInputCommandRows(report.placeholderInputReceiptCommandRows),
     "",
     "## Preflight Process Env Input Checklist",
     "",
@@ -4549,13 +4775,18 @@ const releaseChannelPreflightBlocked = await readRequiredJson(
   releaseChannelPreflightBlockedJsonPath,
   "Release-channel private env preflight blocked smoke"
 );
+const releaseChannelPlaceholderInputReceipt = await readRequiredJson(
+  releaseChannelPlaceholderInputReceiptJsonPath,
+  "Release-channel placeholder input receipt"
+);
 const report = buildReport({
   releaseDoctor,
   externalNextActions,
   externalProofBundle,
   externalGate,
   releaseProgress,
-  releaseChannelPreflightBlocked
+  releaseChannelPreflightBlocked,
+  releaseChannelPlaceholderInputReceipt
 });
 validateReport(report, { releaseDoctor, externalNextActions, externalProofBundle, externalGate, releaseProgress });
 
@@ -4589,6 +4820,11 @@ check(markdown.includes("Release-channel post-edit operator receipt ready:"), "r
 check(markdown.includes("Release-channel post-edit operator receipt rows:"), "release current blocker Markdown should include release-channel post-edit operator receipt rows");
 check(markdown.includes("Release-channel post-edit operator recommended proof chain:"), "release current blocker Markdown should include release-channel post-edit operator recommended proof chain");
 check(markdown.includes("Release-Channel Post-Edit Operator Receipt"), "release current blocker Markdown should include release-channel post-edit operator receipt table");
+check(markdown.includes("Placeholder input receipt ready:"), "release current blocker Markdown should include placeholder input receipt readiness");
+check(markdown.includes("Placeholder input receipt mode:"), "release current blocker Markdown should include placeholder input receipt mode");
+check(markdown.includes("Placeholder private input missing/placeholder/invalid rows:"), "release current blocker Markdown should include placeholder input private row counts");
+check(markdown.includes("Release-Channel Placeholder Input Receipt"), "release current blocker Markdown should include placeholder input receipt section");
+check(markdown.includes("Placeholder Input Operator Commands"), "release current blocker Markdown should include placeholder input command table");
 check(markdown.includes("Preflight process env checklist source ready:"), "release current blocker Markdown should include preflight process env checklist source readiness");
 check(markdown.includes("Preflight process env checklist rows:"), "release current blocker Markdown should include preflight process env checklist row summary");
 check(markdown.includes("Preflight Process Env Input Checklist"), "release current blocker Markdown should include preflight process env checklist table");
@@ -4797,6 +5033,14 @@ console.log(`- Release-channel post-edit operator recommended proof chain: ${rep
 console.log(`- Release-channel post-edit operator proof command: ${report.releaseChannelPostEditOperatorReceiptProofCommand}`);
 console.log(`- Release-channel post-edit operator blocker refresh: ${report.releaseChannelPostEditOperatorReceiptBlockerRefreshCommand}`);
 console.log(`- Release-channel post-edit operator next-actions refresh: ${report.releaseChannelPostEditOperatorReceiptNextActionsCommand}`);
+console.log(`- Placeholder input receipt ready: ${report.placeholderInputReceiptReady ? "yes" : "no"}`);
+console.log(`- Placeholder input receipt mode: ${report.placeholderInputReceiptMode}`);
+console.log(`- Placeholder private input file present: ${report.placeholderInputReceiptPrivateInputFilePresent ? "yes" : "no"}`);
+console.log(`- Placeholder private input loaded keys: ${report.placeholderInputReceiptPrivateInputFileLoadedKeyCount}`);
+console.log(
+  `- Placeholder private input missing/placeholder/invalid rows: ${report.placeholderInputReceiptPrivateInputFileMissingKeyCount}/${report.placeholderInputReceiptPrivateInputFilePlaceholderKeyCount}/${report.placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount}`
+);
+console.log(`- Placeholder input next operator command: ${report.placeholderInputReceiptNextOperatorCommand}`);
 console.log(`- Post-edit proof sequence receipt ready: ${report.postEditProofSequenceReceiptReady ? "yes" : "no"}`);
 console.log(`- Post-edit proof sequence rows: ${report.postEditProofSequenceReceiptRowCount} (${report.postEditProofSequenceReceiptSummary})`);
 console.log(`- Post-edit proof sequence recommended proof chain: ${report.postEditProofSequenceReceiptRecommendedProofCommand}`);
