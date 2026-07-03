@@ -31,6 +31,19 @@ const squirrelDyldReportShape = [
   "fatalDyldError: 1"
 ].join("\n");
 
+const squirrelDyldCodeSignatureReportShape = [
+  "Process: GrooveForge [15208]",
+  "Path: /Users/USER/*/GrooveForge.app/Contents/MacOS/GrooveForge",
+  "Identifier: app.grooveforge.desktop",
+  "Exception Type: EXC_CRASH (SIGABRT)",
+  "Termination Reason: Namespace DYLD, Code 1, Library missing",
+  "Library not loaded: @rpath/Squirrel.framework/Squirrel",
+  "Referenced from: /Users/USER/*/GrooveForge.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework",
+  "Reason: tried: '/Users/USER/*/GrooveForge.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Libraries/Squirrel.framework/Squirrel' (no such file), '/Users/USER/*/GrooveForge.app/Contents/Frameworks/Squirrel.framework/Squirrel' (code signature in sanitized nested framework blocked dyld loading)",
+  "Responsible Process: Codex",
+  "fatalDyldError: 1"
+].join("\n");
+
 const appKitAbortReportShape = [
   "Process: Electron [3070]",
   "Identifier: com.github.Electron",
@@ -101,6 +114,12 @@ const dyldDiagnostic = macGuiLaunchAbortDetails("npm run desktop:package-smoke",
   signal: null,
   output: squirrelDyldReportShape
 });
+const dyldCodeSignatureClassified = isMacDyldFrameworkAbort({ output: squirrelDyldCodeSignatureReportShape });
+const dyldCodeSignatureDiagnostic = macGuiLaunchAbortDetails("npm run desktop:package-smoke", {
+  code: 1,
+  signal: null,
+  output: squirrelDyldCodeSignatureReportShape
+});
 const appKitDiagnostic = macGuiLaunchAbortDetails("npm run desktop:launch-smoke", {
   code: 6,
   signal: null,
@@ -118,6 +137,17 @@ const reportRows = [
       dyldDiagnostic.includes("strict code signatures"),
     source: "sanitized attached GrooveForge report shape",
     evidence: "Namespace DYLD / Library missing / @rpath/Squirrel.framework/Squirrel / no such file or code signature",
+    valueRecorded: false
+  },
+  {
+    id: "squirrel-dyld-code-signature-report",
+    ready:
+      dyldCodeSignatureClassified &&
+      dyldCodeSignatureDiagnostic.includes("Diagnostic: Electron failed during macOS dyld framework loading") &&
+      dyldCodeSignatureDiagnostic.includes("@rpath/Squirrel.framework/Squirrel") &&
+      dyldCodeSignatureDiagnostic.includes("strict code signatures"),
+    source: "sanitized attached GrooveForge code-signature dyld report shape",
+    evidence: "Namespace DYLD / Library missing / @rpath/Squirrel.framework/Squirrel / code signature in nested framework",
     valueRecorded: false
   },
   {
@@ -276,6 +306,7 @@ const summary = {
   rowCount: allRows.length,
   readyRowCount: allRows.filter((row) => row.ready === true).length,
   dyldReportClassified: dyldClassified,
+  dyldCodeSignatureReportClassified: dyldCodeSignatureClassified,
   appKitReportClassified: appKitClassified,
   restrictedGuiPreflightReady: Boolean(restrictedGuiPreflight),
   squirrelDyldInstallName: "@rpath/Squirrel.framework/Squirrel",
@@ -297,10 +328,15 @@ const summary = {
 
 check(summary.smokeReady, "desktop crash report regression smoke should have all rows ready and value-free");
 check(summary.dyldReportClassified === true, "desktop crash report regression should classify the Squirrel dyld report");
+check(
+  summary.dyldCodeSignatureReportClassified === true,
+  "desktop crash report regression should classify the attached Squirrel dyld code-signature report"
+);
 check(summary.appKitReportClassified === true, "desktop crash report regression should classify the AppKit abort report");
 check(summary.restrictedGuiPreflightReady === true, "desktop crash report regression should prove restricted GUI preflight readiness");
 check(allRows.every((row) => row.valueRecorded === false), "desktop crash report regression rows should not record values");
 check(!squirrelDyldReportShape.includes("taejungkim"), "desktop crash report regression should not record real user paths");
+check(!squirrelDyldCodeSignatureReportShape.includes("taejungkim"), "desktop crash report regression should not record real user paths");
 check(!appKitAbortReportShape.includes("taejungkim"), "desktop crash report regression should not record real user paths");
 check(summary.privateValuesRecorded === false, "desktop crash report regression should not record private values");
 check(summary.fullCrashReportRecorded === false, "desktop crash report regression should not record full crash reports");
@@ -318,6 +354,7 @@ const markdown = `# GrooveForge Desktop Crash Report Regression Smoke
 
 - Smoke ready: ${summary.smokeReady ? "yes" : "no"}
 - Squirrel dyld report classified: ${summary.dyldReportClassified ? "yes" : "no"}
+- Squirrel dyld code-signature report classified: ${summary.dyldCodeSignatureReportClassified ? "yes" : "no"}
 - AppKit abort report classified: ${summary.appKitReportClassified ? "yes" : "no"}
 - Restricted GUI preflight ready: ${summary.restrictedGuiPreflightReady ? "yes" : "no"}
 - Squirrel dyld install name: \`${summary.squirrelDyldInstallName}\`
@@ -363,6 +400,7 @@ console.log("GrooveForge desktop crash report regression smoke passed.");
 console.log(`- Markdown: ${relative(markdownPath)}`);
 console.log(`- JSON: ${relative(jsonPath)}`);
 console.log(`- Squirrel dyld report classified: ${summary.dyldReportClassified ? "yes" : "no"}`);
+console.log(`- Squirrel dyld code-signature report classified: ${summary.dyldCodeSignatureReportClassified ? "yes" : "no"}`);
 console.log(`- AppKit abort report classified: ${summary.appKitReportClassified ? "yes" : "no"}`);
 console.log(`- Restricted GUI preflight ready: ${summary.restrictedGuiPreflightReady ? "yes" : "no"}`);
 console.log(`- Guard rows ready: ${summary.guardRows.filter((row) => row.ready).length}/${summary.guardRows.length}`);
