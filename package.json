@@ -108,6 +108,7 @@
     "release:completion-report-packet-smoke": "node harness/scripts/run_release_completion_report_packet_smoke.mjs",
     "release:operator-completion-brief-smoke": "node harness/scripts/run_release_operator_completion_brief_smoke.mjs",
     "release:channel-clearance-transition-smoke": "node harness/scripts/run_release_channel_clearance_transition_smoke.mjs",
+    "release:channel-clearance-transition-post-clearance-smoke": "node harness/scripts/run_release_channel_clearance_transition_smoke.mjs --post-clearance-smoke",
     "release:auto-update-transition-smoke": "node harness/scripts/run_release_auto_update_transition_smoke.mjs",
     "release:update-feed-live-check": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_release_update_feed_live_check.mjs",
     "release:update-feed-live-check-strict": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_release_update_feed_live_check.mjs --strict",

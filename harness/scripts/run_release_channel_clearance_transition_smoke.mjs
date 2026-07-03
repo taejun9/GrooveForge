@@ -2,7 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,13 +12,23 @@ const bundleId = "app.grooveforge.desktop";
 const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
+const postClearanceSmoke = process.argv.includes("--post-clearance-smoke");
+const reportStem = postClearanceSmoke
+  ? "release-channel-clearance-transition-post-clearance-smoke"
+  : "release-channel-clearance-transition-smoke";
+const transitionArtifactNames = [
+  "release-channel-clearance-transition-smoke.md",
+  "release-channel-clearance-transition-smoke.json",
+  "release-channel-clearance-transition-post-clearance-smoke.md",
+  "release-channel-clearance-transition-post-clearance-smoke.json"
+];
 const transitionMarkdownPath = path.join(
   packageRoot,
-  `${appName}-${packageJson.version}-${platformArch}-release-channel-clearance-transition-smoke.md`
+  `${appName}-${packageJson.version}-${platformArch}-${reportStem}.md`
 );
 const transitionJsonPath = path.join(
   packageRoot,
-  `${appName}-${packageJson.version}-${platformArch}-release-channel-clearance-transition-smoke.json`
+  `${appName}-${packageJson.version}-${platformArch}-${reportStem}.json`
 );
 const successHandoffJsonPath = path.join(
   packageRoot,
@@ -29,26 +39,42 @@ const releaseDoctorJsonPath = path.join(
   `${appName}-${packageJson.version}-${platformArch}-release-doctor.json`
 );
 const failures = [];
+const completedPlanPattern = /^plan-(\d+)-[a-z0-9][a-z0-9-]*\.md$/;
 const releaseChannelMetadataKeys = [
   "GROOVEFORGE_DISTRIBUTION_CHANNEL",
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
   "GROOVEFORGE_RELEASE_NOTES_URL",
   "GROOVEFORGE_SUPPORT_URL"
 ];
-const transitionRefreshCommands = [
-  {
-    order: 1,
-    command: "npm run release:final-handoff-success-redaction-smoke",
-    role: "prove strict-ready release-channel handoff path remains redacted",
-    valueRecorded: false
-  },
-  {
-    order: 2,
-    command: "npm run release:doctor",
-    role: "refresh real release doctor current action without requiring full local release evidence",
-    valueRecorded: false
-  }
-];
+const transitionRefreshCommands = postClearanceSmoke
+  ? [
+      {
+        order: 1,
+        command: "synthetic final-handoff success-redaction fixture",
+        role: "prove post-clearance release-channel metadata readiness without reading real ignored env values",
+        valueRecorded: false
+      },
+      {
+        order: 2,
+        command: "synthetic release doctor post-clearance fixture",
+        role: "prove downstream current-action mode after release-channel metadata clears",
+        valueRecorded: false
+      }
+    ]
+  : [
+      {
+        order: 1,
+        command: "npm run release:final-handoff-success-redaction-smoke",
+        role: "prove strict-ready release-channel handoff path remains redacted",
+        valueRecorded: false
+      },
+      {
+        order: 2,
+        command: "npm run release:doctor",
+        role: "refresh real release doctor current action without requiring full local release evidence",
+        valueRecorded: false
+      }
+    ];
 const updateFeedMetadataKeys = [
   "GROOVEFORGE_UPDATE_FEED_URL",
   "ELECTRON_UPDATE_FEED_URL",
@@ -102,6 +128,9 @@ function stringArray(value) {
 }
 
 function runNpmScript(command) {
+  if (command.startsWith("synthetic ")) {
+    return;
+  }
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
   const [, , scriptName] = command.split(" ");
   const result = spawnSync(npmCommand, ["run", scriptName], {
@@ -128,6 +157,70 @@ function valueFreeRow(row) {
   return {
     ...row,
     valueRecorded: false
+  };
+}
+
+async function currentCompletedPlanState() {
+  const completedPlansDir = path.join(root, "docs", "exec_plans", "completed");
+  const entries = await readdir(completedPlansDir, { withFileTypes: true });
+  const completedPlanNumbers = entries
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name.match(completedPlanPattern))
+    .filter(Boolean)
+    .map((match) => Number(match[1]))
+    .filter((planNumber) => Number.isInteger(planNumber) && planNumber > 0);
+  const latestPlanNumber = Math.max(...completedPlanNumbers, 0);
+  if (latestPlanNumber === 0) {
+    return {
+      latestPlan: "none",
+      tenPlanProgress: "none",
+      completedInWindow: 0
+    };
+  }
+  const windowStart = latestPlanNumber - ((latestPlanNumber - 1) % 10);
+  const windowEnd = windowStart + 9;
+  const completedInWindow = completedPlanNumbers.filter((planNumber) => planNumber >= windowStart && planNumber <= windowEnd).length;
+  return {
+    latestPlan: `plan-${latestPlanNumber}`,
+    tenPlanProgress: `${windowStart}-${windowEnd}: ${completedInWindow}/10`,
+    completedInWindow
+  };
+}
+
+async function syntheticPostClearanceFixtures() {
+  const completedPlanState = await currentCompletedPlanState();
+  return {
+    successHandoff: {
+      releaseFinalHandoffReady: true,
+      syntheticSuccessRedactionSmoke: true,
+      releaseChannelMetadataReady: true,
+      realStrictReady: true,
+      currentReadyCount: releaseChannelMetadataKeys.length,
+      currentRowCount: releaseChannelMetadataKeys.length,
+      currentPlaceholderKeyCount: 0,
+      realLocalEnvRead: false,
+      realLocalEnvModified: false,
+      currentTenPlanProgressLabel: completedPlanState.tenPlanProgress,
+      currentTenPlanWindowCompletedCount: completedPlanState.completedInWindow,
+      tenPlanProgressReportDue: false
+    },
+    releaseDoctor: {
+      releaseDoctorReportReady: true,
+      currentActionId: "auto-update-feed",
+      currentActionLabel: "Auto-update feed and signed metadata",
+      currentActionNextCommand: "npm run desktop:auto-update-readiness-smoke",
+      currentActionFirstBlocker: "Update feed/channel metadata and signed update artifacts remain pending.",
+      currentActionRequiredKeys: updateFeedMetadataKeys,
+      currentActionRequiredKeyCount: updateFeedMetadataKeys.length,
+      currentActionPlaceholderKeys: updateFeedMetadataKeys,
+      currentActionPlaceholderKeyCount: updateFeedMetadataKeys.length,
+      releaseChannelMetadataReady: true,
+      completionGapCurrentProofTarget: "Auto-update feed and signed metadata",
+      completionGapHardGateCommand: "npm run release:external-check",
+      externalDistributionReady: false,
+      userFacingCompletionPercent: 99.999999,
+      userFacingRemainingPercent: 0.000001
+    }
   };
 }
 
@@ -302,21 +395,34 @@ function buildReport({ successHandoff, releaseDoctor }) {
   const currentNextCommand = textValue(releaseDoctor.currentActionNextCommand, "npm run release:doctor");
   const currentRequiredKeys = stringArray(releaseDoctor.currentActionRequiredKeys);
   const currentPlaceholderKeys = stringArray(releaseDoctor.currentActionPlaceholderKeys);
+  const currentReleaseChannelPlaceholderKeys = currentPlaceholderKeys.filter((key) => releaseChannelMetadataKeys.includes(key));
+  const currentActionIsReleaseChannel =
+    releaseDoctor.currentActionId === "prepare-local-distribution-env" ||
+    releaseDoctor.currentActionId === "replace-release-channel-placeholders" ||
+    releaseDoctor.currentActionId === "release-channel-metadata";
+  const currentActionRequiresReleaseChannelKeys = releaseChannelMetadataKeys.every((key) => currentRequiredKeys.includes(key));
   const missingLocalEnvCurrentBlocker =
     currentNextCommand === "npm run release:prepare-env" ||
     currentFirstBlocker.includes("local distribution env file is not loaded");
-  const placeholderCurrentBlocker = currentPlaceholderKeys.length === releaseChannelMetadataKeys.length;
-  const currentBlockerMode = missingLocalEnvCurrentBlocker ? "missing-local-env" : "replace-release-channel-placeholders";
+  const placeholderCurrentBlocker = currentReleaseChannelPlaceholderKeys.length === releaseChannelMetadataKeys.length;
   const currentReleaseChannelBlocked =
-    (releaseDoctor.currentActionId === "prepare-local-distribution-env" ||
-      releaseDoctor.currentActionId === "replace-release-channel-placeholders" ||
-      releaseDoctor.currentActionId === "release-channel-metadata") &&
-    currentRequiredKeys.length === releaseChannelMetadataKeys.length &&
+    currentActionIsReleaseChannel &&
+    currentActionRequiresReleaseChannelKeys &&
     (missingLocalEnvCurrentBlocker || placeholderCurrentBlocker);
+  const postReleaseChannelClearance =
+    currentReleaseChannelBlocked === false &&
+    missingLocalEnvCurrentBlocker === false &&
+    currentReleaseChannelPlaceholderKeys.length === 0 &&
+    (releaseDoctor.releaseChannelMetadataReady === true || currentActionIsReleaseChannel === false || currentActionRequiresReleaseChannelKeys === false);
+  const currentBlockerMode = missingLocalEnvCurrentBlocker
+    ? "missing-local-env"
+    : currentReleaseChannelBlocked
+      ? "replace-release-channel-placeholders"
+      : "post-release-channel-clearance";
   const sourceArtifactRows = [
     {
-      label: "Final handoff success-redaction smoke",
-      path: relative(successHandoffJsonPath),
+      label: postClearanceSmoke ? "Synthetic final handoff success-redaction fixture" : "Final handoff success-redaction smoke",
+      path: postClearanceSmoke ? "synthetic/post-clearance/final-handoff-success-redaction" : relative(successHandoffJsonPath),
       present: true,
       ready:
         successHandoff.releaseFinalHandoffReady === true &&
@@ -326,8 +432,8 @@ function buildReport({ successHandoff, releaseDoctor }) {
       valueRecorded: false
     },
     {
-      label: "Release doctor",
-      path: relative(releaseDoctorJsonPath),
+      label: postClearanceSmoke ? "Synthetic release doctor post-clearance fixture" : "Release doctor",
+      path: postClearanceSmoke ? "synthetic/post-clearance/release-doctor" : relative(releaseDoctorJsonPath),
       present: true,
       ready: releaseDoctor.releaseDoctorReportReady === true,
       valueRecorded: false
@@ -336,12 +442,14 @@ function buildReport({ successHandoff, releaseDoctor }) {
   const transitionRows = [
     {
       order: 1,
-      state: "Current real blocker",
-      evidence: missingLocalEnvCurrentBlocker
+      state: postReleaseChannelClearance ? "Post-clearance downstream blocker" : "Current real blocker",
+      evidence: postReleaseChannelClearance
+        ? "Release-channel metadata has no remaining release-channel placeholders, so the transition receipt accepts the downstream auto-update or release-gate blocker."
+        : missingLocalEnvCurrentBlocker
         ? "Release-channel metadata remains the real current blocker until the ignored local env scaffold exists and operator-owned values replace placeholders."
         : "Release-channel metadata remains the real current blocker until operator-owned values replace placeholders.",
       command: currentNextCommand,
-      ready: currentReleaseChannelBlocked,
+      ready: currentReleaseChannelBlocked || postReleaseChannelClearance,
       valueRecorded: false
     },
     {
@@ -384,7 +492,12 @@ function buildReport({ successHandoff, releaseDoctor }) {
     platform: process.platform,
     arch: process.arch,
     platformArch,
-    reportCommand: "npm run release:channel-clearance-transition-smoke",
+    reportCommand: postClearanceSmoke
+      ? "npm run release:channel-clearance-transition-post-clearance-smoke"
+      : "npm run release:channel-clearance-transition-smoke",
+    reportStem,
+    transitionArtifactNames,
+    postClearanceSmoke,
     transitionRefreshCommands,
     transitionRefreshCommandCount: transitionRefreshCommands.length,
     releaseChannelClearanceTransitionReady:
@@ -394,6 +507,8 @@ function buildReport({ successHandoff, releaseDoctor }) {
     sourceArtifactRowCount: sourceArtifactRows.length,
     currentRealBlockerReady: releaseDoctor.releaseDoctorReportReady === true,
     currentBlockerMode,
+    releaseChannelBlockedBeforeClearance: currentReleaseChannelBlocked,
+    releaseChannelPostClearanceMode: postReleaseChannelClearance,
     currentPriorityActionId: textValue(releaseDoctor.currentActionId),
     currentPriorityActionLabel: textValue(releaseDoctor.currentActionLabel),
     currentTarget: textValue(releaseDoctor.completionGapCurrentProofTarget, "Release channel metadata"),
@@ -403,6 +518,8 @@ function buildReport({ successHandoff, releaseDoctor }) {
     currentRequiredKeyCount: integerValue(releaseDoctor.currentActionRequiredKeyCount),
     currentPlaceholderKeys,
     currentPlaceholderKeyCount: integerValue(releaseDoctor.currentActionPlaceholderKeyCount),
+    currentReleaseChannelPlaceholderKeys,
+    currentReleaseChannelPlaceholderKeyCount: currentReleaseChannelPlaceholderKeys.length,
     syntheticClearanceReady: successHandoff.releaseChannelMetadataReady === true,
     syntheticClearanceStrictReady: successHandoff.realStrictReady === true,
     syntheticClearanceCurrentReadyCount: integerValue(successHandoff.currentReadyCount),
@@ -462,8 +579,12 @@ function buildMarkdown(report) {
 
 - Transition receipt ready: ${readyLabel(report.releaseChannelClearanceTransitionReady)}
 - Current blocker mode: ${report.currentBlockerMode}
+- Post-clearance smoke: ${readyLabel(report.postClearanceSmoke)}
+- Release-channel blocked before clearance: ${readyLabel(report.releaseChannelBlockedBeforeClearance)}
+- Release-channel post-clearance mode: ${readyLabel(report.releaseChannelPostClearanceMode)}
 - Current real blocker: ${report.currentPriorityActionLabel} (${report.currentPriorityActionId})
 - Current placeholder keys: ${report.currentPlaceholderKeyCount}
+- Current release-channel placeholder keys: ${report.currentReleaseChannelPlaceholderKeyCount}
 - Synthetic clearance ready: ${readyLabel(report.syntheticClearanceReady)}
 - Synthetic strict ready: ${readyLabel(report.syntheticClearanceStrictReady)}
 - Synthetic ready rows: ${report.syntheticClearanceCurrentReadyCount}/${report.syntheticClearanceCurrentRowCount}
@@ -525,21 +646,41 @@ function validateReport(report, markdown) {
   check(report.transitionRefreshCommands.every((row) => row.valueRecorded === false), "release-channel clearance transition refresh commands should be value-free");
   check(report.currentRealBlockerReady === true, "release-channel clearance transition should include ready current blocker evidence");
   check(
-    ["prepare-local-distribution-env", "replace-release-channel-placeholders", "release-channel-metadata"].includes(report.currentPriorityActionId),
-    "release-channel clearance transition should keep release-channel setup as current real blocker"
+    ["missing-local-env", "replace-release-channel-placeholders", "post-release-channel-clearance"].includes(report.currentBlockerMode),
+    "release-channel clearance transition should identify the current transition mode"
   );
-  check(
-    report.currentBlockerMode === "missing-local-env" || report.currentBlockerMode === "replace-release-channel-placeholders",
-    "release-channel clearance transition should identify the current blocker mode"
-  );
-  check(report.currentRequiredKeyCount === releaseChannelMetadataKeys.length, "release-channel clearance transition should mirror four current required keys");
   if (report.currentBlockerMode === "missing-local-env") {
+    check(
+      ["prepare-local-distribution-env", "replace-release-channel-placeholders", "release-channel-metadata"].includes(report.currentPriorityActionId),
+      "release-channel clearance transition should keep release-channel setup as current real blocker before clearance"
+    );
+    check(report.currentRequiredKeyCount === releaseChannelMetadataKeys.length, "release-channel clearance transition should mirror four release-channel required keys before clearance");
     check(report.currentNextCommand === "npm run release:prepare-env", "release-channel clearance transition should surface prepare-env when the ignored env is missing");
     check(report.currentPlaceholderKeyCount === 0, "release-channel clearance transition should not report placeholder keys before the ignored env exists");
+    check(report.currentReleaseChannelPlaceholderKeyCount === 0, "release-channel clearance transition should not report release-channel placeholders before the ignored env exists");
+    check(report.releaseChannelBlockedBeforeClearance === true, "release-channel clearance transition should mark missing-env mode as blocked before clearance");
+    check(report.releaseChannelPostClearanceMode === false, "release-channel clearance transition should not mark missing-env mode as post-clearance");
     check(report.currentFirstBlocker.includes("local distribution env file is not loaded"), "release-channel clearance transition should surface the missing-env blocker");
-  } else {
+  } else if (report.currentBlockerMode === "replace-release-channel-placeholders") {
+    check(
+      ["prepare-local-distribution-env", "replace-release-channel-placeholders", "release-channel-metadata"].includes(report.currentPriorityActionId),
+      "release-channel clearance transition should keep release-channel setup as current real blocker while placeholders remain"
+    );
+    check(report.currentRequiredKeyCount === releaseChannelMetadataKeys.length, "release-channel clearance transition should mirror four release-channel required keys while placeholders remain");
     check(report.currentPlaceholderKeyCount === releaseChannelMetadataKeys.length, "release-channel clearance transition should mirror four real placeholder keys");
     check(releaseChannelMetadataKeys.every((key) => report.currentPlaceholderKeys.includes(key)), "release-channel clearance transition should mirror release-channel placeholder keys");
+    check(report.currentReleaseChannelPlaceholderKeyCount === releaseChannelMetadataKeys.length, "release-channel clearance transition should count four release-channel placeholders");
+    check(report.releaseChannelBlockedBeforeClearance === true, "release-channel clearance transition should mark placeholder mode as blocked before clearance");
+    check(report.releaseChannelPostClearanceMode === false, "release-channel clearance transition should not mark placeholder mode as post-clearance");
+  } else {
+    check(report.releaseChannelBlockedBeforeClearance === false, "release-channel clearance transition post-clearance mode should not be blocked by release-channel metadata");
+    check(report.releaseChannelPostClearanceMode === true, "release-channel clearance transition should mark downstream mode as post-clearance");
+    check(report.currentReleaseChannelPlaceholderKeyCount === 0, "release-channel clearance transition post-clearance mode should have zero release-channel placeholders");
+    check(
+      !["prepare-local-distribution-env", "replace-release-channel-placeholders", "release-channel-metadata"].includes(report.currentPriorityActionId),
+      "release-channel clearance transition post-clearance mode should have a downstream current action"
+    );
+    check(report.currentNextCommand !== "npm run release:channel-apply-private-env-preflight", "release-channel clearance transition post-clearance mode should advance past release-channel preflight");
   }
   check(report.syntheticClearanceReady === true, "release-channel clearance transition should include synthetic clearance readiness");
   check(report.syntheticClearanceStrictReady === true, "release-channel clearance transition should include synthetic strict readiness");
@@ -589,8 +730,9 @@ for (const row of transitionRefreshCommands) {
   runNpmScript(row.command);
 }
 
-const successHandoff = await readJsonRequired(successHandoffJsonPath, "Final handoff success-redaction smoke");
-const releaseDoctor = await readJsonRequired(releaseDoctorJsonPath, "Release doctor");
+const fixtures = postClearanceSmoke ? await syntheticPostClearanceFixtures() : null;
+const successHandoff = fixtures?.successHandoff ?? (await readJsonRequired(successHandoffJsonPath, "Final handoff success-redaction smoke"));
+const releaseDoctor = fixtures?.releaseDoctor ?? (await readJsonRequired(releaseDoctorJsonPath, "Release doctor"));
 const report = buildReport({ successHandoff, releaseDoctor });
 const markdown = buildMarkdown(report);
 validateReport(report, markdown);
@@ -604,8 +746,11 @@ console.log(`- Markdown: ${relative(transitionMarkdownPath)}`);
 console.log(`- JSON: ${relative(transitionJsonPath)}`);
 console.log(`- Transition ready: ${report.releaseChannelClearanceTransitionReady ? "yes" : "no"}`);
 console.log(`- Current blocker mode: ${report.currentBlockerMode}`);
+console.log(`- Post-clearance smoke: ${report.postClearanceSmoke ? "yes" : "no"}`);
+console.log(`- Release-channel post-clearance mode: ${report.releaseChannelPostClearanceMode ? "yes" : "no"}`);
 console.log(`- Current real blocker: ${report.currentPriorityActionLabel}`);
 console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount}`);
+console.log(`- Current release-channel placeholder keys: ${report.currentReleaseChannelPlaceholderKeyCount}`);
 console.log(`- Synthetic clearance ready: ${report.syntheticClearanceReady ? "yes" : "no"}`);
 console.log(`- Synthetic strict ready: ${report.syntheticClearanceStrictReady ? "yes" : "no"}`);
 console.log(`- Next priority action: ${report.nextPriorityActionLabel}`);
