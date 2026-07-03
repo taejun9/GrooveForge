@@ -527,8 +527,12 @@ function buildMarkdown(report) {
 - Current operator command sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
+- Current operator start command: \`${report.currentOperatorStartCommand}\`
+- Current operator start command role: ${report.currentOperatorStartCommandRole}
+- Current operator start command matches first command: ${readyLabel(report.currentOperatorStartCommandMatchesFirstCommand)}
 - Operator brief first command: \`${report.operatorBriefFirstCommand}\`
 - Operator brief first command matches current operator: ${readyLabel(report.operatorBriefFirstCommandMatchesCurrentOperator)}
+- Operator brief first command matches current operator start: ${readyLabel(report.operatorBriefFirstCommandMatchesCurrentOperatorStart)}
 - Current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
 - Current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
 - Preflight process env checklist source ready: ${readyLabel(report.preflightProcessEnvChecklistSourceReady)}
@@ -685,6 +689,11 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
   const currentOperatorApplyCommandOrder = integerValue(currentBlocker.currentOperatorApplyCommandOrder) || commandOrder(currentOperatorCommandRows, releaseChannelApplyPrivateEnvCommand);
   const currentOperatorStrictProofCommandOrder = integerValue(currentBlocker.currentOperatorStrictProofCommandOrder) || commandOrder(currentOperatorCommandRows, privateEditOperatorProofCommand);
   const currentOperatorFirstCommand = textValue(currentBlocker.currentOperatorFirstCommand, currentOperatorCommandRows[0]?.command ?? "none");
+  const currentOperatorStartCommand = textValue(currentBlocker.currentOperatorStartCommand, currentOperatorFirstCommand);
+  const currentOperatorStartCommandRole = textValue(
+    currentBlocker.currentOperatorStartCommandRole,
+    currentOperatorCommandRows[0]?.role ?? "none"
+  );
   const currentOperatorPreflightBeforeApply =
     currentBlocker.currentOperatorPreflightBeforeApply === true ||
     (currentOperatorPreflightCommandOrder > 0 && currentOperatorPreflightCommandOrder < currentOperatorApplyCommandOrder);
@@ -701,6 +710,7 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     currentOperatorStrictProofCommandOrder > currentOperatorApplyCommandOrder;
   const operatorBriefFirstCommand = textValue(operatorRows[0]?.command, "none");
   const operatorBriefFirstCommandMatchesCurrentOperator = operatorBriefFirstCommand === currentOperatorFirstCommand;
+  const operatorBriefFirstCommandMatchesCurrentOperatorStart = operatorBriefFirstCommand === currentOperatorStartCommand;
   const proofRows = objectRows(completionReportPacket.privateEditProofCommandRows);
   const postClearanceRows = nextActionRows({ completionReportPacket, currentBlocker });
   const sourceBoundaryReady = sourcePrivacyBoundaryReady({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness });
@@ -818,6 +828,11 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     currentOperatorCommandSummary:
       currentOperatorCommandRows.length > 0 ? `${currentOperatorCommandRows.length} value-free current operator command rows` : "none",
     currentOperatorFirstCommand,
+    currentOperatorStartCommand,
+    currentOperatorStartCommandRole,
+    currentOperatorStartCommandMatchesFirstCommand:
+      currentBlocker.currentOperatorStartCommandMatchesFirstCommand === true ||
+      currentOperatorStartCommand === currentOperatorFirstCommand,
     currentOperatorPreflightCommand: textValue(
       currentBlocker.currentOperatorPreflightCommand,
       releaseChannelApplyPrivateEnvPreflightCommand
@@ -831,6 +846,8 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     currentOperatorNextActionsRefreshCommand: textValue(currentBlocker.currentOperatorNextActionsRefreshCommand, "npm run release:next-actions"),
     currentOperatorPreflightBeforeApply,
     currentOperatorApplyBeforeStrictProof,
+    currentOperatorStartCommandValueRecorded:
+      currentBlocker.currentOperatorStartCommandValueRecorded === true ? true : false,
     currentOperatorValueRecorded: currentOperatorCommandRows.some((row) => row.valueRecorded !== false),
     latestCompletedPlanNumber: integerValue(completionReportPacket.latestCompletedPlanNumber),
     latestTenPlanProgressLabel,
@@ -851,6 +868,7 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     operatorBriefRowCount: operatorRows.length,
     operatorBriefFirstCommand,
     operatorBriefFirstCommandMatchesCurrentOperator,
+    operatorBriefFirstCommandMatchesCurrentOperatorStart,
     privateEditOperatorProofCommand: textValue(completionReportPacket.privateEditOperatorProofCommand, privateEditOperatorProofCommand),
     privateEditProofCommandRows: proofRows,
     privateEditProofCommandCount: proofRows.length,
@@ -993,7 +1011,13 @@ check(report.currentOperatorCommandRowCount === report.currentOperatorCommandRow
 check(report.currentOperatorCommandRows.length >= 5, "release operator completion brief current operator command sequence should include preflight, apply, strict proof, blocker refresh, and next-actions refresh");
 check(report.currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false), "release operator completion brief current operator command rows should be ready and value-free");
 check(report.currentOperatorFirstCommand !== "none", "release operator completion brief should expose current operator first command");
+check(report.currentOperatorStartCommand === report.currentOperatorFirstCommand, "release operator completion brief current operator start command should mirror first command");
+check(report.currentOperatorStartCommand === report.currentOperatorCommandRows[0]?.command, "release operator completion brief current operator start command should match first row command");
+check(report.currentOperatorStartCommandRole === report.currentOperatorCommandRows[0]?.role, "release operator completion brief current operator start command role should match first row role");
+check(report.currentOperatorStartCommandMatchesFirstCommand === true, "release operator completion brief current operator start command should declare first-command match");
+check(report.currentOperatorStartCommandValueRecorded === false, "release operator completion brief current operator start command should be value-free");
 check(report.operatorBriefFirstCommandMatchesCurrentOperator === true, "release operator completion brief first command should match current operator first command");
+check(report.operatorBriefFirstCommandMatchesCurrentOperatorStart === true, "release operator completion brief first command should match current operator start command");
 check(report.currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release operator completion brief current operator sequence should expose private env preflight command");
 check(report.currentOperatorApplyCommand === releaseChannelApplyPrivateEnvCommand, "release operator completion brief current operator sequence should expose private env apply command");
 check(report.currentOperatorStrictProofCommand === privateEditOperatorProofCommand, "release operator completion brief current operator sequence should expose strict proof command");
@@ -1059,6 +1083,8 @@ check(markdown.includes("Preflight guided setup fallback command:"), "release op
 check(markdown.includes("Preflight Operator Receipt"), "release operator completion brief Markdown should include preflight operator receipt");
 check(markdown.includes("Operator Brief Rows"), "release operator completion brief Markdown should include operator rows");
 check(markdown.includes("Current Operator Command Sequence"), "release operator completion brief Markdown should include current operator command sequence");
+check(markdown.includes("Current operator start command:"), "release operator completion brief Markdown should include current operator start command");
+check(markdown.includes("Operator brief first command matches current operator start:"), "release operator completion brief Markdown should include brief/start-command match");
 check(markdown.includes("Current Private Edit Rows"), "release operator completion brief Markdown should include edit rows");
 check(markdown.includes("Post-Clearance Next Action Rows"), "release operator completion brief Markdown should include next action rows");
 check(markdown.includes("External distribution claimed: no"), "release operator completion brief Markdown should include non-claiming posture");
@@ -1089,8 +1115,12 @@ console.log(`- Release-channel current placeholder keys: ${report.releaseChannel
 console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
+console.log(`- Current operator start command: ${report.currentOperatorStartCommand}`);
+console.log(`- Current operator start command role: ${report.currentOperatorStartCommandRole}`);
+console.log(`- Current operator start command matches first command: ${report.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`);
 console.log(`- Operator brief first command: ${report.operatorBriefFirstCommand}`);
 console.log(`- Operator brief first command matches current operator: ${report.operatorBriefFirstCommandMatchesCurrentOperator ? "yes" : "no"}`);
+console.log(`- Operator brief first command matches current operator start: ${report.operatorBriefFirstCommandMatchesCurrentOperatorStart ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Preflight process env checklist source ready: ${report.preflightProcessEnvChecklistSourceReady ? "yes" : "no"}`);

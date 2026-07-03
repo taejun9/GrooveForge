@@ -161,6 +161,11 @@ function buildReport(source, localWindow) {
     sourceRefreshCommandRows.length > 0 && sourceRefreshCommandRows.every((row) => row?.valueRecorded === false);
   const sourceProofGateRefreshRowsValueFree = sourceProofGateRefreshRows.every((row) => row.valueRecorded === false);
   const currentOperatorFirstCommand = textValue(summary.currentOperatorFirstCommand);
+  const currentOperatorStartCommand = textValue(summary.currentOperatorStartCommand, currentOperatorFirstCommand);
+  const currentOperatorStartCommandRole = textValue(
+    summary.currentOperatorStartCommandRole,
+    currentOperatorCommandRows[0]?.role ?? "none"
+  );
   const currentOperatorPreflightCommand = textValue(summary.currentOperatorPreflightCommand, releaseChannelApplyPrivateEnvPreflightCommand);
   const currentOperatorApplyCommand = textValue(summary.currentOperatorApplyCommand, releaseChannelApplyPrivateEnvCommand);
   const currentOperatorStrictProofCommand = textValue(summary.currentOperatorStrictProofCommand, releasePrivateEditStrictProofCommand);
@@ -213,6 +218,13 @@ function buildReport(source, localWindow) {
     currentOperatorCommandSummary: textValue(summary.currentOperatorCommandSummary),
     currentOperatorCommandRowsValueFree,
     currentOperatorFirstCommand,
+    currentOperatorStartCommand,
+    currentOperatorStartCommandRole,
+    currentOperatorStartCommandMatchesFirstCommand:
+      summary.currentOperatorStartCommandMatchesFirstCommand === true ||
+      currentOperatorStartCommand === currentOperatorFirstCommand,
+    currentOperatorStartCommandValueRecorded:
+      summary.currentOperatorStartCommandValueRecorded === true ? true : false,
     currentOperatorFirstCommandIsGuidedSetup: currentOperatorFirstCommand === guidedSetupCommand,
     currentOperatorFirstCommandAllowed: [releasePrepareEnvCommand, releaseChannelApplyPrivateEnvPreflightCommand].includes(currentOperatorFirstCommand),
     currentOperatorCommandRowsContainGuidedSetup,
@@ -331,6 +343,9 @@ function buildMarkdown(report) {
 - Source current operator sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Source current operator rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - Source current operator first command: \`${report.currentOperatorFirstCommand}\`
+- Source current operator start command: \`${report.currentOperatorStartCommand}\`
+- Source current operator start command role: ${report.currentOperatorStartCommandRole}
+- Source current operator start command matches first command: ${readyLabel(report.currentOperatorStartCommandMatchesFirstCommand)}
 - Source current operator first command is guided setup: ${readyLabel(report.currentOperatorFirstCommandIsGuidedSetup)}
 - Source current operator rows contain guided setup: ${readyLabel(report.currentOperatorCommandRowsContainGuidedSetup)}
 - Source current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
@@ -383,6 +398,9 @@ ${proofGateRows}
 - Sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - First command: \`${report.currentOperatorFirstCommand}\`
+- Start command: \`${report.currentOperatorStartCommand}\`
+- Start command role: ${report.currentOperatorStartCommandRole}
+- Start command matches first command: ${readyLabel(report.currentOperatorStartCommandMatchesFirstCommand)}
 - First command allowed: ${readyLabel(report.currentOperatorFirstCommandAllowed)}
 - First command is guided setup: ${readyLabel(report.currentOperatorFirstCommandIsGuidedSetup)}
 - Rows contain guided setup: ${readyLabel(report.currentOperatorCommandRowsContainGuidedSetup)}
@@ -439,6 +457,11 @@ function validateReport(report, markdown) {
   check(report.currentOperatorCommandRowCount === report.currentOperatorCommandRows.length, "release 10-plan checkpoint current operator row count should match rows");
   check(report.currentOperatorCommandRows.length >= 5, "release 10-plan checkpoint current operator sequence should include preflight, apply, strict proof, blocker refresh, and next-actions refresh");
   check(report.currentOperatorCommandRowsValueFree === true, "release 10-plan checkpoint current operator rows should be ready and value-free");
+  check(report.currentOperatorStartCommand === report.currentOperatorFirstCommand, "release 10-plan checkpoint current operator start command should mirror first command");
+  check(report.currentOperatorStartCommand === report.currentOperatorCommandRows[0]?.command, "release 10-plan checkpoint current operator start command should match first row command");
+  check(report.currentOperatorStartCommandRole === report.currentOperatorCommandRows[0]?.role, "release 10-plan checkpoint current operator start command role should match first row role");
+  check(report.currentOperatorStartCommandMatchesFirstCommand === true, "release 10-plan checkpoint current operator start command should declare first-command match");
+  check(report.currentOperatorStartCommandValueRecorded === false, "release 10-plan checkpoint current operator start command should be value-free");
   check(report.currentOperatorFirstCommandAllowed === true, "release 10-plan checkpoint current operator first command should be prepare-env or private-env preflight");
   check(report.currentOperatorFirstCommandIsGuidedSetup === false, "release 10-plan checkpoint current operator first command should not be the guided setup wizard");
   check(report.currentOperatorCommandRowsContainGuidedSetup === false, "release 10-plan checkpoint current operator rows should not include the guided setup wizard");
@@ -508,6 +531,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("Proof/Gate Refresh Evidence"), "release 10-plan checkpoint Markdown should include proof/gate refresh evidence");
   check(markdown.includes("Source proof/gate refresh ready: yes"), "release 10-plan checkpoint Markdown should include proof/gate refresh readiness");
   check(markdown.includes("Source Current Operator Command Sequence"), "release 10-plan checkpoint Markdown should include source current operator sequence");
+  check(markdown.includes("Source current operator start command:"), "release 10-plan checkpoint Markdown should include source current operator start command");
   check(markdown.includes("First command is guided setup: no"), "release 10-plan checkpoint Markdown should prove guided setup is not first command");
   check(markdown.includes(`| ${report.localLatestPlan} |`), "release 10-plan checkpoint Markdown should include the boundary plan row when current window completes");
 
@@ -554,6 +578,9 @@ console.log(`- Source external gate refresh command: ${report.sourceExternalGate
 console.log(`- Source current operator sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Source current operator rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
 console.log(`- Source current operator first command: ${report.currentOperatorFirstCommand}`);
+console.log(`- Source current operator start command: ${report.currentOperatorStartCommand}`);
+console.log(`- Source current operator start command role: ${report.currentOperatorStartCommandRole}`);
+console.log(`- Source current operator start command matches first command: ${report.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`);
 console.log(`- Source current operator first command is guided setup: ${report.currentOperatorFirstCommandIsGuidedSetup ? "yes" : "no"}`);
 console.log(`- Source current operator rows contain guided setup: ${report.currentOperatorCommandRowsContainGuidedSetup ? "yes" : "no"}`);
 console.log(`- Source current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);

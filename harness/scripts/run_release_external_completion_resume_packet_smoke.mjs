@@ -211,6 +211,12 @@ function buildReport(sourcePacket, preflightBlocked) {
     integerValue(sourcePacket.currentOperatorApplyCommandOrder) || commandOrder(currentOperatorCommandRows, currentOperatorApplyCommand);
   const currentOperatorStrictProofCommandOrder =
     integerValue(sourcePacket.currentOperatorStrictProofCommandOrder) || commandOrder(currentOperatorCommandRows, currentOperatorStrictProofCommand);
+  const currentOperatorFirstCommand = textValue(sourcePacket.currentOperatorFirstCommand);
+  const currentOperatorStartCommand = textValue(sourcePacket.currentOperatorStartCommand, currentOperatorFirstCommand);
+  const currentOperatorStartCommandRole = textValue(
+    sourcePacket.currentOperatorStartCommandRole,
+    currentOperatorCommandRows[0]?.role ?? "none"
+  );
   const firstBlockedIndex = runRows.findIndex((row) => textValue(row.readiness) !== "ready");
   const firstBlockedRow = firstBlockedIndex >= 0 ? runRows[firstBlockedIndex] : null;
   const resumeRows = firstBlockedIndex >= 0 ? runRows.slice(firstBlockedIndex).map((row, index) => copyValueFreeRunRow(row, index + 1)) : [];
@@ -310,7 +316,12 @@ function buildReport(sourcePacket, preflightBlocked) {
     currentOperatorCommandRows,
     currentOperatorCommandRowCount: integerValue(sourcePacket.currentOperatorCommandRowCount),
     currentOperatorCommandSummary: textValue(sourcePacket.currentOperatorCommandSummary),
-    currentOperatorFirstCommand: textValue(sourcePacket.currentOperatorFirstCommand),
+    currentOperatorFirstCommand,
+    currentOperatorStartCommand,
+    currentOperatorStartCommandRole,
+    currentOperatorStartCommandMatchesFirstCommand:
+      sourcePacket.currentOperatorStartCommandMatchesFirstCommand === true ||
+      currentOperatorStartCommand === currentOperatorFirstCommand,
     currentOperatorPreflightCommand,
     currentOperatorPreflightCommandOrder,
     currentOperatorApplyCommand,
@@ -321,6 +332,8 @@ function buildReport(sourcePacket, preflightBlocked) {
     currentOperatorNextActionsRefreshCommand: textValue(sourcePacket.currentOperatorNextActionsRefreshCommand, "npm run release:next-actions"),
     currentOperatorPreflightBeforeApply: sourcePacket.currentOperatorPreflightBeforeApply === true,
     currentOperatorApplyBeforeStrictProof: sourcePacket.currentOperatorApplyBeforeStrictProof === true,
+    currentOperatorStartCommandValueRecorded:
+      sourcePacket.currentOperatorStartCommandValueRecorded === true ? true : false,
     currentOperatorValueRecorded: sourcePacket.currentOperatorValueRecorded === true ? true : false,
     releaseChannelPrivateInputTemplateCommand: textValue(
       sourcePacket.releaseChannelPrivateInputTemplateCommand,
@@ -358,7 +371,9 @@ function buildReport(sourcePacket, preflightBlocked) {
     nextResumeCommand: firstBlockedSummary ? firstBlockedSummary.command : sourcePacket.hardGateCommand,
     nextResumeProofCommand: firstBlockedSummary ? firstBlockedSummary.proofCommand : "npm run release:completion-summary-refresh-smoke",
     nextResumeMatchesCurrentOperatorFirstCommand:
-      firstBlockedSummary !== null && firstBlockedSummary.command !== "none" && firstBlockedSummary.command === textValue(sourcePacket.currentOperatorFirstCommand),
+      firstBlockedSummary !== null && firstBlockedSummary.command !== "none" && firstBlockedSummary.command === currentOperatorFirstCommand,
+    nextResumeMatchesCurrentOperatorStartCommand:
+      firstBlockedSummary !== null && firstBlockedSummary.command !== "none" && firstBlockedSummary.command === currentOperatorStartCommand,
     resumeRows,
     resumeRowCount: resumeRows.length,
     resumeRowsValueFree: valueFreeRows(resumeRows),
@@ -495,7 +510,11 @@ function buildMarkdown(report) {
 - Current operator command sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
+- Current operator start command: \`${report.currentOperatorStartCommand}\`
+- Current operator start command role: ${report.currentOperatorStartCommandRole}
+- Current operator start command matches first command: ${readyLabel(report.currentOperatorStartCommandMatchesFirstCommand)}
 - Next resume matches current operator first command: ${readyLabel(report.nextResumeMatchesCurrentOperatorFirstCommand)}
+- Next resume matches current operator start command: ${readyLabel(report.nextResumeMatchesCurrentOperatorStartCommand)}
 - Current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
 - Current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
 - Private input template command: \`${report.releaseChannelPrivateInputTemplateCommand}\`
@@ -549,6 +568,9 @@ ${formatResumeRows(report.alreadyReadyRows)}
 - Sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - First command: \`${report.currentOperatorFirstCommand}\`
+- Start command: \`${report.currentOperatorStartCommand}\`
+- Start command role: ${report.currentOperatorStartCommandRole}
+- Start command matches first command: ${readyLabel(report.currentOperatorStartCommandMatchesFirstCommand)}
 - Preflight command: \`${report.currentOperatorPreflightCommand}\`
 - Apply command: \`${report.currentOperatorApplyCommand}\`
 - Strict proof command: \`${report.currentOperatorStrictProofCommand}\`
@@ -790,6 +812,11 @@ function validateReport(report, markdown) {
     report.currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false),
     "external completion resume packet current operator command rows should be ready and value-free"
   );
+  check(report.currentOperatorStartCommand === report.currentOperatorFirstCommand, "external completion resume packet current operator start command should mirror first command");
+  check(report.currentOperatorStartCommand === report.currentOperatorCommandRows[0]?.command, "external completion resume packet current operator start command should match first row command");
+  check(report.currentOperatorStartCommandRole === report.currentOperatorCommandRows[0]?.role, "external completion resume packet current operator start command role should match first row role");
+  check(report.currentOperatorStartCommandMatchesFirstCommand === true, "external completion resume packet current operator start command should declare first-command match");
+  check(report.currentOperatorStartCommandValueRecorded === false, "external completion resume packet current operator start command should be value-free");
   check(
     report.currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand,
     "external completion resume packet current operator sequence should expose private env preflight command"
@@ -852,6 +879,10 @@ function validateReport(report, markdown) {
     "external completion resume packet next resume command should match current operator first command"
   );
   check(
+    report.nextResumeMatchesCurrentOperatorStartCommand === true,
+    "external completion resume packet next resume command should match current operator start command"
+  );
+  check(
     report.resumeRows[0]?.command === report.currentOperatorFirstCommand,
     "external completion resume packet first resume row should start with current operator first command"
   );
@@ -902,6 +933,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("## First Blocked Run Row"), "external completion resume packet Markdown should include first blocked row");
   check(markdown.includes("## Resume Rows"), "external completion resume packet Markdown should include resume rows");
   check(markdown.includes("## Current Operator Command Sequence"), "external completion resume packet Markdown should include current operator command sequence");
+  check(markdown.includes("Current operator start command:"), "external completion resume packet Markdown should include current operator start command");
+  check(markdown.includes("Next resume matches current operator start command:"), "external completion resume packet Markdown should include resume/start-command match");
   check(markdown.includes("Private input template command:"), "external completion resume packet Markdown should include private input template command");
   check(markdown.includes("## Private Env Preflight Blocker"), "external completion resume packet Markdown should include private env preflight blocker");
   check(markdown.includes("Private input file key:"), "external completion resume packet Markdown should include private input file key guidance");
@@ -947,7 +980,11 @@ console.log(`- Current next command: ${report.currentNextCommand}`);
 console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
+console.log(`- Current operator start command: ${report.currentOperatorStartCommand}`);
+console.log(`- Current operator start command role: ${report.currentOperatorStartCommandRole}`);
+console.log(`- Current operator start command matches first command: ${report.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`);
 console.log(`- Next resume matches current operator first command: ${report.nextResumeMatchesCurrentOperatorFirstCommand ? "yes" : "no"}`);
+console.log(`- Next resume matches current operator start command: ${report.nextResumeMatchesCurrentOperatorStartCommand ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Private input template command: ${report.releaseChannelPrivateInputTemplateCommand}`);

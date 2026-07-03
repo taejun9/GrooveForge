@@ -318,6 +318,11 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     channel.currentOperatorFirstCommand,
     currentOperatorCommandRows[0]?.command ?? "none"
   );
+  const currentOperatorStartCommand = textValue(channel.currentOperatorStartCommand, currentOperatorFirstCommand);
+  const currentOperatorStartCommandRole = textValue(
+    channel.currentOperatorStartCommandRole,
+    currentOperatorCommandRows[0]?.role ?? "none"
+  );
   const currentOperatorPreflightCommandOrder =
     integerValue(channel.currentOperatorPreflightCommandOrder) ||
     commandOrder(currentOperatorCommandRows, releaseChannelApplyPrivateEnvPreflightCommand);
@@ -890,6 +895,13 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     currentOperatorCommandRowCount: currentOperatorCommandRows.length,
     currentOperatorCommandSummary: commandSummary(currentOperatorCommandRows),
     currentOperatorFirstCommand,
+    currentOperatorStartCommand,
+    currentOperatorStartCommandRole,
+    currentOperatorStartCommandMatchesFirstCommand:
+      channel.currentOperatorStartCommandMatchesFirstCommand === true ||
+      currentOperatorStartCommand === currentOperatorFirstCommand,
+    currentOperatorStartCommandValueRecorded:
+      channel.currentOperatorStartCommandValueRecorded === true ? true : false,
     currentOperatorFirstCommandMatchesSource: currentOperatorFirstCommand === textValue(channel.currentOperatorFirstCommand),
     currentOperatorFirstCommandIsGuidedSetup: currentOperatorFirstCommand === releaseChannelSetupWizardCommand,
     currentOperatorSourceCommandRowsAvailable: currentOperatorSourceCommandRows.length > 0,
@@ -1166,6 +1178,9 @@ function buildMarkdown(report) {
 - Current operator command sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
+- Current operator start command: \`${report.currentOperatorStartCommand}\`
+- Current operator start command role: ${report.currentOperatorStartCommandRole}
+- Current operator start command matches first command: ${readyLabel(report.currentOperatorStartCommandMatchesFirstCommand)}
 - Current operator first command matches source: ${readyLabel(report.currentOperatorFirstCommandMatchesSource)}
 - Current operator first command is guided setup: ${readyLabel(report.currentOperatorFirstCommandIsGuidedSetup)}
 - Current operator source rows available: ${readyLabel(report.currentOperatorSourceCommandRowsAvailable)}
@@ -1390,6 +1405,11 @@ function validateReport(report, markdown) {
   check(report.currentOperatorCommandRows.length >= 5, "release completion report packet current operator command sequence should include preflight, apply, strict proof, blocker refresh, and next-actions refresh");
   check(report.currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false), "release completion report packet current operator command rows should be ready and value-free");
   check(report.currentOperatorSourceCommandRowsAvailable === true, "release completion report packet current operator command rows should come from the channel edit packet source rows");
+  check(report.currentOperatorStartCommand === report.currentOperatorFirstCommand, "release completion report packet current operator start command should mirror first command");
+  check(report.currentOperatorStartCommand === report.currentOperatorCommandRows[0]?.command, "release completion report packet current operator start command should match first row command");
+  check(report.currentOperatorStartCommandRole === report.currentOperatorCommandRows[0]?.role, "release completion report packet current operator start command role should match first row role");
+  check(report.currentOperatorStartCommandMatchesFirstCommand === true, "release completion report packet current operator start command should declare first-command match");
+  check(report.currentOperatorStartCommandValueRecorded === false, "release completion report packet current operator start command should be value-free");
   check(report.currentOperatorFirstCommandMatchesSource === true, "release completion report packet current operator first command should match the channel edit packet source first command");
   check(report.currentOperatorFirstCommandIsGuidedSetup === false, "release completion report packet current operator first command should not be the guided setup wizard");
   check(
@@ -1741,6 +1761,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("Completion report packet ready: yes"), "release completion report packet Markdown should include readiness");
   check(markdown.includes("Private-edit proof command order:"), "release completion report packet Markdown should include private-edit proof command order");
   check(markdown.includes("Current operator command sequence ready: yes"), "release completion report packet Markdown should include current operator command sequence readiness");
+  check(markdown.includes("Current operator start command:"), "release completion report packet Markdown should include current operator start command");
   check(markdown.includes("Current operator first command matches source: yes"), "release completion report packet Markdown should include current operator first-command source match");
   check(markdown.includes("Current operator first command is guided setup: no"), "release completion report packet Markdown should show guided setup is not the current first command");
   check(markdown.includes("Current operator source rows available: yes"), "release completion report packet Markdown should include current operator source row availability");
@@ -1812,6 +1833,9 @@ console.log(`- Private-edit operator proof command: ${report.privateEditOperator
 console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
+console.log(`- Current operator start command: ${report.currentOperatorStartCommand}`);
+console.log(`- Current operator start command role: ${report.currentOperatorStartCommandRole}`);
+console.log(`- Current operator start command matches first command: ${report.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`);
 console.log(`- Current operator first command matches source: ${report.currentOperatorFirstCommandMatchesSource ? "yes" : "no"}`);
 console.log(`- Current operator first command is guided setup: ${report.currentOperatorFirstCommandIsGuidedSetup ? "yes" : "no"}`);
 console.log(`- Current operator source rows available: ${report.currentOperatorSourceCommandRowsAvailable ? "yes" : "no"}`);
