@@ -697,6 +697,7 @@ import {
   snapshotCompareDirectMetricItems
 } from "./workstationSnapshotCompare";
 import {
+  AudienceCompletionRouteStrip,
   AudienceSessionReadout,
   DualAudienceReadinessStrip,
   FirstBeatPath,
@@ -710,6 +711,7 @@ import {
   createGuideQuickStartCompletionBottleneckLabel,
   createGuideQuickStartCompletionBreakdownItems,
   createGuideQuickStartCompletionScore,
+  createAudienceCompletionRouteRows,
   createDualAudienceReadinessRows,
   createModeSwitchButtonContext,
   createModeSwitchQuickActions,
@@ -6919,6 +6921,30 @@ export function App(): ReactElement {
     );
   }
 
+  function focusAudienceCompletionRouteReadout(): void {
+    const rows = createAudienceCompletionRouteRows({
+      beatReadinessChecks,
+      exportPreflightSummary,
+      firstBeatPathSummary,
+      handoffPackageCheckSummary,
+      productionSnapshotSummary,
+      sessionPassSummary
+    });
+    const readyLaneCount = rows.filter((row) => row.tone === "good").length;
+    const priorityRow = rows.find((row) => row.tone === "danger") ?? rows.find((row) => row.tone === "warn") ?? rows[0];
+    if (typeof document !== "undefined") {
+      document.querySelector<HTMLElement>('[data-testid="audience-completion-route"]')?.scrollIntoView({
+        block: "start",
+        behavior: "auto"
+      });
+    }
+    setProjectStatus(
+      `Audience Completion Route Readout Pattern ${project.selectedPattern}: ${readyLaneCount}/${rows.length} lanes send-ready / ${
+        priorityRow?.laneLabel ?? "Audience Completion Route"
+      } / ${priorityRow?.nextCheckLabel ?? "Check the matching completion lane"} / direct completion lane actions unchanged`
+    );
+  }
+
   function applyProjectKey(key: string): void {
     const changed = updateProject((current) => retargetProjectKey(current, key), `Retargeted project to ${key}`);
     if (changed) {
@@ -9146,6 +9172,7 @@ export function App(): ReactElement {
     onSelectPattern: selectPattern,
     onSelectStyle: selectStyle,
     onSelectAudienceSessionRow: selectAudienceSessionRow,
+    onFocusAudienceCompletionRouteReadout: focusAudienceCompletionRouteReadout,
     onFocusDualAudienceReadinessRouteReadout: focusDualAudienceReadinessRouteReadout,
     onSwitchMode: switchProjectMode,
     onUsePatternInSelectedBlock: usePatternInSelectedBlockFromCompare,
@@ -9423,6 +9450,42 @@ export function App(): ReactElement {
       };
     };
 
+    const runAudienceCompletionRoute = (
+      actionId: string
+    ): Pick<GrooveforgeLaunchSmokeRouteEvidence, "resultMetricValue" | "resultNextCheck" | "resultStatus" | "resultTitle"> => {
+      const action = quickActions.find((candidate) => candidate.id === actionId);
+      if (!action || action.disabled) {
+        return {
+          resultMetricValue: "Action unavailable",
+          resultNextCheck: "Quick Actions must expose the Audience Completion Route before launch smoke can run it.",
+          resultStatus: "Unavailable",
+          resultTitle: actionId
+        };
+      }
+
+      const beforeProject = projectRef.current;
+      action.run();
+      const result = createQuickActionResult(
+        action,
+        beforeProject,
+        projectRef.current,
+        "complete",
+        selectedArrangementIndex,
+        handoffExportReceiptRef.current,
+        null
+      );
+      setQuickActionResult(result);
+      setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
+      setQuickActionsOpen(false);
+
+      return {
+        resultMetricValue: `${result.metric.before} -> ${result.metric.after}`,
+        resultNextCheck: result.nextCheck,
+        resultStatus: result.status,
+        resultTitle: result.title
+      };
+    };
+
     window.__grooveforgeLaunchSmoke = {
       collectAudienceSessionQuickActionEvidence: () => {
         const producer = {
@@ -9441,12 +9504,27 @@ export function App(): ReactElement {
           ...routeEvidence("open dual audience professional producer lane", "dual-audience-readiness-producer-action"),
           ...runDualAudienceReadinessRoute("dual-audience-readiness-producer-action")
         };
+        const completionReadout = {
+          ...routeEvidence("audience completion route", "audience-completion-route-readout-action"),
+          ...runAudienceCompletionRoute("audience-completion-route-readout-action")
+        };
+        const completionBeginner = {
+          ...routeEvidence("open audience completion first-time composer completion", "audience-completion-route-beginner-action"),
+          ...runAudienceCompletionRoute("audience-completion-route-beginner-action")
+        };
+        const completionProducer = {
+          ...routeEvidence("open audience completion professional producer completion", "audience-completion-route-producer-action"),
+          ...runAudienceCompletionRoute("audience-completion-route-producer-action")
+        };
         const guided = {
-          ...routeEvidence("enter guided first-time composer", "audience-session-enter-beginner"),
+          ...routeEvidence("audience-session-enter-beginner", "audience-session-enter-beginner"),
           ...runAudienceSessionRoute("audience-session-enter-beginner")
         };
 
         return {
+          completionBeginner,
+          completionProducer,
+          completionReadout,
           dualBeginner,
           dualProducer,
           dualReadout,
@@ -9458,13 +9536,19 @@ export function App(): ReactElement {
             producer.resultTitle.length > 0 &&
             dualReadout.resultTitle.length > 0 &&
             dualBeginner.resultTitle.length > 0 &&
-            dualProducer.resultTitle.length > 0,
+            dualProducer.resultTitle.length > 0 &&
+            completionReadout.resultTitle.length > 0 &&
+            completionBeginner.resultTitle.length > 0 &&
+            completionProducer.resultTitle.length > 0,
           searchPresent:
             guided.searchMetricValue.length > 0 &&
             producer.searchMetricValue.length > 0 &&
             dualReadout.searchMetricValue.length > 0 &&
             dualBeginner.searchMetricValue.length > 0 &&
-            dualProducer.searchMetricValue.length > 0
+            dualProducer.searchMetricValue.length > 0 &&
+            completionReadout.searchMetricValue.length > 0 &&
+            completionBeginner.searchMetricValue.length > 0 &&
+            completionProducer.searchMetricValue.length > 0
         };
       }
     };
@@ -9849,6 +9933,19 @@ export function App(): ReactElement {
         productionSnapshotSummary={productionSnapshotSummary}
         sessionPassSummary={sessionPassSummary}
         onFocusExportPreflight={focusExportPreflightCard}
+        onFocusProductionSnapshot={focusProductionSnapshotMetric}
+        onJumpFirstBeatPath={jumpToFirstBeatPathStep}
+      />
+
+      <AudienceCompletionRouteStrip
+        beatReadinessChecks={beatReadinessChecks}
+        exportPreflightSummary={exportPreflightSummary}
+        firstBeatPathSummary={firstBeatPathSummary}
+        handoffPackageCheckSummary={handoffPackageCheckSummary}
+        productionSnapshotSummary={productionSnapshotSummary}
+        sessionPassSummary={sessionPassSummary}
+        onFocusExportPreflight={focusExportPreflightCard}
+        onFocusHandoffPackageCheck={focusHandoffPackageCheckCard}
         onFocusProductionSnapshot={focusProductionSnapshotMetric}
         onJumpFirstBeatPath={jumpToFirstBeatPathStep}
       />

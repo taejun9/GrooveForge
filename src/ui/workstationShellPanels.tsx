@@ -320,6 +320,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Dual Audience Readiness Route Readout, first-time composer lane command, professional producer lane command, lane readiness posture, First Beat Path route, Export Preflight or Production Snapshot route, audition cue, and next check before choosing an audience readiness lane."
       },
       {
+        id: "audience-completion-route",
+        command: "Audience Completion Route",
+        shortcut: "Quick Actions / Readout",
+        target: "First-time composer completion / Professional producer completion",
+        context:
+          "Audience Completion Route Readout, first-time composer completion lane command, professional producer completion lane command, First Beat Path, Production Snapshot, Export Preflight, Handoff Package Check, send-ready posture, audition cue, and next final check before export or delivery."
+      },
+      {
         id: "first-beat-path",
         command: "First Beat Path",
         shortcut: "Quick Actions / Readout",

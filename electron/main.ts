@@ -67,6 +67,9 @@ type LaunchSmokePaletteRouteEvidence = {
 };
 
 type LaunchSmokePaletteEvidence = {
+  completionBeginner: LaunchSmokePaletteRouteEvidence;
+  completionProducer: LaunchSmokePaletteRouteEvidence;
+  completionReadout: LaunchSmokePaletteRouteEvidence;
   dualBeginner: LaunchSmokePaletteRouteEvidence;
   dualProducer: LaunchSmokePaletteRouteEvidence;
   dualReadout: LaunchSmokePaletteRouteEvidence;
@@ -458,7 +461,9 @@ function launchSmokeFailures(evidence: LaunchSmokeEvidence): string[] {
 function launchSmokePaletteFailures(evidence: LaunchSmokePaletteEvidence): string[] {
   const failures: string[] = [];
   if (!evidence.opened || !evidence.searchPresent || !evidence.resultPresent) {
-    failures.push("live Quick Actions palette should open, accept Audience Session and Dual Audience Readiness searches, and leave an execution result");
+    failures.push(
+      "live Quick Actions palette should open, accept Audience Session, Dual Audience Readiness, and Audience Completion Route searches, and leave an execution result"
+    );
   }
   if (!evidence.guided.actionPresent) {
     failures.push("live Quick Actions palette should show Enter Guided after first-time composer search");
@@ -545,6 +550,40 @@ function launchSmokePaletteFailures(evidence: LaunchSmokePaletteEvidence): strin
   }
   if (!evidence.dualProducer.resultNextCheck.includes("Export Preflight") && !evidence.dualProducer.resultNextCheck.includes("Production Snapshot")) {
     failures.push("live Quick Actions Dual Audience producer lane should guide the next producer delivery check");
+  }
+  if (!evidence.completionReadout.actionPresent) {
+    failures.push("live Quick Actions palette should show Audience Completion Route Readout");
+  }
+  if (evidence.completionReadout.spotlightAction !== "audience-completion-route-readout-action") {
+    failures.push(
+      `live Quick Actions Audience Completion spotlight should target audience-completion-route-readout-action, got ${evidence.completionReadout.spotlightAction}`
+    );
+  }
+  if (!evidence.completionReadout.spotlightTitle.includes("Review Audience Completion Route")) {
+    failures.push(`live Quick Actions Audience Completion spotlight should name Audience Completion Route, got ${evidence.completionReadout.spotlightTitle}`);
+  }
+  if (!evidence.completionReadout.resultMetricValue.includes("Audience Completion Route Readout")) {
+    failures.push("live Quick Actions Audience Completion readout result metric should include the route readout");
+  }
+  if (!evidence.completionBeginner.actionPresent || !evidence.completionBeginner.resultMetricValue.includes("First-time composer completion")) {
+    failures.push("live Quick Actions Audience Completion beginner lane should execute with first-time composer completion evidence");
+  }
+  if (
+    !evidence.completionBeginner.resultNextCheck.includes("First Beat Path") &&
+    !evidence.completionBeginner.resultNextCheck.includes("Export Preflight") &&
+    !evidence.completionBeginner.resultNextCheck.includes("Handoff Package Check")
+  ) {
+    failures.push("live Quick Actions Audience Completion beginner lane should guide the next beginner completion check");
+  }
+  if (!evidence.completionProducer.actionPresent || !evidence.completionProducer.resultMetricValue.includes("Professional producer completion")) {
+    failures.push("live Quick Actions Audience Completion producer lane should execute with professional producer completion evidence");
+  }
+  if (
+    !evidence.completionProducer.resultNextCheck.includes("Production Snapshot") &&
+    !evidence.completionProducer.resultNextCheck.includes("Export Preflight") &&
+    !evidence.completionProducer.resultNextCheck.includes("Handoff Package Check")
+  ) {
+    failures.push("live Quick Actions Audience Completion producer lane should guide the next producer completion check");
   }
   return failures;
 }
@@ -687,6 +726,9 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "dual-audience-readiness",
         "dual-audience-readiness-beginner",
         "dual-audience-readiness-producer",
+        "audience-completion-route",
+        "audience-completion-route-beginner",
+        "audience-completion-route-producer",
         "mode-guided",
         "mode-studio",
         "quick-actions-open",
@@ -764,6 +806,9 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         location: window.location.href,
         missingText: expectedText.filter((text) => !bodyText.includes(text)),
         palette: {
+          completionBeginner: emptyRoute,
+          completionProducer: emptyRoute,
+          completionReadout: emptyRoute,
           dualBeginner: emptyRoute,
           dualProducer: emptyRoute,
           dualReadout: emptyRoute,
@@ -822,7 +867,7 @@ async function collectLaunchSmokePaletteEvidence(win: BrowserWindow): Promise<La
 
 function collectLaunchSmokePaletteEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokePaletteEvidence> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Timed out collecting live Quick Actions palette evidence.")), 30000);
+    const timeout = setTimeout(() => reject(new Error("Timed out collecting live Quick Actions palette evidence.")), 60000);
     void collectLaunchSmokePaletteEvidence(win)
       .then((evidence) => {
         clearTimeout(timeout);

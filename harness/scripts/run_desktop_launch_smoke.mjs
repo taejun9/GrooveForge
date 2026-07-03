@@ -27,6 +27,9 @@ const expectedLiveTestIds = [
   "dual-audience-readiness",
   "dual-audience-readiness-beginner",
   "dual-audience-readiness-producer",
+  "audience-completion-route",
+  "audience-completion-route-beginner",
+  "audience-completion-route-producer",
   "mode-guided",
   "mode-studio",
   "quick-actions-open",
@@ -106,11 +109,11 @@ function checkResult(result) {
   check(evidence?.palette?.opened === true, "live desktop Quick Actions palette should open during launch smoke");
   check(
     evidence?.palette?.searchPresent === true,
-    "live desktop Quick Actions palette should accept Audience Session and Dual Audience Readiness search input"
+    "live desktop Quick Actions palette should accept Audience Session, Dual Audience Readiness, and Audience Completion Route search input"
   );
   check(
     evidence?.palette?.resultPresent === true,
-    "live desktop Quick Actions palette should leave Audience Session and Dual Audience Readiness execution results"
+    "live desktop Quick Actions palette should leave Audience Session, Dual Audience Readiness, and Audience Completion Route execution results"
   );
   check(evidence?.palette?.guided?.actionPresent === true, "live desktop Quick Actions palette should show Enter Guided from first-time composer search");
   check(
@@ -210,6 +213,44 @@ function checkResult(result) {
     String(evidence?.palette?.dualProducer?.resultNextCheck ?? "").includes("Export Preflight") ||
       String(evidence?.palette?.dualProducer?.resultNextCheck ?? "").includes("Production Snapshot"),
     "live desktop Quick Actions Dual Audience producer lane should guide the next producer delivery check"
+  );
+  check(
+    evidence?.palette?.completionReadout?.actionPresent === true,
+    "live desktop Quick Actions palette should show Audience Completion Route Readout"
+  );
+  check(
+    evidence?.palette?.completionReadout?.spotlightAction === "audience-completion-route-readout-action",
+    "live desktop Quick Actions Audience Completion spotlight should target audience-completion-route-readout-action"
+  );
+  check(
+    String(evidence?.palette?.completionReadout?.spotlightTitle ?? "").includes("Review Audience Completion Route"),
+    "live desktop Quick Actions Audience Completion spotlight should name Audience Completion Route"
+  );
+  check(
+    String(evidence?.palette?.completionReadout?.resultMetricValue ?? "").includes("Audience Completion Route Readout"),
+    "live desktop Quick Actions Audience Completion readout result should include the route readout"
+  );
+  check(
+    evidence?.palette?.completionBeginner?.actionPresent === true &&
+      String(evidence?.palette?.completionBeginner?.resultMetricValue ?? "").includes("First-time composer completion"),
+    "live desktop Quick Actions Audience Completion beginner lane should execute with first-time composer completion evidence"
+  );
+  check(
+    String(evidence?.palette?.completionBeginner?.resultNextCheck ?? "").includes("First Beat Path") ||
+      String(evidence?.palette?.completionBeginner?.resultNextCheck ?? "").includes("Export Preflight") ||
+      String(evidence?.palette?.completionBeginner?.resultNextCheck ?? "").includes("Handoff Package Check"),
+    "live desktop Quick Actions Audience Completion beginner lane should guide the next beginner completion check"
+  );
+  check(
+    evidence?.palette?.completionProducer?.actionPresent === true &&
+      String(evidence?.palette?.completionProducer?.resultMetricValue ?? "").includes("Professional producer completion"),
+    "live desktop Quick Actions Audience Completion producer lane should execute with professional producer completion evidence"
+  );
+  check(
+    String(evidence?.palette?.completionProducer?.resultNextCheck ?? "").includes("Production Snapshot") ||
+      String(evidence?.palette?.completionProducer?.resultNextCheck ?? "").includes("Export Preflight") ||
+      String(evidence?.palette?.completionProducer?.resultNextCheck ?? "").includes("Handoff Package Check"),
+    "live desktop Quick Actions Audience Completion producer lane should guide the next producer completion check"
   );
 
   const visual = evidence?.visual;
@@ -341,10 +382,13 @@ child.on("exit", (code, signal) => {
     "- Dual Audience Readiness Quick Actions: route readout, first-time composer lane, and professional producer lane search/run evidence passed"
   );
   console.log(
-    "- Beginner path: Audience Session Readout, Dual Audience Readiness, Enter Guided, Guide Quick Start, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
+    "- Audience Completion Route Quick Actions: route readout, first-time composer completion, and professional producer completion search/run evidence passed"
   );
   console.log(
-    "- Producer path: Audience Session Readout, Dual Audience Readiness, Enter Studio, Studio mode, Review Queue, Production Snapshot, Mix Coach, Sound/Mix Snapshot, Quick Actions, Command Reference"
+    "- Beginner path: Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Enter Guided, Guide Quick Start, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
+  );
+  console.log(
+    "- Producer path: Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Enter Studio, Studio mode, Review Queue, Production Snapshot, Mix Coach, Handoff Pack, Quick Actions, Command Reference"
   );
   console.log("- Workstation path: transport, compose, sound, arrange, mix, master, export controls, Handoff Pack");
 });

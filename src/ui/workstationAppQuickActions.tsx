@@ -834,6 +834,8 @@ import {
   createGuideQuickStartCompletionBottleneckLabel,
   createGuideQuickStartCompletionBreakdownItems,
   createGuideQuickStartCompletionScore,
+  createAudienceCompletionRouteQuickActions,
+  createAudienceCompletionRouteRows,
   createAudienceSessionQuickActions,
   createDualAudienceReadinessQuickActions,
   createDualAudienceReadinessRows,
@@ -1490,6 +1492,7 @@ export function createQuickActions({
   onSelectPattern,
   onSelectStyle,
   onSelectAudienceSessionRow,
+  onFocusAudienceCompletionRouteReadout,
   onFocusDualAudienceReadinessRouteReadout,
   onSwitchMode,
   onUsePatternInSelectedBlock,
@@ -1877,6 +1880,7 @@ export function createQuickActions({
   onSelectPattern: (pattern: PatternSlot) => void;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
   onSelectAudienceSessionRow: (row: AudienceSessionReadoutRow) => void;
+  onFocusAudienceCompletionRouteReadout: () => void;
   onFocusDualAudienceReadinessRouteReadout: () => void;
   onSwitchMode: (mode: ProjectState["mode"]) => void;
   onUsePatternInSelectedBlock: (pattern: PatternSlot) => void;
@@ -3011,6 +3015,22 @@ export function createQuickActions({
     onFocusRouteReadout: onFocusDualAudienceReadinessRouteReadout,
     onJumpFirstBeatPath,
     rows: dualAudienceReadinessRows
+  });
+  const audienceCompletionRouteRows = createAudienceCompletionRouteRows({
+    beatReadinessChecks,
+    exportPreflightSummary,
+    firstBeatPathSummary,
+    handoffPackageCheckSummary,
+    productionSnapshotSummary,
+    sessionPassSummary
+  });
+  const audienceCompletionRouteActions = createAudienceCompletionRouteQuickActions({
+    onFocusExportPreflight,
+    onFocusHandoffPackageCheck,
+    onFocusProductionSnapshot,
+    onFocusRouteReadout: onFocusAudienceCompletionRouteReadout,
+    onJumpFirstBeatPath,
+    rows: audienceCompletionRouteRows
   });
   const modeSwitchActions = createModeSwitchQuickActions({
     firstBeatPathSummary,
@@ -5628,6 +5648,7 @@ export function createQuickActions({
       run: () => onFocusSessionPass(sessionPassCard)
     },
     ...sessionPassActions,
+    ...audienceCompletionRouteActions,
     ...dualAudienceReadinessActions,
     ...audienceSessionActions,
     ...modeSwitchActions,
@@ -7507,6 +7528,7 @@ export function createQuickActionResult(
     action.id === "stem-audition-readout-action" ||
     action.id === "stem-audition-route-readout-action" ||
     action.id === "timbre-check" ||
+    action.id.startsWith("audience-completion-route-") ||
     action.id.startsWith("dual-audience-readiness-") ||
     action.id === "session-pass-route-readout-action" ||
     action.id === "session-pass-focus" ||
@@ -8993,6 +9015,70 @@ export function quickActionDualAudienceReadinessMetricSnapshot(
   return {
     id: "dual-audience-readiness-route",
     label: "Dual Audience Readiness",
+    value: [
+      lane.routeLabel,
+      lane.laneLabel,
+      action.detail,
+      `${modeLabel(project.mode)} mode`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} selected-pattern events`,
+      `${projectEventTotal(project)} editable project events`,
+      `${arrangementTotalBars(project)} bars`,
+      lane.nextCheck
+    ].join(" / ")
+  };
+}
+
+export function audienceCompletionRouteQuickActionLane(action: QuickAction): {
+  laneLabel: string;
+  nextCheck: string;
+  routeLabel: string;
+} | null {
+  if (!action.id.startsWith("audience-completion-route-")) {
+    return null;
+  }
+
+  if (action.id === "audience-completion-route-readout-action") {
+    return {
+      laneLabel: "Audience Completion Route",
+      nextCheck: "Choose the first-time composer or professional producer completion lane before final export.",
+      routeLabel: "Audience Completion Route Readout"
+    };
+  }
+
+  if (action.id === "audience-completion-route-beginner-action" || action.resultTargetId === "beginner") {
+    return {
+      laneLabel: "First-time composer completion",
+      nextCheck: "Use First Beat Path, Export Preflight, and Handoff Package Check before sending the first beat.",
+      routeLabel: "Open first-time composer completion lane"
+    };
+  }
+
+  if (action.id === "audience-completion-route-producer-action" || action.resultTargetId === "producer") {
+    return {
+      laneLabel: "Professional producer completion",
+      nextCheck: "Use Production Snapshot, Export Preflight, and Handoff Package Check before delivery.",
+      routeLabel: "Open professional producer completion lane"
+    };
+  }
+
+  return null;
+}
+
+export function quickActionAudienceCompletionRouteMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const lane = audienceCompletionRouteQuickActionLane(action);
+  if (!lane) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+
+  return {
+    id: "audience-completion-route",
+    label: "Audience Completion Route",
     value: [
       lane.routeLabel,
       lane.laneLabel,
@@ -16598,6 +16684,16 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("audience-completion-route-")) {
+    return (
+      quickActionAudienceCompletionRouteMetricSnapshot(project, action) ?? {
+        id: "audience-completion-route",
+        label: "Audience Completion Route",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id.startsWith("dual-audience-readiness-")) {
     return (
       quickActionDualAudienceReadinessMetricSnapshot(project, action) ?? {
@@ -21555,6 +21651,32 @@ export function quickActionResultFollowup(
       auditionCue: "Keep the beat playing only if you are comparing the same music against the new session goal.",
       nextCheck: "Run Delivery Target Align only when arrangement length, master, mix posture, and stem expectation should change."
     };
+  }
+
+  const audienceCompletionRouteLane = audienceCompletionRouteQuickActionLane(action);
+  if (audienceCompletionRouteLane) {
+    if (action.id === "audience-completion-route-readout-action") {
+      return {
+        auditionCue:
+          "Read both Audience Completion Route lanes before choosing a final beginner handoff check or producer delivery scan.",
+        nextCheck:
+          "Open the first-time composer completion lane for First Beat Path and Export Preflight, or the professional producer completion lane for Production Snapshot and Handoff Package Check."
+      };
+    }
+
+    return audienceCompletionRouteLane.laneLabel === "First-time composer completion"
+      ? {
+          auditionCue:
+            "Use the first-time composer completion lane to confirm the first beat has composition, export, and handoff checks before sending.",
+          nextCheck:
+            "Confirm the Audience Completion Route result names First Beat Path, Export Preflight, or Handoff Package Check before final export."
+        }
+      : {
+          auditionCue:
+            "Use the professional producer completion lane to scan production, delivery, and handoff posture before sending files.",
+          nextCheck:
+            "Confirm the Audience Completion Route result names Production Snapshot, Export Preflight, or Handoff Package Check before delivery."
+        };
   }
 
   const dualAudienceReadinessLane = dualAudienceReadinessQuickActionLane(action);

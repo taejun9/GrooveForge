@@ -5,6 +5,7 @@ import {
   Gauge,
   ListChecks,
   Music2,
+  PackageCheck,
   SlidersHorizontal,
   Target
 } from "lucide-react";
@@ -21,6 +22,8 @@ import type {
   AudienceSessionReadoutSummary,
   ExportPreflightCard,
   ExportPreflightSummary,
+  HandoffPackageCheckCard,
+  HandoffPackageCheckSummary,
   MixCoachTone,
   ModeFocusCard,
   ModeFocusJumpResult,
@@ -124,6 +127,22 @@ export type DualAudienceReadinessLane = {
   firstBeatPathStep?: FirstBeatPathStep;
   exportPreflightCard?: ExportPreflightCard;
   productionSnapshotMetric?: ProductionSnapshotMetric;
+};
+
+export type AudienceCompletionRouteLane = {
+  id: "beginner" | "producer";
+  laneLabel: string;
+  label: string;
+  statusLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  nextCheckLabel: string;
+  actionLabel: string;
+  tone: MixCoachTone;
+  firstBeatPathStep?: FirstBeatPathStep;
+  exportPreflightCard?: ExportPreflightCard;
+  productionSnapshotMetric?: ProductionSnapshotMetric;
+  handoffPackageCheckCard?: HandoffPackageCheckCard;
 };
 
 export function modeLabel(mode: ProjectState["mode"]): string {
@@ -522,6 +541,273 @@ export function createDualAudienceReadinessRows({
   ];
 }
 
+export function AudienceCompletionRouteStrip({
+  beatReadinessChecks,
+  exportPreflightSummary,
+  firstBeatPathSummary,
+  handoffPackageCheckSummary,
+  productionSnapshotSummary,
+  sessionPassSummary,
+  onFocusExportPreflight,
+  onFocusHandoffPackageCheck,
+  onFocusProductionSnapshot,
+  onJumpFirstBeatPath
+}: {
+  beatReadinessChecks: BeatReadinessCheck[];
+  exportPreflightSummary: ExportPreflightSummary;
+  firstBeatPathSummary: FirstBeatPathSummary;
+  handoffPackageCheckSummary: HandoffPackageCheckSummary;
+  productionSnapshotSummary: ProductionSnapshotSummary;
+  sessionPassSummary: SessionPassSummary;
+  onFocusExportPreflight: (card: ExportPreflightCard) => void;
+  onFocusHandoffPackageCheck: (card: HandoffPackageCheckCard) => void;
+  onFocusProductionSnapshot: (metric: ProductionSnapshotMetric) => void;
+  onJumpFirstBeatPath: (step: FirstBeatPathStep) => void;
+}): ReactElement {
+  const rows = createAudienceCompletionRouteRows({
+    beatReadinessChecks,
+    exportPreflightSummary,
+    firstBeatPathSummary,
+    handoffPackageCheckSummary,
+    productionSnapshotSummary,
+    sessionPassSummary
+  });
+  const tone = modeSwitchWeakestTone(rows.map((row) => row.tone));
+  const readyLaneCount = rows.filter((row) => row.tone === "good").length;
+  const priorityRow = rows.find((row) => row.tone === "danger") ?? rows.find((row) => row.tone === "warn") ?? rows[0];
+  const headline = "Audience Completion Route";
+  const detail = `${readyLaneCount}/${rows.length} lanes send-ready / ${
+    priorityRow?.nextCheckLabel ?? "Check beginner and producer completion routes"
+  }`;
+
+  function runLaneAction(row: AudienceCompletionRouteLane): void {
+    if (row.firstBeatPathStep) {
+      onJumpFirstBeatPath(row.firstBeatPathStep);
+      return;
+    }
+
+    if (row.productionSnapshotMetric) {
+      onFocusProductionSnapshot(row.productionSnapshotMetric);
+      return;
+    }
+
+    if (row.exportPreflightCard) {
+      onFocusExportPreflight(row.exportPreflightCard);
+      return;
+    }
+
+    if (row.handoffPackageCheckCard) {
+      onFocusHandoffPackageCheck(row.handoffPackageCheckCard);
+    }
+  }
+
+  return (
+    <section
+      aria-label="Audience completion route"
+      className={`dual-audience-readiness audience-completion-route ${tone}`}
+      data-audience-completion-route={tone}
+      data-testid="audience-completion-route"
+      title={`${headline}: ${detail}`}
+    >
+      <div className="dual-audience-readiness-heading">
+        <div>
+          <PackageCheck size={15} aria-hidden="true" />
+          <span data-testid="audience-completion-route-status">{readyLaneCount}/{rows.length} lanes send-ready</span>
+        </div>
+        <strong data-testid="audience-completion-route-headline">{headline}</strong>
+        <small data-testid="audience-completion-route-detail">{detail}</small>
+      </div>
+      <div className="dual-audience-readiness-grid" data-testid="audience-completion-route-grid">
+        {rows.map((row) => (
+          <div
+            className={`dual-audience-readiness-card ${row.tone}`}
+            data-audience-completion-route-lane={row.id}
+            data-testid={`audience-completion-route-${row.id}`}
+            key={row.id}
+            title={`${row.laneLabel}: ${row.statusLabel} / ${row.metricLabel} / ${row.detailLabel} / ${row.nextCheckLabel}`}
+          >
+            <span data-testid={`audience-completion-route-${row.id}-status`}>{row.statusLabel}</span>
+            <strong data-testid={`audience-completion-route-${row.id}-label`}>{row.laneLabel}</strong>
+            <small data-testid={`audience-completion-route-${row.id}-metric`}>{row.metricLabel}</small>
+            <small data-testid={`audience-completion-route-${row.id}-detail`}>{row.detailLabel}</small>
+            <em data-testid={`audience-completion-route-${row.id}-next`}>{row.nextCheckLabel}</em>
+            <button
+              aria-label={`${row.actionLabel} for ${row.label}`}
+              className="dual-audience-readiness-action"
+              data-testid={`audience-completion-route-${row.id}-action`}
+              title={`${row.actionLabel}: ${row.nextCheckLabel}`}
+              type="button"
+              onClick={() => runLaneAction(row)}
+            >
+              <ArrowRight size={13} aria-hidden="true" />
+              <span>{row.actionLabel}</span>
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function createAudienceCompletionRouteRows({
+  beatReadinessChecks,
+  exportPreflightSummary,
+  firstBeatPathSummary,
+  handoffPackageCheckSummary,
+  productionSnapshotSummary,
+  sessionPassSummary
+}: {
+  beatReadinessChecks: BeatReadinessCheck[];
+  exportPreflightSummary: ExportPreflightSummary;
+  firstBeatPathSummary: FirstBeatPathSummary;
+  handoffPackageCheckSummary: HandoffPackageCheckSummary;
+  productionSnapshotSummary: ProductionSnapshotSummary;
+  sessionPassSummary: SessionPassSummary;
+}): AudienceCompletionRouteLane[] {
+  const nextFirstBeatStep =
+    firstBeatPathSummary.steps.find((step) => step.id === firstBeatPathSummary.nextStepId) ??
+    firstBeatPathSummary.steps.find((step) => step.tone !== "good") ??
+    firstBeatPathSummary.steps[0];
+  const exportFocus =
+    priorityToneItem(exportPreflightSummary.cards.filter((card) => card.tone !== "good")) ??
+    priorityToneItem(exportPreflightSummary.cards);
+  const handoffFocus =
+    priorityToneItem(handoffPackageCheckSummary.cards.filter((card) => card.tone !== "good")) ??
+    priorityToneItem(handoffPackageCheckSummary.cards);
+  const productionFocus =
+    priorityToneItem(productionSnapshotSummary.metrics.filter((metric) => metric.tone !== "good")) ??
+    priorityToneItem(productionSnapshotSummary.metrics);
+  const readyBeatChecks = beatReadinessChecks.filter((check) => check.tone === "good").length;
+  const readyPreflightChecks = exportPreflightSummary.cards.filter((card) => card.tone === "good").length;
+  const readyHandoffChecks = handoffPackageCheckSummary.cards.filter((card) => card.tone === "good").length;
+  const readyProductionChecks = productionSnapshotSummary.metrics.filter((metric) => metric.tone === "good").length;
+  const beginnerTone = modeSwitchWeakestTone([
+    firstBeatPathSummary.tone,
+    ...beatReadinessChecks.map((check) => check.tone),
+    exportPreflightSummary.tone,
+    handoffPackageCheckSummary.tone,
+    sessionPassSummary.cards.find((card) => card.id === "guided")?.tone ?? sessionPassSummary.tone
+  ]);
+  const producerTone = modeSwitchWeakestTone([
+    productionSnapshotSummary.tone,
+    exportPreflightSummary.tone,
+    handoffPackageCheckSummary.tone,
+    sessionPassSummary.cards.find((card) => card.id === "studio")?.tone ?? sessionPassSummary.tone,
+    sessionPassSummary.cards.find((card) => card.id === "deliver")?.tone ?? sessionPassSummary.tone
+  ]);
+  const beginnerTarget = audienceCompletionTarget([
+    nextFirstBeatStep && firstBeatPathSummary.tone !== "good"
+      ? {
+          tone: nextFirstBeatStep.tone,
+          detail: nextFirstBeatStep.detail,
+          actionLabel: `Open ${nextFirstBeatStep.jumpLabel}`,
+          firstBeatPathStep: nextFirstBeatStep
+        }
+      : null,
+    exportFocus
+      ? {
+          tone: exportFocus.tone,
+          detail: exportFocus.detail,
+          actionLabel: `Open ${exportFocus.focusLabel}`,
+          exportPreflightCard: exportFocus
+        }
+      : null,
+    handoffFocus
+      ? {
+          tone: handoffFocus.tone,
+          detail: handoffFocus.detail,
+          actionLabel: `Open ${handoffFocus.focusLabel}`,
+          handoffPackageCheckCard: handoffFocus
+        }
+      : null,
+    nextFirstBeatStep
+      ? {
+          tone: nextFirstBeatStep.tone,
+          detail: nextFirstBeatStep.detail,
+          actionLabel: `Open ${nextFirstBeatStep.jumpLabel}`,
+          firstBeatPathStep: nextFirstBeatStep
+        }
+      : null
+  ]);
+  const producerTarget = audienceCompletionTarget([
+    productionFocus
+      ? {
+          tone: productionFocus.tone,
+          detail: productionFocus.detail,
+          actionLabel: `Open ${productionFocus.focusLabel}`,
+          productionSnapshotMetric: productionFocus
+        }
+      : null,
+    exportFocus
+      ? {
+          tone: exportFocus.tone,
+          detail: exportFocus.detail,
+          actionLabel: `Open ${exportFocus.focusLabel}`,
+          exportPreflightCard: exportFocus
+        }
+      : null,
+    handoffFocus
+      ? {
+          tone: handoffFocus.tone,
+          detail: handoffFocus.detail,
+          actionLabel: `Open ${handoffFocus.focusLabel}`,
+          handoffPackageCheckCard: handoffFocus
+        }
+      : null
+  ]);
+
+  return [
+    {
+      id: "beginner",
+      laneLabel: "First-time composer completion",
+      label: "First-time composer",
+      statusLabel: readinessStatusLabel(beginnerTone, "Ready to hand off", "Final check", "Completion blocker"),
+      metricLabel: `${readyBeatChecks}/${beatReadinessChecks.length} beat checks / ${readyPreflightChecks}/${exportPreflightSummary.cards.length} preflight`,
+      detailLabel: `${firstBeatPathSummary.headline} / ${exportPreflightSummary.headline} / ${handoffPackageCheckSummary.headline}`,
+      nextCheckLabel: beginnerTarget?.detail ?? firstBeatPathSummary.detail,
+      actionLabel: beginnerTarget?.actionLabel ?? "Open First Beat Path",
+      tone: beginnerTone,
+      firstBeatPathStep: beginnerTarget?.firstBeatPathStep,
+      exportPreflightCard: beginnerTarget?.exportPreflightCard,
+      handoffPackageCheckCard: beginnerTarget?.handoffPackageCheckCard
+    },
+    {
+      id: "producer",
+      laneLabel: "Professional producer completion",
+      label: "Professional producer",
+      statusLabel: readinessStatusLabel(producerTone, "Send scan ready", "Delivery review", "Send blocker"),
+      metricLabel: `${readyProductionChecks}/${productionSnapshotSummary.metrics.length} production / ${readyHandoffChecks}/${handoffPackageCheckSummary.cards.length} package`,
+      detailLabel: `${productionSnapshotSummary.headline} / ${exportPreflightSummary.headline} / ${handoffPackageCheckSummary.headline}`,
+      nextCheckLabel: producerTarget?.detail ?? productionSnapshotSummary.detail,
+      actionLabel: producerTarget?.actionLabel ?? "Open Production Snapshot",
+      tone: producerTone,
+      productionSnapshotMetric: producerTarget?.productionSnapshotMetric,
+      exportPreflightCard: producerTarget?.exportPreflightCard,
+      handoffPackageCheckCard: producerTarget?.handoffPackageCheckCard
+    }
+  ];
+}
+
+type AudienceCompletionTarget = {
+  actionLabel: string;
+  detail: string;
+  exportPreflightCard?: ExportPreflightCard;
+  firstBeatPathStep?: FirstBeatPathStep;
+  handoffPackageCheckCard?: HandoffPackageCheckCard;
+  productionSnapshotMetric?: ProductionSnapshotMetric;
+  tone: MixCoachTone;
+};
+
+function audienceCompletionTarget(targets: Array<AudienceCompletionTarget | null>): AudienceCompletionTarget | null {
+  const availableTargets = targets.filter((target): target is AudienceCompletionTarget => target !== null);
+  return (
+    availableTargets.find((target) => target.tone === "danger") ??
+    availableTargets.find((target) => target.tone === "warn") ??
+    availableTargets[0] ??
+    null
+  );
+}
+
 function priorityToneItem<T extends { tone: MixCoachTone }>(items: T[]): T | undefined {
   return items.find((item) => item.tone === "danger") ?? items.find((item) => item.tone === "warn") ?? items[0];
 }
@@ -630,6 +916,85 @@ export function createDualAudienceReadinessQuickActions({
     ].join(" / "),
     group: "Project",
     keywords: `dual audience readiness ${row.id} ${row.label} ${row.laneLabel} ${row.statusLabel} ${row.metricLabel} ${row.detailLabel} ${row.nextCheckLabel} guided studio producer beginner route command palette direct beat workstation`,
+    resultTargetId: row.id,
+    run: () => runLaneAction(row)
+  }));
+
+  return [routeAction, ...laneActions];
+}
+
+export function createAudienceCompletionRouteQuickActions({
+  onFocusExportPreflight,
+  onFocusHandoffPackageCheck,
+  onFocusProductionSnapshot,
+  onFocusRouteReadout,
+  onJumpFirstBeatPath,
+  rows
+}: {
+  onFocusExportPreflight: (card: ExportPreflightCard) => void;
+  onFocusHandoffPackageCheck: (card: HandoffPackageCheckCard) => void;
+  onFocusProductionSnapshot: (metric: ProductionSnapshotMetric) => void;
+  onFocusRouteReadout: () => void;
+  onJumpFirstBeatPath: (step: FirstBeatPathStep) => void;
+  rows: AudienceCompletionRouteLane[];
+}): QuickAction[] {
+  const readyLaneCount = rows.filter((row) => row.tone === "good").length;
+  const priorityRow = rows.find((row) => row.tone === "danger") ?? rows.find((row) => row.tone === "warn") ?? rows[0];
+  const beginnerLane = rows.find((row) => row.id === "beginner") ?? rows[0];
+  const producerLane = rows.find((row) => row.id === "producer") ?? rows[1] ?? rows[0];
+  const routeDetail = [
+    `${readyLaneCount}/${rows.length} lanes send-ready`,
+    `${beginnerLane?.laneLabel ?? "First-time composer completion"}: ${beginnerLane?.statusLabel ?? "Ready"}`,
+    `${producerLane?.laneLabel ?? "Professional producer completion"}: ${producerLane?.statusLabel ?? "Ready"}`,
+    `Priority ${priorityRow?.laneLabel ?? "Audience Completion Route"}: ${
+      priorityRow?.nextCheckLabel ?? "Check beginner and producer send routes"
+    }`,
+    "Visible Audience Completion Route actions unchanged"
+  ].join(" / ");
+
+  function runLaneAction(row: AudienceCompletionRouteLane): void {
+    if (row.firstBeatPathStep) {
+      onJumpFirstBeatPath(row.firstBeatPathStep);
+      return;
+    }
+
+    if (row.productionSnapshotMetric) {
+      onFocusProductionSnapshot(row.productionSnapshotMetric);
+      return;
+    }
+
+    if (row.exportPreflightCard) {
+      onFocusExportPreflight(row.exportPreflightCard);
+      return;
+    }
+
+    if (row.handoffPackageCheckCard) {
+      onFocusHandoffPackageCheck(row.handoffPackageCheckCard);
+    }
+  }
+
+  const routeAction: QuickAction = {
+    id: "audience-completion-route-readout-action",
+    title: `Review Audience Completion Route: ${readyLaneCount}/${rows.length} lanes send-ready`,
+    detail: routeDetail,
+    group: "Project",
+    keywords: `Quick Actions Audience Completion Route readout completion send ready handoff final check first-time composer professional producer beginner producer First Beat Path Production Snapshot Export Preflight Handoff Package Check ${routeDetail}`,
+    resultTargetId: priorityRow?.id,
+    run: onFocusRouteReadout
+  };
+
+  const laneActions: QuickAction[] = rows.map((row) => ({
+    id: `audience-completion-route-${row.id}-action`,
+    title: `Open Audience Completion ${row.laneLabel}`,
+    detail: [
+      row.statusLabel,
+      row.metricLabel,
+      row.detailLabel,
+      row.nextCheckLabel,
+      `Visible ${row.laneLabel} action unchanged`
+    ].join(" / "),
+    group: "Project",
+    keywords: `audience completion route ${row.id} ${row.label} ${row.laneLabel} send ready final check handoff export preflight production snapshot first beat path ${row.statusLabel} ${row.metricLabel} ${row.detailLabel} ${row.nextCheckLabel} command palette direct beat workstation`,
     resultTargetId: row.id,
     run: () => runLaneAction(row)
   }));

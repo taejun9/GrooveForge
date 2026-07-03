@@ -75,6 +75,9 @@ function validateFirstRunRenderer(html) {
       "Dual Audience Readiness",
       "First-time composer lane",
       "First-time composer",
+      'data-testid="audience-completion-route"',
+      "Audience Completion Route",
+      "First-time composer completion",
       'data-testid="audience-session-action-beginner"',
       "Enter Guided",
       "First Beat Path",
@@ -88,6 +91,8 @@ function validateFirstRunRenderer(html) {
       "Professional producer",
       "Professional producer lane",
       'data-testid="dual-audience-readiness-producer"',
+      "Professional producer completion",
+      'data-testid="audience-completion-route-producer"',
       'data-testid="audience-session-action-producer"',
       "Enter Studio",
       "Studio",
@@ -161,6 +166,19 @@ function createDualAudienceSmokeAction({ id, resultTargetId, title }) {
       "Dual Audience Readiness Route Readout / First-time composer lane: Next guided step / Professional producer lane: Producer review / First Beat Path / Export Preflight / Production Snapshot",
     group: "Project",
     keywords: "dual audience readiness first-time composer lane professional producer lane route readout",
+    resultTargetId,
+    run() {}
+  };
+}
+
+function createAudienceCompletionSmokeAction({ id, resultTargetId, title }) {
+  return {
+    id,
+    title,
+    detail:
+      "Audience Completion Route Readout / First-time composer completion: Final check / Professional producer completion: Delivery review / First Beat Path / Production Snapshot / Export Preflight / Handoff Package Check",
+    group: "Project",
+    keywords: "audience completion route first-time composer completion professional producer completion route readout",
     resultTargetId,
     run() {}
   };
@@ -327,6 +345,83 @@ function validateDualAudienceQuickActionResults(quickActions, workstation) {
   }
 }
 
+function validateAudienceCompletionQuickActionResults(quickActions, workstation) {
+  const cases = [
+    {
+      label: "Audience Completion Route readout result",
+      action: createAudienceCompletionSmokeAction({
+        id: "audience-completion-route-readout-action",
+        resultTargetId: "beginner",
+        title: "Review Audience Completion Route: 1/2 lanes send-ready"
+      }),
+      metricNeedles: [
+        "Audience Completion Route Readout",
+        "First-time composer completion",
+        "Professional producer completion",
+        "Pattern A",
+        "selected-pattern events",
+        "editable project events"
+      ],
+      nextNeedles: ["first-time composer", "professional producer", "completion lane"]
+    },
+    {
+      label: "Audience Completion beginner lane result",
+      action: createAudienceCompletionSmokeAction({
+        id: "audience-completion-route-beginner-action",
+        resultTargetId: "beginner",
+        title: "Open Audience Completion First-time composer completion"
+      }),
+      metricNeedles: [
+        "Open first-time composer completion lane",
+        "First-time composer completion",
+        "First Beat Path",
+        "Export Preflight",
+        "Handoff Package Check"
+      ],
+      nextNeedles: ["First Beat Path", "Export Preflight", "Handoff Package Check"]
+    },
+    {
+      label: "Audience Completion producer lane result",
+      action: createAudienceCompletionSmokeAction({
+        id: "audience-completion-route-producer-action",
+        resultTargetId: "producer",
+        title: "Open Audience Completion Professional producer completion"
+      }),
+      metricNeedles: [
+        "Open professional producer completion lane",
+        "Professional producer completion",
+        "Production Snapshot",
+        "Export Preflight",
+        "Handoff Package Check"
+      ],
+      nextNeedles: ["Production Snapshot", "Export Preflight", "Handoff Package Check"]
+    }
+  ];
+
+  for (const testCase of cases) {
+    const result = quickActions.createQuickActionResult(
+      testCase.action,
+      workstation.starterProject,
+      workstation.starterProject,
+      "complete"
+    );
+
+    check(result.actionId === testCase.action.id, `${testCase.label} should return the executed action id`);
+    check(result.status === "Focused", `${testCase.label} should report Focused status`);
+    check(result.tone === "good", `${testCase.label} should report a good tone`);
+    check(result.metric.id === "audience-completion-route", `${testCase.label} should use the Audience Completion metric id`);
+    check(result.metric.label === "Audience Completion Route", `${testCase.label} should use the Audience Completion metric label`);
+    check(result.metric.tone === "good", `${testCase.label} metric should report a good tone`);
+
+    for (const needle of testCase.metricNeedles) {
+      checkIncludes(result.metric.after, needle, `${testCase.label} after metric`);
+    }
+    for (const needle of testCase.nextNeedles) {
+      checkIncludes(result.nextCheck, needle, `${testCase.label} next check`);
+    }
+  }
+}
+
 function createAudienceSessionSmokeSummary() {
   return {
     headline: "Audience session ready",
@@ -471,6 +566,51 @@ function createDualAudienceSmokeRows() {
   ];
 }
 
+function createAudienceCompletionSmokeRows() {
+  return [
+    {
+      id: "beginner",
+      laneLabel: "First-time composer completion",
+      label: "First-time composer",
+      statusLabel: "Final check",
+      metricLabel: "4/5 beat checks / 3/5 preflight",
+      detailLabel: "First Beat Path / Export Preflight / Handoff Package Check",
+      nextCheckLabel: "Use Export Preflight before sending the first beat.",
+      actionLabel: "Open Export Preflight",
+      tone: "warn",
+      exportPreflightCard: {
+        id: "readiness",
+        label: "Readiness",
+        value: "Review",
+        detail: "Composition and arrangement checks need one pass",
+        focusLabel: "Compose",
+        tone: "warn"
+      }
+    },
+    {
+      id: "producer",
+      laneLabel: "Professional producer completion",
+      label: "Professional producer",
+      statusLabel: "Delivery review",
+      metricLabel: "4/5 production / 3/4 package",
+      detailLabel: "Production Snapshot / Export Preflight / Handoff Package Check",
+      nextCheckLabel: "Use Handoff Package Check before delivery.",
+      actionLabel: "Open Deliver",
+      tone: "warn",
+      handoffPackageCheckCard: {
+        id: "context",
+        focusId: "context",
+        label: "Context",
+        value: "Review",
+        status: "Needs context",
+        detail: "Confirm Session Brief and Handoff Sheet",
+        focusLabel: "Deliver",
+        tone: "warn"
+      }
+    }
+  ];
+}
+
 function validateDualAudienceQuickActionPalette(guidancePanels, palette) {
   const runs = [];
   const actions = guidancePanels.createDualAudienceReadinessQuickActions({
@@ -522,6 +662,72 @@ function validateDualAudienceQuickActionPalette(guidancePanels, palette) {
   check(runs.join(",") === "route,firstBeat:compose,export:mix", "Dual Audience palette actions should run route and lane handlers");
 }
 
+function validateAudienceCompletionQuickActionPalette(guidancePanels, palette) {
+  const runs = [];
+  const actions = guidancePanels.createAudienceCompletionRouteQuickActions({
+    onFocusExportPreflight(card) {
+      runs.push(`export:${card.id}`);
+    },
+    onFocusHandoffPackageCheck(card) {
+      runs.push(`handoff:${card.id}`);
+    },
+    onFocusProductionSnapshot(metric) {
+      runs.push(`snapshot:${metric.id}`);
+    },
+    onFocusRouteReadout() {
+      runs.push("route");
+    },
+    onJumpFirstBeatPath(step) {
+      runs.push(`firstBeat:${step.id}`);
+    },
+    rows: createAudienceCompletionSmokeRows()
+  });
+
+  check(actions.length === 3, "Audience Completion palette smoke should create route, beginner, and producer actions");
+  check(actions.every((action) => action.group === "Project"), "Audience Completion palette actions should remain Project-group actions");
+
+  const routeAction = actions.find((action) => action.id === "audience-completion-route-readout-action");
+  const beginnerAction = actions.find((action) => action.id === "audience-completion-route-beginner-action");
+  const producerAction = actions.find((action) => action.id === "audience-completion-route-producer-action");
+  check(routeAction?.title.includes("Review Audience Completion Route"), "Audience Completion palette should expose route readout title");
+  check(
+    beginnerAction?.title === "Open Audience Completion First-time composer completion",
+    "Audience Completion palette should expose beginner completion title"
+  );
+  check(
+    producerAction?.title === "Open Audience Completion Professional producer completion",
+    "Audience Completion palette should expose producer completion title"
+  );
+  check(beginnerAction?.resultTargetId === "beginner", "Audience Completion palette should keep beginner result target");
+  check(producerAction?.resultTargetId === "producer", "Audience Completion palette should keep producer result target");
+
+  const routeSearch = palette.filterQuickActions(actions, "audience completion route", "all");
+  const beginnerSearch = palette.filterQuickActions(actions, "first-time composer completion", "project");
+  const producerSearch = palette.filterQuickActions(actions, "professional producer completion", "project");
+
+  check(routeSearch[0]?.id === "audience-completion-route-readout-action", "Audience Completion palette search should find route readout first");
+  check(
+    beginnerSearch.some((action) => action.id === "audience-completion-route-beginner-action"),
+    "Audience Completion palette search should find beginner completion lane"
+  );
+  check(
+    producerSearch.some((action) => action.id === "audience-completion-route-producer-action"),
+    "Audience Completion palette search should find producer completion lane"
+  );
+
+  const routeSearchResult = palette.createQuickActionSearchResult("audience completion route", "all", actions);
+  check(routeSearchResult.tone === "good", "Audience Completion palette search result should be actionable");
+  check(
+    routeSearchResult.metricValue.includes("Review Audience Completion Route"),
+    "Audience Completion palette search result should target the route readout"
+  );
+
+  routeAction?.run();
+  beginnerAction?.run();
+  producerAction?.run();
+  check(runs.join(",") === "route,export:readiness,handoff:context", "Audience Completion palette actions should run route and lane handlers");
+}
+
 installBrowserMocks();
 
 const server = await createServer({
@@ -543,11 +749,19 @@ try {
     await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
     await server.ssrLoadModule("/src/domain/workstation.ts")
   );
+  validateAudienceCompletionQuickActionResults(
+    await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
+    await server.ssrLoadModule("/src/domain/workstation.ts")
+  );
   validateAudienceSessionQuickActionPalette(
     await server.ssrLoadModule("/src/ui/workstationGuidancePanels.tsx"),
     await server.ssrLoadModule("/src/ui/workstationAppQuickActionPalette.ts")
   );
   validateDualAudienceQuickActionPalette(
+    await server.ssrLoadModule("/src/ui/workstationGuidancePanels.tsx"),
+    await server.ssrLoadModule("/src/ui/workstationAppQuickActionPalette.ts")
+  );
+  validateAudienceCompletionQuickActionPalette(
     await server.ssrLoadModule("/src/ui/workstationGuidancePanels.tsx"),
     await server.ssrLoadModule("/src/ui/workstationAppQuickActionPalette.ts")
   );
@@ -564,14 +778,15 @@ try {
     console.log(`- Markup: ${html.length} characters from App first render`);
     console.log("- Starter: Untitled Beat, Guided 145 BPM F minor Trap state visible");
     console.log(
-      "- Beginner path: Guide Quick Start, Audience Session Readout, Dual Audience Readiness, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
+      "- Beginner path: Guide Quick Start, Audience Session Readout, Dual Audience Readiness, Audience Completion Route, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
     );
     console.log(
-      "- Producer path: Dual Audience Readiness, Studio switch, Review Queue, Production Snapshot, Mix Coach, Sound/Mix Snapshot, Quick Actions, Command Reference"
+      "- Producer path: Dual Audience Readiness, Audience Completion Route, Studio switch, Review Queue, Production Snapshot, Mix Coach, Handoff Pack, Quick Actions, Command Reference"
     );
     console.log("- Audience Session result: Enter Guided and Enter Studio Quick Actions return Entered status, route metrics, and route-specific follow-up");
     console.log("- Audience Session palette: Enter Guided and Enter Studio are searchable through Quick Actions query and scope filters");
     console.log("- Dual Audience Readiness palette: route readout plus both audience lanes are searchable and return focused route metrics");
+    console.log("- Audience Completion Route palette: route readout plus both audience completion lanes are searchable and return focused route metrics");
     console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack");
   }
 } finally {

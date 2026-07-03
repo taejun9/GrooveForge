@@ -59,6 +59,9 @@ type GrooveforgeLaunchSmokeRouteEvidence = {
 };
 
 type GrooveforgeLaunchSmokePaletteEvidence = {
+  completionBeginner: GrooveforgeLaunchSmokeRouteEvidence;
+  completionProducer: GrooveforgeLaunchSmokeRouteEvidence;
+  completionReadout: GrooveforgeLaunchSmokeRouteEvidence;
   dualBeginner: GrooveforgeLaunchSmokeRouteEvidence;
   dualProducer: GrooveforgeLaunchSmokeRouteEvidence;
   dualReadout: GrooveforgeLaunchSmokeRouteEvidence;
