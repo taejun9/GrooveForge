@@ -35,6 +35,8 @@ GrooveForge should satisfy two workflows at once: beginners get a clear setup ->
 
 The first-run Audience Session Readout should make that split actionable: first-time composers get an explicit Enter Guided route into the guided first-beat workflow, while professional producers get an explicit Enter Studio route into the producer scan workflow. The same two audience routes should also be searchable in Quick Actions and discoverable in Command Reference so button users and command-palette users get the same split, and command execution should show an Audience Session result with the chosen route, before/after mode metric, audition cue, and next check. These routes are UI-local mode choices and must not change generation, export, sampling scope, remote behavior, or project schema beyond the existing explicit mode switch.
 
+The first-run Dual Audience Readiness strip should keep that promise visible after mode choice by summarizing the first-time composer next step and the professional producer delivery scan from existing local First Beat Path, Beat Readiness, Session Pass, Production Snapshot, and Export Preflight signals. It is a read-only navigation surface, not a scoring engine, genre lock, style imitation feature, remote service, or export mutation.
+
 The first-session acceptance test is concrete: choose BPM/key/style, program drums, write 808/bass, add melody/chords, shape sounds, arrange sections, balance the mix, set the master posture, and export WAV/stems without importing audio. A product draft that cannot explain this path before mentioning extension features is not aligned.
 
 ## Product Boundary

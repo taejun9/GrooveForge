@@ -11,6 +11,7 @@ import {
 import { useEffect, useState, type ReactElement, type Ref } from "react";
 import type { ProjectState } from "../domain/workstation";
 import type {
+  BeatReadinessCheck,
   FirstBeatPathStepId,
   FirstBeatPathStep,
   FirstBeatPathJumpResult,
@@ -18,11 +19,15 @@ import type {
   AudienceSessionActionResult,
   AudienceSessionReadoutRow,
   AudienceSessionReadoutSummary,
+  ExportPreflightCard,
+  ExportPreflightSummary,
   MixCoachTone,
   ModeFocusCard,
   ModeFocusJumpResult,
   ModeFocusSummary,
   ModeSwitchResult,
+  ProductionSnapshotMetric,
+  ProductionSnapshotSummary,
   QuickAction,
   ReferenceAlignmentCard,
   ReferenceAlignmentCardId,
@@ -104,6 +109,21 @@ type GuideQuickStartContextItem = {
   detailLabel: string;
   title: string;
   tone: MixCoachTone;
+};
+
+type DualAudienceReadinessLane = {
+  id: "beginner" | "producer";
+  laneLabel: string;
+  label: string;
+  statusLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  nextCheckLabel: string;
+  actionLabel: string;
+  tone: MixCoachTone;
+  firstBeatPathStep?: FirstBeatPathStep;
+  exportPreflightCard?: ExportPreflightCard;
+  productionSnapshotMetric?: ProductionSnapshotMetric;
 };
 
 export function modeLabel(mode: ProjectState["mode"]): string {
@@ -324,6 +344,194 @@ export function AudienceSessionReadout({
       )}
     </section>
   );
+}
+
+export function DualAudienceReadinessStrip({
+  beatReadinessChecks,
+  exportPreflightSummary,
+  firstBeatPathSummary,
+  productionSnapshotSummary,
+  sessionPassSummary,
+  onFocusExportPreflight,
+  onFocusProductionSnapshot,
+  onJumpFirstBeatPath
+}: {
+  beatReadinessChecks: BeatReadinessCheck[];
+  exportPreflightSummary: ExportPreflightSummary;
+  firstBeatPathSummary: FirstBeatPathSummary;
+  productionSnapshotSummary: ProductionSnapshotSummary;
+  sessionPassSummary: SessionPassSummary;
+  onFocusExportPreflight: (card: ExportPreflightCard) => void;
+  onFocusProductionSnapshot: (metric: ProductionSnapshotMetric) => void;
+  onJumpFirstBeatPath: (step: FirstBeatPathStep) => void;
+}): ReactElement {
+  const rows = createDualAudienceReadinessRows({
+    beatReadinessChecks,
+    exportPreflightSummary,
+    firstBeatPathSummary,
+    productionSnapshotSummary,
+    sessionPassSummary
+  });
+  const tone = modeSwitchWeakestTone(rows.map((row) => row.tone));
+  const readyLaneCount = rows.filter((row) => row.tone === "good").length;
+  const priorityRow = rows.find((row) => row.tone === "danger") ?? rows.find((row) => row.tone === "warn") ?? rows[0];
+  const headline = "Dual Audience Readiness";
+  const detail = `${readyLaneCount}/${rows.length} lanes ready / ${
+    priorityRow?.nextCheckLabel ?? "Beginner path and producer delivery checks aligned"
+  }`;
+
+  function runLaneAction(row: DualAudienceReadinessLane): void {
+    if (row.id === "beginner" && row.firstBeatPathStep) {
+      onJumpFirstBeatPath(row.firstBeatPathStep);
+      return;
+    }
+
+    if (row.exportPreflightCard) {
+      onFocusExportPreflight(row.exportPreflightCard);
+      return;
+    }
+
+    if (row.productionSnapshotMetric) {
+      onFocusProductionSnapshot(row.productionSnapshotMetric);
+    }
+  }
+
+  return (
+    <section
+      aria-label="Dual audience readiness"
+      className={`dual-audience-readiness ${tone}`}
+      data-dual-audience-readiness={tone}
+      data-testid="dual-audience-readiness"
+      title={`${headline}: ${detail}`}
+    >
+      <div className="dual-audience-readiness-heading">
+        <div>
+          <ListChecks size={15} aria-hidden="true" />
+          <span data-testid="dual-audience-readiness-status">{readyLaneCount}/{rows.length} lanes ready</span>
+        </div>
+        <strong data-testid="dual-audience-readiness-headline">{headline}</strong>
+        <small data-testid="dual-audience-readiness-detail">{detail}</small>
+      </div>
+      <div className="dual-audience-readiness-grid" data-testid="dual-audience-readiness-grid">
+        {rows.map((row) => (
+          <div
+            className={`dual-audience-readiness-card ${row.tone}`}
+            data-dual-audience-readiness-lane={row.id}
+            data-testid={`dual-audience-readiness-${row.id}`}
+            key={row.id}
+            title={`${row.laneLabel}: ${row.statusLabel} / ${row.metricLabel} / ${row.detailLabel} / ${row.nextCheckLabel}`}
+          >
+            <span data-testid={`dual-audience-readiness-${row.id}-status`}>{row.statusLabel}</span>
+            <strong data-testid={`dual-audience-readiness-${row.id}-label`}>{row.laneLabel}</strong>
+            <small data-testid={`dual-audience-readiness-${row.id}-metric`}>{row.metricLabel}</small>
+            <small data-testid={`dual-audience-readiness-${row.id}-detail`}>{row.detailLabel}</small>
+            <em data-testid={`dual-audience-readiness-${row.id}-next`}>{row.nextCheckLabel}</em>
+            <button
+              aria-label={`${row.actionLabel} for ${row.label}`}
+              className="dual-audience-readiness-action"
+              data-testid={`dual-audience-readiness-${row.id}-action`}
+              title={`${row.actionLabel}: ${row.nextCheckLabel}`}
+              type="button"
+              onClick={() => runLaneAction(row)}
+            >
+              <ArrowRight size={13} aria-hidden="true" />
+              <span>{row.actionLabel}</span>
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function createDualAudienceReadinessRows({
+  beatReadinessChecks,
+  exportPreflightSummary,
+  firstBeatPathSummary,
+  productionSnapshotSummary,
+  sessionPassSummary
+}: {
+  beatReadinessChecks: BeatReadinessCheck[];
+  exportPreflightSummary: ExportPreflightSummary;
+  firstBeatPathSummary: FirstBeatPathSummary;
+  productionSnapshotSummary: ProductionSnapshotSummary;
+  sessionPassSummary: SessionPassSummary;
+}): DualAudienceReadinessLane[] {
+  const nextFirstBeatStep =
+    firstBeatPathSummary.steps.find((step) => step.id === firstBeatPathSummary.nextStepId) ??
+    firstBeatPathSummary.steps.find((step) => step.tone !== "good") ??
+    firstBeatPathSummary.steps[0];
+  const readyBeatChecks = beatReadinessChecks.filter((check) => check.tone === "good").length;
+  const beginnerTone = modeSwitchWeakestTone([
+    firstBeatPathSummary.tone,
+    ...beatReadinessChecks.map((check) => check.tone),
+    sessionPassSummary.cards.find((card) => card.id === "guided")?.tone ?? sessionPassSummary.tone
+  ]);
+
+  const exportFocus =
+    priorityToneItem(exportPreflightSummary.cards.filter((card) => card.tone !== "good")) ??
+    priorityToneItem(exportPreflightSummary.cards);
+  const productionFocus =
+    priorityToneItem(productionSnapshotSummary.metrics.filter((metric) => metric.tone !== "good")) ??
+    priorityToneItem(productionSnapshotSummary.metrics);
+  const producerToneItems = [
+    ...productionSnapshotSummary.metrics,
+    ...exportPreflightSummary.cards,
+    ...sessionPassSummary.cards.filter((card) => card.id === "studio" || card.id === "deliver")
+  ];
+  const readyProducerChecks = producerToneItems.filter((item) => item.tone === "good").length;
+  const producerTone = modeSwitchWeakestTone([
+    productionSnapshotSummary.tone,
+    exportPreflightSummary.tone,
+    sessionPassSummary.cards.find((card) => card.id === "studio")?.tone ?? sessionPassSummary.tone,
+    sessionPassSummary.cards.find((card) => card.id === "deliver")?.tone ?? sessionPassSummary.tone
+  ]);
+  const producerUsesExport = exportFocus && exportFocus.tone !== "good";
+  const producerTarget = producerUsesExport ? exportFocus : productionFocus ?? exportFocus;
+
+  return [
+    {
+      id: "beginner",
+      laneLabel: "First-time composer lane",
+      label: "First-time composer",
+      statusLabel: readinessStatusLabel(beginnerTone, "First beat ready", "Next guided step", "Foundation needed"),
+      metricLabel: `${readyBeatChecks}/${beatReadinessChecks.length} beat checks / ${firstBeatPathSummary.countLabel}`,
+      detailLabel: `${firstBeatPathSummary.headline} / ${nextFirstBeatStep?.label ?? "Path"}: ${
+        nextFirstBeatStep?.value ?? firstBeatPathSummary.statusLabel
+      }`,
+      nextCheckLabel: nextFirstBeatStep?.detail ?? firstBeatPathSummary.detail,
+      actionLabel: nextFirstBeatStep ? `Open ${nextFirstBeatStep.jumpLabel}` : "Open First Beat Path",
+      tone: beginnerTone,
+      firstBeatPathStep: nextFirstBeatStep
+    },
+    {
+      id: "producer",
+      laneLabel: "Professional producer lane",
+      label: "Professional producer",
+      statusLabel: readinessStatusLabel(producerTone, "Delivery scan ready", "Producer review", "Handoff blocker"),
+      metricLabel: `${readyProducerChecks}/${producerToneItems.length} producer checks / ${exportPreflightSummary.headline}`,
+      detailLabel: `${productionSnapshotSummary.headline} / ${producerTarget?.label ?? "Delivery"}: ${
+        producerTarget?.value ?? productionSnapshotSummary.detail
+      }`,
+      nextCheckLabel: producerTarget?.detail ?? exportPreflightSummary.detail,
+      actionLabel: `Open ${producerTarget?.focusLabel ?? "Export Preflight"}`,
+      tone: producerTone,
+      exportPreflightCard: producerUsesExport ? exportFocus : undefined,
+      productionSnapshotMetric: producerUsesExport ? undefined : productionFocus
+    }
+  ];
+}
+
+function priorityToneItem<T extends { tone: MixCoachTone }>(items: T[]): T | undefined {
+  return items.find((item) => item.tone === "danger") ?? items.find((item) => item.tone === "warn") ?? items[0];
+}
+
+function readinessStatusLabel(tone: MixCoachTone, good: string, warn: string, danger: string): string {
+  if (tone === "good") {
+    return good;
+  }
+
+  return tone === "warn" ? warn : danger;
 }
 
 export function createAudienceSessionQuickActions({

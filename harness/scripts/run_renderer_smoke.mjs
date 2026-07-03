@@ -71,6 +71,9 @@ function validateFirstRunRenderer(html) {
       "Guide Quick Start",
       'data-testid="audience-session-readout"',
       "Audience session",
+      'data-testid="dual-audience-readiness"',
+      "Dual Audience Readiness",
+      "First-time composer lane",
       "First-time composer",
       'data-testid="audience-session-action-beginner"',
       "Enter Guided",
@@ -83,6 +86,8 @@ function validateFirstRunRenderer(html) {
     ],
     "producer workflow": [
       "Professional producer",
+      "Professional producer lane",
+      'data-testid="dual-audience-readiness-producer"',
       'data-testid="audience-session-action-producer"',
       "Enter Studio",
       "Studio",
@@ -364,8 +369,12 @@ try {
     console.log("- Scope: first-run React workstation server render without browser, Electron window, network, imported audio, or sampling scope");
     console.log(`- Markup: ${html.length} characters from App first render`);
     console.log("- Starter: Untitled Beat, Guided 145 BPM F minor Trap state visible");
-    console.log("- Beginner path: Guide Quick Start, Audience Session Readout, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator");
-    console.log("- Producer path: Studio switch, Review Queue, Production Snapshot, Mix Coach, Sound/Mix Snapshot, Quick Actions, Command Reference");
+    console.log(
+      "- Beginner path: Guide Quick Start, Audience Session Readout, Dual Audience Readiness, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
+    );
+    console.log(
+      "- Producer path: Dual Audience Readiness, Studio switch, Review Queue, Production Snapshot, Mix Coach, Sound/Mix Snapshot, Quick Actions, Command Reference"
+    );
     console.log("- Audience Session result: Enter Guided and Enter Studio Quick Actions return Entered status, route metrics, and route-specific follow-up");
     console.log("- Audience Session palette: Enter Guided and Enter Studio are searchable through Quick Actions query and scope filters");
     console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack");

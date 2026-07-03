@@ -698,6 +698,7 @@ import {
 } from "./workstationSnapshotCompare";
 import {
   AudienceSessionReadout,
+  DualAudienceReadinessStrip,
   FirstBeatPath,
   GuideQuickStart,
   ModeFocus,
@@ -9753,6 +9754,17 @@ export function App(): ReactElement {
         result={audienceSessionActionResult}
         summary={audienceSessionReadoutSummary}
         onSelectAudience={selectAudienceSessionRow}
+      />
+
+      <DualAudienceReadinessStrip
+        beatReadinessChecks={beatReadinessChecks}
+        exportPreflightSummary={exportPreflightSummary}
+        firstBeatPathSummary={firstBeatPathSummary}
+        productionSnapshotSummary={productionSnapshotSummary}
+        sessionPassSummary={sessionPassSummary}
+        onFocusExportPreflight={focusExportPreflightCard}
+        onFocusProductionSnapshot={focusProductionSnapshotMetric}
+        onJumpFirstBeatPath={jumpToFirstBeatPathStep}
       />
 
       <ModeFocus result={modeFocusResult} summary={modeFocusSummary} onFocus={focusModeFocusCard} />

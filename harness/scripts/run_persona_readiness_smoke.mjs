@@ -1055,6 +1055,8 @@ const renderedSignalRows = [
   checkRenderedGroup(html, "beginner first-run path", [
     "Guide Quick Start",
     "Audience session",
+    "Dual Audience Readiness",
+    "First-time composer lane",
     "First-time composer",
     "Enter Guided",
     "First Beat Path",
@@ -1066,6 +1068,8 @@ const renderedSignalRows = [
   ]),
   checkRenderedGroup(html, "professional producer path", [
     "Professional producer",
+    "Professional producer lane",
+    "Dual Audience Readiness",
     "Enter Studio",
     "Studio",
     "Review Queue",
