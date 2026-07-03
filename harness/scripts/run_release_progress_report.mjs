@@ -794,6 +794,15 @@ function buildCurrentOperatorCommandSequenceSummary(report) {
     currentOperatorCommandSummary: rows.length > 0 ? `${rows.length} value-free current operator command rows` : "none",
     currentOperatorCommandRows: rows,
     currentOperatorFirstCommand: textValue(report.externalProofBundleCurrentOperatorFirstCommand, "none"),
+    currentOperatorStartCommand: textValue(
+      report.externalProofBundleCurrentOperatorStartCommand,
+      textValue(report.externalProofBundleCurrentOperatorFirstCommand, "none")
+    ),
+    currentOperatorStartCommandRole: textValue(report.externalProofBundleCurrentOperatorStartCommandRole, rows[0]?.role ?? "none"),
+    currentOperatorStartCommandMatchesFirstCommand:
+      report.externalProofBundleCurrentOperatorStartCommandMatchesFirstCommand === true ||
+      textValue(report.externalProofBundleCurrentOperatorStartCommand, textValue(report.externalProofBundleCurrentOperatorFirstCommand, "none")) ===
+        textValue(report.externalProofBundleCurrentOperatorFirstCommand, "none"),
     currentOperatorPreflightCommand: textValue(
       report.externalProofBundleCurrentOperatorPreflightCommand,
       releaseChannelApplyPrivateEnvPreflightCommand
@@ -816,6 +825,8 @@ function buildCurrentOperatorCommandSequenceSummary(report) {
     ),
     currentOperatorPreflightBeforeApply: report.externalProofBundleCurrentOperatorPreflightBeforeApply === true,
     currentOperatorApplyBeforeStrictProof: report.externalProofBundleCurrentOperatorApplyBeforeStrictProof === true,
+    currentOperatorStartCommandValueRecorded:
+      report.externalProofBundleCurrentOperatorStartCommandValueRecorded === true ? true : false,
     currentOperatorValueRecorded: report.externalProofBundleCurrentOperatorValueRecorded === true ? true : false
   };
 }
@@ -1243,6 +1254,18 @@ function buildExternalProofBundleSummary(externalProofBundle) {
     externalProofBundleCurrentOperatorCommandSummary: textValue(externalProofBundle.currentOperatorCommandSummary, "none"),
     externalProofBundleCurrentOperatorCommandRows: currentOperatorCommandRows,
     externalProofBundleCurrentOperatorFirstCommand: textValue(externalProofBundle.currentOperatorFirstCommand, "none"),
+    externalProofBundleCurrentOperatorStartCommand: textValue(
+      externalProofBundle.currentOperatorStartCommand,
+      textValue(externalProofBundle.currentOperatorFirstCommand, "none")
+    ),
+    externalProofBundleCurrentOperatorStartCommandRole: textValue(
+      externalProofBundle.currentOperatorStartCommandRole,
+      currentOperatorCommandRows[0]?.role ?? "none"
+    ),
+    externalProofBundleCurrentOperatorStartCommandMatchesFirstCommand:
+      externalProofBundle.currentOperatorStartCommandMatchesFirstCommand === true ||
+      textValue(externalProofBundle.currentOperatorStartCommand, textValue(externalProofBundle.currentOperatorFirstCommand, "none")) ===
+        textValue(externalProofBundle.currentOperatorFirstCommand, "none"),
     externalProofBundleCurrentOperatorPreflightCommand: textValue(
       externalProofBundle.currentOperatorPreflightCommand,
       releaseChannelApplyPrivateEnvPreflightCommand
@@ -1268,6 +1291,8 @@ function buildExternalProofBundleSummary(externalProofBundle) {
     ),
     externalProofBundleCurrentOperatorPreflightBeforeApply: externalProofBundle.currentOperatorPreflightBeforeApply === true,
     externalProofBundleCurrentOperatorApplyBeforeStrictProof: externalProofBundle.currentOperatorApplyBeforeStrictProof === true,
+    externalProofBundleCurrentOperatorStartCommandValueRecorded:
+      externalProofBundle.currentOperatorStartCommandValueRecorded === true ? true : false,
     externalProofBundleCurrentOperatorValueRecorded: externalProofBundle.currentOperatorValueRecorded === true ? true : false,
     externalProofBundleReleaseChannelPostEditOperatorReceiptReady:
       externalProofBundle.releaseChannelPostEditOperatorReceiptReady === true &&
@@ -1625,6 +1650,9 @@ function buildMarkdown(report) {
 - Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}
 - Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
+- Current operator start command: \`${report.currentOperatorStartCommand}\`
+- Current operator start command role: ${report.currentOperatorStartCommandRole}
+- Current operator start command matches first command: ${report.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}
 - Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}
 - Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}
 - Post-edit proof sequence receipt ready: ${report.postEditProofSequenceReceiptReady ? "yes" : "no"}
@@ -1865,6 +1893,9 @@ ${formatReleaseChannelPostEditOperatorReceiptRows(report.releaseChannelPostEditO
 - Sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}
 - Command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - First command: \`${report.currentOperatorFirstCommand}\`
+- Operator start command: \`${report.currentOperatorStartCommand}\`
+- Operator start role: ${report.currentOperatorStartCommandRole}
+- Start matches first command: ${report.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}
 - Preflight command: \`${report.currentOperatorPreflightCommand}\`
 - Apply command: \`${report.currentOperatorApplyCommand}\`
 - Strict proof command: \`${report.currentOperatorStrictProofCommand}\`
@@ -2627,6 +2658,27 @@ check(
   "release progress report should mirror external proof current operator command rows"
 );
 check(releaseProgressReport.currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false), "release progress report current operator command rows should be ready and value-free");
+check(
+  releaseProgressReport.currentOperatorStartCommand === releaseProgressReport.externalProofBundleCurrentOperatorStartCommand,
+  "release progress report should mirror external proof current operator start command"
+);
+check(
+  releaseProgressReport.currentOperatorStartCommand === releaseProgressReport.currentOperatorFirstCommand,
+  "release progress report current operator start command should mirror first command"
+);
+check(
+  releaseProgressReport.currentOperatorStartCommand === releaseProgressReport.currentOperatorCommandRows[0]?.command,
+  "release progress report current operator start command should match first row command"
+);
+check(
+  releaseProgressReport.currentOperatorStartCommandRole === releaseProgressReport.currentOperatorCommandRows[0]?.role,
+  "release progress report current operator start command role should match first row role"
+);
+check(
+  releaseProgressReport.currentOperatorStartCommandMatchesFirstCommand === true,
+  "release progress report current operator start command should declare first-command match"
+);
+check(releaseProgressReport.currentOperatorStartCommandValueRecorded === false, "release progress report current operator start command should be value-free");
 check(releaseProgressReport.currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release progress report current operator sequence should expose private env preflight command");
 check(releaseProgressReport.currentOperatorApplyCommand === releaseChannelApplyPrivateEnvCommand, "release progress report current operator sequence should expose private env apply command");
 check(releaseProgressReport.currentOperatorStrictProofCommand === recommendedPrivateEditOperatorProofCommand, "release progress report current operator sequence should expose recommended strict proof command");
@@ -2937,6 +2989,9 @@ check(markdown.includes("Release-channel post-edit receipt ready:"), "release pr
 check(markdown.includes("Release-channel post-edit receipt rows:"), "release progress Markdown should include release-channel post-edit receipt rows");
 check(markdown.includes("Release-Channel Post-Edit Receipt"), "release progress Markdown should include release-channel post-edit receipt table");
 check(markdown.includes("Current operator command sequence ready:"), "release progress Markdown should include current operator command sequence readiness");
+check(markdown.includes("Current operator start command:"), "release progress Markdown should include current operator start command");
+check(markdown.includes("Current operator start command role:"), "release progress Markdown should include current operator start command role");
+check(markdown.includes("Current operator start command matches first command:"), "release progress Markdown should include current operator start command match");
 check(markdown.includes("Current Operator Command Sequence"), "release progress Markdown should include current operator command sequence table");
 check(markdown.includes("Release-channel post-edit operator receipt ready:"), "release progress Markdown should include release-channel post-edit operator receipt readiness");
 check(markdown.includes("Release-channel post-edit operator receipt rows:"), "release progress Markdown should include release-channel post-edit operator receipt rows");
@@ -3057,6 +3112,9 @@ console.log(`- Release-channel post-edit operator next-actions refresh: ${releas
 console.log(`- Current operator command sequence ready: ${releaseProgressReport.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${releaseProgressReport.currentOperatorCommandRowCount} (${releaseProgressReport.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${releaseProgressReport.currentOperatorFirstCommand}`);
+console.log(`- Current operator start command: ${releaseProgressReport.currentOperatorStartCommand}`);
+console.log(`- Current operator start command role: ${releaseProgressReport.currentOperatorStartCommandRole}`);
+console.log(`- Current operator start command matches first command: ${releaseProgressReport.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${releaseProgressReport.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${releaseProgressReport.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Post-edit proof sequence receipt ready: ${releaseProgressReport.postEditProofSequenceReceiptReady ? "yes" : "no"}`);

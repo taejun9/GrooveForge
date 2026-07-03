@@ -2445,6 +2445,15 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentOperatorCommandSummary: textValue(releaseProgress.currentOperatorCommandSummary, "none"),
     currentOperatorCommandRows,
     currentOperatorFirstCommand: textValue(releaseProgress.currentOperatorFirstCommand, "none"),
+    currentOperatorStartCommand: textValue(
+      releaseProgress.currentOperatorStartCommand,
+      textValue(releaseProgress.currentOperatorFirstCommand, "none")
+    ),
+    currentOperatorStartCommandRole: textValue(releaseProgress.currentOperatorStartCommandRole, currentOperatorCommandRows[0]?.role ?? "none"),
+    currentOperatorStartCommandMatchesFirstCommand:
+      releaseProgress.currentOperatorStartCommandMatchesFirstCommand === true ||
+      textValue(releaseProgress.currentOperatorStartCommand, textValue(releaseProgress.currentOperatorFirstCommand, "none")) ===
+        textValue(releaseProgress.currentOperatorFirstCommand, "none"),
     currentOperatorPreflightCommand: textValue(
       releaseProgress.currentOperatorPreflightCommand,
       releaseChannelApplyPrivateEnvPreflightCommand
@@ -2467,6 +2476,7 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     ),
     currentOperatorPreflightBeforeApply: releaseProgress.currentOperatorPreflightBeforeApply === true,
     currentOperatorApplyBeforeStrictProof: releaseProgress.currentOperatorApplyBeforeStrictProof === true,
+    currentOperatorStartCommandValueRecorded: releaseProgress.currentOperatorStartCommandValueRecorded === true ? true : false,
     currentOperatorValueRecorded: releaseProgress.currentOperatorValueRecorded === true ? true : false,
     postEditProofSequenceReceiptReady,
     postEditProofSequenceReceiptRowCount: integerValue(releaseProgress.postEditProofSequenceReceiptRowCount),
@@ -3383,6 +3393,16 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentOperatorCommandRows.length >= 5, "release current blocker current operator command sequence should include preflight, apply, strict proof, blocker refresh, and next-actions refresh");
   check(sameJson(report.currentOperatorCommandRows, valueFreeObjectRows(releaseProgress.currentOperatorCommandRows)), "release current blocker should mirror release progress current operator command rows");
   check(report.currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false), "release current blocker current operator command rows should be ready and value-free");
+  check(
+    report.currentOperatorStartCommand ===
+      textValue(releaseProgress.currentOperatorStartCommand, textValue(releaseProgress.currentOperatorFirstCommand, "none")),
+    "release current blocker should mirror release progress current operator start command"
+  );
+  check(report.currentOperatorStartCommand === report.currentOperatorFirstCommand, "release current blocker current operator start command should mirror first command");
+  check(report.currentOperatorStartCommand === report.currentOperatorCommandRows[0]?.command, "release current blocker current operator start command should match first row command");
+  check(report.currentOperatorStartCommandRole === report.currentOperatorCommandRows[0]?.role, "release current blocker current operator start command role should match first row role");
+  check(report.currentOperatorStartCommandMatchesFirstCommand === true, "release current blocker current operator start command should declare first-command match");
+  check(report.currentOperatorStartCommandValueRecorded === false, "release current blocker current operator start command should be value-free");
   check(report.currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release current blocker current operator sequence should expose private env preflight command");
   check(report.currentOperatorApplyCommand === releaseChannelApplyPrivateEnvCommand, "release current blocker current operator sequence should expose private env apply command");
   check(report.currentOperatorStrictProofCommand === recommendedPrivateEditOperatorProofCommand, "release current blocker current operator sequence should expose recommended strict proof command");
@@ -3851,6 +3871,9 @@ function buildMarkdown(report) {
     `- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`,
     `- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`,
     `- Current operator first command: \`${report.currentOperatorFirstCommand}\``,
+    `- Current operator start command: \`${report.currentOperatorStartCommand}\``,
+    `- Current operator start command role: ${report.currentOperatorStartCommandRole}`,
+    `- Current operator start command matches first command: ${report.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`,
     `- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`,
     `- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`,
     `- Post-edit proof sequence receipt ready: ${report.postEditProofSequenceReceiptReady ? "yes" : "no"}`,
@@ -4043,6 +4066,9 @@ function buildMarkdown(report) {
     `- Sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`,
     `- Command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`,
     `- First command: \`${report.currentOperatorFirstCommand}\``,
+    `- Operator start command: \`${report.currentOperatorStartCommand}\``,
+    `- Operator start role: ${report.currentOperatorStartCommandRole}`,
+    `- Start matches first command: ${report.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`,
     `- Preflight command: \`${report.currentOperatorPreflightCommand}\``,
     `- Apply command: \`${report.currentOperatorApplyCommand}\``,
     `- Strict proof command: \`${report.currentOperatorStrictProofCommand}\``,
@@ -4624,6 +4650,9 @@ check(markdown.includes("Local Env Loader Diagnostics"), "release current blocke
 check(markdown.includes("Local env diagnostics ready:"), "release current blocker Markdown should include local env diagnostics readiness");
 check(markdown.includes("Current Operator Command Sequence"), "release current blocker Markdown should include current operator command sequence");
 check(markdown.includes("Current operator command sequence ready:"), "release current blocker Markdown should include current operator command sequence readiness");
+check(markdown.includes("Current operator start command:"), "release current blocker Markdown should include current operator start command");
+check(markdown.includes("Current operator start command role:"), "release current blocker Markdown should include current operator start command role");
+check(markdown.includes("Current operator start command matches first command:"), "release current blocker Markdown should include current operator start command match");
 
 if (failures.length > 0) {
   fail("Validation failed.", failures.map((message) => `- ${message}`).join("\n"));
@@ -4651,6 +4680,9 @@ console.log(`- Preflight process env checklist missing/placeholder/invalid rows:
 console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
+console.log(`- Current operator start command: ${report.currentOperatorStartCommand}`);
+console.log(`- Current operator start command role: ${report.currentOperatorStartCommandRole}`);
+console.log(`- Current operator start command matches first command: ${report.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);

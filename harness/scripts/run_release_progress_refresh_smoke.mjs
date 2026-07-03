@@ -424,6 +424,15 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     currentOperatorCommandSummary:
       currentOperatorCommandRows.length > 0 ? `${currentOperatorCommandRows.length} value-free current operator command rows` : "none",
     currentOperatorFirstCommand: textValue(currentBlocker.currentOperatorFirstCommand, "none"),
+    currentOperatorStartCommand: textValue(
+      currentBlocker.currentOperatorStartCommand,
+      textValue(currentBlocker.currentOperatorFirstCommand, "none")
+    ),
+    currentOperatorStartCommandRole: textValue(currentBlocker.currentOperatorStartCommandRole, currentOperatorCommandRows[0]?.role ?? "none"),
+    currentOperatorStartCommandMatchesFirstCommand:
+      currentBlocker.currentOperatorStartCommandMatchesFirstCommand === true ||
+      textValue(currentBlocker.currentOperatorStartCommand, textValue(currentBlocker.currentOperatorFirstCommand, "none")) ===
+        textValue(currentBlocker.currentOperatorFirstCommand, "none"),
     currentOperatorPreflightCommand: textValue(
       currentBlocker.currentOperatorPreflightCommand,
       releaseChannelApplyPrivateEnvPreflightCommand
@@ -446,6 +455,7 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     ),
     currentOperatorPreflightBeforeApply: currentBlocker.currentOperatorPreflightBeforeApply === true,
     currentOperatorApplyBeforeStrictProof: currentBlocker.currentOperatorApplyBeforeStrictProof === true,
+    currentOperatorStartCommandValueRecorded: currentBlocker.currentOperatorStartCommandValueRecorded === true ? true : false,
     currentOperatorValueRecorded: currentBlocker.currentOperatorValueRecorded === true ? true : false,
     releaseChannelPrivateInputTemplateCommand: textValue(
       completionReportPacket.channelEditPrivateInputTemplateCommand,
@@ -583,6 +593,9 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     currentOperatorCommandRowCount: completionSummary.currentOperatorCommandRowCount,
     currentOperatorCommandSummary: completionSummary.currentOperatorCommandSummary,
     currentOperatorFirstCommand: completionSummary.currentOperatorFirstCommand,
+    currentOperatorStartCommand: completionSummary.currentOperatorStartCommand,
+    currentOperatorStartCommandRole: completionSummary.currentOperatorStartCommandRole,
+    currentOperatorStartCommandMatchesFirstCommand: completionSummary.currentOperatorStartCommandMatchesFirstCommand,
     currentOperatorPreflightCommand: completionSummary.currentOperatorPreflightCommand,
     currentOperatorPreflightCommandOrder: completionSummary.currentOperatorPreflightCommandOrder,
     currentOperatorApplyCommand: completionSummary.currentOperatorApplyCommand,
@@ -593,6 +606,7 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     currentOperatorNextActionsRefreshCommand: completionSummary.currentOperatorNextActionsRefreshCommand,
     currentOperatorPreflightBeforeApply: completionSummary.currentOperatorPreflightBeforeApply,
     currentOperatorApplyBeforeStrictProof: completionSummary.currentOperatorApplyBeforeStrictProof,
+    currentOperatorStartCommandValueRecorded: completionSummary.currentOperatorStartCommandValueRecorded,
     currentOperatorValueRecorded: completionSummary.currentOperatorValueRecorded,
     releaseChannelPrivateInputTemplateCommand: completionSummary.releaseChannelPrivateInputTemplateCommand,
     releaseChannelPrivateInputTemplateRole: completionSummary.releaseChannelPrivateInputTemplateRole,
@@ -743,6 +757,9 @@ function buildMarkdown(report) {
 - Current operator command sequence ready: ${readyLabel(report.completionSummary.currentOperatorCommandSequenceReady)}
 - Current operator command rows: ${report.completionSummary.currentOperatorCommandRowCount} (${report.completionSummary.currentOperatorCommandSummary})
 - Current operator first command: \`${report.completionSummary.currentOperatorFirstCommand}\`
+- Current operator start command: \`${report.completionSummary.currentOperatorStartCommand}\`
+- Current operator start command role: ${report.completionSummary.currentOperatorStartCommandRole}
+- Current operator start command matches first command: ${readyLabel(report.completionSummary.currentOperatorStartCommandMatchesFirstCommand)}
 - Current operator preflight before apply: ${readyLabel(report.completionSummary.currentOperatorPreflightBeforeApply)}
 - Current operator apply before strict proof: ${readyLabel(report.completionSummary.currentOperatorApplyBeforeStrictProof)}
 - Private input template command: \`${report.completionSummary.releaseChannelPrivateInputTemplateCommand}\`
@@ -943,6 +960,12 @@ function validateReport(report, markdown) {
   check(report.currentOperatorCommandRowCount === report.currentOperatorCommandRows.length, "release progress refresh current operator command row count should match rows");
   check(report.currentOperatorCommandRows.length >= 5, "release progress refresh current operator command sequence should include preflight, apply, strict proof, blocker refresh, and next-actions refresh");
   check(report.currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false), "release progress refresh current operator command rows should be ready and value-free");
+  check(report.currentOperatorStartCommand === report.completionSummary.currentOperatorStartCommand, "release progress refresh should mirror completion summary current operator start command");
+  check(report.currentOperatorStartCommand === report.currentOperatorFirstCommand, "release progress refresh current operator start command should mirror first command");
+  check(report.currentOperatorStartCommand === report.currentOperatorCommandRows[0]?.command, "release progress refresh current operator start command should match first row command");
+  check(report.currentOperatorStartCommandRole === report.currentOperatorCommandRows[0]?.role, "release progress refresh current operator start command role should match first row role");
+  check(report.currentOperatorStartCommandMatchesFirstCommand === true, "release progress refresh current operator start command should declare first-command match");
+  check(report.currentOperatorStartCommandValueRecorded === false, "release progress refresh current operator start command should be value-free");
   check(report.currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release progress refresh current operator sequence should expose private env preflight command");
   check(report.currentOperatorApplyCommand === releaseChannelApplyPrivateEnvCommand, "release progress refresh current operator sequence should expose private env apply command");
   check(report.currentOperatorStrictProofCommand === "npm run release:private-edit-strict-proof", "release progress refresh current operator sequence should expose strict proof command");
@@ -1098,6 +1121,9 @@ function validateReport(report, markdown) {
   check(markdown.includes("## Completion Blocker Action Receipt"), "release progress refresh Markdown should include completion blocker action receipt");
   check(markdown.includes("## Completion Blocker Focus Rows"), "release progress refresh Markdown should include completion blocker focus rows");
   check(markdown.includes("Completion blocker action receipt ready: yes"), "release progress refresh Markdown should include blocker action receipt readiness");
+  check(markdown.includes("Current operator start command:"), "release progress refresh Markdown should include current operator start command");
+  check(markdown.includes("Current operator start command role:"), "release progress refresh Markdown should include current operator start command role");
+  check(markdown.includes("Current operator start command matches first command:"), "release progress refresh Markdown should include current operator start command match");
   check(markdown.includes("Auto-update claimed: no"), "release progress refresh Markdown should keep auto-update unclaimed");
   check(markdown.includes("External distribution claimed: no"), "release progress refresh Markdown should keep external distribution unclaimed");
 
@@ -1155,6 +1181,9 @@ console.log(`- Completion blocker focus rows: ${report.completionBlockerFocusRow
 console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
+console.log(`- Current operator start command: ${report.currentOperatorStartCommand}`);
+console.log(`- Current operator start command role: ${report.currentOperatorStartCommandRole}`);
+console.log(`- Current operator start command matches first command: ${report.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Private input template command: ${report.releaseChannelPrivateInputTemplateCommand}`);

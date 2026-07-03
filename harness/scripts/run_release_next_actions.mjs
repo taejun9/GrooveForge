@@ -1913,6 +1913,8 @@ function buildCurrentOperatorCommandSequenceSummary({
   const strictProofOrder = commandOrder(recommendedPrivateEditOperatorProofCommand);
   const blockerRefreshOrder = commandOrder(blockerRefreshCommand);
   const nextActionsRefreshOrder = commandOrder(nextActionsRefreshCommand);
+  const startCommand = rows[0]?.command ?? "none";
+  const startCommandRole = rows[0]?.role ?? "none";
 
   return {
     currentOperatorCommandSequenceReady:
@@ -1930,7 +1932,10 @@ function buildCurrentOperatorCommandSequenceSummary({
     currentOperatorCommandRowCount: rows.length,
     currentOperatorCommandSummary: `${rows.length} value-free current operator command rows`,
     currentOperatorCommandRows: rows,
-    currentOperatorFirstCommand: rows[0]?.command ?? "none",
+    currentOperatorFirstCommand: startCommand,
+    currentOperatorStartCommand: startCommand,
+    currentOperatorStartCommandRole: startCommandRole,
+    currentOperatorStartCommandMatchesFirstCommand: startCommand === (rows[0]?.command ?? "none"),
     currentOperatorPreflightCommand: releaseChannelApplyPrivateEnvPreflightCommand,
     currentOperatorPreflightCommandOrder: preflightOrder,
     currentOperatorApplyCommand: releaseChannelApplyPrivateEnvCommand,
@@ -1941,6 +1946,7 @@ function buildCurrentOperatorCommandSequenceSummary({
     currentOperatorNextActionsRefreshCommand: nextActionsRefreshCommand,
     currentOperatorPreflightBeforeApply: preflightOrder > 0 && applyOrder > 0 && preflightOrder < applyOrder,
     currentOperatorApplyBeforeStrictProof: applyOrder > 0 && strictProofOrder > 0 && applyOrder < strictProofOrder,
+    currentOperatorStartCommandValueRecorded: false,
     currentOperatorValueRecorded: false
   };
 }
@@ -3369,6 +3375,7 @@ function buildMarkdown(report) {
 - Current focus: ${report.currentFocus}
 - Current action: ${report.currentActionLabel}
 - Current next command: \`${report.currentNextCommand}\`
+- Current operator start command: \`${report.currentOperatorStartCommand}\`
 - Current first blocker: ${report.currentFirstBlocker}
 - Completion gap status: ${report.completionGapStatus}
 - Completion gap summary: ${report.completionGapSummary}
@@ -3433,6 +3440,9 @@ function buildMarkdown(report) {
 - Current operator command sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
+- Current operator start command: \`${report.currentOperatorStartCommand}\`
+- Current operator start command role: ${report.currentOperatorStartCommandRole}
+- Current operator start command matches first command: ${readyLabel(report.currentOperatorStartCommandMatchesFirstCommand)}
 - Current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
 - Current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
 - Post-edit proof sequence receipt ready: ${readyLabel(report.postEditProofSequenceReceiptReady)}
@@ -3733,6 +3743,9 @@ ${formatReleaseChannelPostEditOperatorReceiptRows(report.releaseChannelPostEditO
 - Sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - First command: \`${report.currentOperatorFirstCommand}\`
+- Operator start command: \`${report.currentOperatorStartCommand}\`
+- Operator start role: ${report.currentOperatorStartCommandRole}
+- Start matches first command: ${readyLabel(report.currentOperatorStartCommandMatchesFirstCommand)}
 - Preflight command: \`${report.currentOperatorPreflightCommand}\`
 - Apply command: \`${report.currentOperatorApplyCommand}\`
 - Strict proof command: \`${report.currentOperatorStrictProofCommand}\`
@@ -5180,6 +5193,25 @@ check(typeof nextActionsReport.currentOperatorCommandSequenceReady === "boolean"
 check(Number.isInteger(nextActionsReport.currentOperatorCommandRowCount), "external next actions should include current operator command row count");
 check(typeof nextActionsReport.currentOperatorCommandSummary === "string" && nextActionsReport.currentOperatorCommandSummary.length > 0, "external next actions should include current operator command summary");
 check(Array.isArray(nextActionsReport.currentOperatorCommandRows), "external next actions should include current operator command rows");
+check(typeof nextActionsReport.currentOperatorStartCommand === "string" && nextActionsReport.currentOperatorStartCommand.length > 0, "external next actions should include current operator start command");
+check(typeof nextActionsReport.currentOperatorStartCommandRole === "string" && nextActionsReport.currentOperatorStartCommandRole.length > 0, "external next actions should include current operator start command role");
+check(
+  nextActionsReport.currentOperatorStartCommand === nextActionsReport.currentOperatorFirstCommand,
+  "external next actions current operator start command should mirror the first sequence command"
+);
+check(
+  nextActionsReport.currentOperatorStartCommand === nextActionsReport.currentOperatorCommandRows[0]?.command,
+  "external next actions current operator start command should match the first row command"
+);
+check(
+  nextActionsReport.currentOperatorStartCommandRole === nextActionsReport.currentOperatorCommandRows[0]?.role,
+  "external next actions current operator start command role should match the first row role"
+);
+check(
+  nextActionsReport.currentOperatorStartCommandMatchesFirstCommand === true,
+  "external next actions current operator start command should declare a first-command match"
+);
+check(nextActionsReport.currentOperatorStartCommandValueRecorded === false, "external next actions current operator start command should be value-free");
 const releaseChannelCurrentOperatorSequenceRequired = nextActionsReport.currentActionId === "release-channel-metadata";
 check(
   nextActionsReport.currentOperatorCommandSequenceReady === releaseChannelCurrentOperatorSequenceRequired,
@@ -6472,6 +6504,7 @@ check(nextActionsReport.sourceClaimedExternalDistribution === false, "external n
 check(markdown.includes("External Next Actions"), "external next actions Markdown should include title");
 check(markdown.includes("Current focus:"), "external next actions Markdown should include current focus");
 check(markdown.includes("Current next command:"), "external next actions Markdown should include current next command");
+check(markdown.includes("Current operator start command:"), "external next actions Markdown should include current operator start command");
 check(markdown.includes("Current first blocker:"), "external next actions Markdown should include current first blocker");
 check(markdown.includes("Completion gap status:"), "external next actions Markdown should include completion gap status");
 check(markdown.includes("Completion gap summary:"), "external next actions Markdown should include completion gap summary");
@@ -6515,6 +6548,8 @@ check(markdown.includes("Next action preview verification rows:"), "external nex
 check(markdown.includes("Next action preview prerequisite command rows:"), "external next actions Markdown should include next action preview prerequisite command status");
 check(markdown.includes("Next action preview operator action rows:"), "external next actions Markdown should include next action preview operator action status");
 check(markdown.includes("Next action preview env edit rows:"), "external next actions Markdown should include next action preview env edit status");
+check(markdown.includes("Current operator start command role:"), "external next actions Markdown should include current operator start command role");
+check(markdown.includes("Current operator start command matches first command:"), "external next actions Markdown should include current operator start command match status");
 check(markdown.includes("Current env edit target:"), "external next actions Markdown should include current env edit target");
 check(markdown.includes("Current operator action:"), "external next actions Markdown should include current operator action");
 check(markdown.includes("Current rerun command:"), "external next actions Markdown should include current rerun command");
@@ -6784,6 +6819,7 @@ console.log(`- JSON: ${relative(nextActionsJsonPath)}`);
 console.log(`- Completion stage: ${nextActionsReport.completionStage}`);
 console.log(`- Current focus: ${nextActionsReport.currentFocus}`);
 console.log(`- Current next command: ${nextActionsReport.currentNextCommand}`);
+console.log(`- Current operator start command: ${nextActionsReport.currentOperatorStartCommand}`);
 console.log(`- Current first blocker: ${nextActionsReport.currentFirstBlocker}`);
 console.log(`- Completion gap status: ${nextActionsReport.completionGapStatus}`);
 console.log(`- Completion gap summary: ${nextActionsReport.completionGapSummary}`);
@@ -6855,6 +6891,9 @@ console.log(`- Release-channel post-edit operator next-actions refresh: ${nextAc
 console.log(`- Current operator command sequence ready: ${nextActionsReport.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${nextActionsReport.currentOperatorCommandRowCount} (${nextActionsReport.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${nextActionsReport.currentOperatorFirstCommand}`);
+console.log(`- Current operator start command: ${nextActionsReport.currentOperatorStartCommand}`);
+console.log(`- Current operator start command role: ${nextActionsReport.currentOperatorStartCommandRole}`);
+console.log(`- Current operator start command matches first command: ${nextActionsReport.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${nextActionsReport.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${nextActionsReport.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Post-edit proof sequence receipt ready: ${nextActionsReport.postEditProofSequenceReceiptReady ? "yes" : "no"}`);

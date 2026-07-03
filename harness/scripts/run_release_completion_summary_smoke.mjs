@@ -239,6 +239,12 @@ function buildReport(source, completedPlanState) {
     currentOperatorCommandRowCount: integerValue(summary.currentOperatorCommandRowCount),
     currentOperatorCommandSummary: textValue(summary.currentOperatorCommandSummary),
     currentOperatorFirstCommand: textValue(summary.currentOperatorFirstCommand),
+    currentOperatorStartCommand: textValue(summary.currentOperatorStartCommand, textValue(summary.currentOperatorFirstCommand)),
+    currentOperatorStartCommandRole: textValue(summary.currentOperatorStartCommandRole, objectRows(summary.currentOperatorCommandRows)[0]?.role ?? "none"),
+    currentOperatorStartCommandMatchesFirstCommand:
+      summary.currentOperatorStartCommandMatchesFirstCommand === true ||
+      textValue(summary.currentOperatorStartCommand, textValue(summary.currentOperatorFirstCommand)) ===
+        textValue(summary.currentOperatorFirstCommand),
     currentOperatorPreflightCommand: textValue(summary.currentOperatorPreflightCommand, releaseChannelApplyPrivateEnvPreflightCommand),
     currentOperatorPreflightCommandOrder: integerValue(summary.currentOperatorPreflightCommandOrder),
     currentOperatorApplyCommand: textValue(summary.currentOperatorApplyCommand, releaseChannelApplyPrivateEnvCommand),
@@ -249,6 +255,7 @@ function buildReport(source, completedPlanState) {
     currentOperatorNextActionsRefreshCommand: textValue(summary.currentOperatorNextActionsRefreshCommand, "npm run release:next-actions"),
     currentOperatorPreflightBeforeApply: summary.currentOperatorPreflightBeforeApply === true,
     currentOperatorApplyBeforeStrictProof: summary.currentOperatorApplyBeforeStrictProof === true,
+    currentOperatorStartCommandValueRecorded: summary.currentOperatorStartCommandValueRecorded === true ? true : false,
     currentOperatorValueRecorded: summary.currentOperatorValueRecorded === true ? true : false,
     releaseChannelPrivateInputTemplateCommand: textValue(
       summary.releaseChannelPrivateInputTemplateCommand,
@@ -384,6 +391,9 @@ function buildMarkdown(report) {
 - Current operator command sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
+- Current operator start command: \`${report.currentOperatorStartCommand}\`
+- Current operator start command role: ${report.currentOperatorStartCommandRole}
+- Current operator start command matches first command: ${readyLabel(report.currentOperatorStartCommandMatchesFirstCommand)}
 - Current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
 - Current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
 - Private input template command: \`${report.releaseChannelPrivateInputTemplateCommand}\`
@@ -426,6 +436,9 @@ ${formatCompletionBlockerFocusRows(report.completionBlockerFocusRows)}
 - Sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - First command: \`${report.currentOperatorFirstCommand}\`
+- Operator start command: \`${report.currentOperatorStartCommand}\`
+- Operator start role: ${report.currentOperatorStartCommandRole}
+- Start matches first command: ${readyLabel(report.currentOperatorStartCommandMatchesFirstCommand)}
 - Preflight command: \`${report.currentOperatorPreflightCommand}\`
 - Apply command: \`${report.currentOperatorApplyCommand}\`
 - Strict proof command: \`${report.currentOperatorStrictProofCommand}\`
@@ -511,6 +524,11 @@ function validateReport(report, markdown) {
   check(report.currentOperatorCommandRowCount === report.currentOperatorCommandRows.length, "release completion summary current operator command row count should match rows");
   check(report.currentOperatorCommandRows.length >= 5, "release completion summary current operator command sequence should include preflight, apply, strict proof, blocker refresh, and next-actions refresh");
   check(report.currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false), "release completion summary current operator command rows should be ready and value-free");
+  check(report.currentOperatorStartCommand === report.currentOperatorFirstCommand, "release completion summary current operator start command should mirror first command");
+  check(report.currentOperatorStartCommand === report.currentOperatorCommandRows[0]?.command, "release completion summary current operator start command should match first row command");
+  check(report.currentOperatorStartCommandRole === report.currentOperatorCommandRows[0]?.role, "release completion summary current operator start command role should match first row role");
+  check(report.currentOperatorStartCommandMatchesFirstCommand === true, "release completion summary current operator start command should declare first-command match");
+  check(report.currentOperatorStartCommandValueRecorded === false, "release completion summary current operator start command should be value-free");
   check(report.currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release completion summary current operator sequence should expose private env preflight command");
   check(report.currentOperatorApplyCommand === releaseChannelApplyPrivateEnvCommand, "release completion summary current operator sequence should expose private env apply command");
   check(report.currentOperatorStrictProofCommand === "npm run release:private-edit-strict-proof", "release completion summary current operator sequence should expose strict proof command");
@@ -558,6 +576,9 @@ function validateReport(report, markdown) {
   check(markdown.includes("## Completion Blocker Focus Rows"), "release completion summary Markdown should include completion blocker focus rows");
   check(markdown.includes("Completion blocker action receipt ready: yes"), "release completion summary Markdown should include blocker action receipt readiness");
   check(markdown.includes("Current operator command sequence ready: yes"), "release completion summary Markdown should include current operator command sequence readiness");
+  check(markdown.includes("Current operator start command:"), "release completion summary Markdown should include current operator start command");
+  check(markdown.includes("Current operator start command role:"), "release completion summary Markdown should include current operator start command role");
+  check(markdown.includes("Current operator start command matches first command:"), "release completion summary Markdown should include current operator start command match");
   check(markdown.includes("Current Operator Command Sequence"), "release completion summary Markdown should include current operator command sequence");
   check(markdown.includes("Private input template command:"), "release completion summary Markdown should include private input template command");
 
@@ -607,6 +628,9 @@ console.log(`- Completion blocker focus rows: ${report.completionBlockerFocusRow
 console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
+console.log(`- Current operator start command: ${report.currentOperatorStartCommand}`);
+console.log(`- Current operator start command role: ${report.currentOperatorStartCommandRole}`);
+console.log(`- Current operator start command matches first command: ${report.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Private input template command: ${report.releaseChannelPrivateInputTemplateCommand}`);

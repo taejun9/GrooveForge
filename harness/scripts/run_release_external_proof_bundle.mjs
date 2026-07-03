@@ -185,6 +185,12 @@ function buildCurrentEnvSummary(externalNextActions) {
     currentOperatorCommandSummary: textValue(externalNextActions?.currentOperatorCommandSummary, "none"),
     currentOperatorCommandRows,
     currentOperatorFirstCommand: textValue(externalNextActions?.currentOperatorFirstCommand, "none"),
+    currentOperatorStartCommand: textValue(externalNextActions?.currentOperatorStartCommand, textValue(externalNextActions?.currentOperatorFirstCommand, "none")),
+    currentOperatorStartCommandRole: textValue(externalNextActions?.currentOperatorStartCommandRole, currentOperatorCommandRows[0]?.role ?? "none"),
+    currentOperatorStartCommandMatchesFirstCommand:
+      externalNextActions?.currentOperatorStartCommandMatchesFirstCommand === true ||
+      textValue(externalNextActions?.currentOperatorStartCommand, textValue(externalNextActions?.currentOperatorFirstCommand, "none")) ===
+        textValue(externalNextActions?.currentOperatorFirstCommand, "none"),
     currentOperatorPreflightCommand: textValue(
       externalNextActions?.currentOperatorPreflightCommand,
       "npm run release:channel-apply-private-env-preflight"
@@ -198,6 +204,7 @@ function buildCurrentEnvSummary(externalNextActions) {
     currentOperatorNextActionsRefreshCommand: textValue(externalNextActions?.currentOperatorNextActionsRefreshCommand, "npm run release:next-actions"),
     currentOperatorPreflightBeforeApply: externalNextActions?.currentOperatorPreflightBeforeApply === true,
     currentOperatorApplyBeforeStrictProof: externalNextActions?.currentOperatorApplyBeforeStrictProof === true,
+    currentOperatorStartCommandValueRecorded: externalNextActions?.currentOperatorStartCommandValueRecorded === true ? true : false,
     currentOperatorValueRecorded: externalNextActions?.currentOperatorValueRecorded === true ? true : false,
     releaseChannelPostEditOperatorReceiptReady:
       externalNextActions?.releaseChannelPostEditOperatorReceiptReady === true &&
@@ -485,6 +492,9 @@ ${formatGateRequirementRows(summary.gateRequirementRows)}
 - Current operator command sequence ready: ${summary.currentOperatorCommandSequenceReady ? "yes" : "no"}
 - Current operator command rows: ${summary.currentOperatorCommandRowCount} (${summary.currentOperatorCommandSummary})
 - Current operator first command: \`${summary.currentOperatorFirstCommand}\`
+- Current operator start command: \`${summary.currentOperatorStartCommand}\`
+- Current operator start command role: ${summary.currentOperatorStartCommandRole}
+- Current operator start command matches first command: ${summary.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}
 - Current operator preflight before apply: ${summary.currentOperatorPreflightBeforeApply ? "yes" : "no"}
 - Current operator apply before strict proof: ${summary.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}
 - Post-edit proof sequence receipt ready: ${summary.postEditProofSequenceReceiptReady ? "yes" : "no"}
@@ -810,6 +820,11 @@ check(summary.currentOperatorCommandSequenceReady === true, "release proof bundl
 check(summary.currentOperatorCommandRowCount === summary.currentOperatorCommandRows.length, "release proof bundle current operator command row count should match rows");
 check(summary.currentOperatorCommandRows.length >= 5, "release proof bundle current operator command sequence should include preflight, apply, strict proof, blocker refresh, and next-actions refresh");
 check(summary.currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false), "release proof bundle current operator command rows should be ready and value-free");
+check(summary.currentOperatorStartCommand === summary.currentOperatorFirstCommand, "release proof bundle current operator start command should mirror first command");
+check(summary.currentOperatorStartCommand === summary.currentOperatorCommandRows[0]?.command, "release proof bundle current operator start command should match first row command");
+check(summary.currentOperatorStartCommandRole === summary.currentOperatorCommandRows[0]?.role, "release proof bundle current operator start command role should match first row role");
+check(summary.currentOperatorStartCommandMatchesFirstCommand === true, "release proof bundle current operator start command should declare first-command match");
+check(summary.currentOperatorStartCommandValueRecorded === false, "release proof bundle current operator start command should be value-free");
 check(
   summary.currentOperatorCommandRows.some((row) => row.step === "Private metadata preflight" && row.command === "npm run release:channel-apply-private-env-preflight"),
   "release proof bundle current operator command sequence should include private metadata preflight"
@@ -939,6 +954,9 @@ check(markdown.includes("Current Proof Checklist Rows"), "release proof bundle M
 check(markdown.includes("Current Action Checklist Rows"), "release proof bundle Markdown should include current action checklist rows");
 check(markdown.includes("Current Command Verification Rows"), "release proof bundle Markdown should include current command verification rows");
 check(markdown.includes("Current Operator Command Sequence"), "release proof bundle Markdown should include current operator command sequence");
+check(markdown.includes("Current operator start command:"), "release proof bundle Markdown should include current operator start command");
+check(markdown.includes("Current operator start command role:"), "release proof bundle Markdown should include current operator start command role");
+check(markdown.includes("Current operator start command matches first command:"), "release proof bundle Markdown should include current operator start command match");
 check(markdown.includes("Release-channel post-edit operator receipt ready:"), "release proof bundle Markdown should include release-channel post-edit operator receipt readiness");
 check(markdown.includes("Release-channel post-edit operator recommended proof chain:"), "release proof bundle Markdown should include release-channel post-edit operator recommended proof chain");
 check(markdown.includes("Release-Channel Post-Edit Operator Receipt"), "release proof bundle Markdown should include release-channel post-edit operator receipt table");
@@ -999,6 +1017,9 @@ console.log(`- Release-channel post-edit operator next-actions refresh: ${summar
 console.log(`- Current operator command sequence ready: ${summary.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${summary.currentOperatorCommandRowCount} (${summary.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${summary.currentOperatorFirstCommand}`);
+console.log(`- Current operator start command: ${summary.currentOperatorStartCommand}`);
+console.log(`- Current operator start command role: ${summary.currentOperatorStartCommandRole}`);
+console.log(`- Current operator start command matches first command: ${summary.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${summary.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${summary.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Post-edit proof sequence receipt ready: ${summary.postEditProofSequenceReceiptReady ? "yes" : "no"}`);
