@@ -119,6 +119,11 @@ function checkPackageScripts() {
   checkIncludes(packageJson.scripts?.desktop ?? "", "run_desktop_app.mjs", "package.json desktop script");
   checkIncludes(packageJson.scripts?.["desktop:smoke"] ?? "", "run_desktop_entry_smoke.mjs", "package.json desktop:smoke script");
   checkIncludes(
+    packageJson.scripts?.["desktop:crash-report-regression-smoke"] ?? "",
+    "run_desktop_crash_report_regression_smoke.mjs",
+    "package.json desktop:crash-report-regression-smoke script"
+  );
+  checkIncludes(
     packageJson.scripts?.["desktop:project-io-smoke"] ?? "",
     "run_desktop_project_io_smoke.mjs",
     "package.json desktop:project-io-smoke script"
@@ -145,6 +150,7 @@ function checkPackageScripts() {
   );
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run build", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:smoke", "package.json verify script");
+  checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:crash-report-regression-smoke", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:project-io-smoke", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:packaged-project-io-smoke", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:pkg-payload-smoke", "package.json verify script");
@@ -153,6 +159,13 @@ function checkPackageScripts() {
   check(
     (packageJson.scripts?.verify ?? "").indexOf("npm run build") < (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:smoke"),
     "package.json verify should run desktop:smoke after npm run build"
+  );
+  check(
+    (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:smoke") <
+      (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:crash-report-regression-smoke") &&
+      (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:crash-report-regression-smoke") <
+        (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:launch-smoke"),
+    "package.json verify should run desktop:crash-report-regression-smoke after entry smoke and before live launch smoke"
   );
   check(
     (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:launch-smoke") <
