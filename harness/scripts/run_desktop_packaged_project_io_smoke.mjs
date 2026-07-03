@@ -89,6 +89,10 @@ async function checkPackagedArtifacts() {
     "packaged project IO Electron runtime framework dependencies should pass codesign --verify --strict before launch"
   );
   check(
+    frameworkDependencies.allRequiredDependenciesSignatureCompatible,
+    "packaged project IO Electron runtime framework dependencies should be signature-compatible with the app bundle before launch"
+  );
+  check(
     frameworkDependencies.allRequiredDependenciesDyldLoadable,
     "packaged project IO Electron runtime framework dependencies should be dyld-loadable through @rpath before launch"
   );
@@ -164,6 +168,7 @@ function buildReport(project, result, sourceContents, savedContents, frameworkDe
     packagedFrameworkDependenciesReady:
       frameworkDependencies.allRequiredDependenciesPresent === true &&
       frameworkDependencies.allRequiredDependenciesCodeSigned === true &&
+      frameworkDependencies.allRequiredDependenciesSignatureCompatible === true &&
       frameworkDependencies.allRequiredDependenciesDyldLoadable === true,
     packagedNativeSaveReady: true,
     packagedNativeOpenReady: true,
@@ -205,7 +210,7 @@ function buildMarkdown(report) {
 - Source SHA-256: \`${report.sourceSha256.slice(0, 16)}...\`
 - Saved SHA-256: \`${report.savedSha256.slice(0, 16)}...\`
 - Electron runtime framework dependencies ready: ${report.packagedFrameworkDependenciesReady ? "yes" : "no"}
-- Electron runtime framework dependencies: ${report.frameworkDependencies.presentDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} present, ${report.frameworkDependencies.signatureVerifiedDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} code-signed, ${report.frameworkDependencies.dyldLoadableDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} dyld-loadable
+- Electron runtime framework dependencies: ${report.frameworkDependencies.presentDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} present, ${report.frameworkDependencies.signatureVerifiedDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} code-signed, ${report.frameworkDependencies.signatureCompatibleDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} signature-compatible, ${report.frameworkDependencies.dyldLoadableDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} dyld-loadable
 
 ## Packaged Native Bridge Checks
 
@@ -219,8 +224,8 @@ function buildMarkdown(report) {
 
 ## Dyld Framework Dependency Checks
 
-| install name | referenced | present | code-signed | dyld-loadable | candidate count | resolved path |
-|---|---:|---:|---:|---:|---:|---|
+| install name | referenced | present | code-signed | signature-compatible | dyld-loadable | candidate count | resolved path |
+|---|---:|---:|---:|---:|---:|---:|---|
 ${formatFrameworkDependencyRows(report.frameworkDependencies.requiredDependencyRows)}
 
 ## Not Recorded
@@ -383,7 +388,7 @@ console.log(`- Report Markdown: ${relative(reportMarkdownPath)}`);
 console.log(`- Project: ${reopenedProject.title}, ${reopenedProject.bpm} BPM ${reopenedProject.key}, ${workstation.arrangementTotalBars(reopenedProject)} bars`);
 console.log(`- Packaged bridge: saveProject/openProject roundtrip matched ${report.savedBytes} bytes, sha256 ${report.savedSha256.slice(0, 16)}...`);
 console.log(
-  `- Framework dependencies: ${report.frameworkDependencies.presentDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} present, ${report.frameworkDependencies.signatureVerifiedDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} code-signed`
+  `- Framework dependencies: ${report.frameworkDependencies.presentDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} present, ${report.frameworkDependencies.signatureVerifiedDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} code-signed, ${report.frameworkDependencies.signatureCompatibleDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} signature-compatible`
 );
 console.log(
   `- Dyld framework loadability: ${report.frameworkDependencies.dyldLoadableDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} loadable via ${report.frameworkDependencies.rpathCount} dyld rpaths`

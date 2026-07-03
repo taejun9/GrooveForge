@@ -16,6 +16,7 @@ const appName = "GrooveForge";
 const bundleId = "app.grooveforge.desktop";
 const iconFileName = `${appName}.icns`;
 const iconSource = path.join(root, "assets", "brand", "grooveforge-icon.svg");
+const entitlementsPath = path.join(root, "harness", "fixtures", "macos-hardened-runtime-entitlements.plist");
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const timeoutMs = 210000;
 const outputRoot = path.join(root, "build", "desktop", `${appName}-${process.platform}-${process.arch}`);
@@ -122,6 +123,7 @@ function signatureEvidence(details) {
     identifier: details.match(/Identifier=([^\n]+)/)?.[1] ?? null,
     flagsLine: flagsLine ?? null,
     isAdHoc: details.includes("Signature=adhoc") || /\bflags=[^\n]*\badhoc\b/.test(flagsLine ?? ""),
+    hasRuntimeFlag: /\bflags=[^\n]*\bruntime\b/.test(flagsLine ?? ""),
     hasDeveloperIdAuthority: details.includes("Authority=Developer ID"),
     valueRecorded: false
   };
@@ -468,6 +470,7 @@ function checkBuiltArtifacts() {
     existsSync(path.join(root, "dist-electron", "preload.cjs")),
     "dist-electron/preload.cjs is missing; run npm run build before desktop package smoke"
   );
+  check(existsSync(entitlementsPath), "hardened runtime entitlements file should exist before local launch signing");
 
   const assetDir = path.join(root, "dist", "assets");
   if (!existsSync(assetDir)) {
@@ -605,7 +608,7 @@ async function packageMacApp() {
 }
 
 async function signPackagedAppForLocalLaunch(paths) {
-  const signArgs = ["--force", "--deep", "--sign", "-", paths.packagedApp];
+  const signArgs = ["--force", "--deep", "--options", "runtime", "--entitlements", entitlementsPath, "--sign", "-", paths.packagedApp];
   const verifyArgs = ["--verify", "--deep", "--strict", "--verbose=2", paths.packagedApp];
 
   await runCommand("codesign", signArgs);
@@ -615,15 +618,17 @@ async function signPackagedAppForLocalLaunch(paths) {
 
   check(signature.identifier === bundleId, `package-smoke launch signature should preserve ${bundleId}`);
   check(signature.isAdHoc, "package-smoke launch signature should be local ad-hoc");
+  check(signature.hasRuntimeFlag, "package-smoke launch signature should include the hardened runtime flag");
   check(!signature.hasDeveloperIdAuthority, "package-smoke launch signature should not claim Developer ID authority");
 
   return {
     signed: true,
     verified: true,
-    signCommand: "codesign --force --deep --sign -",
+    signCommand: "codesign --force --deep --options runtime --entitlements harness/fixtures/macos-hardened-runtime-entitlements.plist --sign -",
     verifyCommand: "codesign --verify --deep --strict --verbose=2",
     identifier: signature.identifier,
     isAdHoc: signature.isAdHoc,
+    hasRuntimeFlag: signature.hasRuntimeFlag,
     hasDeveloperIdAuthority: signature.hasDeveloperIdAuthority,
     valueRecorded: false
   };
@@ -698,6 +703,10 @@ async function checkPackagedApp(paths) {
   check(
     frameworkDependencies.allRequiredDependenciesCodeSigned,
     "packaged app Electron runtime framework dependencies should pass codesign --verify --strict before launch"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesSignatureCompatible,
+    "packaged app Electron runtime framework dependencies should be signature-compatible with the app bundle before launch"
   );
   check(
     frameworkDependencies.allRequiredDependenciesDyldLoadable,
@@ -845,7 +854,7 @@ console.log(`- App: ${path.relative(root, paths.packagedApp)}`);
 console.log(`- Entry: ${path.relative(root, path.join(paths.appRoot, "dist-electron", "main.js"))} -> packaged dist/index.html`);
 console.log(`- Icon: ${path.basename(paths.icon.iconPath)}, ${paths.icon.iconBytes} bytes, GrooveForge bundle metadata`);
 console.log(
-  `- Framework dependencies: ${paths.frameworkDependencies.presentDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} present, ${paths.frameworkDependencies.signatureVerifiedDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} code-signed`
+  `- Framework dependencies: ${paths.frameworkDependencies.presentDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} present, ${paths.frameworkDependencies.signatureVerifiedDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} code-signed, ${paths.frameworkDependencies.signatureCompatibleDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} signature-compatible`
 );
 console.log(
   `- Dyld framework loadability: ${paths.frameworkDependencies.dyldLoadableDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} loadable via ${paths.frameworkDependencies.rpathCount} dyld rpaths`

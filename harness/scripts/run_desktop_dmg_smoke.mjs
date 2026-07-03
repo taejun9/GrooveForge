@@ -5,6 +5,7 @@ import { constants, existsSync, readdirSync, readFileSync } from "node:fs";
 import { access, cp, lstat, mkdir, readFile, rm, stat, symlink } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { electronFrameworkDependencyReport } from "./desktop_bundle_dependency_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -148,6 +149,7 @@ async function checkDmgFile() {
 async function checkMountedDmg() {
   await detachMountIfNeeded();
   await runCommand("hdiutil", ["attach", dmgPath, "-readonly", "-nobrowse", "-mountpoint", dmgMount]);
+  let frameworkDependencies = null;
 
   try {
     const entries = readdirSync(dmgMount).filter((entry) => !entry.startsWith(".")).sort();
@@ -178,9 +180,30 @@ async function checkMountedDmg() {
     check(signatureDetails.includes(`Identifier=${bundleId}`), `mounted app ad-hoc signature should preserve ${bundleId}`);
     check(signatureDetails.includes("Signature=adhoc"), "mounted app should retain ad-hoc signature");
     check(!signatureDetails.includes("Authority=Developer ID"), "mounted app should not claim Developer ID authority");
+    frameworkDependencies = await electronFrameworkDependencyReport(appPath, { root, timeoutMs: commandTimeoutMs });
+    check(frameworkDependencies.otoolReady, "mounted DMG app Electron Framework dependency scan should run");
+    check(frameworkDependencies.rpathScansReady, "mounted DMG app Electron dyld rpath scans should run");
+    check(
+      frameworkDependencies.allRequiredDependenciesPresent,
+      "mounted DMG app should include every @rpath Electron runtime framework dependency, including Squirrel.framework/Squirrel"
+    );
+    check(
+      frameworkDependencies.allRequiredDependenciesCodeSigned,
+      "mounted DMG app Electron runtime framework dependencies should pass codesign --verify --strict"
+    );
+    check(
+      frameworkDependencies.allRequiredDependenciesSignatureCompatible,
+      "mounted DMG app Electron runtime framework dependencies should be signature-compatible with the app bundle"
+    );
+    check(
+      frameworkDependencies.allRequiredDependenciesDyldLoadable,
+      "mounted DMG app Electron runtime framework dependencies should be dyld-loadable through @rpath"
+    );
   } finally {
     await detachMountIfNeeded();
   }
+
+  return frameworkDependencies;
 }
 
 if (process.platform !== "darwin") {
@@ -191,7 +214,7 @@ if (process.platform !== "darwin") {
 
 await createDmg();
 const dmgBytes = await checkDmgFile();
-await checkMountedDmg();
+const frameworkDependencies = await checkMountedDmg();
 await rm(dmgStage, { force: true, recursive: true });
 await rm(dmgMount, { force: true, recursive: true });
 
@@ -203,4 +226,10 @@ console.log("GrooveForge desktop DMG smoke passed.");
 console.log("- Scope: local macOS DMG creation, image metadata, mounted contents, and ad-hoc signed branded app payload");
 console.log(`- DMG: ${path.relative(root, dmgPath)} (${dmgBytes} bytes)`);
 console.log(`- Contents: ${appName}.app plus Applications shortcut`);
+console.log(
+  `- Framework dependencies: ${frameworkDependencies.presentDependencyCount}/${frameworkDependencies.requiredDependencyCount} present, ${frameworkDependencies.signatureVerifiedDependencyCount}/${frameworkDependencies.requiredDependencyCount} code-signed, ${frameworkDependencies.signatureCompatibleDependencyCount}/${frameworkDependencies.requiredDependencyCount} signature-compatible`
+);
+console.log(
+  `- Dyld framework loadability: ${frameworkDependencies.dyldLoadableDependencyCount}/${frameworkDependencies.requiredDependencyCount} loadable via ${frameworkDependencies.rpathCount} dyld rpaths`
+);
 console.log("- Not claimed: Developer ID signing, notarization, auto-update, app-store submission, or external distribution-channel QA");

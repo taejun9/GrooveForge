@@ -184,6 +184,10 @@ async function checkSignedFrameworkDependencies() {
     "ad-hoc signed app Electron runtime framework dependencies should pass codesign --verify --strict before launch"
   );
   check(
+    frameworkDependencies.allRequiredDependenciesSignatureCompatible,
+    "ad-hoc signed app Electron runtime framework dependencies should be signature-compatible with the app bundle before launch"
+  );
+  check(
     frameworkDependencies.allRequiredDependenciesDyldLoadable,
     "ad-hoc signed app Electron runtime framework dependencies should be dyld-loadable through @rpath before launch"
   );
@@ -308,7 +312,7 @@ console.log(`- Entitlements: ${path.relative(root, entitlementsPath)}`);
 console.log("- Signature: ad-hoc with hardened runtime option and Electron runtime entitlements, Developer ID signing not claimed");
 console.log(`- Runtime flags: app ${signature.appSignature.hasRuntimeFlag ? "yes" : "no"}, executable ${signature.executableSignature.hasRuntimeFlag ? "yes" : "no"}`);
 console.log(
-  `- Framework dependencies: ${frameworkDependencies.presentDependencyCount}/${frameworkDependencies.requiredDependencyCount} present, ${frameworkDependencies.signatureVerifiedDependencyCount}/${frameworkDependencies.requiredDependencyCount} code-signed`
+  `- Framework dependencies: ${frameworkDependencies.presentDependencyCount}/${frameworkDependencies.requiredDependencyCount} present, ${frameworkDependencies.signatureVerifiedDependencyCount}/${frameworkDependencies.requiredDependencyCount} code-signed, ${frameworkDependencies.signatureCompatibleDependencyCount}/${frameworkDependencies.requiredDependencyCount} signature-compatible`
 );
 console.log(
   `- Dyld framework loadability: ${frameworkDependencies.dyldLoadableDependencyCount}/${frameworkDependencies.requiredDependencyCount} loadable via ${frameworkDependencies.rpathCount} dyld rpaths`

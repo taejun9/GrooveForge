@@ -194,6 +194,10 @@ async function checkInstalledApp() {
     "installed app Electron runtime framework dependencies should pass codesign --verify --strict before launch"
   );
   check(
+    frameworkDependencies.allRequiredDependenciesSignatureCompatible,
+    "installed app Electron runtime framework dependencies should be signature-compatible with the app bundle before launch"
+  );
+  check(
     frameworkDependencies.allRequiredDependenciesDyldLoadable,
     "installed app Electron runtime framework dependencies should be dyld-loadable through @rpath before launch"
   );
@@ -306,7 +310,7 @@ console.log("GrooveForge desktop install smoke passed.");
 console.log("- Scope: local DMG mount, simulated Applications copy, ad-hoc signature retention, and installed app launch smoke");
 console.log(`- Installed app: ${path.relative(root, installedApp)}`);
 console.log(
-  `- Framework dependencies: ${frameworkDependencies.presentDependencyCount}/${frameworkDependencies.requiredDependencyCount} present, ${frameworkDependencies.signatureVerifiedDependencyCount}/${frameworkDependencies.requiredDependencyCount} code-signed`
+  `- Framework dependencies: ${frameworkDependencies.presentDependencyCount}/${frameworkDependencies.requiredDependencyCount} present, ${frameworkDependencies.signatureVerifiedDependencyCount}/${frameworkDependencies.requiredDependencyCount} code-signed, ${frameworkDependencies.signatureCompatibleDependencyCount}/${frameworkDependencies.requiredDependencyCount} signature-compatible`
 );
 console.log(
   `- Dyld framework loadability: ${frameworkDependencies.dyldLoadableDependencyCount}/${frameworkDependencies.requiredDependencyCount} loadable via ${frameworkDependencies.rpathCount} dyld rpaths`

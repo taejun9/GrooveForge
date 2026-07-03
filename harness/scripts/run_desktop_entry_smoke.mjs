@@ -195,6 +195,7 @@ function checkDesktopGuiLaunchGuardContract() {
   const packageSmokeSource = readText("harness/scripts/run_desktop_package_smoke.mjs");
   const packagedProjectIoSmokeSource = readText("harness/scripts/run_desktop_packaged_project_io_smoke.mjs");
   const adhocSignSmokeSource = readText("harness/scripts/run_desktop_adhoc_sign_smoke.mjs");
+  const dmgSmokeSource = readText("harness/scripts/run_desktop_dmg_smoke.mjs");
   const pkgPayloadSmokeSource = readText("harness/scripts/run_desktop_pkg_payload_smoke.mjs");
   const pkgPayloadProjectIoSmokeSource = readText("harness/scripts/run_desktop_pkg_payload_project_io_smoke.mjs");
   const installSmokeSource = readText("harness/scripts/run_desktop_install_smoke.mjs");
@@ -212,6 +213,8 @@ function checkDesktopGuiLaunchGuardContract() {
   checkIncludes(bundleDependencyGuardSource, "parseOtoolRpaths", "desktop bundle dependency guard");
   checkIncludes(bundleDependencyGuardSource, "dyldCandidateRows", "desktop bundle dependency guard");
   checkIncludes(bundleDependencyGuardSource, "appExecutableLoadCommandsReady", "desktop bundle dependency guard");
+  checkIncludes(bundleDependencyGuardSource, "signatureCompatibilityEvidence", "desktop bundle dependency guard");
+  checkIncludes(bundleDependencyGuardSource, "allRequiredDependenciesSignatureCompatible", "desktop bundle dependency guard");
   checkIncludes(bundleDependencyGuardSource, "allRequiredDependenciesDyldLoadable", "desktop bundle dependency guard");
   checkIncludes(desktopAppSource, "isMacAppKitAbort({ code, signal })", "harness/scripts/run_desktop_app.mjs");
   checkIncludes(desktopAppSource, "macGuiLaunchAbortDetails(\"npm run desktop\"", "harness/scripts/run_desktop_app.mjs");
@@ -222,6 +225,7 @@ function checkDesktopGuiLaunchGuardContract() {
   checkIncludes(projectIoSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:project-io-smoke\"", "harness/scripts/run_desktop_project_io_smoke.mjs");
   checkIncludes(packageSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:package-smoke\")", "harness/scripts/run_desktop_package_smoke.mjs");
   checkIncludes(packageSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:package-smoke\"", "harness/scripts/run_desktop_package_smoke.mjs");
+  checkIncludes(packageSmokeSource, "allRequiredDependenciesSignatureCompatible", "harness/scripts/run_desktop_package_smoke.mjs");
   checkIncludes(packageSmokeSource, "allRequiredDependenciesDyldLoadable", "harness/scripts/run_desktop_package_smoke.mjs");
   checkIncludes(
     packagedProjectIoSmokeSource,
@@ -233,10 +237,19 @@ function checkDesktopGuiLaunchGuardContract() {
     "macGuiLaunchAbortDetails(\"npm run desktop:packaged-project-io-smoke\"",
     "harness/scripts/run_desktop_packaged_project_io_smoke.mjs"
   );
+  checkIncludes(
+    packagedProjectIoSmokeSource,
+    "allRequiredDependenciesSignatureCompatible",
+    "harness/scripts/run_desktop_packaged_project_io_smoke.mjs"
+  );
   checkIncludes(adhocSignSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:adhoc-sign-smoke\")", "harness/scripts/run_desktop_adhoc_sign_smoke.mjs");
   checkIncludes(adhocSignSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:adhoc-sign-smoke\"", "harness/scripts/run_desktop_adhoc_sign_smoke.mjs");
+  checkIncludes(adhocSignSmokeSource, "allRequiredDependenciesSignatureCompatible", "harness/scripts/run_desktop_adhoc_sign_smoke.mjs");
+  checkIncludes(dmgSmokeSource, "electronFrameworkDependencyReport", "harness/scripts/run_desktop_dmg_smoke.mjs");
+  checkIncludes(dmgSmokeSource, "allRequiredDependenciesSignatureCompatible", "harness/scripts/run_desktop_dmg_smoke.mjs");
   checkIncludes(pkgPayloadSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:pkg-payload-smoke\")", "harness/scripts/run_desktop_pkg_payload_smoke.mjs");
   checkIncludes(pkgPayloadSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:pkg-payload-smoke\"", "harness/scripts/run_desktop_pkg_payload_smoke.mjs");
+  checkIncludes(pkgPayloadSmokeSource, "allRequiredDependenciesSignatureCompatible", "harness/scripts/run_desktop_pkg_payload_smoke.mjs");
   checkIncludes(pkgPayloadSmokeSource, "allRequiredDependenciesDyldLoadable", "harness/scripts/run_desktop_pkg_payload_smoke.mjs");
   checkIncludes(
     pkgPayloadProjectIoSmokeSource,
@@ -250,6 +263,7 @@ function checkDesktopGuiLaunchGuardContract() {
   );
   checkIncludes(installSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:install-smoke\")", "harness/scripts/run_desktop_install_smoke.mjs");
   checkIncludes(installSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:install-smoke\"", "harness/scripts/run_desktop_install_smoke.mjs");
+  checkIncludes(installSmokeSource, "allRequiredDependenciesSignatureCompatible", "harness/scripts/run_desktop_install_smoke.mjs");
   checkIncludes(installSmokeSource, "allRequiredDependenciesDyldLoadable", "harness/scripts/run_desktop_install_smoke.mjs");
   checkIncludes(
     installedProjectIoSmokeSource,
@@ -259,6 +273,11 @@ function checkDesktopGuiLaunchGuardContract() {
   checkIncludes(
     installedProjectIoSmokeSource,
     "macGuiLaunchAbortDetails(\"npm run desktop:installed-project-io-smoke\"",
+    "harness/scripts/run_desktop_installed_project_io_smoke.mjs"
+  );
+  checkIncludes(
+    installedProjectIoSmokeSource,
+    "allRequiredDependenciesSignatureCompatible",
     "harness/scripts/run_desktop_installed_project_io_smoke.mjs"
   );
 

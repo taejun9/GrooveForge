@@ -173,11 +173,69 @@ function parseOtoolInstallNames(output) {
     .filter((line) => line.startsWith("@rpath/"));
 }
 
+function parseCodeSignatureDetails(output, code) {
+  const text = String(output ?? "");
+  const teamIdentifierMatch = text.match(/TeamIdentifier=([^\n]+)/);
+  const teamIdentifier = teamIdentifierMatch?.[1]?.trim();
+  const normalizedTeamIdentifier =
+    teamIdentifier && teamIdentifier.toLowerCase() !== "not set" && teamIdentifier !== "-" ? teamIdentifier : null;
+  const flagsLine = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.startsWith("CodeDirectory") && line.includes("flags="));
+
+  return {
+    displayReady: code === 0,
+    identifierPresent: /Identifier=([^\n]+)/.test(text),
+    teamIdentifier: normalizedTeamIdentifier,
+    isAdHoc: text.includes("Signature=adhoc") || /\bflags=[^\n]*\badhoc\b/.test(flagsLine ?? ""),
+    hasDeveloperIdAuthority: text.includes("Authority=Developer ID"),
+    hasRuntimeFlag: /\bflags=[^\n]*\bruntime\b/.test(flagsLine ?? ""),
+    valueRecorded: false
+  };
+}
+
+function redactedSignatureSummary(signature) {
+  return {
+    displayReady: signature.displayReady === true,
+    identifierPresent: signature.identifierPresent === true,
+    teamIdentifierPresent: Boolean(signature.teamIdentifier),
+    isAdHoc: signature.isAdHoc === true,
+    hasDeveloperIdAuthority: signature.hasDeveloperIdAuthority === true,
+    hasRuntimeFlag: signature.hasRuntimeFlag === true,
+    valueRecorded: false
+  };
+}
+
+function signatureCompatibilityEvidence(appSignature, dependencySignature) {
+  const appIsAdHoc = appSignature.isAdHoc === true;
+  const dependencyIsAdHoc = dependencySignature.isAdHoc === true;
+  const teamIdentifierMatchesApp = Boolean(
+    appSignature.teamIdentifier &&
+      dependencySignature.teamIdentifier &&
+      appSignature.teamIdentifier === dependencySignature.teamIdentifier
+  );
+  const signatureCompatible =
+    appSignature.displayReady === true &&
+    dependencySignature.displayReady === true &&
+    (appIsAdHoc ? dependencyIsAdHoc : teamIdentifierMatchesApp);
+
+  return {
+    signatureCompatible,
+    appSignatureAdHoc: appIsAdHoc,
+    dependencySignatureAdHoc: dependencyIsAdHoc,
+    appTeamIdentifierPresent: Boolean(appSignature.teamIdentifier),
+    dependencyTeamIdentifierPresent: Boolean(dependencySignature.teamIdentifier),
+    dependencyTeamIdentifierMatchesApp: teamIdentifierMatchesApp,
+    valueRecorded: false
+  };
+}
+
 export function formatFrameworkDependencyRows(rows) {
   return rows
     .map(
       (row) =>
-        `| ${escapeCell(row.installName)} | ${readyLabel(row.referencedByElectronFramework)} | ${readyLabel(row.present)} | ${readyLabel(row.signatureVerified)} | ${readyLabel(row.dyldLoadable)} | ${row.dyldCandidateCount} | ${escapeCell(row.resolvedPath)} |`
+        `| ${escapeCell(row.installName)} | ${readyLabel(row.referencedByElectronFramework)} | ${readyLabel(row.present)} | ${readyLabel(row.signatureVerified)} | ${readyLabel(row.signatureCompatible)} | ${readyLabel(row.dyldLoadable)} | ${row.dyldCandidateCount} | ${escapeCell(row.resolvedPath)} |`
     )
     .join("\n");
 }
@@ -185,6 +243,12 @@ export function formatFrameworkDependencyRows(rows) {
 export async function electronFrameworkDependencyReport(appPath, { root, timeoutMs = 120000 } = {}) {
   const electronFrameworkBinary = electronFrameworkBinaryPath(appPath);
   const appExecutable = appExecutablePath(appPath);
+  const appSignatureDisplay = await runCommand("codesign", ["--display", "--verbose=4", appPath], {
+    cwd: root,
+    timeoutMs,
+    allowFailure: true
+  });
+  const appSignature = parseCodeSignatureDetails(`${appSignatureDisplay.stdout}\n${appSignatureDisplay.stderr}`, appSignatureDisplay.code);
   const otool = await runCommand("otool", ["-L", electronFrameworkBinary], {
     cwd: root,
     timeoutMs,
@@ -229,27 +293,47 @@ export async function electronFrameworkDependencyReport(appPath, { root, timeout
       const frameworkRoot = frameworkRootFor(candidate.path);
       let frameworkSignatureVerified = false;
       let binarySignatureVerified = false;
+      let frameworkSignature = parseCodeSignatureDetails("", 1);
+      let binarySignature = parseCodeSignatureDetails("", 1);
 
       if (present) {
-        const frameworkSignature = await runCommand("codesign", ["--verify", "--strict", "--verbose=2", frameworkRoot], {
+        const frameworkVerify = await runCommand("codesign", ["--verify", "--strict", "--verbose=2", frameworkRoot], {
           cwd: root,
           timeoutMs,
           allowFailure: true
         });
-        const binarySignature = await runCommand("codesign", ["--verify", "--strict", "--verbose=2", candidate.path], {
+        const binaryVerify = await runCommand("codesign", ["--verify", "--strict", "--verbose=2", candidate.path], {
           cwd: root,
           timeoutMs,
           allowFailure: true
         });
-        frameworkSignatureVerified = frameworkSignature.code === 0;
-        binarySignatureVerified = binarySignature.code === 0;
+        const frameworkDisplay = await runCommand("codesign", ["--display", "--verbose=4", frameworkRoot], {
+          cwd: root,
+          timeoutMs,
+          allowFailure: true
+        });
+        const binaryDisplay = await runCommand("codesign", ["--display", "--verbose=4", candidate.path], {
+          cwd: root,
+          timeoutMs,
+          allowFailure: true
+        });
+        frameworkSignatureVerified = frameworkVerify.code === 0;
+        binarySignatureVerified = binaryVerify.code === 0;
+        frameworkSignature = parseCodeSignatureDetails(`${frameworkDisplay.stdout}\n${frameworkDisplay.stderr}`, frameworkDisplay.code);
+        binarySignature = parseCodeSignatureDetails(`${binaryDisplay.stdout}\n${binaryDisplay.stderr}`, binaryDisplay.code);
       }
 
       const signatureVerified = frameworkSignatureVerified && binarySignatureVerified;
+      const frameworkSignatureCompatibility = signatureCompatibilityEvidence(appSignature, frameworkSignature);
+      const binarySignatureCompatibility = signatureCompatibilityEvidence(appSignature, binarySignature);
+      const signatureCompatible =
+        signatureVerified &&
+        frameworkSignatureCompatibility.signatureCompatible === true &&
+        binarySignatureCompatibility.signatureCompatible === true;
       if (present && !existsSync(resolvedCandidate.path)) {
         resolvedCandidate = candidate;
       }
-      if (present && signatureVerified) {
+      if (present && signatureVerified && signatureCompatible) {
         resolvedCandidate = candidate;
       }
 
@@ -263,6 +347,11 @@ export async function electronFrameworkDependencyReport(appPath, { root, timeout
         frameworkSignatureVerified,
         binarySignatureVerified,
         signatureVerified,
+        signatureCompatible,
+        frameworkSignature: redactedSignatureSummary(frameworkSignature),
+        binarySignature: redactedSignatureSummary(binarySignature),
+        frameworkSignatureCompatibility,
+        binarySignatureCompatibility,
         valueRecorded: false
       });
     }
@@ -271,10 +360,15 @@ export async function electronFrameworkDependencyReport(appPath, { root, timeout
     const present = existsSync(resolvedPath);
     const resolvedCandidateRow = candidateRows.find((candidate) => candidate.path === relativePath(root, resolvedPath));
     const signatureVerified = resolvedCandidateRow?.signatureVerified === true;
+    const signatureCompatible = resolvedCandidateRow?.signatureCompatible === true;
     const dyldLoadable =
       installNames.includes(installName) &&
       candidateRows.some(
-        (candidate) => candidate.fromLoadCommand === true && candidate.present === true && candidate.signatureVerified === true
+        (candidate) =>
+          candidate.fromLoadCommand === true &&
+          candidate.present === true &&
+          candidate.signatureVerified === true &&
+          candidate.signatureCompatible === true
       );
     const dyldStatus = !installNames.includes(installName)
       ? "not-referenced"
@@ -289,6 +383,7 @@ export async function electronFrameworkDependencyReport(appPath, { root, timeout
       referencedByElectronFramework: installNames.includes(installName),
       present,
       signatureVerified,
+      signatureCompatible,
       dyldLoadable,
       dyldStatus,
       resolvedPath: relativePath(root, resolvedPath),
@@ -301,8 +396,10 @@ export async function electronFrameworkDependencyReport(appPath, { root, timeout
   }
 
   return {
+    appSignature: redactedSignatureSummary(appSignature),
     electronFrameworkBinary: relativePath(root, electronFrameworkBinary),
     appExecutable: relativePath(root, appExecutable),
+    appSignatureReady: appSignature.displayReady === true,
     otoolReady: otool.code === 0,
     otoolLoadCommandsReady: otoolLoadCommands.code === 0,
     appExecutableLoadCommandsReady: appExecutableLoadCommands.code === 0,
@@ -315,10 +412,12 @@ export async function electronFrameworkDependencyReport(appPath, { root, timeout
     referencedDependencyCount: rows.filter((row) => row.referencedByElectronFramework).length,
     presentDependencyCount: rows.filter((row) => row.present).length,
     signatureVerifiedDependencyCount: rows.filter((row) => row.signatureVerified).length,
+    signatureCompatibleDependencyCount: rows.filter((row) => row.signatureCompatible).length,
     dyldLoadableDependencyCount: rows.filter((row) => row.dyldLoadable).length,
     allRequiredDependenciesReferenced: rows.every((row) => row.referencedByElectronFramework),
     allRequiredDependenciesPresent: rows.every((row) => row.present),
     allRequiredDependenciesCodeSigned: rows.every((row) => row.signatureVerified),
+    allRequiredDependenciesSignatureCompatible: rows.every((row) => row.signatureCompatible),
     allRequiredDependenciesDyldLoadable: rows.every((row) => row.dyldLoadable),
     valueRecorded: false
   };
