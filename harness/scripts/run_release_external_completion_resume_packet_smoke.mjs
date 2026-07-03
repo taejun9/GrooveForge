@@ -30,6 +30,7 @@ const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
 const privateEditStrictProofCommand = "npm run release:private-edit-strict-proof";
 const privateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
 const defaultPrivateInputFileName = ".env.release-channel.local";
+const operatorPrivateInputFileDefaultPath = defaultPrivateInputFileName;
 const blockedPrivateInputFilePathMode = "blocked-smoke-isolated-missing-input-file";
 
 const refreshCommands = [
@@ -253,6 +254,12 @@ function buildReport(sourcePacket, preflightBlocked) {
       preflightBlocked.privateInputFileDefaultName,
       defaultPrivateInputFileName
     ),
+    privateEnvPreflightOperatorPrivateInputFileDefaultPath: textValue(
+      preflightBlocked.operatorPrivateInputFileDefaultPath,
+      operatorPrivateInputFileDefaultPath
+    ),
+    privateEnvPreflightOperatorPrivateInputFileDefaultPathValueRecorded:
+      preflightBlocked.operatorPrivateInputFileDefaultPathValueRecorded === true,
     privateEnvPreflightPrivateInputFilePath: textValue(preflightBlocked.privateInputFilePath),
     privateEnvPreflightPrivateInputFilePathMode: textValue(
       preflightBlocked.privateInputFilePathMode,
@@ -450,6 +457,7 @@ function buildMarkdown(report) {
 - Private-env preflight expected blocked exit observed: ${readyLabel(report.privateEnvPreflightExpectedBlockedExitObserved)}
 - Private-env private input file key: \`${report.privateEnvPreflightPrivateInputFileKey}\`
 - Private-env private input file default: \`${report.privateEnvPreflightPrivateInputFileDefaultName}\`
+- Private-env operator private input file default path: \`${report.privateEnvPreflightOperatorPrivateInputFileDefaultPath}\`
 - Private-env private input file path: ${report.privateEnvPreflightPrivateInputFilePath}
 - Private-env private input file present: ${readyLabel(report.privateEnvPreflightPrivateInputFilePresent)}
 - Private-env private input file loaded keys: ${report.privateEnvPreflightPrivateInputFileLoadedKeyCount} (${report.privateEnvPreflightPrivateInputFileLoadedKeySummary})
@@ -543,6 +551,8 @@ ${formatCurrentOperatorCommandRows(report.currentOperatorCommandRows)}
 - Missing process env inputs: ${report.privateEnvPreflightMissingInputCount}/${report.privateEnvPreflightRequiredInputCount}
 - Private input file key: \`${report.privateEnvPreflightPrivateInputFileKey}\`
 - Private input file default: \`${report.privateEnvPreflightPrivateInputFileDefaultName}\`
+- Operator private input file default path: \`${report.privateEnvPreflightOperatorPrivateInputFileDefaultPath}\`
+- Operator private input file default path value recorded: ${readyLabel(report.privateEnvPreflightOperatorPrivateInputFileDefaultPathValueRecorded)}
 - Private input file path: ${report.privateEnvPreflightPrivateInputFilePath}
 - Private input file path mode: ${report.privateEnvPreflightPrivateInputFilePathMode}
 - Private input file present: ${readyLabel(report.privateEnvPreflightPrivateInputFilePresent)}
@@ -643,6 +653,14 @@ function validateReport(report, markdown) {
   check(
     report.privateEnvPreflightPrivateInputFileDefaultName === defaultPrivateInputFileName,
     "external completion resume packet blocked preflight should expose the default private input file name"
+  );
+  check(
+    report.privateEnvPreflightOperatorPrivateInputFileDefaultPath === operatorPrivateInputFileDefaultPath,
+    "external completion resume packet blocked preflight should expose the operator default private input file path"
+  );
+  check(
+    report.privateEnvPreflightOperatorPrivateInputFileDefaultPathValueRecorded === false,
+    "external completion resume packet blocked preflight operator default private input file path should be value-free"
   );
   check(
     report.privateEnvPreflightPrivateInputFilePath !== "none",
@@ -836,6 +854,10 @@ function validateReport(report, markdown) {
   check(markdown.includes("## Current Operator Command Sequence"), "external completion resume packet Markdown should include current operator command sequence");
   check(markdown.includes("## Private Env Preflight Blocker"), "external completion resume packet Markdown should include private env preflight blocker");
   check(markdown.includes("Private input file key:"), "external completion resume packet Markdown should include private input file key guidance");
+  check(
+    markdown.includes("Operator private input file default path:"),
+    "external completion resume packet Markdown should include operator default private input file path guidance"
+  );
   check(markdown.includes("Guided setup fallback command:"), "external completion resume packet Markdown should include guided setup fallback guidance");
   check(markdown.includes("External distribution claimed: no"), "external completion resume packet Markdown should keep external distribution unclaimed");
 
@@ -881,6 +903,7 @@ console.log(`- Private-env preflight blocked smoke ready: ${report.privateEnvPre
 console.log(`- Private-env preflight missing inputs: ${report.privateEnvPreflightMissingInputCount}/${report.privateEnvPreflightRequiredInputCount}`);
 console.log(`- Private-env private input file key: ${report.privateEnvPreflightPrivateInputFileKey}`);
 console.log(`- Private-env private input file default: ${report.privateEnvPreflightPrivateInputFileDefaultName}`);
+console.log(`- Private-env operator private input file default path: ${report.privateEnvPreflightOperatorPrivateInputFileDefaultPath}`);
 console.log(`- Private-env private input file path: ${report.privateEnvPreflightPrivateInputFilePath}`);
 console.log(`- Private-env private input file present: ${report.privateEnvPreflightPrivateInputFilePresent ? "yes" : "no"}`);
 console.log(`- Private-env private input file loaded keys: ${report.privateEnvPreflightPrivateInputFileLoadedKeyCount}`);
