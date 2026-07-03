@@ -39,6 +39,9 @@ const releaseChannelPrivateInputTemplateRole =
   "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const releaseChannelApplyPrivateEnvProofCommand = "npm run release:channel-apply-private-env-proof";
+const releaseChannelApplyPrivateEnvProofRole =
+  "run private env preflight, apply only after preflight readiness, strict proof, and completion readout as one value-free operator proof runner";
 const privateEditStrictProofCommand = "npm run release:private-edit-strict-proof";
 
 const refreshCommands = [
@@ -445,6 +448,12 @@ function buildReport({ completionSummaryRefresh, completionSummary, updateFeedPa
     currentOperatorStartCommandValueRecorded:
       completionSummary.currentOperatorStartCommandValueRecorded === true ? true : false,
     currentOperatorValueRecorded: completionSummary.currentOperatorValueRecorded === true ? true : false,
+    releaseChannelPrivateEnvApplyProofCommand: textValue(completionSummary.releaseChannelPrivateEnvApplyProofCommand, releaseChannelApplyPrivateEnvProofCommand),
+    releaseChannelPrivateEnvApplyProofRole: textValue(completionSummary.releaseChannelPrivateEnvApplyProofRole, releaseChannelApplyPrivateEnvProofRole),
+    releaseChannelPrivateEnvApplyProofAfterPreflight:
+      completionSummary.releaseChannelPrivateEnvApplyProofAfterPreflight === true ||
+      textValue(completionSummary.releaseChannelPrivateEnvApplyProofCommand, releaseChannelApplyPrivateEnvProofCommand) === releaseChannelApplyPrivateEnvProofCommand,
+    releaseChannelPrivateEnvApplyProofValueRecorded: completionSummary.releaseChannelPrivateEnvApplyProofValueRecorded === true ? true : false,
     releaseChannelPrivateInputTemplateCommand: textValue(
       completionSummary.releaseChannelPrivateInputTemplateCommand,
       releaseChannelPrivateInputTemplateCommand
@@ -604,6 +613,8 @@ function buildMarkdown(report) {
 - First run matches current operator start command: ${readyLabel(report.firstRunMatchesCurrentOperatorStartCommand)}
 - Current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
 - Current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
+- Private env apply proof runner command: \`${report.releaseChannelPrivateEnvApplyProofCommand}\`
+- Private env apply proof runner after preflight: ${readyLabel(report.releaseChannelPrivateEnvApplyProofAfterPreflight)}
 - Private input template command: \`${report.releaseChannelPrivateInputTemplateCommand}\`
 - Private input template default path: \`${report.releaseChannelPrivateInputTemplateDefaultPath}\`
 - Private input template before preflight: ${readyLabel(report.releaseChannelPrivateInputTemplateBeforePreflight)}
@@ -667,6 +678,9 @@ ${formatRunRows(report.runRows)}
 - Next-actions refresh command: \`${report.currentOperatorNextActionsRefreshCommand}\`
 - Preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
 - Apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
+- Private env apply proof runner command: \`${report.releaseChannelPrivateEnvApplyProofCommand}\`
+- Private env apply proof runner role: ${report.releaseChannelPrivateEnvApplyProofRole}
+- Private env apply proof runner after preflight: ${readyLabel(report.releaseChannelPrivateEnvApplyProofAfterPreflight)}
 - Value recorded: ${readyLabel(report.currentOperatorValueRecorded)}
 
 | order | command | role | ready | value recorded |
@@ -754,6 +768,10 @@ function validateReport(report, markdown) {
   );
   check(report.currentOperatorPreflightBeforeApply === true, "external completion run packet current operator sequence should place preflight before apply");
   check(report.currentOperatorApplyBeforeStrictProof === true, "external completion run packet current operator sequence should place apply before strict proof");
+  check(report.releaseChannelPrivateEnvApplyProofCommand === releaseChannelApplyPrivateEnvProofCommand, "external completion run packet should expose private env apply proof runner command");
+  check(report.releaseChannelPrivateEnvApplyProofRole === releaseChannelApplyPrivateEnvProofRole, "external completion run packet should describe private env apply proof runner role");
+  check(report.releaseChannelPrivateEnvApplyProofAfterPreflight === true, "external completion run packet should keep proof runner after preflight readiness");
+  check(report.releaseChannelPrivateEnvApplyProofValueRecorded === false, "external completion run packet private env apply proof runner command should be value-free");
   check(
     report.releaseChannelPrivateInputTemplateCommand === releaseChannelPrivateInputTemplateCommand,
     "external completion run packet should expose private input template command"
@@ -862,6 +880,7 @@ function validateReport(report, markdown) {
   check(!/https?:\/\//i.test(markdown), "external completion run packet Markdown should not include URL values");
   check(markdown.includes("External Completion Run Packet Smoke"), "external completion run packet Markdown should include title");
   check(markdown.includes("Private input template command:"), "external completion run packet Markdown should include private input template command");
+  check(markdown.includes("Private env apply proof runner command:"), "external completion run packet Markdown should include private env apply proof runner command");
   check(markdown.includes("## External Completion Run Rows"), "external completion run packet Markdown should include run rows");
   check(markdown.includes("## Current Operator Command Sequence"), "external completion run packet Markdown should include current operator command sequence");
   check(markdown.includes("Current operator start command:"), "external completion run packet Markdown should include current operator start command");
@@ -916,6 +935,8 @@ console.log(`- First run matches current operator first command: ${report.firstR
 console.log(`- First run matches current operator start command: ${report.firstRunMatchesCurrentOperatorStartCommand ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
+console.log(`- Private env apply proof runner command: ${report.releaseChannelPrivateEnvApplyProofCommand}`);
+console.log(`- Private env apply proof runner after preflight: ${report.releaseChannelPrivateEnvApplyProofAfterPreflight ? "yes" : "no"}`);
 console.log(`- Private input template command: ${report.releaseChannelPrivateInputTemplateCommand}`);
 console.log(`- Private input template default path: ${report.releaseChannelPrivateInputTemplateDefaultPath}`);
 console.log(`- Run rows: ${report.runRowCount}`);

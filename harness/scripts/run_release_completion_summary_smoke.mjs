@@ -29,6 +29,9 @@ const releaseChannelApplyPrivateEnvPreflightRole =
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const releaseChannelApplyPrivateEnvRole =
   "apply operator-owned release-channel process env values into the ignored local env before strict proof";
+const releaseChannelApplyPrivateEnvProofCommand = "npm run release:channel-apply-private-env-proof";
+const releaseChannelApplyPrivateEnvProofRole =
+  "run private env preflight, apply only after preflight readiness, strict proof, and completion readout as one value-free operator proof runner";
 
 function check(condition, message) {
   if (!condition) {
@@ -292,6 +295,12 @@ function buildReport(source, completedPlanState) {
         textValue(summary.releaseChannelFirstProofCommandAfterPrivateEdits) === "npm run release:channel-live-check" &&
         textValue(summary.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits) === "npm run release:private-edit-strict-proof"),
     releaseChannelPrivateEnvApplyValueRecorded: summary.releaseChannelPrivateEnvApplyValueRecorded === true ? true : false,
+    releaseChannelPrivateEnvApplyProofCommand: textValue(summary.releaseChannelPrivateEnvApplyProofCommand, releaseChannelApplyPrivateEnvProofCommand),
+    releaseChannelPrivateEnvApplyProofRole: textValue(summary.releaseChannelPrivateEnvApplyProofRole, releaseChannelApplyPrivateEnvProofRole),
+    releaseChannelPrivateEnvApplyProofAfterPreflight:
+      summary.releaseChannelPrivateEnvApplyProofAfterPreflight === true ||
+      textValue(summary.releaseChannelPrivateEnvApplyProofCommand, releaseChannelApplyPrivateEnvProofCommand) === releaseChannelApplyPrivateEnvProofCommand,
+    releaseChannelPrivateEnvApplyProofValueRecorded: summary.releaseChannelPrivateEnvApplyProofValueRecorded === true ? true : false,
     releaseChannelFirstProofCommandAfterPrivateEdits: textValue(summary.releaseChannelFirstProofCommandAfterPrivateEdits),
     releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits: textValue(summary.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits),
     hardGateReady: summary.hardGateReady === true,
@@ -403,6 +412,8 @@ function buildMarkdown(report) {
 - Private env apply preflight before apply: ${readyLabel(report.releaseChannelPrivateEnvApplyPreflightBeforeApply)}
 - Private env apply command: \`${report.releaseChannelPrivateEnvApplyCommand}\`
 - Private env apply before strict proof: ${readyLabel(report.releaseChannelPrivateEnvApplyBeforeStrictProof)}
+- Private env apply proof runner command: \`${report.releaseChannelPrivateEnvApplyProofCommand}\`
+- Private env apply proof runner after preflight: ${readyLabel(report.releaseChannelPrivateEnvApplyProofAfterPreflight)}
 - First proof after private edits: \`${report.releaseChannelFirstProofCommandAfterPrivateEdits}\`
 - Recommended operator proof chain: \`${report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits}\`
 - Hard gate ready: ${readyLabel(report.hardGateReady)}
@@ -554,6 +565,10 @@ function validateReport(report, markdown) {
   check(report.releaseChannelPrivateEnvApplyRole === releaseChannelApplyPrivateEnvRole, "release completion summary should describe private env apply role");
   check(report.releaseChannelPrivateEnvApplyBeforeStrictProof === true, "release completion summary should place private env apply before strict proof");
   check(report.releaseChannelPrivateEnvApplyValueRecorded === false, "release completion summary private env apply command should be value-free");
+  check(report.releaseChannelPrivateEnvApplyProofCommand === releaseChannelApplyPrivateEnvProofCommand, "release completion summary should expose private env apply proof runner command");
+  check(report.releaseChannelPrivateEnvApplyProofRole === releaseChannelApplyPrivateEnvProofRole, "release completion summary should describe private env apply proof runner role");
+  check(report.releaseChannelPrivateEnvApplyProofAfterPreflight === true, "release completion summary should keep proof runner after preflight readiness");
+  check(report.releaseChannelPrivateEnvApplyProofValueRecorded === false, "release completion summary private env apply proof runner command should be value-free");
   check(report.releaseChannelFirstProofCommandAfterPrivateEdits === "npm run release:channel-live-check", "release completion summary should expose release-channel first proof command");
   check(report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits === "npm run release:private-edit-strict-proof", "release completion summary should expose recommended proof chain");
   check(report.hardGateReady === false, "release completion summary should keep hard gate unready");
@@ -639,6 +654,8 @@ console.log(`- Private env apply preflight command: ${report.releaseChannelPriva
 console.log(`- Private env apply preflight before apply: ${report.releaseChannelPrivateEnvApplyPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Private env apply command: ${report.releaseChannelPrivateEnvApplyCommand}`);
 console.log(`- Private env apply before strict proof: ${report.releaseChannelPrivateEnvApplyBeforeStrictProof ? "yes" : "no"}`);
+console.log(`- Private env apply proof runner command: ${report.releaseChannelPrivateEnvApplyProofCommand}`);
+console.log(`- Private env apply proof runner after preflight: ${report.releaseChannelPrivateEnvApplyProofAfterPreflight ? "yes" : "no"}`);
 console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);
 console.log(`- Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})`);
 console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})`);

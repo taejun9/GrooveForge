@@ -29,6 +29,9 @@ const releaseChannelPrivateInputTemplateRole =
   "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const releaseChannelApplyPrivateEnvProofCommand = "npm run release:channel-apply-private-env-proof";
+const releaseChannelApplyPrivateEnvProofRole =
+  "run private env preflight, apply only after preflight readiness, strict proof, and completion readout as one value-free operator proof runner";
 const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
 const privateEditStrictProofCommand = "npm run release:private-edit-strict-proof";
 const privateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
@@ -335,6 +338,20 @@ function buildReport(sourcePacket, preflightBlocked) {
     currentOperatorStartCommandValueRecorded:
       sourcePacket.currentOperatorStartCommandValueRecorded === true ? true : false,
     currentOperatorValueRecorded: sourcePacket.currentOperatorValueRecorded === true ? true : false,
+    releaseChannelPrivateEnvApplyProofCommand: textValue(
+      sourcePacket.releaseChannelPrivateEnvApplyProofCommand,
+      releaseChannelApplyPrivateEnvProofCommand
+    ),
+    releaseChannelPrivateEnvApplyProofRole: textValue(
+      sourcePacket.releaseChannelPrivateEnvApplyProofRole,
+      releaseChannelApplyPrivateEnvProofRole
+    ),
+    releaseChannelPrivateEnvApplyProofAfterPreflight:
+      sourcePacket.releaseChannelPrivateEnvApplyProofAfterPreflight === true ||
+      textValue(sourcePacket.releaseChannelPrivateEnvApplyProofCommand, releaseChannelApplyPrivateEnvProofCommand) ===
+        releaseChannelApplyPrivateEnvProofCommand,
+    releaseChannelPrivateEnvApplyProofValueRecorded:
+      sourcePacket.releaseChannelPrivateEnvApplyProofValueRecorded === true ? true : false,
     releaseChannelPrivateInputTemplateCommand: textValue(
       sourcePacket.releaseChannelPrivateInputTemplateCommand,
       releaseChannelPrivateInputTemplateCommand
@@ -517,6 +534,8 @@ function buildMarkdown(report) {
 - Next resume matches current operator start command: ${readyLabel(report.nextResumeMatchesCurrentOperatorStartCommand)}
 - Current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
 - Current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
+- Private env apply proof runner command: \`${report.releaseChannelPrivateEnvApplyProofCommand}\`
+- Private env apply proof runner after preflight: ${readyLabel(report.releaseChannelPrivateEnvApplyProofAfterPreflight)}
 - Private input template command: \`${report.releaseChannelPrivateInputTemplateCommand}\`
 - Private input template default path: \`${report.releaseChannelPrivateInputTemplateDefaultPath}\`
 - Private input template before preflight: ${readyLabel(report.releaseChannelPrivateInputTemplateBeforePreflight)}
@@ -578,6 +597,9 @@ ${formatResumeRows(report.alreadyReadyRows)}
 - Next-actions refresh command: \`${report.currentOperatorNextActionsRefreshCommand}\`
 - Preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
 - Apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
+- Private env apply proof runner command: \`${report.releaseChannelPrivateEnvApplyProofCommand}\`
+- Private env apply proof runner role: ${report.releaseChannelPrivateEnvApplyProofRole}
+- Private env apply proof runner after preflight: ${readyLabel(report.releaseChannelPrivateEnvApplyProofAfterPreflight)}
 - Value recorded: ${readyLabel(report.currentOperatorValueRecorded)}
 
 | order | command | role | ready | value recorded |
@@ -832,6 +854,22 @@ function validateReport(report, markdown) {
   check(report.currentOperatorPreflightBeforeApply === true, "external completion resume packet current operator sequence should place preflight before apply");
   check(report.currentOperatorApplyBeforeStrictProof === true, "external completion resume packet current operator sequence should place apply before strict proof");
   check(
+    report.releaseChannelPrivateEnvApplyProofCommand === releaseChannelApplyPrivateEnvProofCommand,
+    "external completion resume packet should expose private env apply proof runner command"
+  );
+  check(
+    report.releaseChannelPrivateEnvApplyProofRole === releaseChannelApplyPrivateEnvProofRole,
+    "external completion resume packet should describe private env apply proof runner role"
+  );
+  check(
+    report.releaseChannelPrivateEnvApplyProofAfterPreflight === true,
+    "external completion resume packet should keep proof runner after preflight readiness"
+  );
+  check(
+    report.releaseChannelPrivateEnvApplyProofValueRecorded === false,
+    "external completion resume packet private env apply proof runner command should be value-free"
+  );
+  check(
     report.releaseChannelPrivateInputTemplateCommand === releaseChannelPrivateInputTemplateCommand,
     "external completion resume packet should expose private input template command"
   );
@@ -936,6 +974,10 @@ function validateReport(report, markdown) {
   check(markdown.includes("Current operator start command:"), "external completion resume packet Markdown should include current operator start command");
   check(markdown.includes("Next resume matches current operator start command:"), "external completion resume packet Markdown should include resume/start-command match");
   check(markdown.includes("Private input template command:"), "external completion resume packet Markdown should include private input template command");
+  check(
+    markdown.includes("Private env apply proof runner command:"),
+    "external completion resume packet Markdown should include private env apply proof runner command"
+  );
   check(markdown.includes("## Private Env Preflight Blocker"), "external completion resume packet Markdown should include private env preflight blocker");
   check(markdown.includes("Private input file key:"), "external completion resume packet Markdown should include private input file key guidance");
   check(
@@ -987,6 +1029,8 @@ console.log(`- Next resume matches current operator first command: ${report.next
 console.log(`- Next resume matches current operator start command: ${report.nextResumeMatchesCurrentOperatorStartCommand ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
+console.log(`- Private env apply proof runner command: ${report.releaseChannelPrivateEnvApplyProofCommand}`);
+console.log(`- Private env apply proof runner after preflight: ${report.releaseChannelPrivateEnvApplyProofAfterPreflight ? "yes" : "no"}`);
 console.log(`- Private input template command: ${report.releaseChannelPrivateInputTemplateCommand}`);
 console.log(`- Private input template default path: ${report.releaseChannelPrivateInputTemplateDefaultPath}`);
 console.log(`- Private-env preflight blocked smoke ready: ${report.privateEnvPreflightBlockedReady ? "yes" : "no"}`);

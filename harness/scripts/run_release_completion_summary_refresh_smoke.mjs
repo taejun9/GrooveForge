@@ -37,6 +37,9 @@ const releaseChannelApplyPrivateEnvPreflightRole =
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const releaseChannelApplyPrivateEnvRole =
   "apply operator-owned release-channel process env values into the ignored local env before strict proof";
+const releaseChannelApplyPrivateEnvProofCommand = "npm run release:channel-apply-private-env-proof";
+const releaseChannelApplyPrivateEnvProofRole =
+  "run private env preflight, apply only after preflight readiness, strict proof, and completion readout as one value-free operator proof runner";
 const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
 const privateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
 const defaultPrivateInputFileName = ".env.release-channel.local";
@@ -611,6 +614,12 @@ function buildReport({ progressRefresh, completionSummary, externalResume, opera
         textValue(completionSummary.releaseChannelFirstProofCommandAfterPrivateEdits) === "npm run release:channel-live-check" &&
         textValue(completionSummary.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits) === "npm run release:private-edit-strict-proof"),
     releaseChannelPrivateEnvApplyValueRecorded: completionSummary.releaseChannelPrivateEnvApplyValueRecorded === true ? true : false,
+    releaseChannelPrivateEnvApplyProofCommand: textValue(completionSummary.releaseChannelPrivateEnvApplyProofCommand, releaseChannelApplyPrivateEnvProofCommand),
+    releaseChannelPrivateEnvApplyProofRole: textValue(completionSummary.releaseChannelPrivateEnvApplyProofRole, releaseChannelApplyPrivateEnvProofRole),
+    releaseChannelPrivateEnvApplyProofAfterPreflight:
+      completionSummary.releaseChannelPrivateEnvApplyProofAfterPreflight === true ||
+      textValue(completionSummary.releaseChannelPrivateEnvApplyProofCommand, releaseChannelApplyPrivateEnvProofCommand) === releaseChannelApplyPrivateEnvProofCommand,
+    releaseChannelPrivateEnvApplyProofValueRecorded: completionSummary.releaseChannelPrivateEnvApplyProofValueRecorded === true ? true : false,
     releaseChannelFirstProofCommandAfterPrivateEdits: textValue(completionSummary.releaseChannelFirstProofCommandAfterPrivateEdits),
     releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits: textValue(completionSummary.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits),
     realOperatorPreflightReceiptReady: realOperatorPreflightReady,
@@ -918,6 +927,8 @@ function buildMarkdown(report) {
 - Private env apply preflight before apply: ${readyLabel(report.releaseChannelPrivateEnvApplyPreflightBeforeApply)}
 - Private env apply command: \`${report.releaseChannelPrivateEnvApplyCommand}\`
 - Private env apply before strict proof: ${readyLabel(report.releaseChannelPrivateEnvApplyBeforeStrictProof)}
+- Private env apply proof runner command: \`${report.releaseChannelPrivateEnvApplyProofCommand}\`
+- Private env apply proof runner after preflight: ${readyLabel(report.releaseChannelPrivateEnvApplyProofAfterPreflight)}
 - First proof after private edits: \`${report.releaseChannelFirstProofCommandAfterPrivateEdits}\`
 - Recommended operator proof chain: \`${report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits}\`
 - Real operator preflight receipt ready: ${readyLabel(report.realOperatorPreflightReceiptReady)}
@@ -1291,6 +1302,10 @@ function validateReport(report, markdown) {
   check(report.releaseChannelPrivateEnvApplyRole === releaseChannelApplyPrivateEnvRole, "release completion summary refresh should describe private env apply role");
   check(report.releaseChannelPrivateEnvApplyBeforeStrictProof === true, "release completion summary refresh should place private env apply before strict proof");
   check(report.releaseChannelPrivateEnvApplyValueRecorded === false, "release completion summary refresh private env apply command should be value-free");
+  check(report.releaseChannelPrivateEnvApplyProofCommand === releaseChannelApplyPrivateEnvProofCommand, "release completion summary refresh should expose private env apply proof runner command");
+  check(report.releaseChannelPrivateEnvApplyProofRole === releaseChannelApplyPrivateEnvProofRole, "release completion summary refresh should describe private env apply proof runner role");
+  check(report.releaseChannelPrivateEnvApplyProofAfterPreflight === true, "release completion summary refresh should keep proof runner after preflight readiness");
+  check(report.releaseChannelPrivateEnvApplyProofValueRecorded === false, "release completion summary refresh private env apply proof runner command should be value-free");
   check(report.releaseChannelFirstProofCommandAfterPrivateEdits === "npm run release:channel-live-check", "release completion summary refresh should expose release-channel first proof command");
   check(report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits === "npm run release:private-edit-strict-proof", "release completion summary refresh should expose recommended private edit proof chain");
   check(report.realOperatorPreflightReceiptReady === true, "release completion summary refresh should leave a ready real operator preflight readout");
@@ -1835,6 +1850,8 @@ async function main() {
   console.log(`- Private env apply preflight before apply: ${report.releaseChannelPrivateEnvApplyPreflightBeforeApply ? "yes" : "no"}`);
   console.log(`- Private env apply command: ${report.releaseChannelPrivateEnvApplyCommand}`);
   console.log(`- Private env apply before strict proof: ${report.releaseChannelPrivateEnvApplyBeforeStrictProof ? "yes" : "no"}`);
+  console.log(`- Private env apply proof runner command: ${report.releaseChannelPrivateEnvApplyProofCommand}`);
+  console.log(`- Private env apply proof runner after preflight: ${report.releaseChannelPrivateEnvApplyProofAfterPreflight ? "yes" : "no"}`);
   console.log(`- External resume packet ready: ${report.externalCompletionResumePacketReady ? "yes" : "no"}`);
   console.log(`- External resume private input template command: ${report.externalCompletionResumePrivateInputTemplateCommand}`);
   console.log(
