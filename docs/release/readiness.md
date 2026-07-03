@@ -83,6 +83,13 @@ npm run release:channel-private-input-template
 npm run release:channel-private-input-template-smoke
 ```
 
+Run the value-free release-channel setup brief when the operator wants to inspect the ignored private input file, current local env target, missing/placeholder/shape status, and next preflight/apply/proof commands without printing private values:
+
+```sh
+npm run release:channel-setup-brief
+npm run release:channel-setup-brief-smoke
+```
+
 Run the guided local-only release-channel setup wizard when the operator wants the ignored env scaffold, private metadata apply helper, and strict live-check proof chained without recording URL/channel values:
 
 ```sh
