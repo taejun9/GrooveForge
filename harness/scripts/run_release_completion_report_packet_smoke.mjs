@@ -841,6 +841,14 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     channel.externalDistributionReady === false &&
     channel.releaseChannelSetupWizardCommand === releaseChannelSetupWizardCommand &&
     channel.releaseChannelSetupWizardCommandValueRecorded === false &&
+    channel.releaseChannelPrivateInputFileGuidanceReady === true &&
+    channel.releaseChannelPrivateInputFileKey === "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE" &&
+    channel.releaseChannelPrivateInputFileDefaultName === ".env.release-channel.local" &&
+    channel.releaseChannelOperatorPrivateInputFileDefaultPath === ".env.release-channel.local" &&
+    channel.releaseChannelOperatorPrivateInputFileDefaultPathValueRecorded === false &&
+    channel.releaseChannelPrivateInputFileValueRecorded === false &&
+    channel.releaseChannelGuidedSetupFallbackCommand === releaseChannelSetupWizardCommand &&
+    channel.releaseChannelGuidedSetupFallbackValueRecorded === false &&
     channel.releaseChannelRecommendedOperatorProofCommand === privateEditOperatorProofCommand &&
     channel.releaseChannelRecommendedOperatorProofCommandValueRecorded === false &&
     clearanceTransitionReady &&
@@ -979,6 +987,20 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     channelEditApplyPrivateEnvPreflightCommandValueRecorded:
       channel.releaseChannelApplyPrivateEnvPreflightCommandValueRecorded === false,
     channelEditApplyPrivateEnvCommand: textValue(channel.releaseChannelApplyPrivateEnvCommand),
+    channelEditPrivateInputFileGuidanceReady: channel.releaseChannelPrivateInputFileGuidanceReady === true,
+    channelEditPrivateInputFileKey: textValue(channel.releaseChannelPrivateInputFileKey),
+    channelEditPrivateInputFileDefaultName: textValue(channel.releaseChannelPrivateInputFileDefaultName),
+    channelEditOperatorPrivateInputFileDefaultPath: textValue(channel.releaseChannelOperatorPrivateInputFileDefaultPath),
+    channelEditOperatorPrivateInputFileDefaultPathValueRecorded:
+      channel.releaseChannelOperatorPrivateInputFileDefaultPathValueRecorded === true,
+    channelEditPrivateInputFilePath: textValue(channel.releaseChannelPrivateInputFilePath),
+    channelEditPrivateInputFilePathMode: textValue(channel.releaseChannelPrivateInputFilePathMode),
+    channelEditPrivateInputFilePresent: channel.releaseChannelPrivateInputFilePresent === true,
+    channelEditPrivateInputFileLoadedKeyCount: integerValue(channel.releaseChannelPrivateInputFileLoadedKeyCount),
+    channelEditPrivateInputFileLoadedKeySummary: textValue(channel.releaseChannelPrivateInputFileLoadedKeySummary),
+    channelEditPrivateInputFileValueRecorded: channel.releaseChannelPrivateInputFileValueRecorded === true,
+    channelEditGuidedSetupFallbackCommand: textValue(channel.releaseChannelGuidedSetupFallbackCommand),
+    channelEditGuidedSetupFallbackValueRecorded: channel.releaseChannelGuidedSetupFallbackValueRecorded === true,
     channelEditRecommendedOperatorProofCommandValueRecorded:
       channel.releaseChannelRecommendedOperatorProofCommandValueRecorded === false,
     firstPrivateEditProofCommand: privateEditProofCommandRows[0].command,
@@ -1155,6 +1177,12 @@ function buildMarkdown(report) {
 - Channel edit packet preflight command: \`${report.channelEditApplyPrivateEnvPreflightCommand}\`
 - Channel edit packet first apply command: \`${report.channelEditApplyPrivateEnvCommand}\`
 - Channel edit packet preflight before apply: ${readyLabel(report.releaseChannelEditPacketApplyPrivateEnvPreflightBeforeApply)}
+- Channel edit private input file key: \`${report.channelEditPrivateInputFileKey}\`
+- Channel edit private input file default: \`${report.channelEditPrivateInputFileDefaultName}\`
+- Channel edit operator private input file default path: \`${report.channelEditOperatorPrivateInputFileDefaultPath}\`
+- Channel edit blocked-smoke private input file path: ${report.channelEditPrivateInputFilePath}
+- Channel edit private input file loaded keys: ${report.channelEditPrivateInputFileLoadedKeyCount} (${report.channelEditPrivateInputFileLoadedKeySummary})
+- Channel edit guided setup fallback command: \`${report.channelEditGuidedSetupFallbackCommand}\`
 - Latest completed plan: plan-${report.latestCompletedPlanNumber}
 - Latest 10-plan progress: ${report.latestTenPlanProgressLabel}
 - 10-plan report due: ${readyLabel(report.tenPlanProgressReportDue)}
@@ -1446,6 +1474,24 @@ function validateReport(report, markdown) {
     "release completion report packet should prove the channel edit packet private env preflight helper is value-free"
   );
   check(report.channelEditApplyPrivateEnvCommand === releaseChannelApplyPrivateEnvCommand, "release completion report packet should mirror the channel edit packet private env apply helper");
+  check(report.channelEditPrivateInputFileGuidanceReady === true, "release completion report packet should mirror channel edit private input file guidance");
+  check(report.channelEditPrivateInputFileKey === "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE", "release completion report packet should mirror the private input file key");
+  check(report.channelEditPrivateInputFileDefaultName === ".env.release-channel.local", "release completion report packet should mirror the private input file default");
+  check(
+    report.channelEditOperatorPrivateInputFileDefaultPath === ".env.release-channel.local",
+    "release completion report packet should mirror the operator private input file default path"
+  );
+  check(
+    report.channelEditOperatorPrivateInputFileDefaultPathValueRecorded === false,
+    "release completion report packet operator private input file default path should be value-free"
+  );
+  check(report.channelEditPrivateInputFilePath !== "none", "release completion report packet should mirror the blocked-smoke private input file path");
+  check(report.channelEditPrivateInputFilePathMode === "blocked-smoke-isolated-missing-input-file", "release completion report packet should keep blocked-smoke private input path mode");
+  check(report.channelEditPrivateInputFilePresent === false, "release completion report packet should keep blocked-smoke private input file absent");
+  check(report.channelEditPrivateInputFileLoadedKeyCount === 0, "release completion report packet should mirror zero private input file loaded keys");
+  check(report.channelEditPrivateInputFileValueRecorded === false, "release completion report packet private input file path should be value-free");
+  check(report.channelEditGuidedSetupFallbackCommand === releaseChannelSetupWizardCommand, "release completion report packet should mirror guided setup fallback");
+  check(report.channelEditGuidedSetupFallbackValueRecorded === false, "release completion report packet guided setup fallback should be value-free");
   check(
     report.channelEditRecommendedOperatorProofCommandRole === report.privateEditOperatorProofCommandRole,
     "release completion report packet should mirror the channel edit packet recommended proof role"
@@ -1678,6 +1724,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("Update Feed Checkpoint Evidence"), "release completion report packet Markdown should include update-feed checkpoint evidence table");
   check(markdown.includes("Channel edit packet setup wizard command:"), "release completion report packet Markdown should include channel edit packet setup wizard");
   check(markdown.includes("Channel edit packet recommended proof chain:"), "release completion report packet Markdown should include channel edit packet proof recommendation");
+  check(markdown.includes("Channel edit operator private input file default path:"), "release completion report packet Markdown should include operator private input file path guidance");
+  check(markdown.includes("Channel edit guided setup fallback command:"), "release completion report packet Markdown should include guided setup fallback");
   check(markdown.includes("Private-Edit Proof Commands"), "release completion report packet Markdown should include private-edit proof command table");
   check(markdown.includes("10-plan report due:"), "release completion report packet Markdown should include the 10-plan report due flag");
   check(markdown.includes(`Next 10-plan progress report at: ${report.nextTenPlanProgressReportAt}`), "release completion report packet Markdown should include next 10-plan report plan");
@@ -1762,6 +1810,12 @@ console.log(`- Channel edit packet recommended proof chain: ${report.channelEdit
 console.log(`- Channel edit packet preflight command: ${report.channelEditApplyPrivateEnvPreflightCommand}`);
 console.log(`- Channel edit packet apply command: ${report.channelEditApplyPrivateEnvCommand}`);
 console.log(`- Channel edit packet preflight before apply: ${report.releaseChannelEditPacketApplyPrivateEnvPreflightBeforeApply ? "yes" : "no"}`);
+console.log(`- Channel edit private input file key: ${report.channelEditPrivateInputFileKey}`);
+console.log(`- Channel edit private input file default: ${report.channelEditPrivateInputFileDefaultName}`);
+console.log(`- Channel edit operator private input file default path: ${report.channelEditOperatorPrivateInputFileDefaultPath}`);
+console.log(`- Channel edit blocked-smoke private input file path: ${report.channelEditPrivateInputFilePath}`);
+console.log(`- Channel edit private input file loaded keys: ${report.channelEditPrivateInputFileLoadedKeyCount}`);
+console.log(`- Channel edit guided setup fallback command: ${report.channelEditGuidedSetupFallbackCommand}`);
 console.log(`- Latest completed plan: plan-${report.latestCompletedPlanNumber}`);
 console.log(`- Latest 10-plan progress: ${report.latestTenPlanProgressLabel}`);
 console.log(`- 10-plan report due: ${report.tenPlanProgressReportDue ? "yes" : "no"}`);

@@ -32,6 +32,10 @@ const releasePrepareEnvCommand = "npm run release:prepare-env";
 const privateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
+const privateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
+const defaultPrivateInputFileName = ".env.release-channel.local";
+const operatorPrivateInputFileDefaultPath = defaultPrivateInputFileName;
 const failures = [];
 
 function check(condition, message) {
@@ -535,6 +539,12 @@ function buildMarkdown(report) {
 - Preflight process env checklist rows: ${report.preflightProcessEnvChecklistRowCount} (${report.preflightProcessEnvChecklistSummary})
 - Preflight process env checklist ready rows: ${report.preflightProcessEnvChecklistReadyCount}/${report.preflightProcessEnvChecklistRowCount}
 - Preflight process env checklist missing/placeholder/invalid rows: ${report.preflightProcessEnvChecklistMissingCount}/${report.preflightProcessEnvChecklistPlaceholderCount}/${report.preflightProcessEnvChecklistInvalidShapeCount}
+- Preflight private input file key: \`${report.preflightPrivateInputFileKey}\`
+- Preflight private input file default: \`${report.preflightPrivateInputFileDefaultName}\`
+- Preflight operator private input file default path: \`${report.preflightOperatorPrivateInputFileDefaultPath}\`
+- Preflight blocked-smoke private input file path: ${report.preflightPrivateInputFilePath}
+- Preflight private input file loaded keys: ${report.preflightPrivateInputFileLoadedKeyCount} (${report.preflightPrivateInputFileLoadedKeySummary})
+- Preflight guided setup fallback command: \`${report.preflightGuidedSetupFallbackCommand}\`
 - Preflight operator receipt source ready: ${readyLabel(report.preflightOperatorReceiptSourceReady)}
 - Preflight operator receipt rows: ${report.preflightOperatorReceiptRowCount} (${report.preflightOperatorReceiptSummary})
 - Preflight operator receipt first command: \`${report.preflightOperatorReceiptFirstCommand}\`
@@ -648,6 +658,13 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     preflightProcessEnvChecklistRows.every((row) => row.preflightCommand === releaseChannelApplyPrivateEnvPreflightCommand) &&
     preflightProcessEnvChecklistRows.every((row) => row.writeCommand === releaseChannelApplyPrivateEnvCommand) &&
     preflightProcessEnvChecklistRows.every((row) => row.proofCommand === privateEditOperatorProofCommand) &&
+    releaseChannelPreflightBlocked.privateInputFileKey === privateInputFileKey &&
+    releaseChannelPreflightBlocked.privateInputFileDefaultName === defaultPrivateInputFileName &&
+    releaseChannelPreflightBlocked.operatorPrivateInputFileDefaultPath === operatorPrivateInputFileDefaultPath &&
+    releaseChannelPreflightBlocked.operatorPrivateInputFileDefaultPathValueRecorded === false &&
+    releaseChannelPreflightBlocked.privateInputFileValueRecorded === false &&
+    releaseChannelPreflightBlocked.guidedSetupFallbackCommand === releaseChannelSetupWizardCommand &&
+    releaseChannelPreflightBlocked.guidedSetupFallbackValueRecorded === false &&
     preflightProcessEnvChecklistRows.every((row) => row.valueRecorded === false);
   const preflightOperatorReceiptFirstCommand = textValue(preflightOperatorReceiptRows[0]?.command, "none");
   const preflightOperatorReceiptIncludesHardGate = preflightOperatorReceiptRows.some((row) => row.command === hardGateCommand);
@@ -764,6 +781,19 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
       preflightProcessEnvChecklistRows.length > 0
         ? `${preflightProcessEnvChecklistRows.length} value-free process.env input checklist rows`
         : "none",
+    preflightPrivateInputFileKey: textValue(releaseChannelPreflightBlocked.privateInputFileKey),
+    preflightPrivateInputFileDefaultName: textValue(releaseChannelPreflightBlocked.privateInputFileDefaultName),
+    preflightOperatorPrivateInputFileDefaultPath: textValue(releaseChannelPreflightBlocked.operatorPrivateInputFileDefaultPath),
+    preflightOperatorPrivateInputFileDefaultPathValueRecorded:
+      releaseChannelPreflightBlocked.operatorPrivateInputFileDefaultPathValueRecorded === true,
+    preflightPrivateInputFilePath: textValue(releaseChannelPreflightBlocked.privateInputFilePath),
+    preflightPrivateInputFilePathMode: textValue(releaseChannelPreflightBlocked.privateInputFilePathMode),
+    preflightPrivateInputFilePresent: releaseChannelPreflightBlocked.privateInputFilePresent === true,
+    preflightPrivateInputFileLoadedKeyCount: integerValue(releaseChannelPreflightBlocked.privateInputFileLoadedKeyCount),
+    preflightPrivateInputFileLoadedKeySummary: textValue(releaseChannelPreflightBlocked.privateInputFileLoadedKeySummary),
+    preflightPrivateInputFileValueRecorded: releaseChannelPreflightBlocked.privateInputFileValueRecorded === true,
+    preflightGuidedSetupFallbackCommand: textValue(releaseChannelPreflightBlocked.guidedSetupFallbackCommand),
+    preflightGuidedSetupFallbackValueRecorded: releaseChannelPreflightBlocked.guidedSetupFallbackValueRecorded === true,
     preflightOperatorReceiptSourceReady,
     preflightOperatorReceiptArtifactPath: relative(releaseChannelPreflightBlockedJsonPath),
     preflightOperatorReceiptReady: releaseChannelPreflightBlocked.operatorReceiptReady === true,
@@ -894,6 +924,23 @@ check(report.preflightProcessEnvChecklistRows.every((row) => row.preflightComman
 check(report.preflightProcessEnvChecklistRows.every((row) => row.writeCommand === releaseChannelApplyPrivateEnvCommand), "release operator completion brief preflight checklist rows should carry apply command");
 check(report.preflightProcessEnvChecklistRows.every((row) => row.proofCommand === privateEditOperatorProofCommand), "release operator completion brief preflight checklist rows should carry strict proof command");
 check(report.preflightProcessEnvChecklistRows.every((row) => row.valueRecorded === false), "release operator completion brief preflight checklist rows should be value-free");
+check(report.preflightPrivateInputFileKey === privateInputFileKey, "release operator completion brief should expose the private input file key");
+check(report.preflightPrivateInputFileDefaultName === defaultPrivateInputFileName, "release operator completion brief should expose the private input file default");
+check(
+  report.preflightOperatorPrivateInputFileDefaultPath === operatorPrivateInputFileDefaultPath,
+  "release operator completion brief should expose the operator private input file default path"
+);
+check(
+  report.preflightOperatorPrivateInputFileDefaultPathValueRecorded === false,
+  "release operator completion brief operator private input file default path should be value-free"
+);
+check(report.preflightPrivateInputFilePath !== "none", "release operator completion brief should expose the blocked-smoke private input file path");
+check(report.preflightPrivateInputFilePathMode === "blocked-smoke-isolated-missing-input-file", "release operator completion brief should keep blocked-smoke private input file path mode");
+check(report.preflightPrivateInputFilePresent === false, "release operator completion brief should keep blocked-smoke private input file absent");
+check(report.preflightPrivateInputFileLoadedKeyCount === 0, "release operator completion brief should mirror zero loaded private input file keys");
+check(report.preflightPrivateInputFileValueRecorded === false, "release operator completion brief private input file path should be value-free");
+check(report.preflightGuidedSetupFallbackCommand === releaseChannelSetupWizardCommand, "release operator completion brief should expose guided setup fallback");
+check(report.preflightGuidedSetupFallbackValueRecorded === false, "release operator completion brief guided setup fallback should be value-free");
 check(report.preflightOperatorReceiptSourceReady === true, "release operator completion brief should include ready private-env operator receipt source");
 check(report.preflightOperatorReceiptReady === true, "release operator completion brief should mirror a ready private-env operator receipt");
 check(report.preflightOperatorReceiptRowCount === 6, "release operator completion brief preflight operator receipt should include six rows");
@@ -1007,6 +1054,8 @@ check(outputLooksValueFree(jsonText), "release operator completion brief JSON sh
 check(outputLooksValueFree(markdown), "release operator completion brief Markdown should not include URL values");
 check(markdown.includes("Release Operator Completion Brief Smoke"), "release operator completion brief Markdown should include title");
 check(markdown.includes("Preflight Process Env Input Checklist"), "release operator completion brief Markdown should include preflight checklist");
+check(markdown.includes("Preflight operator private input file default path:"), "release operator completion brief Markdown should include operator private input path guidance");
+check(markdown.includes("Preflight guided setup fallback command:"), "release operator completion brief Markdown should include guided setup fallback");
 check(markdown.includes("Preflight Operator Receipt"), "release operator completion brief Markdown should include preflight operator receipt");
 check(markdown.includes("Operator Brief Rows"), "release operator completion brief Markdown should include operator rows");
 check(markdown.includes("Current Operator Command Sequence"), "release operator completion brief Markdown should include current operator command sequence");
@@ -1052,6 +1101,12 @@ console.log(`- Preflight process env checklist source exit status: ${report.pref
 console.log(`- Preflight process env checklist rows: ${report.preflightProcessEnvChecklistRowCount} (${report.preflightProcessEnvChecklistSummary})`);
 console.log(`- Preflight process env checklist ready rows: ${report.preflightProcessEnvChecklistReadyCount}/${report.preflightProcessEnvChecklistRowCount}`);
 console.log(`- Preflight process env checklist missing/placeholder/invalid rows: ${report.preflightProcessEnvChecklistMissingCount}/${report.preflightProcessEnvChecklistPlaceholderCount}/${report.preflightProcessEnvChecklistInvalidShapeCount}`);
+console.log(`- Preflight private input file key: ${report.preflightPrivateInputFileKey}`);
+console.log(`- Preflight private input file default: ${report.preflightPrivateInputFileDefaultName}`);
+console.log(`- Preflight operator private input file default path: ${report.preflightOperatorPrivateInputFileDefaultPath}`);
+console.log(`- Preflight blocked-smoke private input file path: ${report.preflightPrivateInputFilePath}`);
+console.log(`- Preflight private input file loaded keys: ${report.preflightPrivateInputFileLoadedKeyCount}`);
+console.log(`- Preflight guided setup fallback command: ${report.preflightGuidedSetupFallbackCommand}`);
 console.log(`- Preflight operator receipt source ready: ${report.preflightOperatorReceiptSourceReady ? "yes" : "no"}`);
 console.log(`- Preflight operator receipt rows: ${report.preflightOperatorReceiptRowCount} (${report.preflightOperatorReceiptSummary})`);
 console.log(`- Preflight operator receipt first command: ${report.preflightOperatorReceiptFirstCommand}`);

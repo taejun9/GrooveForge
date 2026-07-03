@@ -18,6 +18,7 @@ const packetMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.vers
 const packetJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${packetJsonArtifactName}`);
 const releaseDoctorJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-doctor.json`);
 const releaseChannelLiveCheckJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-live-check.json`);
+const releaseChannelPreflightBlockedJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-apply-private-env-preflight-blocked-smoke.json`);
 const releaseChannelMetadataKeys = [
   "GROOVEFORGE_DISTRIBUTION_CHANNEL",
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
@@ -28,6 +29,9 @@ const recommendedOperatorProofCommand = "npm run release:private-edit-strict-pro
 const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const privateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
+const defaultPrivateInputFileName = ".env.release-channel.local";
+const operatorPrivateInputFileDefaultPath = defaultPrivateInputFileName;
 const lowerLevelLiveCheckCommand = "npm run release:channel-live-check";
 const lowerLevelStrictProofCommand = "npm run release:channel-live-check-strict";
 const refreshCommandRows = [
@@ -41,6 +45,12 @@ const refreshCommandRows = [
     order: 2,
     command: "npm run release:channel-live-check",
     role: "refresh value-free current release-channel key shape and location evidence",
+    valueRecorded: false
+  },
+  {
+    order: 3,
+    command: "npm run release:channel-apply-private-env-preflight-blocked-smoke",
+    role: "refresh value-free private input file route and blocked preflight handoff evidence",
     valueRecorded: false
   }
 ];
@@ -377,7 +387,7 @@ function formatEditRows(rows) {
     .join("\n");
 }
 
-function buildReport({ doctor, liveCheck, progress }) {
+function buildReport({ doctor, liveCheck, preflightBlocked, progress }) {
   const mode = packetMode(doctor);
   const editRows = buildEditRows(liveCheck);
   const currentEnvEditTarget = displayEvidenceFile(liveCheck.currentEnvEditTarget ?? doctor.currentEnvEditTarget);
@@ -395,6 +405,26 @@ function buildReport({ doctor, liveCheck, progress }) {
     currentOperatorRows.some((row) => row.command === "npm run release:current-blocker") &&
     currentOperatorRows.some((row) => row.command === "npm run release:next-actions") &&
     currentOperatorRows.every((row) => row.command !== releaseChannelSetupWizardCommand);
+  const preflightBlockedSourceReady =
+    preflightBlocked.blockedSmokeReady === true &&
+    preflightBlocked.expectedBlockedExitObserved === true &&
+    preflightBlocked.sourceCommand === releaseChannelApplyPrivateEnvPreflightCommand &&
+    preflightBlocked.currentOperatorFirstCommand === releaseChannelApplyPrivateEnvPreflightCommand &&
+    preflightBlocked.nextWriteCommand === releaseChannelApplyPrivateEnvCommand &&
+    preflightBlocked.recommendedOperatorProofCommand === recommendedOperatorProofCommand &&
+    preflightBlocked.privateInputFileKey === privateInputFileKey &&
+    preflightBlocked.privateInputFileDefaultName === defaultPrivateInputFileName &&
+    preflightBlocked.operatorPrivateInputFileDefaultPath === operatorPrivateInputFileDefaultPath &&
+    preflightBlocked.operatorPrivateInputFileDefaultPathValueRecorded === false &&
+    preflightBlocked.privateInputFileValueRecorded === false &&
+    preflightBlocked.guidedSetupFallbackCommand === releaseChannelSetupWizardCommand &&
+    preflightBlocked.guidedSetupFallbackValueRecorded === false &&
+    preflightBlocked.privateValuesRecorded === false &&
+    preflightBlocked.networkProbeAttempted === false &&
+    preflightBlocked.releaseUploadAttempted === false &&
+    preflightBlocked.signingAttempted === false &&
+    preflightBlocked.notarySubmissionAttempted === false &&
+    preflightBlocked.claimedExternalDistribution === false;
   const sourceArtifactRows = [
     sourceRow({
       label: "Release doctor",
@@ -407,12 +437,19 @@ function buildReport({ doctor, liveCheck, progress }) {
       path: releaseChannelLiveCheckJsonPath,
       ready: liveCheck.releaseChannelLiveCheckRowCount === releaseChannelMetadataKeys.length,
       evidence: `${integerValue(liveCheck.releaseChannelLiveCheckCurrentReadyCount)}/${integerValue(liveCheck.releaseChannelLiveCheckRowCount)} current-ready rows; ${integerValue(liveCheck.currentPlaceholderKeyCount)} placeholders`
+    }),
+    sourceRow({
+      label: "Release-channel private env preflight blocked smoke",
+      path: releaseChannelPreflightBlockedJsonPath,
+      ready: preflightBlockedSourceReady,
+      evidence: `${textValue(preflightBlocked.privateInputFileKey)} -> ${textValue(preflightBlocked.operatorPrivateInputFileDefaultPath)}; loaded keys ${integerValue(preflightBlocked.privateInputFileLoadedKeyCount)}`
     })
   ];
   const releaseChannelEditPacketReady =
     refreshCommandRows.every((row) => row.valueRecorded === false) &&
     operatorRows.every((row) => row.valueRecorded === false) &&
     currentOperatorCommandSequenceReady &&
+    preflightBlockedSourceReady &&
     sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false) &&
     editRows.length === releaseChannelMetadataKeys.length &&
     editRows.every((row) => releaseChannelMetadataKeys.includes(row.key) && row.valueRecorded === false) &&
@@ -478,6 +515,20 @@ function buildReport({ doctor, liveCheck, progress }) {
     releaseChannelApplyPrivateEnvPreflightCommand,
     releaseChannelApplyPrivateEnvPreflightCommandValueRecorded: false,
     releaseChannelApplyPrivateEnvCommand,
+    releaseChannelPrivateInputFileGuidanceReady: preflightBlockedSourceReady,
+    releaseChannelPrivateInputFileKey: textValue(preflightBlocked.privateInputFileKey),
+    releaseChannelPrivateInputFileDefaultName: textValue(preflightBlocked.privateInputFileDefaultName),
+    releaseChannelOperatorPrivateInputFileDefaultPath: textValue(preflightBlocked.operatorPrivateInputFileDefaultPath),
+    releaseChannelOperatorPrivateInputFileDefaultPathValueRecorded:
+      preflightBlocked.operatorPrivateInputFileDefaultPathValueRecorded === true,
+    releaseChannelPrivateInputFilePath: textValue(preflightBlocked.privateInputFilePath),
+    releaseChannelPrivateInputFilePathMode: textValue(preflightBlocked.privateInputFilePathMode),
+    releaseChannelPrivateInputFilePresent: preflightBlocked.privateInputFilePresent === true,
+    releaseChannelPrivateInputFileLoadedKeyCount: integerValue(preflightBlocked.privateInputFileLoadedKeyCount),
+    releaseChannelPrivateInputFileLoadedKeySummary: textValue(preflightBlocked.privateInputFileLoadedKeySummary),
+    releaseChannelPrivateInputFileValueRecorded: preflightBlocked.privateInputFileValueRecorded === true,
+    releaseChannelGuidedSetupFallbackCommand: textValue(preflightBlocked.guidedSetupFallbackCommand),
+    releaseChannelGuidedSetupFallbackValueRecorded: preflightBlocked.guidedSetupFallbackValueRecorded === true,
     releaseChannelRecommendedOperatorProofCommand: recommendedOperatorProofCommand,
     releaseChannelRecommendedOperatorProofCommandRole:
       "recommended strict-first proof chain after applying the four private release-channel metadata values",
@@ -581,6 +632,12 @@ function buildMarkdown(report) {
 - Guided setup wizard command: \`${report.releaseChannelSetupWizardCommand}\`
 - Private metadata preflight command: \`${report.releaseChannelApplyPrivateEnvPreflightCommand}\`
 - First private metadata apply command: \`${report.releaseChannelApplyPrivateEnvCommand}\`
+- Private input file key: \`${report.releaseChannelPrivateInputFileKey}\`
+- Private input file default: \`${report.releaseChannelPrivateInputFileDefaultName}\`
+- Operator private input file default path: \`${report.releaseChannelOperatorPrivateInputFileDefaultPath}\`
+- Current blocked-smoke private input file path: ${report.releaseChannelPrivateInputFilePath}
+- Private input file loaded keys: ${report.releaseChannelPrivateInputFileLoadedKeyCount} (${report.releaseChannelPrivateInputFileLoadedKeySummary})
+- Guided setup fallback command: \`${report.releaseChannelGuidedSetupFallbackCommand}\`
 - Recommended operator proof chain: \`${report.releaseChannelRecommendedOperatorProofCommand}\`
 - Recommended operator proof role: ${report.releaseChannelRecommendedOperatorProofCommandRole}
 - Lower-level live-check proof: \`${report.releaseChannelLowerLevelLiveCheckCommand}\`
@@ -648,8 +705,12 @@ function validateReport(report, markdown) {
   const serialized = JSON.stringify(report);
   check(report.releaseChannelEditPacketReady === true, "release-channel edit packet should be ready");
   check(report.reportCommand === "npm run release:channel-edit-packet-smoke", "release-channel edit packet should report its command");
-  check(report.refreshCommandCount === 2, "release-channel edit packet should refresh two source commands");
-  check(report.refreshCommandSummary === "npm run release:doctor -> npm run release:channel-live-check", "release-channel edit packet should refresh doctor then live-check");
+  check(report.refreshCommandCount === 3, "release-channel edit packet should refresh three source commands");
+  check(
+    report.refreshCommandSummary ===
+      "npm run release:doctor -> npm run release:channel-live-check -> npm run release:channel-apply-private-env-preflight-blocked-smoke",
+    "release-channel edit packet should refresh doctor, live-check, then blocked private-env preflight"
+  );
   check(report.operatorCommandCount >= 7, "release-channel edit packet should include operator proof commands");
   check(report.operatorCommandRows.every((row) => row.valueRecorded === false), "release-channel edit packet operator rows should be value-free");
   check(report.currentOperatorCommandSequenceReady === true, "release-channel edit packet current operator command sequence should be ready");
@@ -711,6 +772,24 @@ function validateReport(report, markdown) {
   );
   check(report.releaseChannelSetupWizardCommand === releaseChannelSetupWizardCommand, "release-channel edit packet should expose the setup wizard");
   check(report.releaseChannelSetupWizardCommandValueRecorded === false, "release-channel edit packet setup wizard command should be value-free");
+  check(report.releaseChannelPrivateInputFileGuidanceReady === true, "release-channel edit packet should include private input file guidance");
+  check(report.releaseChannelPrivateInputFileKey === privateInputFileKey, "release-channel edit packet should expose the private input file key");
+  check(report.releaseChannelPrivateInputFileDefaultName === defaultPrivateInputFileName, "release-channel edit packet should expose the private input file default");
+  check(
+    report.releaseChannelOperatorPrivateInputFileDefaultPath === operatorPrivateInputFileDefaultPath,
+    "release-channel edit packet should expose the operator private input file default path"
+  );
+  check(
+    report.releaseChannelOperatorPrivateInputFileDefaultPathValueRecorded === false,
+    "release-channel edit packet operator private input file default path should be value-free"
+  );
+  check(report.releaseChannelPrivateInputFilePath !== "none", "release-channel edit packet should expose the current blocked-smoke private input file path");
+  check(report.releaseChannelPrivateInputFilePathMode === "blocked-smoke-isolated-missing-input-file", "release-channel edit packet should keep the blocked-smoke path mode");
+  check(report.releaseChannelPrivateInputFilePresent === false, "release-channel edit packet should keep the blocked-smoke private input file absent");
+  check(report.releaseChannelPrivateInputFileLoadedKeyCount === 0, "release-channel edit packet should mirror zero loaded private input file keys");
+  check(report.releaseChannelPrivateInputFileValueRecorded === false, "release-channel edit packet private input file path should be value-free");
+  check(report.releaseChannelGuidedSetupFallbackCommand === releaseChannelSetupWizardCommand, "release-channel edit packet should expose guided setup fallback");
+  check(report.releaseChannelGuidedSetupFallbackValueRecorded === false, "release-channel edit packet guided setup fallback should be value-free");
   check(
     report.operatorCommandRows.some((row) => row.command === recommendedOperatorProofCommand),
     "release-channel edit packet should include the recommended private-edit strict proof chain"
@@ -732,7 +811,7 @@ function validateReport(report, markdown) {
   check(report.releaseChannelLowerLevelLiveCheckCommand === lowerLevelLiveCheckCommand, "release-channel edit packet should expose the lower-level live-check command");
   check(report.releaseChannelLowerLevelStrictProofCommand === lowerLevelStrictProofCommand, "release-channel edit packet should expose the lower-level strict proof command");
   check(report.releaseChannelLowerLevelProofCommandsValueRecorded === false, "release-channel edit packet lower-level proof commands should be value-free");
-  check(report.sourceArtifactRowCount === 2, "release-channel edit packet should include two source artifacts");
+  check(report.sourceArtifactRowCount === 3, "release-channel edit packet should include three source artifacts");
   check(report.sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false), "release-channel edit packet source artifacts should be present, ready, and value-free");
   check(["create-ignored-env-scaffold", "replace-release-channel-placeholders", "verify-release-channel-metadata", "continue-external-proof-chain"].includes(report.releaseChannelEditPacketMode), "release-channel edit packet should identify a known mode");
   check(report.currentEnvEditTarget !== "none", "release-channel edit packet should point at the ignored local env target");
@@ -784,6 +863,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("Release-Channel Edit Packet Smoke"), "release-channel edit packet Markdown should include title");
   check(markdown.includes("Release-channel edit packet ready: yes"), "release-channel edit packet Markdown should include readiness");
   check(markdown.includes("Recommended operator proof chain"), "release-channel edit packet Markdown should include the recommended operator proof chain");
+  check(markdown.includes("Operator private input file default path:"), "release-channel edit packet Markdown should include operator private input file path guidance");
+  check(markdown.includes("Guided setup fallback command:"), "release-channel edit packet Markdown should include guided setup fallback");
   check(markdown.includes("Current Operator Commands"), "release-channel edit packet Markdown should include current operator commands");
   check(markdown.includes("Current operator first command:"), "release-channel edit packet Markdown should include current operator first command");
   check(markdown.includes("Release-Channel Edit Rows"), "release-channel edit packet Markdown should include edit rows");
@@ -801,8 +882,9 @@ for (const row of refreshCommandRows) {
 
 const doctor = await readJsonRequired(releaseDoctorJsonPath, "Release doctor");
 const liveCheck = await readJsonRequired(releaseChannelLiveCheckJsonPath, "Release-channel live check");
+const preflightBlocked = await readJsonRequired(releaseChannelPreflightBlockedJsonPath, "Release-channel private env preflight blocked smoke");
 const progress = await completedPlanProgress();
-const report = buildReport({ doctor, liveCheck, progress });
+const report = buildReport({ doctor, liveCheck, preflightBlocked, progress });
 const markdown = buildMarkdown(report);
 validateReport(report, markdown);
 
@@ -816,6 +898,12 @@ console.log(`- JSON: ${relative(packetJsonPath)}`);
 console.log("- Release-channel edit packet ready: yes");
 console.log(`- Packet mode: ${report.releaseChannelEditPacketMode}`);
 console.log(`- Recommended operator proof chain: ${report.releaseChannelRecommendedOperatorProofCommand}`);
+console.log(`- Private input file key: ${report.releaseChannelPrivateInputFileKey}`);
+console.log(`- Private input file default: ${report.releaseChannelPrivateInputFileDefaultName}`);
+console.log(`- Operator private input file default path: ${report.releaseChannelOperatorPrivateInputFileDefaultPath}`);
+console.log(`- Current blocked-smoke private input file path: ${report.releaseChannelPrivateInputFilePath}`);
+console.log(`- Private input file loaded keys: ${report.releaseChannelPrivateInputFileLoadedKeyCount}`);
+console.log(`- Guided setup fallback command: ${report.releaseChannelGuidedSetupFallbackCommand}`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
 console.log(`- Latest 10-plan progress: ${report.latestTenPlanProgressLabel}`);
 console.log(`- Current action: ${report.currentActionLabel}`);
