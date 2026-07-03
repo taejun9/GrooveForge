@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,6 +18,7 @@ const readoutRefreshCommand = "npm run release:completion-summary-refresh-smoke"
 const sourceJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${sourceStem}.json`);
 const readoutMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${readoutStem}.md`);
 const readoutJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${readoutStem}.json`);
+const completedPlanRoot = path.join(root, "docs", "exec_plans", "completed");
 const failures = [];
 const releaseChannelPrivateInputTemplateCommand = "npm run release:channel-private-input-template";
 const releaseChannelPrivateInputTemplateRole =
@@ -100,6 +101,12 @@ function buildSourceGuidance(report) {
     `- Source ready: ${readyLabel(report.sourceReady)}`,
     `- Source summary ready: ${readyLabel(report.sourceSummaryReady)}`,
     `- Source labels match: ${readyLabel(report.sourceLabelsMatch)}`,
+    `- Source latest plan: ${report.latestPlan}`,
+    `- Current completed-plan latest: ${report.currentCompletedPlan}`,
+    `- Source 10-plan progress: ${report.tenPlanProgress}`,
+    `- Current completed-plan 10-plan progress: ${report.currentCompletedPlanTenPlanProgress}`,
+    `- Source latest plan matches current completed plans: ${readyLabel(report.sourceLatestPlanMatchesCurrentCompletedPlans)}`,
+    `- Source 10-plan progress matches current completed plans: ${readyLabel(report.sourceTenPlanProgressMatchesCurrentCompletedPlans)}`,
     `- Strict proof handoff ready: ${readyLabel(report.strictProofHandoffReceiptReady)}`,
     `- Private-edit blocked smoke ready: ${readyLabel(report.privateEditBlockedSmokeReady)}`,
     `- Final handoff success-redaction ready: ${readyLabel(report.finalHandoffSuccessRedactionReady)}`,
@@ -108,10 +115,43 @@ function buildSourceGuidance(report) {
   ].join("\n");
 }
 
-function buildReport(source) {
+async function currentCompletedPlanState() {
+  const completedFiles = await readdir(completedPlanRoot);
+  const completedPlanNumbers = completedFiles
+    .map((file) => /^plan-(\d+)-/.exec(file)?.[1])
+    .filter((value) => typeof value === "string")
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  if (completedPlanNumbers.length === 0) {
+    fail("No completed plan files were found.", `Expected completed plans under ${relative(completedPlanRoot)}.`);
+  }
+  const latestPlanNumber = Math.max(...completedPlanNumbers);
+  const windowStart = latestPlanNumber - ((latestPlanNumber - 1) % 10);
+  const windowEnd = windowStart + 9;
+  const windowRows = completedPlanNumbers.filter((number) => number >= windowStart && number <= windowEnd).sort((a, b) => a - b);
+  return {
+    latestPlanNumber,
+    latestPlan: `plan-${latestPlanNumber}`,
+    tenPlanWindowStart: windowStart,
+    tenPlanWindowEnd: windowEnd,
+    tenPlanCompletedCount: windowRows.length,
+    tenPlanTotal: 10,
+    tenPlanProgress: `${windowStart}-${windowEnd}: ${windowRows.length}/10`,
+    tenPlanReportDue: windowRows.length === 10,
+    completedPlanRows: windowRows.map((number) => `plan-${number}`)
+  };
+}
+
+function buildReport(source, completedPlanState) {
   const summary = source.completionSummary ?? {};
   const completionBlockerActionRows = objectRows(summary.completionBlockerActionRows);
   const completionBlockerFocusRows = objectRows(summary.completionBlockerFocusRows);
+  const latestPlanNumber = integerValue(summary.latestPlanNumber);
+  const latestPlan = textValue(summary.latestPlan);
+  const tenPlanProgress = textValue(summary.tenPlanProgress);
+  const tenPlanCompletedCount = integerValue(summary.tenPlanCompletedCount);
+  const tenPlanTotal = integerValue(summary.tenPlanTotal);
+  const tenPlanReportDue = summary.tenPlanReportDue === true;
   return {
     appName,
     bundleId,
@@ -130,12 +170,28 @@ function buildReport(source) {
     sourceReady: source.releaseProgressRefreshReady === true,
     sourceSummaryReady: summary.ready === true,
     sourceLabelsMatch: source.labelsMatch === true,
-    latestPlanNumber: integerValue(summary.latestPlanNumber),
-    latestPlan: textValue(summary.latestPlan),
-    tenPlanProgress: textValue(summary.tenPlanProgress),
-    tenPlanCompletedCount: integerValue(summary.tenPlanCompletedCount),
-    tenPlanTotal: integerValue(summary.tenPlanTotal),
-    tenPlanReportDue: summary.tenPlanReportDue === true,
+    latestPlanNumber,
+    latestPlan,
+    tenPlanProgress,
+    tenPlanCompletedCount,
+    tenPlanTotal,
+    tenPlanReportDue,
+    currentCompletedPlanNumber: completedPlanState.latestPlanNumber,
+    currentCompletedPlan: completedPlanState.latestPlan,
+    currentCompletedPlanTenPlanProgress: completedPlanState.tenPlanProgress,
+    currentCompletedPlanTenPlanCompletedCount: completedPlanState.tenPlanCompletedCount,
+    currentCompletedPlanTenPlanTotal: completedPlanState.tenPlanTotal,
+    currentCompletedPlanTenPlanReportDue: completedPlanState.tenPlanReportDue,
+    currentCompletedPlanWindowStart: completedPlanState.tenPlanWindowStart,
+    currentCompletedPlanWindowEnd: completedPlanState.tenPlanWindowEnd,
+    currentCompletedPlanRows: completedPlanState.completedPlanRows,
+    sourceCompletedPlanStateReady: completedPlanState.latestPlanNumber > 0,
+    sourceLatestPlanMatchesCurrentCompletedPlans:
+      latestPlanNumber === completedPlanState.latestPlanNumber && latestPlan === completedPlanState.latestPlan,
+    sourceTenPlanProgressMatchesCurrentCompletedPlans: tenPlanProgress === completedPlanState.tenPlanProgress,
+    sourceTenPlanCountMatchesCurrentCompletedPlans:
+      tenPlanCompletedCount === completedPlanState.tenPlanCompletedCount && tenPlanTotal === completedPlanState.tenPlanTotal,
+    sourceTenPlanReportDueMatchesCurrentCompletedPlans: tenPlanReportDue === completedPlanState.tenPlanReportDue,
     completionPercent: summary.completionPercent,
     remainingPercent: summary.remainingPercent,
     freshArtifactCount: integerValue(summary.freshArtifactCount),
@@ -292,6 +348,10 @@ function buildMarkdown(report) {
 - Source labels match: ${readyLabel(report.sourceLabelsMatch)}
 - Latest completed plan: ${report.latestPlan}
 - 10-plan progress: ${report.tenPlanProgress}
+- Current completed-plan latest: ${report.currentCompletedPlan}
+- Current completed-plan 10-plan progress: ${report.currentCompletedPlanTenPlanProgress}
+- Source latest plan matches current completed plans: ${readyLabel(report.sourceLatestPlanMatchesCurrentCompletedPlans)}
+- Source 10-plan progress matches current completed plans: ${readyLabel(report.sourceTenPlanProgressMatchesCurrentCompletedPlans)}
 - User-facing completion: ${report.completionPercent}%
 - Remaining completion: ${report.remainingPercent}%
 - Fresh artifacts: ${report.freshArtifactCount}
@@ -392,8 +452,14 @@ function validateReport(report, markdown) {
   check(report.sourceReady === true, "release completion summary should require ready progress refresh source");
   check(report.sourceSummaryReady === true, "release completion summary should require ready compact source summary");
   check(report.sourceLabelsMatch === true, "release completion summary should require matched source labels");
+  check(report.sourceCompletedPlanStateReady === true, "release completion summary should derive current completed-plan filesystem state");
   check(report.latestPlanNumber > 0, "release completion summary should include latest plan number");
   check(report.latestPlan === `plan-${report.latestPlanNumber}`, "release completion summary should format latest plan");
+  check(report.sourceLatestPlanMatchesCurrentCompletedPlans === true, "release completion summary source latest plan should match current completed plan files");
+  check(report.sourceTenPlanProgressMatchesCurrentCompletedPlans === true, "release completion summary source 10-plan progress should match current completed plan files");
+  check(report.sourceTenPlanCountMatchesCurrentCompletedPlans === true, "release completion summary source 10-plan counts should match current completed plan files");
+  check(report.sourceTenPlanReportDueMatchesCurrentCompletedPlans === true, "release completion summary source 10-plan report due posture should match current completed plan files");
+  check(report.currentCompletedPlanRows.length === report.currentCompletedPlanTenPlanCompletedCount, "release completion summary current completed-plan rows should match current 10-plan count");
   check(report.tenPlanTotal === 10, "release completion summary should use ten-plan totals");
   check(report.tenPlanProgress === `${report.latestPlanNumber - ((report.latestPlanNumber - 1) % 10)}-${report.latestPlanNumber - ((report.latestPlanNumber - 1) % 10) + 9}: ${report.tenPlanCompletedCount}/10`, "release completion summary should align latest plan window");
   check(report.completionPercent === 99.999999, "release completion summary should preserve completion percent");
@@ -487,6 +553,7 @@ function validateReport(report, markdown) {
   check(!/https?:\/\//i.test(markdown), "release completion summary Markdown should not include URL values");
   check(markdown.includes("Release Completion Summary Smoke"), "release completion summary Markdown should include title");
   check(markdown.includes("Completion summary readout ready: yes"), "release completion summary Markdown should include readiness");
+  check(markdown.includes("Source latest plan matches current completed plans: yes"), "release completion summary Markdown should include current-plan guard status");
   check(markdown.includes("## Completion Blocker Action Receipt"), "release completion summary Markdown should include completion blocker action receipt");
   check(markdown.includes("## Completion Blocker Focus Rows"), "release completion summary Markdown should include completion blocker focus rows");
   check(markdown.includes("Completion blocker action receipt ready: yes"), "release completion summary Markdown should include blocker action receipt readiness");
@@ -500,7 +567,8 @@ function validateReport(report, markdown) {
 }
 
 const source = await readJsonRequired(sourceJsonPath, "Release progress refresh smoke");
-const report = buildReport(source);
+const completedPlanState = await currentCompletedPlanState();
+const report = buildReport(source, completedPlanState);
 report.completionSummaryReadoutReady = true;
 const markdown = buildMarkdown(report);
 validateReport(report, markdown);
@@ -516,6 +584,10 @@ console.log("- Completion summary readout ready: yes");
 console.log(`- Source command: ${report.sourceCommand}`);
 console.log(`- Latest completed plan: ${report.latestPlan}`);
 console.log(`- 10-plan progress: ${report.tenPlanProgress}`);
+console.log(`- Current completed-plan latest: ${report.currentCompletedPlan}`);
+console.log(`- Current completed-plan 10-plan progress: ${report.currentCompletedPlanTenPlanProgress}`);
+console.log(`- Source latest plan matches current completed plans: ${report.sourceLatestPlanMatchesCurrentCompletedPlans ? "yes" : "no"}`);
+console.log(`- Source 10-plan progress matches current completed plans: ${report.sourceTenPlanProgressMatchesCurrentCompletedPlans ? "yes" : "no"}`);
 console.log(`- User-facing completion: ${report.completionPercent}%`);
 console.log(`- Remaining completion: ${report.remainingPercent}%`);
 console.log(`- Fresh artifacts: ${report.freshArtifactCount}`);
