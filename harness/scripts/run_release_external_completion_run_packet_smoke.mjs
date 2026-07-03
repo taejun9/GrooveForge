@@ -34,6 +34,9 @@ const updateMetadataPacketJsonPath = path.join(
 );
 const developerIdPacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${developerIdPacketStem}.json`);
 const failures = [];
+const releaseChannelPrivateInputTemplateCommand = "npm run release:channel-private-input-template";
+const releaseChannelPrivateInputTemplateRole =
+  "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const privateEditStrictProofCommand = "npm run release:private-edit-strict-proof";
@@ -429,6 +432,26 @@ function buildReport({ completionSummaryRefresh, completionSummary, updateFeedPa
     currentOperatorPreflightBeforeApply: completionSummary.currentOperatorPreflightBeforeApply === true,
     currentOperatorApplyBeforeStrictProof: completionSummary.currentOperatorApplyBeforeStrictProof === true,
     currentOperatorValueRecorded: completionSummary.currentOperatorValueRecorded === true ? true : false,
+    releaseChannelPrivateInputTemplateCommand: textValue(
+      completionSummary.releaseChannelPrivateInputTemplateCommand,
+      releaseChannelPrivateInputTemplateCommand
+    ),
+    releaseChannelPrivateInputTemplateRole: textValue(
+      completionSummary.releaseChannelPrivateInputTemplateRole,
+      releaseChannelPrivateInputTemplateRole
+    ),
+    releaseChannelPrivateInputTemplateDefaultPath: textValue(
+      completionSummary.releaseChannelPrivateInputTemplateDefaultPath,
+      ".env.release-channel.local"
+    ),
+    releaseChannelPrivateInputTemplatePrivateInputFileKey: textValue(
+      completionSummary.releaseChannelPrivateInputTemplatePrivateInputFileKey,
+      "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE"
+    ),
+    releaseChannelPrivateInputTemplateBeforePreflight:
+      completionSummary.releaseChannelPrivateInputTemplateBeforePreflight === true,
+    releaseChannelPrivateInputTemplateValueRecorded:
+      completionSummary.releaseChannelPrivateInputTemplateValueRecorded === true ? true : false,
     firstRunCommand: textValue(runRows[0]?.command),
     firstRunMatchesCurrentOperatorFirstCommand:
       textValue(runRows[0]?.command) !== "none" && textValue(runRows[0]?.command) === textValue(completionSummary.currentOperatorFirstCommand),
@@ -562,6 +585,9 @@ function buildMarkdown(report) {
 - First run matches current operator first command: ${readyLabel(report.firstRunMatchesCurrentOperatorFirstCommand)}
 - Current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
 - Current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
+- Private input template command: \`${report.releaseChannelPrivateInputTemplateCommand}\`
+- Private input template default path: \`${report.releaseChannelPrivateInputTemplateDefaultPath}\`
+- Private input template before preflight: ${readyLabel(report.releaseChannelPrivateInputTemplateBeforePreflight)}
 - Release-channel metadata blocked: ${readyLabel(report.releaseChannelMetadataBlocked)}
 - Release-channel metadata cleared: ${readyLabel(report.releaseChannelMetadataCleared)}
 - Release-channel metadata needs ignored env: ${readyLabel(report.releaseChannelMetadataNeedsIgnoredEnv)}
@@ -702,6 +728,30 @@ function validateReport(report, markdown) {
   check(report.currentOperatorPreflightBeforeApply === true, "external completion run packet current operator sequence should place preflight before apply");
   check(report.currentOperatorApplyBeforeStrictProof === true, "external completion run packet current operator sequence should place apply before strict proof");
   check(
+    report.releaseChannelPrivateInputTemplateCommand === releaseChannelPrivateInputTemplateCommand,
+    "external completion run packet should expose private input template command"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplateRole === releaseChannelPrivateInputTemplateRole,
+    "external completion run packet should expose private input template role"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplateDefaultPath === ".env.release-channel.local",
+    "external completion run packet should expose private input template default path"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplatePrivateInputFileKey === "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE",
+    "external completion run packet should expose private input template file key"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplateBeforePreflight === true,
+    "external completion run packet should place private input template before preflight"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplateValueRecorded === false,
+    "external completion run packet private input template command should be value-free"
+  );
+  check(
     report.currentOperatorBlockerRefreshCommand === "npm run release:current-blocker",
     "external completion run packet current operator sequence should include current-blocker refresh"
   );
@@ -780,6 +830,7 @@ function validateReport(report, markdown) {
   check(!/https?:\/\//i.test(serialized), "external completion run packet JSON should not include URL values");
   check(!/https?:\/\//i.test(markdown), "external completion run packet Markdown should not include URL values");
   check(markdown.includes("External Completion Run Packet Smoke"), "external completion run packet Markdown should include title");
+  check(markdown.includes("Private input template command:"), "external completion run packet Markdown should include private input template command");
   check(markdown.includes("## External Completion Run Rows"), "external completion run packet Markdown should include run rows");
   check(markdown.includes("## Current Operator Command Sequence"), "external completion run packet Markdown should include current operator command sequence");
   check(markdown.includes("Current blocker run rows"), "external completion run packet Markdown should include current blocker row summary");
@@ -828,6 +879,8 @@ console.log(`- Current operator first command: ${report.currentOperatorFirstComm
 console.log(`- First run matches current operator first command: ${report.firstRunMatchesCurrentOperatorFirstCommand ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
+console.log(`- Private input template command: ${report.releaseChannelPrivateInputTemplateCommand}`);
+console.log(`- Private input template default path: ${report.releaseChannelPrivateInputTemplateDefaultPath}`);
 console.log(`- Run rows: ${report.runRowCount}`);
 console.log(`- Blocked run rows: ${report.blockedRunRowCount} (${report.blockedRunRowSummary})`);
 console.log(`- Current blocker run rows: ${report.currentBlockedRunRowCount} (${report.currentBlockedRunRowSummary})`);

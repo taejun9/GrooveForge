@@ -21,6 +21,9 @@ const operatorCompletionBriefJsonPath = path.join(packageRoot, `${appName}-${pac
 const refreshMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${refreshStem}.md`);
 const refreshJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${refreshStem}.json`);
 const failures = [];
+const releaseChannelPrivateInputTemplateCommand = "npm run release:channel-private-input-template";
+const releaseChannelPrivateInputTemplateRole =
+  "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvPreflightRole =
   "verify operator-owned release-channel process env values before writing the ignored local env";
@@ -444,6 +447,25 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     currentOperatorPreflightBeforeApply: currentBlocker.currentOperatorPreflightBeforeApply === true,
     currentOperatorApplyBeforeStrictProof: currentBlocker.currentOperatorApplyBeforeStrictProof === true,
     currentOperatorValueRecorded: currentBlocker.currentOperatorValueRecorded === true ? true : false,
+    releaseChannelPrivateInputTemplateCommand: textValue(
+      completionReportPacket.channelEditPrivateInputTemplateCommand,
+      releaseChannelPrivateInputTemplateCommand
+    ),
+    releaseChannelPrivateInputTemplateRole: textValue(
+      completionReportPacket.channelEditPrivateInputTemplateRole,
+      releaseChannelPrivateInputTemplateRole
+    ),
+    releaseChannelPrivateInputTemplateDefaultPath: textValue(
+      completionReportPacket.channelEditPrivateInputTemplateDefaultPath,
+      ".env.release-channel.local"
+    ),
+    releaseChannelPrivateInputTemplatePrivateInputFileKey: textValue(
+      completionReportPacket.channelEditPrivateInputTemplatePrivateInputFileKey,
+      "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE"
+    ),
+    releaseChannelPrivateInputTemplateBeforePreflight:
+      completionReportPacket.channelEditPrivateInputTemplateBeforePreflight === true,
+    releaseChannelPrivateInputTemplateValueRecorded: false,
     releaseChannelPrivateEnvApplyPreflightCommand: releaseChannelApplyPrivateEnvPreflightCommand,
     releaseChannelPrivateEnvApplyPreflightRole: releaseChannelApplyPrivateEnvPreflightRole,
     releaseChannelPrivateEnvApplyPreflightBeforeApply:
@@ -572,6 +594,13 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     currentOperatorPreflightBeforeApply: completionSummary.currentOperatorPreflightBeforeApply,
     currentOperatorApplyBeforeStrictProof: completionSummary.currentOperatorApplyBeforeStrictProof,
     currentOperatorValueRecorded: completionSummary.currentOperatorValueRecorded,
+    releaseChannelPrivateInputTemplateCommand: completionSummary.releaseChannelPrivateInputTemplateCommand,
+    releaseChannelPrivateInputTemplateRole: completionSummary.releaseChannelPrivateInputTemplateRole,
+    releaseChannelPrivateInputTemplateDefaultPath: completionSummary.releaseChannelPrivateInputTemplateDefaultPath,
+    releaseChannelPrivateInputTemplatePrivateInputFileKey:
+      completionSummary.releaseChannelPrivateInputTemplatePrivateInputFileKey,
+    releaseChannelPrivateInputTemplateBeforePreflight: completionSummary.releaseChannelPrivateInputTemplateBeforePreflight,
+    releaseChannelPrivateInputTemplateValueRecorded: completionSummary.releaseChannelPrivateInputTemplateValueRecorded,
     releaseChannelPrivateEnvApplyPreflightCommand: completionSummary.releaseChannelPrivateEnvApplyPreflightCommand,
     releaseChannelPrivateEnvApplyPreflightRole: completionSummary.releaseChannelPrivateEnvApplyPreflightRole,
     releaseChannelPrivateEnvApplyPreflightBeforeApply: completionSummary.releaseChannelPrivateEnvApplyPreflightBeforeApply,
@@ -716,6 +745,9 @@ function buildMarkdown(report) {
 - Current operator first command: \`${report.completionSummary.currentOperatorFirstCommand}\`
 - Current operator preflight before apply: ${readyLabel(report.completionSummary.currentOperatorPreflightBeforeApply)}
 - Current operator apply before strict proof: ${readyLabel(report.completionSummary.currentOperatorApplyBeforeStrictProof)}
+- Private input template command: \`${report.completionSummary.releaseChannelPrivateInputTemplateCommand}\`
+- Private input template default path: \`${report.completionSummary.releaseChannelPrivateInputTemplateDefaultPath}\`
+- Private input template before preflight: ${readyLabel(report.completionSummary.releaseChannelPrivateInputTemplateBeforePreflight)}
 - Private env apply preflight command: \`${report.completionSummary.releaseChannelPrivateEnvApplyPreflightCommand}\`
 - Private env apply preflight before apply: ${readyLabel(report.completionSummary.releaseChannelPrivateEnvApplyPreflightBeforeApply)}
 - Private env apply command: \`${report.completionSummary.releaseChannelPrivateEnvApplyCommand}\`
@@ -920,6 +952,30 @@ function validateReport(report, markdown) {
   check(report.currentOperatorNextActionsRefreshCommand === "npm run release:next-actions", "release progress refresh current operator sequence should include next-actions refresh");
   check(report.currentOperatorValueRecorded === false, "release progress refresh current operator sequence should be value-free");
   check(
+    report.completionSummary.releaseChannelPrivateInputTemplateCommand === releaseChannelPrivateInputTemplateCommand,
+    "release progress refresh summary should expose release-channel private input template command"
+  );
+  check(
+    report.completionSummary.releaseChannelPrivateInputTemplateRole === releaseChannelPrivateInputTemplateRole,
+    "release progress refresh summary should expose release-channel private input template role"
+  );
+  check(
+    report.completionSummary.releaseChannelPrivateInputTemplateDefaultPath === ".env.release-channel.local",
+    "release progress refresh summary should expose release-channel private input template default path"
+  );
+  check(
+    report.completionSummary.releaseChannelPrivateInputTemplatePrivateInputFileKey === "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE",
+    "release progress refresh summary should expose release-channel private input template file key"
+  );
+  check(
+    report.completionSummary.releaseChannelPrivateInputTemplateBeforePreflight === true,
+    "release progress refresh summary should place release-channel private input template before preflight"
+  );
+  check(
+    report.completionSummary.releaseChannelPrivateInputTemplateValueRecorded === false,
+    "release progress refresh summary private input template command should be value-free"
+  );
+  check(
     report.completionSummary.releaseChannelFirstProofCommandAfterPrivateEdits === "npm run release:channel-live-check",
     "release progress refresh summary should expose release-channel first proof command"
   );
@@ -1101,6 +1157,8 @@ console.log(`- Current operator command rows: ${report.currentOperatorCommandRow
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
 console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
+console.log(`- Private input template command: ${report.releaseChannelPrivateInputTemplateCommand}`);
+console.log(`- Private input template default path: ${report.releaseChannelPrivateInputTemplateDefaultPath}`);
 console.log(`- Private env apply preflight command: ${report.releaseChannelPrivateEnvApplyPreflightCommand}`);
 console.log(`- Private env apply preflight before apply: ${report.releaseChannelPrivateEnvApplyPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Private env apply command: ${report.releaseChannelPrivateEnvApplyCommand}`);

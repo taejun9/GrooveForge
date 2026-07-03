@@ -24,6 +24,9 @@ const clearanceTransitionJsonPath = path.join(packageRoot, `${appName}-${package
 const autoUpdateTransitionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-auto-update-transition-smoke.json`);
 const updateFeedCheckpointJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-update-feed-checkpoint-smoke.json`);
 const failures = [];
+const releaseChannelPrivateInputTemplateCommand = "npm run release:channel-private-input-template";
+const releaseChannelPrivateInputTemplateRole =
+  "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
 const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
@@ -839,6 +842,12 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     audience.completionGapStatus === "external proof pending" &&
     channel.completionGapStatus === "external proof pending" &&
     channel.externalDistributionReady === false &&
+    channel.releaseChannelPrivateInputTemplateCommand === releaseChannelPrivateInputTemplateCommand &&
+    channel.releaseChannelPrivateInputTemplateRole === releaseChannelPrivateInputTemplateRole &&
+    channel.releaseChannelPrivateInputTemplateDefaultPath === ".env.release-channel.local" &&
+    channel.releaseChannelPrivateInputTemplatePrivateInputFileKey === "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE" &&
+    channel.releaseChannelPrivateInputTemplateBeforePreflight === true &&
+    channel.releaseChannelPrivateInputTemplateValueRecorded === false &&
     channel.releaseChannelSetupWizardCommand === releaseChannelSetupWizardCommand &&
     channel.releaseChannelSetupWizardCommandValueRecorded === false &&
     channel.releaseChannelPrivateInputFileGuidanceReady === true &&
@@ -979,6 +988,16 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     updateFeedCheckpointRowCount: updateFeedCheckpointRows.length,
     updateFeedCheckpointSummary: updateFeedCheckpointRows.map((row) => row.item).join(", "),
     updateFeedCheckpointValueRecorded: false,
+    channelEditPrivateInputTemplateCommand: textValue(channel.releaseChannelPrivateInputTemplateCommand),
+    channelEditPrivateInputTemplateRole: textValue(channel.releaseChannelPrivateInputTemplateRole),
+    channelEditPrivateInputTemplateDefaultPath: textValue(channel.releaseChannelPrivateInputTemplateDefaultPath),
+    channelEditPrivateInputTemplatePrivateInputFileKey: textValue(
+      channel.releaseChannelPrivateInputTemplatePrivateInputFileKey
+    ),
+    channelEditPrivateInputTemplateBeforePreflight:
+      channel.releaseChannelPrivateInputTemplateBeforePreflight === true,
+    channelEditPrivateInputTemplateValueRecorded:
+      channel.releaseChannelPrivateInputTemplateValueRecorded === false,
     channelEditSetupWizardCommand: textValue(channel.releaseChannelSetupWizardCommand),
     channelEditSetupWizardCommandValueRecorded: channel.releaseChannelSetupWizardCommandValueRecorded === false,
     channelEditRecommendedOperatorProofCommand: textValue(channel.releaseChannelRecommendedOperatorProofCommand),
@@ -1172,6 +1191,9 @@ function buildMarkdown(report) {
 - Final handoff real strict placeholder keys: ${report.finalHandoffSuccessRedactionRealStrictPlaceholderKeyCount}
 - Final handoff real env read: ${readyLabel(report.finalHandoffSuccessRedactionRealLocalEnvRead)}
 - Channel edit packet setup wizard command: \`${report.channelEditSetupWizardCommand}\`
+- Channel edit private input template command: \`${report.channelEditPrivateInputTemplateCommand}\`
+- Channel edit private input template default path: \`${report.channelEditPrivateInputTemplateDefaultPath}\`
+- Channel edit private input template before preflight: ${readyLabel(report.channelEditPrivateInputTemplateBeforePreflight)}
 - Channel edit packet recommended proof chain: \`${report.channelEditRecommendedOperatorProofCommand}\`
 - Channel edit packet proof role: ${report.channelEditRecommendedOperatorProofCommandRole}
 - Channel edit packet preflight command: \`${report.channelEditApplyPrivateEnvPreflightCommand}\`
@@ -1463,6 +1485,15 @@ function validateReport(report, markdown) {
   check(report.updateFeedCheckpointRows.every((row) => row.valueRecorded === false), "release completion report packet update-feed checkpoint rows should not record values");
   check(report.updateFeedCheckpointValueRecorded === false, "release completion report packet update-feed checkpoint evidence should be value-free");
   check(report.channelEditRecommendedOperatorProofCommand === privateEditOperatorProofCommand, "release completion report packet should mirror the channel edit packet recommended proof chain");
+  check(report.channelEditPrivateInputTemplateCommand === releaseChannelPrivateInputTemplateCommand, "release completion report packet should mirror the private input template command");
+  check(report.channelEditPrivateInputTemplateRole === releaseChannelPrivateInputTemplateRole, "release completion report packet should mirror the private input template role");
+  check(report.channelEditPrivateInputTemplateDefaultPath === ".env.release-channel.local", "release completion report packet should mirror the private input template default path");
+  check(
+    report.channelEditPrivateInputTemplatePrivateInputFileKey === "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE",
+    "release completion report packet should mirror the private input template file key"
+  );
+  check(report.channelEditPrivateInputTemplateBeforePreflight === true, "release completion report packet should place private input template before preflight");
+  check(report.channelEditPrivateInputTemplateValueRecorded === true, "release completion report packet should prove the private input template command is value-free");
   check(report.channelEditSetupWizardCommand === releaseChannelSetupWizardCommand, "release completion report packet should mirror the channel edit packet setup wizard");
   check(report.channelEditSetupWizardCommandValueRecorded === true, "release completion report packet should prove the channel edit packet setup wizard is value-free");
   check(
@@ -1723,6 +1754,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("Update-feed checkpoint ready:"), "release completion report packet Markdown should include update-feed checkpoint readiness");
   check(markdown.includes("Update Feed Checkpoint Evidence"), "release completion report packet Markdown should include update-feed checkpoint evidence table");
   check(markdown.includes("Channel edit packet setup wizard command:"), "release completion report packet Markdown should include channel edit packet setup wizard");
+  check(markdown.includes("Channel edit private input template command:"), "release completion report packet Markdown should include channel edit private input template command");
   check(markdown.includes("Channel edit packet recommended proof chain:"), "release completion report packet Markdown should include channel edit packet proof recommendation");
   check(markdown.includes("Channel edit operator private input file default path:"), "release completion report packet Markdown should include operator private input file path guidance");
   check(markdown.includes("Channel edit guided setup fallback command:"), "release completion report packet Markdown should include guided setup fallback");
@@ -1785,6 +1817,8 @@ console.log(`- Current operator first command is guided setup: ${report.currentO
 console.log(`- Current operator source rows available: ${report.currentOperatorSourceCommandRowsAvailable ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
+console.log(`- Channel edit private input template command: ${report.channelEditPrivateInputTemplateCommand}`);
+console.log(`- Channel edit private input template default path: ${report.channelEditPrivateInputTemplateDefaultPath}`);
 console.log(`- Strict proof handoff receipt ready: ${report.strictProofHandoffReceiptReady ? "yes" : "no"}`);
 console.log(`- Strict proof handoff receipt rows: ${report.strictProofHandoffReceiptRowCount} (${report.strictProofHandoffReceiptSummary})`);
 console.log(`- Private-edit blocked smoke ready: ${report.privateEditBlockedSmokeReady ? "yes" : "no"}`);

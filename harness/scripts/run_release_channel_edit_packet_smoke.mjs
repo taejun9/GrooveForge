@@ -26,6 +26,9 @@ const releaseChannelMetadataKeys = [
   "GROOVEFORGE_SUPPORT_URL"
 ];
 const recommendedOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const releaseChannelPrivateInputTemplateCommand = "npm run release:channel-private-input-template";
+const releaseChannelPrivateInputTemplateRole =
+  "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
 const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
@@ -203,14 +206,46 @@ function operatorCommandRows(mode, currentEnvEditTarget) {
       ? [
           {
             order: 1,
+            command: releaseChannelPrivateInputTemplateCommand,
+            role: releaseChannelPrivateInputTemplateRole,
+            valueRecorded: false
+          },
+          {
+            order: 2,
             command: releaseChannelSetupWizardCommand,
             role: `guided local-only setup for the four private release-channel metadata values in ${currentEnvEditTarget}`,
             valueRecorded: false
           },
           {
-            order: 2,
+            order: 3,
             command: "npm run release:prepare-env",
             role: "create the ignored local distribution env scaffold before private edits",
+            valueRecorded: false
+          },
+          {
+            order: 4,
+            command: releaseChannelApplyPrivateEnvPreflightCommand,
+            role: `verify the four private release-channel process env values before writing ${currentEnvEditTarget}`,
+            valueRecorded: false
+          },
+          {
+            order: 5,
+            command: releaseChannelApplyPrivateEnvCommand,
+            role: `apply the four private release-channel metadata values from process env into ${currentEnvEditTarget} after preflight passes`,
+            valueRecorded: false
+          }
+        ]
+      : [
+          {
+            order: 1,
+            command: releaseChannelPrivateInputTemplateCommand,
+            role: releaseChannelPrivateInputTemplateRole,
+            valueRecorded: false
+          },
+          {
+            order: 2,
+            command: releaseChannelSetupWizardCommand,
+            role: `guided local-only setup for the four private release-channel metadata values in ${currentEnvEditTarget}`,
             valueRecorded: false
           },
           {
@@ -221,26 +256,6 @@ function operatorCommandRows(mode, currentEnvEditTarget) {
           },
           {
             order: 4,
-            command: releaseChannelApplyPrivateEnvCommand,
-            role: `apply the four private release-channel metadata values from process env into ${currentEnvEditTarget} after preflight passes`,
-            valueRecorded: false
-          }
-        ]
-      : [
-          {
-            order: 1,
-            command: releaseChannelSetupWizardCommand,
-            role: `guided local-only setup for the four private release-channel metadata values in ${currentEnvEditTarget}`,
-            valueRecorded: false
-          },
-          {
-            order: 2,
-            command: releaseChannelApplyPrivateEnvPreflightCommand,
-            role: `verify the four private release-channel process env values before writing ${currentEnvEditTarget}`,
-            valueRecorded: false
-          },
-          {
-            order: 3,
             command: releaseChannelApplyPrivateEnvCommand,
             role: `apply the four private release-channel metadata values from process env into ${currentEnvEditTarget} after preflight passes`,
             valueRecorded: false
@@ -510,6 +525,15 @@ function buildReport({ doctor, liveCheck, preflightBlocked, progress }) {
       currentOperatorApplyCommandOrder < currentOperatorStrictProofCommandOrder,
     currentOperatorFirstCommandIsGuidedSetup: currentOperatorRows[0]?.command === releaseChannelSetupWizardCommand,
     currentOperatorValueRecorded: false,
+    releaseChannelPrivateInputTemplateCommand,
+    releaseChannelPrivateInputTemplateRole,
+    releaseChannelPrivateInputTemplateDefaultPath: defaultPrivateInputFileName,
+    releaseChannelPrivateInputTemplatePrivateInputFileKey: privateInputFileKey,
+    releaseChannelPrivateInputTemplateBeforePreflight:
+      commandOrder(operatorRows, releaseChannelPrivateInputTemplateCommand) > 0 &&
+      commandOrder(operatorRows, releaseChannelPrivateInputTemplateCommand) <
+        commandOrder(operatorRows, releaseChannelApplyPrivateEnvPreflightCommand),
+    releaseChannelPrivateInputTemplateValueRecorded: false,
     releaseChannelSetupWizardCommand,
     releaseChannelSetupWizardCommandValueRecorded: false,
     releaseChannelApplyPrivateEnvPreflightCommand,
@@ -629,6 +653,9 @@ function buildMarkdown(report) {
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
 - Current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
 - Current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
+- Private input template command: \`${report.releaseChannelPrivateInputTemplateCommand}\`
+- Private input template default path: \`${report.releaseChannelPrivateInputTemplateDefaultPath}\`
+- Private input template before preflight: ${readyLabel(report.releaseChannelPrivateInputTemplateBeforePreflight)}
 - Guided setup wizard command: \`${report.releaseChannelSetupWizardCommand}\`
 - Private metadata preflight command: \`${report.releaseChannelApplyPrivateEnvPreflightCommand}\`
 - First private metadata apply command: \`${report.releaseChannelApplyPrivateEnvCommand}\`
@@ -743,6 +770,34 @@ function validateReport(report, markdown) {
   check(
     report.operatorCommandRows.some((row) => row.command === releaseChannelSetupWizardCommand),
     "release-channel edit packet should include the setup wizard"
+  );
+  check(
+    report.operatorCommandRows.some((row) => row.command === releaseChannelPrivateInputTemplateCommand),
+    "release-channel edit packet should include the private input template command"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplateCommand === releaseChannelPrivateInputTemplateCommand,
+    "release-channel edit packet should expose the private input template command"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplateRole === releaseChannelPrivateInputTemplateRole,
+    "release-channel edit packet should describe the private input template role"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplateDefaultPath === defaultPrivateInputFileName,
+    "release-channel edit packet should expose the private input template default path"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplatePrivateInputFileKey === privateInputFileKey,
+    "release-channel edit packet should expose the private input template file key"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplateBeforePreflight === true,
+    "release-channel edit packet should place the private input template before preflight in the helper sequence"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplateValueRecorded === false,
+    "release-channel edit packet private input template command should be value-free"
   );
   check(
     report.operatorCommandRows.some((row) => row.command === releaseChannelApplyPrivateEnvPreflightCommand),
@@ -863,6 +918,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("Release-Channel Edit Packet Smoke"), "release-channel edit packet Markdown should include title");
   check(markdown.includes("Release-channel edit packet ready: yes"), "release-channel edit packet Markdown should include readiness");
   check(markdown.includes("Recommended operator proof chain"), "release-channel edit packet Markdown should include the recommended operator proof chain");
+  check(markdown.includes("Private input template command:"), "release-channel edit packet Markdown should include the private input template command");
   check(markdown.includes("Operator private input file default path:"), "release-channel edit packet Markdown should include operator private input file path guidance");
   check(markdown.includes("Guided setup fallback command:"), "release-channel edit packet Markdown should include guided setup fallback");
   check(markdown.includes("Current Operator Commands"), "release-channel edit packet Markdown should include current operator commands");
@@ -898,6 +954,8 @@ console.log(`- JSON: ${relative(packetJsonPath)}`);
 console.log("- Release-channel edit packet ready: yes");
 console.log(`- Packet mode: ${report.releaseChannelEditPacketMode}`);
 console.log(`- Recommended operator proof chain: ${report.releaseChannelRecommendedOperatorProofCommand}`);
+console.log(`- Private input template command: ${report.releaseChannelPrivateInputTemplateCommand}`);
+console.log(`- Private input template default path: ${report.releaseChannelPrivateInputTemplateDefaultPath}`);
 console.log(`- Private input file key: ${report.releaseChannelPrivateInputFileKey}`);
 console.log(`- Private input file default: ${report.releaseChannelPrivateInputFileDefaultName}`);
 console.log(`- Operator private input file default path: ${report.releaseChannelOperatorPrivateInputFileDefaultPath}`);

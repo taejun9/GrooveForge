@@ -24,6 +24,9 @@ const preflightBlockedJsonPath = path.join(packageRoot, `${appName}-${packageJso
 const resumePacketMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${resumePacketStem}.md`);
 const resumePacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${resumePacketStem}.json`);
 const failures = [];
+const releaseChannelPrivateInputTemplateCommand = "npm run release:channel-private-input-template";
+const releaseChannelPrivateInputTemplateRole =
+  "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
@@ -319,6 +322,26 @@ function buildReport(sourcePacket, preflightBlocked) {
     currentOperatorPreflightBeforeApply: sourcePacket.currentOperatorPreflightBeforeApply === true,
     currentOperatorApplyBeforeStrictProof: sourcePacket.currentOperatorApplyBeforeStrictProof === true,
     currentOperatorValueRecorded: sourcePacket.currentOperatorValueRecorded === true ? true : false,
+    releaseChannelPrivateInputTemplateCommand: textValue(
+      sourcePacket.releaseChannelPrivateInputTemplateCommand,
+      releaseChannelPrivateInputTemplateCommand
+    ),
+    releaseChannelPrivateInputTemplateRole: textValue(
+      sourcePacket.releaseChannelPrivateInputTemplateRole,
+      releaseChannelPrivateInputTemplateRole
+    ),
+    releaseChannelPrivateInputTemplateDefaultPath: textValue(
+      sourcePacket.releaseChannelPrivateInputTemplateDefaultPath,
+      defaultPrivateInputFileName
+    ),
+    releaseChannelPrivateInputTemplatePrivateInputFileKey: textValue(
+      sourcePacket.releaseChannelPrivateInputTemplatePrivateInputFileKey,
+      privateInputFileKey
+    ),
+    releaseChannelPrivateInputTemplateBeforePreflight:
+      sourcePacket.releaseChannelPrivateInputTemplateBeforePreflight === true,
+    releaseChannelPrivateInputTemplateValueRecorded:
+      sourcePacket.releaseChannelPrivateInputTemplateValueRecorded === true ? true : false,
     hardGateCommand: textValue(sourcePacket.hardGateCommand, "npm run release:external-check"),
     hardGateReady: sourcePacket.hardGateReady === true,
     hardGateWouldFail: sourcePacket.hardGateWouldFail === true,
@@ -475,6 +498,9 @@ function buildMarkdown(report) {
 - Next resume matches current operator first command: ${readyLabel(report.nextResumeMatchesCurrentOperatorFirstCommand)}
 - Current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
 - Current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
+- Private input template command: \`${report.releaseChannelPrivateInputTemplateCommand}\`
+- Private input template default path: \`${report.releaseChannelPrivateInputTemplateDefaultPath}\`
+- Private input template before preflight: ${readyLabel(report.releaseChannelPrivateInputTemplateBeforePreflight)}
 - First blocked run row found: ${readyLabel(report.firstBlockedRunRowFound)}
 - First blocked run order: ${report.firstBlockedRunOrder}
 - First blocked phase: ${report.firstBlockedPhase}
@@ -779,6 +805,30 @@ function validateReport(report, markdown) {
   check(report.currentOperatorPreflightBeforeApply === true, "external completion resume packet current operator sequence should place preflight before apply");
   check(report.currentOperatorApplyBeforeStrictProof === true, "external completion resume packet current operator sequence should place apply before strict proof");
   check(
+    report.releaseChannelPrivateInputTemplateCommand === releaseChannelPrivateInputTemplateCommand,
+    "external completion resume packet should expose private input template command"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplateRole === releaseChannelPrivateInputTemplateRole,
+    "external completion resume packet should expose private input template role"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplateDefaultPath === defaultPrivateInputFileName,
+    "external completion resume packet should expose private input template default path"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplatePrivateInputFileKey === privateInputFileKey,
+    "external completion resume packet should expose private input template file key"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplateBeforePreflight === true,
+    "external completion resume packet should place private input template before preflight"
+  );
+  check(
+    report.releaseChannelPrivateInputTemplateValueRecorded === false,
+    "external completion resume packet private input template command should be value-free"
+  );
+  check(
     report.currentOperatorBlockerRefreshCommand === "npm run release:current-blocker",
     "external completion resume packet current operator sequence should include current-blocker refresh"
   );
@@ -852,6 +902,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("## First Blocked Run Row"), "external completion resume packet Markdown should include first blocked row");
   check(markdown.includes("## Resume Rows"), "external completion resume packet Markdown should include resume rows");
   check(markdown.includes("## Current Operator Command Sequence"), "external completion resume packet Markdown should include current operator command sequence");
+  check(markdown.includes("Private input template command:"), "external completion resume packet Markdown should include private input template command");
   check(markdown.includes("## Private Env Preflight Blocker"), "external completion resume packet Markdown should include private env preflight blocker");
   check(markdown.includes("Private input file key:"), "external completion resume packet Markdown should include private input file key guidance");
   check(
@@ -899,6 +950,8 @@ console.log(`- Current operator first command: ${report.currentOperatorFirstComm
 console.log(`- Next resume matches current operator first command: ${report.nextResumeMatchesCurrentOperatorFirstCommand ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
+console.log(`- Private input template command: ${report.releaseChannelPrivateInputTemplateCommand}`);
+console.log(`- Private input template default path: ${report.releaseChannelPrivateInputTemplateDefaultPath}`);
 console.log(`- Private-env preflight blocked smoke ready: ${report.privateEnvPreflightBlockedReady ? "yes" : "no"}`);
 console.log(`- Private-env preflight missing inputs: ${report.privateEnvPreflightMissingInputCount}/${report.privateEnvPreflightRequiredInputCount}`);
 console.log(`- Private-env private input file key: ${report.privateEnvPreflightPrivateInputFileKey}`);
