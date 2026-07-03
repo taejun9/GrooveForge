@@ -213,6 +213,17 @@ function buildCurrentActionCommandSequence({ prerequisiteCommands = [], nextComm
   return unique([prerequisiteCommands, nextCommand, rerunCommands]);
 }
 
+function operatorStartRoleForCommand(command) {
+  const roles = {
+    "npm run release:prepare-env": "operator-scaffold",
+    [releaseChannelApplyPrivateEnvPreflightCommand]: "operator-preflight",
+    "npm run desktop:distribution-channel-qa-smoke": "operator-proof",
+    "npm run release:next-actions": "operator-refresh",
+    "npm run release:external-check": "operator-hard-gate"
+  };
+  return roles[command] ?? "operator-action";
+}
+
 function formatChecklistList(items) {
   return Array.isArray(items) && items.length > 0 ? items.map((item, index) => `${index + 1}. ${item}`).join("\n") : "1. None.";
 }
@@ -496,6 +507,7 @@ function buildCurrentAction({
       currentActionId: "prepare-local-distribution-env",
       currentActionLabel: "Create ignored local distribution env",
       currentActionNextCommand: "npm run release:prepare-env",
+      currentActionOperatorStartCommand: "npm run release:prepare-env",
       currentActionFirstBlocker: "Ignored local distribution env file is not loaded.",
       currentActionOperatorAction: `Run \`npm run release:prepare-env\` to create ${currentEnvEditTarget}, then set private release-channel process env values, run \`${releaseChannelApplyPrivateEnvPreflightCommand}\`, and run \`${releaseChannelApplyPrivateEnvCommand}\`.`,
       currentActionRequiredKeys: releaseChannelMetadataKeys,
@@ -518,6 +530,7 @@ function buildCurrentAction({
       currentActionId: "replace-release-channel-placeholders",
       currentActionLabel: "Replace release-channel metadata placeholders",
       currentActionNextCommand: "npm run release:doctor",
+      currentActionOperatorStartCommand: releaseChannelApplyPrivateEnvPreflightCommand,
       currentActionFirstBlocker: `Current release-channel metadata still contains ${releaseChannelPlaceholderKeys.length} placeholder keys.`,
       currentActionOperatorAction: `Set private process env values for the current release-channel keys (${releaseChannelPlaceholderKeys.length}), run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${currentEnvEditTarget}: ${keySummary}.`,
       currentActionPostEditProofCommand: privateEditStrictProofCommand,
@@ -543,6 +556,7 @@ function buildCurrentAction({
       currentActionId: "verify-release-channel-metadata",
       currentActionLabel: "Verify release-channel metadata",
       currentActionNextCommand: "npm run desktop:distribution-channel-qa-smoke",
+      currentActionOperatorStartCommand: "npm run desktop:distribution-channel-qa-smoke",
       currentActionFirstBlocker: firstChannelBlocker,
       currentActionOperatorAction: "Run distribution-channel QA after the current release-channel metadata keys have real operator-owned values.",
       currentActionRequiredKeys: releaseChannelMetadataKeys,
@@ -562,6 +576,7 @@ function buildCurrentAction({
       currentActionId: "continue-external-proof-chain",
       currentActionLabel: "Continue external proof chain",
       currentActionNextCommand: "npm run release:next-actions",
+      currentActionOperatorStartCommand: "npm run release:next-actions",
       currentActionFirstBlocker: firstBlocker,
       currentActionOperatorAction: "Use external next-actions to select the next proof target after release-channel metadata.",
       currentActionRequiredKeys: [],
@@ -575,6 +590,7 @@ function buildCurrentAction({
     currentActionId: "run-hard-external-distribution-gate",
     currentActionLabel: "Run hard external distribution gate",
     currentActionNextCommand: "npm run release:external-check",
+    currentActionOperatorStartCommand: "npm run release:external-check",
     currentActionFirstBlocker: "none",
     currentActionOperatorAction: "Run the hard external distribution gate after every redacted readiness signal is ready.",
     currentActionRequiredKeys: [],
@@ -589,6 +605,11 @@ function enrichCurrentAction(action, { currentEnvEditTarget = "", editLocations 
   const currentActionRequiredKeys = Array.isArray(action.currentActionRequiredKeys) ? action.currentActionRequiredKeys : [];
   const currentActionPlaceholderKeys = Array.isArray(action.currentActionPlaceholderKeys) ? action.currentActionPlaceholderKeys : [];
   const currentActionChecklist = Array.isArray(action.currentActionChecklist) ? action.currentActionChecklist : [];
+  const currentActionOperatorStartCommand =
+    typeof action.currentActionOperatorStartCommand === "string" && action.currentActionOperatorStartCommand.length > 0
+      ? action.currentActionOperatorStartCommand
+      : action.currentActionNextCommand;
+  const currentActionOperatorStartCommandRole = operatorStartRoleForCommand(currentActionOperatorStartCommand);
   const currentActionPostEditProofCommand =
     typeof action.currentActionPostEditProofCommand === "string" && action.currentActionPostEditProofCommand.length > 0
       ? action.currentActionPostEditProofCommand
@@ -654,6 +675,9 @@ function enrichCurrentAction(action, { currentEnvEditTarget = "", editLocations 
     currentActionCommandSequenceCount: currentActionCommandSequence.length,
     currentActionCommandSequenceSummary: formatCommandSummary(currentActionCommandSequence),
     currentActionCommandSequence,
+    currentActionOperatorStartCommand,
+    currentActionOperatorStartCommandRole,
+    currentActionOperatorStartCommandValueRecorded: false,
     currentActionPostEditProofCommand,
     currentActionPostEditProofRole,
     currentActionPostEditProofValueRecorded: false,
@@ -741,6 +765,8 @@ function buildMarkdown(report) {
 - Local env placeholder keys: ${report.localEnvPlaceholderKeyCount}
 - Current action: ${report.currentActionLabel}
 - Current next command: \`${report.currentActionNextCommand}\`
+- Current action operator start command: \`${report.currentActionOperatorStartCommand}\`
+- Current action operator start command role: ${report.currentActionOperatorStartCommandRole}
 - Current action post-edit proof command: \`${report.currentActionPostEditProofCommand}\`
 - Current action post-edit proof role: ${report.currentActionPostEditProofRole}
 - Current first blocker: ${report.currentActionFirstBlocker}
@@ -825,6 +851,8 @@ ${formatChecklistList(report.completionGapClaimBlockers)}
 
 - Action: ${report.currentActionLabel}
 - Next command: \`${report.currentActionNextCommand}\`
+- Operator start command: \`${report.currentActionOperatorStartCommand}\`
+- Operator start command role: ${report.currentActionOperatorStartCommandRole}
 - Post-edit proof command: \`${report.currentActionPostEditProofCommand}\`
 - Post-edit proof role: ${report.currentActionPostEditProofRole}
 - First blocker: ${report.currentActionFirstBlocker}
@@ -841,6 +869,7 @@ ${formatChecklistList(report.completionGapClaimBlockers)}
 - Prerequisite commands: ${report.currentActionPrerequisiteCommandCount} (${report.currentActionPrerequisiteCommandSummary})
 - Rerun commands: ${report.currentActionRerunCommandCount} (${report.currentActionRerunCommandSummary})
 - Command sequence: ${report.currentActionCommandSequenceCount} (${report.currentActionCommandSequenceSummary})
+- Operator start command value recorded: ${readyLabel(report.currentActionOperatorStartCommandValueRecorded)}
 - Post-edit proof value recorded: ${readyLabel(report.currentActionPostEditProofValueRecorded)}
 - Value recorded: ${readyLabel(report.currentActionValueRecorded)}
 
@@ -1331,6 +1360,17 @@ check(typeof releaseDoctorReport.currentActionId === "string" && releaseDoctorRe
 check(typeof releaseDoctorReport.currentActionLabel === "string" && releaseDoctorReport.currentActionLabel.length > 0, "release doctor should include the current action label");
 check(typeof releaseDoctorReport.currentActionNextCommand === "string" && releaseDoctorReport.currentActionNextCommand.length > 0, "release doctor should include the current next command");
 check(
+  typeof releaseDoctorReport.currentActionOperatorStartCommand === "string" &&
+    releaseDoctorReport.currentActionOperatorStartCommand.length > 0,
+  "release doctor should include the current action operator start command"
+);
+check(
+  typeof releaseDoctorReport.currentActionOperatorStartCommandRole === "string" &&
+    releaseDoctorReport.currentActionOperatorStartCommandRole.length > 0,
+  "release doctor should include the current action operator start command role"
+);
+check(releaseDoctorReport.currentActionOperatorStartCommandValueRecorded === false, "release doctor current action operator start command should not record values");
+check(
   typeof releaseDoctorReport.currentActionPostEditProofCommand === "string" &&
     releaseDoctorReport.currentActionPostEditProofCommand.length > 0,
   "release doctor should include the current action post-edit proof command"
@@ -1507,6 +1547,10 @@ check(
 check(releaseDoctorReport.currentActionValueRecorded === false, "release doctor current action should not record values");
 if (releaseDoctorReport.localEnvFileLoaded === false) {
   check(releaseDoctorReport.currentActionNextCommand === "npm run release:prepare-env", "release doctor should surface prepare-env when local env evidence is absent");
+  check(
+    releaseDoctorReport.currentActionOperatorStartCommand === "npm run release:prepare-env",
+    "release doctor missing-env operator start command should be prepare-env"
+  );
   check(releaseDoctorReport.currentActionFirstBlocker.includes("local distribution env file is not loaded"), "release doctor should make missing local env the current first blocker");
   check(releaseDoctorReport.currentActionCommandSequence.includes("npm run release:prepare-env"), "release doctor missing-env command sequence should include prepare-env");
   check(releaseDoctorReport.currentActionCommandSequence.includes("npm run release:doctor"), "release doctor missing-env command sequence should include doctor rerun");
@@ -1523,6 +1567,14 @@ if (releaseDoctorReport.localEnvFileLoaded === false) {
 if (releaseDoctorReport.localEnvFileLoaded === true && releaseChannelMetadataKeys.every((key) => releaseDoctorReport.localEnvPlaceholderKeys.includes(key))) {
   check(releaseDoctorReport.currentActionId === "replace-release-channel-placeholders", "release doctor should prioritize release-channel placeholder cleanup");
   check(releaseDoctorReport.currentActionNextCommand === "npm run release:doctor", "release doctor should rerun itself after placeholder cleanup");
+  check(
+    releaseDoctorReport.currentActionOperatorStartCommand === releaseChannelApplyPrivateEnvPreflightCommand,
+    "release doctor placeholder operator start command should be private env preflight"
+  );
+  check(
+    releaseDoctorReport.currentActionOperatorStartCommand !== releaseDoctorReport.currentActionNextCommand,
+    "release doctor placeholder operator start command should be distinct from doctor rerun command"
+  );
   check(
     releaseDoctorReport.currentActionPostEditProofCommand === privateEditStrictProofCommand,
     "release doctor placeholder action should surface strict private-edit proof command"
@@ -1641,6 +1693,8 @@ check(markdown.includes("Release Prepare Env Existing Placeholder Keys"), "relea
 check(markdown.includes("Release Prepare Env Release-Channel Placeholder Edit Locations"), "release doctor Markdown should include prepare-env release-channel placeholder edit location section");
 check(markdown.includes("Current action:"), "release doctor Markdown should include current action status");
 check(markdown.includes("Current next command:"), "release doctor Markdown should include current next command");
+check(markdown.includes("Current action operator start command:"), "release doctor Markdown should include current action operator start command");
+check(markdown.includes("Current action operator start command role:"), "release doctor Markdown should include current action operator start command role");
 check(markdown.includes("Current action post-edit proof command:"), "release doctor Markdown should include current action post-edit proof command");
 check(markdown.includes("Current action post-edit proof role:"), "release doctor Markdown should include current action post-edit proof role");
 check(markdown.includes("Current first blocker:"), "release doctor Markdown should include current first blocker");
@@ -1657,6 +1711,7 @@ check(markdown.includes("Current action prerequisite commands:"), "release docto
 check(markdown.includes("Current action rerun commands:"), "release doctor Markdown should include current action rerun commands");
 check(markdown.includes("Current action command sequence:"), "release doctor Markdown should include current action command sequence status");
 check(markdown.includes("Current Action"), "release doctor Markdown should include current action section");
+check(markdown.includes("Operator start command:"), "release doctor Markdown should include current operator start command details");
 check(markdown.includes("Operator action:"), "release doctor Markdown should include current operator action details");
 check(markdown.includes("Current Action Command Sequence"), "release doctor Markdown should include current command sequence section");
 check(markdown.includes("Current Action Evidence Rows"), "release doctor Markdown should include current action evidence row section");
@@ -1710,6 +1765,8 @@ console.log(`- Release-channel focus placeholder keys: ${releaseDoctorReport.rel
 console.log(`- Local env placeholder keys: ${releaseDoctorReport.localEnvPlaceholderKeyCount}`);
 console.log(`- Current action: ${releaseDoctorReport.currentActionLabel}`);
 console.log(`- Current next command: ${releaseDoctorReport.currentActionNextCommand}`);
+console.log(`- Current action operator start command: ${releaseDoctorReport.currentActionOperatorStartCommand}`);
+console.log(`- Current action operator start command role: ${releaseDoctorReport.currentActionOperatorStartCommandRole}`);
 console.log(`- Current action post-edit proof command: ${releaseDoctorReport.currentActionPostEditProofCommand}`);
 console.log(`- Current action post-edit proof role: ${releaseDoctorReport.currentActionPostEditProofRole}`);
 console.log(`- Current first blocker: ${releaseDoctorReport.currentActionFirstBlocker}`);
