@@ -38,6 +38,11 @@ const refreshCommands = [...refreshCommandsBeforeSourceCheck, ...refreshCommands
 const recommendedPrivateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const releaseChannelPrivateInputTemplateCommand = "npm run release:channel-private-input-template";
+const releaseChannelPrivateInputTemplateRole =
+  "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
+const releaseChannelPrivateInputTemplateDefaultPath = ".env.release-channel.local";
+const releaseChannelPrivateInputTemplatePrivateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
 const releaseChannelMetadataKeys = [
   "GROOVEFORGE_DISTRIBUTION_CHANNEL",
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
@@ -1275,7 +1280,11 @@ function currentActionHandoffRows({
   currentCommandSequenceSummary,
   hardGateCommand,
   hardGateRequirementBlockedCount,
-  hardGateBlockedRequirementSummary
+  hardGateBlockedRequirementSummary,
+  privateInputTemplateCommand,
+  privateInputTemplateDefaultPath,
+  privateInputTemplatePrivateInputFileKey,
+  privateInputTemplateBeforePreflight
 }) {
   const sourceArtifactSummary = valueFreeObjectRows(sourceArtifacts)
     .map((artifact) => textValue(artifact.label))
@@ -1308,6 +1317,18 @@ function currentActionHandoffRows({
     },
     {
       order: 3,
+      item: "Private input template helper",
+      sourceField: "releaseChannelPrivateInputTemplateCommand/releaseChannelPrivateInputTemplateDefaultPath",
+      evidence: `${privateInputTemplateCommand}; ${privateInputTemplateDefaultPath}; ${privateInputTemplatePrivateInputFileKey}; before preflight ${privateInputTemplateBeforePreflight ? "yes" : "no"}`,
+      blockerCount: currentPlaceholderKeyCount,
+      acceptanceBlockerCount: currentActionAcceptanceBlockerCount,
+      proofCommand: currentNextCommand,
+      rerunCommand: currentRerunCommand,
+      hardGateCommand,
+      valueRecorded: false
+    },
+    {
+      order: 4,
       item: "Acceptance blockers",
       sourceField: "currentActionAcceptanceBlockerRows",
       evidence: currentActionAcceptanceBlockerSummary,
@@ -1319,7 +1340,7 @@ function currentActionHandoffRows({
       valueRecorded: false
     },
     {
-      order: 4,
+      order: 5,
       item: "Rerun order",
       sourceField: "externalProofBundle.currentCommandVerificationRows/nextExpectedOperatorSequence",
       evidence: currentCommandSequenceSummary,
@@ -1331,7 +1352,7 @@ function currentActionHandoffRows({
       valueRecorded: false
     },
     {
-      order: 5,
+      order: 6,
       item: "Hard gate",
       sourceField: "externalGate.requirements",
       evidence: hardGateBlockedRequirementSummary,
@@ -1797,7 +1818,11 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     hardGateBlockedRequirementSummary:
       hardGateBlockedRequirementRows.length > 0
         ? `${hardGateBlockedRequirementRows.length} blocked hard-gate requirements`
-        : "none"
+        : "none",
+    privateInputTemplateCommand: releaseChannelPrivateInputTemplateCommand,
+    privateInputTemplateDefaultPath: releaseChannelPrivateInputTemplateDefaultPath,
+    privateInputTemplatePrivateInputFileKey: releaseChannelPrivateInputTemplatePrivateInputFileKey,
+    privateInputTemplateBeforePreflight: true
   });
   const privateSafetyRows = privateEditSafetyRows({
     currentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
@@ -2028,6 +2053,12 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
       releaseChannelApplyPrivateEnvCommand === "npm run release:channel-apply-private-env" &&
       recommendedPrivateEditOperatorProofCommand === "npm run release:private-edit-strict-proof",
     releaseChannelPrivateEnvApplyValueRecorded: false,
+    releaseChannelPrivateInputTemplateCommand,
+    releaseChannelPrivateInputTemplateRole,
+    releaseChannelPrivateInputTemplateDefaultPath,
+    releaseChannelPrivateInputTemplatePrivateInputFileKey,
+    releaseChannelPrivateInputTemplateBeforePreflight: true,
+    releaseChannelPrivateInputTemplateValueRecorded: false,
     hardGateCommand,
     hardGateReady: externalGate.externalDistributionGateReady === true,
     hardGateWouldFail: externalGate.hardGateWouldFail === true,
@@ -2258,7 +2289,7 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentActionPostEditVerificationRows: postEditVerificationRows,
     currentActionPostEditVerificationMatchesAcceptance: postEditVerificationRows.length === acceptanceRows.length,
     currentActionHandoffReady:
-      handoffRows.length === 5 &&
+      handoffRows.length === 6 &&
       handoffRows.every((row) => row.valueRecorded === false) &&
       handoffRows.every((row) => row.proofCommand === currentNextCommand && row.rerunCommand === currentRerunCommand && row.hardGateCommand === hardGateCommand),
     currentActionHandoffRowCount: handoffRows.length,
@@ -3158,7 +3189,7 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentActionPostEditVerificationMatchesAcceptance === true, "release current blocker current action post-edit verification should match acceptance rows");
   check(report.currentActionHandoffReady === true, "release current blocker current action handoff should be ready");
   check(report.currentActionHandoffRowCount === report.currentActionHandoffRows.length, "release current blocker current action handoff row count should match rows");
-  check(report.currentActionHandoffRowCount === 5, "release current blocker current action handoff should include five handoff rows");
+  check(report.currentActionHandoffRowCount === 6, "release current blocker current action handoff should include six handoff rows");
   check(typeof report.currentActionHandoffSummary === "string" && report.currentActionHandoffSummary.length > 0, "release current blocker should include current action handoff summary");
   check(report.currentActionHandoffRows.every((row) => row.valueRecorded === false), "release current blocker current action handoff rows should not record values");
   check(report.currentActionHandoffRows.every((row) => row.proofCommand === report.currentNextCommand), "release current blocker current action handoff proof commands should match current next command");
@@ -3166,12 +3197,22 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentActionHandoffRows.every((row) => row.hardGateCommand === report.hardGateCommand), "release current blocker current action handoff hard-gate commands should match hard gate command");
   check(report.currentActionHandoffRows.some((row) => row.sourceField === "sourceArtifacts"), "release current blocker current action handoff should include source artifacts");
   check(report.currentActionHandoffRows.some((row) => row.sourceField.includes("currentEnvEditTarget")), "release current blocker current action handoff should include current edit target");
+  check(report.currentActionHandoffRows.some((row) => row.sourceField.includes("releaseChannelPrivateInputTemplateCommand")), "release current blocker current action handoff should include private input template helper");
   check(report.currentActionHandoffRows.some((row) => row.sourceField === "currentActionAcceptanceBlockerRows"), "release current blocker current action handoff should include acceptance blockers");
   check(report.currentActionHandoffRows.some((row) => row.sourceField.includes("currentCommandVerificationRows")), "release current blocker current action handoff should include rerun order");
   check(report.currentActionHandoffRows.some((row) => row.sourceField === "externalGate.requirements"), "release current blocker current action handoff should include hard-gate requirements");
   check(report.currentActionHandoffRows.some((row) => row.acceptanceBlockerCount === report.currentActionAcceptanceBlockerCount), "release current blocker current action handoff should mirror acceptance blocker count");
   check(report.currentActionHandoffSourceArtifactCount === report.sourceArtifacts.length, "release current blocker current action handoff source artifact count should match source artifacts");
   check(report.currentActionHandoffSourceArtifactSummary.includes("Release doctor"), "release current blocker current action handoff should summarize source artifacts");
+  check(report.releaseChannelPrivateInputTemplateCommand === releaseChannelPrivateInputTemplateCommand, "release current blocker should expose private input template command");
+  check(report.releaseChannelPrivateInputTemplateRole === releaseChannelPrivateInputTemplateRole, "release current blocker should expose private input template role");
+  check(report.releaseChannelPrivateInputTemplateDefaultPath === releaseChannelPrivateInputTemplateDefaultPath, "release current blocker should expose private input template default path");
+  check(
+    report.releaseChannelPrivateInputTemplatePrivateInputFileKey === releaseChannelPrivateInputTemplatePrivateInputFileKey,
+    "release current blocker should expose private input template private input file key"
+  );
+  check(report.releaseChannelPrivateInputTemplateBeforePreflight === true, "release current blocker should keep private input template before preflight");
+  check(report.releaseChannelPrivateInputTemplateValueRecorded === false, "release current blocker private input template helper should be value-free");
   check(report.currentPrivateEditSafetyReady === true, "release current blocker private edit safety checklist should be ready");
   check(report.currentPrivateEditSafetyRowCount === report.currentPrivateEditSafetyRows.length, "release current blocker private edit safety row count should match rows");
   check(report.currentPrivateEditSafetyRowCount === 5, "release current blocker private edit safety should include five rows");
@@ -3752,6 +3793,8 @@ function buildMarkdown(report) {
     `- Current action post-edit signals currently ready: ${report.currentActionPostEditVerificationCurrentSummary}`,
     `- Current action handoff ready: ${report.currentActionHandoffReady ? "yes" : "no"}`,
     `- Current action handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})`,
+    `- Private input template command: ${report.releaseChannelPrivateInputTemplateCommand}`,
+    `- Private input template default path: ${report.releaseChannelPrivateInputTemplateDefaultPath}`,
     `- Private edit safety ready: ${report.currentPrivateEditSafetyReady ? "yes" : "no"}`,
     `- Private edit safety rows: ${report.currentPrivateEditSafetyRowCount} (${report.currentPrivateEditSafetySummary})`,
     `- Current input shape checklist ready: ${report.currentInputShapeChecklistReady ? "yes" : "no"}`,
@@ -4357,6 +4400,9 @@ function buildMarkdown(report) {
     `- Handoff ready: ${report.currentActionHandoffReady ? "yes" : "no"}`,
     `- Handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})`,
     `- Source artifacts: ${report.currentActionHandoffSourceArtifactCount} (${report.currentActionHandoffSourceArtifactSummary})`,
+    `- Private input template command: \`${report.releaseChannelPrivateInputTemplateCommand}\``,
+    `- Private input template default path: \`${report.releaseChannelPrivateInputTemplateDefaultPath}\``,
+    `- Private input template before preflight: ${report.releaseChannelPrivateInputTemplateBeforePreflight ? "yes" : "no"}`,
     "",
     "| order | item | source field | evidence | blocker count | acceptance blockers | proof command | rerun command | hard gate | value recorded |",
     "|---:|---|---|---|---:|---:|---|---|---|---:|",
@@ -4568,6 +4614,7 @@ check(markdown.includes("Current command source artifact matrix ready:"), "relea
 check(markdown.includes("Current Action Post-Edit Verification"), "release current blocker Markdown should include current action post-edit verification");
 check(markdown.includes("Current action post-edit verification ready:"), "release current blocker Markdown should include current action post-edit verification readiness");
 check(markdown.includes("Current Action Handoff Package"), "release current blocker Markdown should include current action handoff package");
+check(markdown.includes("Private input template command:"), "release current blocker Markdown should include private input template command");
 check(markdown.includes("Current action handoff ready:"), "release current blocker Markdown should include current action handoff readiness");
 check(markdown.includes("Private Edit Safety Checklist"), "release current blocker Markdown should include private edit safety checklist");
 check(markdown.includes("Private edit safety ready:"), "release current blocker Markdown should include private edit safety readiness");
@@ -4653,6 +4700,8 @@ console.log(`- Current action post-edit verification ready: ${report.currentActi
 console.log(`- Current action post-edit verification rows: ${report.currentActionPostEditVerificationRowCount} (${report.currentActionPostEditVerificationSummary})`);
 console.log(`- Current action handoff ready: ${report.currentActionHandoffReady ? "yes" : "no"}`);
 console.log(`- Current action handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})`);
+console.log(`- Private input template command: ${report.releaseChannelPrivateInputTemplateCommand}`);
+console.log(`- Private input template default path: ${report.releaseChannelPrivateInputTemplateDefaultPath}`);
 console.log(`- Private edit safety ready: ${report.currentPrivateEditSafetyReady ? "yes" : "no"}`);
 console.log(`- Private edit safety rows: ${report.currentPrivateEditSafetyRowCount} (${report.currentPrivateEditSafetySummary})`);
 console.log(`- Current input shape checklist ready: ${report.currentInputShapeChecklistReady ? "yes" : "no"}`);

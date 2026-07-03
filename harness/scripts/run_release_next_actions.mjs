@@ -47,6 +47,11 @@ const releaseChannelMetadataKeys = [
 const recommendedPrivateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const releaseChannelPrivateInputTemplateCommand = "npm run release:channel-private-input-template";
+const releaseChannelPrivateInputTemplateRole =
+  "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
+const releaseChannelPrivateInputTemplateDefaultPath = ".env.release-channel.local";
+const releaseChannelPrivateInputTemplatePrivateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
 const releaseChannelApplyPrivateEnvPreflightBlockedSmokeCommand =
   "npm run release:channel-apply-private-env-preflight-blocked-smoke";
 const sensitivePrivateKeys = [
@@ -1060,6 +1065,20 @@ function buildCurrentActionHandoffSummary({
     },
     {
       order: 3,
+      item: "Private input template helper",
+      sourceField: "releaseChannelPrivateInputTemplateCommand/releaseChannelPrivateInputTemplateDefaultPath",
+      evidence: `${releaseChannelPrivateInputTemplateCommand}; ${releaseChannelPrivateInputTemplateDefaultPath}; ${releaseChannelPrivateInputTemplatePrivateInputFileKey}; before preflight yes`,
+      blockerCount: Number.isInteger(currentActionSummary.currentPlaceholderKeyCount)
+        ? currentActionSummary.currentPlaceholderKeyCount
+        : 0,
+      acceptanceBlockerCount,
+      proofCommand,
+      rerunCommand,
+      hardGateCommand: hardExternalGateCommand,
+      valueRecorded: false
+    },
+    {
+      order: 4,
       item: "Acceptance blockers",
       sourceField: "currentActionAcceptanceBlockerRows",
       evidence: currentActionAcceptance.currentActionAcceptanceBlockerSummary ?? "none",
@@ -1071,7 +1090,7 @@ function buildCurrentActionHandoffSummary({
       valueRecorded: false
     },
     {
-      order: 4,
+      order: 5,
       item: "Rerun order",
       sourceField: "currentCommandVerificationRows/currentCommandSequence",
       evidence: currentActionSummary.currentCommandSequenceSummary ?? currentCommandVerification.currentCommandVerificationRowSummary ?? "none",
@@ -1083,7 +1102,7 @@ function buildCurrentActionHandoffSummary({
       valueRecorded: false
     },
     {
-      order: 5,
+      order: 6,
       item: "Hard gate",
       sourceField: "externalPreflight.gateRequirementTotal/gateRequirementReadyCount",
       evidence: hardGateBlockedRequirementSummary,
@@ -1097,7 +1116,7 @@ function buildCurrentActionHandoffSummary({
   ];
 
   return {
-    currentActionHandoffReady: currentActionHandoffRows.length === 5 && currentActionHandoffRows.every((row) => row.valueRecorded === false),
+    currentActionHandoffReady: currentActionHandoffRows.length === 6 && currentActionHandoffRows.every((row) => row.valueRecorded === false),
     currentActionHandoffRowCount: currentActionHandoffRows.length,
     currentActionHandoffSummary:
       currentActionHandoffRows.length > 0 ? `${currentActionHandoffRows.length} value-free current action handoff rows` : "none",
@@ -3239,6 +3258,12 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     externalPreflightCommand: "npm run release:external-preflight",
     prepareEnvCommand: "npm run release:prepare-env",
     doctorCommand: "npm run release:doctor",
+    releaseChannelPrivateInputTemplateCommand,
+    releaseChannelPrivateInputTemplateRole,
+    releaseChannelPrivateInputTemplateDefaultPath,
+    releaseChannelPrivateInputTemplatePrivateInputFileKey,
+    releaseChannelPrivateInputTemplateBeforePreflight: true,
+    releaseChannelPrivateInputTemplateValueRecorded: false,
     hardExternalGateCommand: "npm run release:external-check",
     prerequisiteCommand: "npm run release:check",
     externalNextActionsMarkdownPath: relative(nextActionsMarkdownPath),
@@ -3388,6 +3413,8 @@ function buildMarkdown(report) {
 - Current action post-edit signals currently ready: ${report.currentActionPostEditVerificationCurrentSummary}
 - Current action handoff ready: ${readyLabel(report.currentActionHandoffReady)}
 - Current action handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})
+- Private input template command: ${report.releaseChannelPrivateInputTemplateCommand}
+- Private input template default path: ${report.releaseChannelPrivateInputTemplateDefaultPath}
 - Current private edit safety ready: ${readyLabel(report.currentPrivateEditSafetyReady)}
 - Current private edit safety rows: ${report.currentPrivateEditSafetyRowCount} (${report.currentPrivateEditSafetySummary})
 - Current input shape checklist ready: ${readyLabel(report.currentInputShapeChecklistReady)}
@@ -3650,6 +3677,9 @@ ${formatCurrentActionPostEditVerificationRows(report.currentActionPostEditVerifi
 - Handoff ready: ${readyLabel(report.currentActionHandoffReady)}
 - Handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})
 - Source artifacts: ${report.currentActionHandoffSourceArtifactCount} (${report.currentActionHandoffSourceArtifactSummary})
+- Private input template command: \`${report.releaseChannelPrivateInputTemplateCommand}\`
+- Private input template default path: \`${report.releaseChannelPrivateInputTemplateDefaultPath}\`
+- Private input template before preflight: ${readyLabel(report.releaseChannelPrivateInputTemplateBeforePreflight)}
 
 ${formatCurrentActionHandoffRows(report.currentActionHandoffRows)}
 
@@ -3989,6 +4019,12 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     externalPreflightCommand: "npm run release:external-preflight",
     prepareEnvCommand: "npm run release:prepare-env",
     doctorCommand: "npm run release:doctor",
+    releaseChannelPrivateInputTemplateCommand,
+    releaseChannelPrivateInputTemplateRole,
+    releaseChannelPrivateInputTemplateDefaultPath,
+    releaseChannelPrivateInputTemplatePrivateInputFileKey,
+    releaseChannelPrivateInputTemplateBeforePreflight: true,
+    releaseChannelPrivateInputTemplateValueRecorded: false,
     hardExternalGateCommand: "npm run release:external-check",
     prerequisiteCommand: "npm run release:check",
     externalNextActionsMarkdownPath: relative(nextActionsMarkdownPath),
@@ -4123,6 +4159,15 @@ check(nextActionsReport.nextActionsCommand === "npm run release:next-actions", "
 check(nextActionsReport.nextActionsSmokeCommand === "npm run release:next-actions-smoke", "external next actions should identify the smoke command");
 check(nextActionsReport.externalPreflightCommand === "npm run release:external-preflight", "external next actions should include the preflight command");
 check(nextActionsReport.prepareEnvCommand === "npm run release:prepare-env", "external next actions should include the prepare-env command");
+check(nextActionsReport.releaseChannelPrivateInputTemplateCommand === releaseChannelPrivateInputTemplateCommand, "external next actions should expose private input template command");
+check(nextActionsReport.releaseChannelPrivateInputTemplateRole === releaseChannelPrivateInputTemplateRole, "external next actions should expose private input template role");
+check(nextActionsReport.releaseChannelPrivateInputTemplateDefaultPath === releaseChannelPrivateInputTemplateDefaultPath, "external next actions should expose private input template default path");
+check(
+  nextActionsReport.releaseChannelPrivateInputTemplatePrivateInputFileKey === releaseChannelPrivateInputTemplatePrivateInputFileKey,
+  "external next actions should expose private input template private input file key"
+);
+check(nextActionsReport.releaseChannelPrivateInputTemplateBeforePreflight === true, "external next actions should keep private input template before preflight");
+check(nextActionsReport.releaseChannelPrivateInputTemplateValueRecorded === false, "external next actions private input template helper should be value-free");
 check(nextActionsReport.hardExternalGateCommand === "npm run release:external-check", "external next actions should keep the hard gate command");
 check(nextActionsReport.prerequisiteCommand === "npm run release:check", "external next actions should include the source evidence prerequisite");
 check(nextActionsReport.productScope.includes("all-genre direct beat workstation"), "external next actions should describe direct beat workstation scope");
@@ -4834,7 +4879,7 @@ check(
   nextActionsReport.currentActionHandoffRowCount === nextActionsReport.currentActionHandoffRows.length,
   "external next actions current action handoff row count should match listed rows"
 );
-check(nextActionsReport.currentActionHandoffRowCount === 5, "external next actions current action handoff should include five rows");
+check(nextActionsReport.currentActionHandoffRowCount === 6, "external next actions current action handoff should include six rows");
 check(
   nextActionsReport.currentActionHandoffSourceArtifactCount === nextActionsReport.sourceArtifacts.length,
   "external next actions current action handoff source artifact count should match source artifacts"
@@ -4857,15 +4902,16 @@ check(
       row.hardGateCommand === nextActionsReport.hardExternalGateCommand &&
       row.valueRecorded === false
   ),
-  "external next actions current action handoff rows should summarize sources, edit target, acceptance blockers, rerun order, and hard gate without values"
+  "external next actions current action handoff rows should summarize sources, edit target, private input template helper, acceptance blockers, rerun order, and hard gate without values"
 );
 check(
   nextActionsReport.currentActionHandoffRows.some((row) => row.sourceField === "sourceArtifacts") &&
     nextActionsReport.currentActionHandoffRows.some((row) => row.sourceField.includes("currentEnvEditTarget")) &&
+    nextActionsReport.currentActionHandoffRows.some((row) => row.sourceField.includes("releaseChannelPrivateInputTemplateCommand")) &&
     nextActionsReport.currentActionHandoffRows.some((row) => row.sourceField === "currentActionAcceptanceBlockerRows") &&
     nextActionsReport.currentActionHandoffRows.some((row) => row.sourceField.includes("currentCommandVerificationRows")) &&
     nextActionsReport.currentActionHandoffRows.some((row) => row.sourceField.includes("externalPreflight")),
-  "external next actions current action handoff should include source artifacts, edit target, acceptance blockers, rerun order, and hard gate rows"
+  "external next actions current action handoff should include source artifacts, edit target, private input template helper, acceptance blockers, rerun order, and hard gate rows"
 );
 check(typeof nextActionsReport.currentPrivateEditSafetyReady === "boolean", "external next actions should include current private edit safety readiness");
 check(Number.isInteger(nextActionsReport.currentPrivateEditSafetyRowCount), "external next actions should include current private edit safety row count");
@@ -6053,14 +6099,15 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
     "release channel metadata should include placeholder, private-input, and channel-QA post-edit expected signals"
   );
   check(nextActionsReport.currentActionHandoffReady === true, "release channel metadata should include ready current action handoff package while placeholders remain");
-  check(nextActionsReport.currentActionHandoffRowCount === 5, "release channel metadata should include five current action handoff rows when placeholders remain");
+  check(nextActionsReport.currentActionHandoffRowCount === 6, "release channel metadata should include six current action handoff rows when placeholders remain");
   check(
     nextActionsReport.currentActionHandoffRows.some((row) => row.item === "Source artifacts" && row.evidence.includes("Release doctor")) &&
       nextActionsReport.currentActionHandoffRows.some((row) => row.item === "Current edit target" && row.evidence.includes(nextActionsReport.currentEnvEditTarget)) &&
+      nextActionsReport.currentActionHandoffRows.some((row) => row.item === "Private input template helper" && row.evidence.includes(releaseChannelPrivateInputTemplateCommand)) &&
       nextActionsReport.currentActionHandoffRows.some((row) => row.item === "Acceptance blockers" && row.acceptanceBlockerCount === 3) &&
       nextActionsReport.currentActionHandoffRows.some((row) => row.item === "Rerun order" && row.evidence.includes("npm run release:current-blocker")) &&
       nextActionsReport.currentActionHandoffRows.some((row) => row.item === "Hard gate" && row.hardGateCommand === "npm run release:external-check"),
-    "release channel metadata should include source, edit-target, acceptance, rerun, and hard-gate handoff rows"
+    "release channel metadata should include source, edit-target, private input template helper, acceptance, rerun, and hard-gate handoff rows"
   );
   check(nextActionsReport.currentPrivateEditSafetyReady === true, "release channel metadata should include ready private edit safety rows while placeholders remain");
   check(nextActionsReport.currentPrivateEditSafetyRowCount === 5, "release channel metadata should include five private edit safety rows when placeholders remain");
@@ -6452,6 +6499,7 @@ check(markdown.includes("Current action post-edit verification ready:"), "extern
 check(markdown.includes("Current action post-edit verification rows:"), "external next actions Markdown should include current action post-edit verification row status");
 check(markdown.includes("Current action handoff ready:"), "external next actions Markdown should include current action handoff readiness");
 check(markdown.includes("Current action handoff rows:"), "external next actions Markdown should include current action handoff row status");
+check(markdown.includes("Private input template command:"), "external next actions Markdown should include private input template command");
 check(markdown.includes("Current private edit safety ready:"), "external next actions Markdown should include current private edit safety readiness");
 check(markdown.includes("Current private edit safety rows:"), "external next actions Markdown should include current private edit safety row status");
 check(markdown.includes("Current input shape checklist ready:"), "external next actions Markdown should include current input shape checklist readiness");
@@ -6788,6 +6836,8 @@ console.log(
 console.log(`- Current action post-edit signals currently ready: ${nextActionsReport.currentActionPostEditVerificationCurrentSummary}`);
 console.log(`- Current action handoff ready: ${nextActionsReport.currentActionHandoffReady ? "yes" : "no"}`);
 console.log(`- Current action handoff rows: ${nextActionsReport.currentActionHandoffRowCount} (${nextActionsReport.currentActionHandoffSummary})`);
+console.log(`- Private input template command: ${nextActionsReport.releaseChannelPrivateInputTemplateCommand}`);
+console.log(`- Private input template default path: ${nextActionsReport.releaseChannelPrivateInputTemplateDefaultPath}`);
 console.log(`- Current private edit safety ready: ${nextActionsReport.currentPrivateEditSafetyReady ? "yes" : "no"}`);
 console.log(`- Current private edit safety rows: ${nextActionsReport.currentPrivateEditSafetyRowCount} (${nextActionsReport.currentPrivateEditSafetySummary})`);
 console.log(`- Current input shape checklist ready: ${nextActionsReport.currentInputShapeChecklistReady ? "yes" : "no"}`);
