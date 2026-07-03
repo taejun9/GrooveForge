@@ -63,6 +63,7 @@ const releaseChannelMetadataKeys = [
   "GROOVEFORGE_RELEASE_NOTES_URL",
   "GROOVEFORGE_SUPPORT_URL"
 ];
+const placeholderPattern = /^(|<[^>]+>|CHANGE_ME|REPLACE_ME|TODO|TBD|example|example-.+|your-.+|https:\/\/example\.com.*)$/i;
 const syntheticValues = {
   GROOVEFORGE_DISTRIBUTION_CHANNEL: "private-beta",
   GROOVEFORGE_RELEASE_DOWNLOAD_URL: "https://downloads.invalid/grooveforge.dmg",
@@ -142,6 +143,10 @@ function channelShapeReady(value) {
 
 function shapeReadyForKey(key, value) {
   return key === "GROOVEFORGE_DISTRIBUTION_CHANNEL" ? channelShapeReady(value) : safeHttpsUrlShapeReady(value);
+}
+
+function isPlaceholderValue(value) {
+  return placeholderPattern.test(String(value ?? "").trim());
 }
 
 function expectedShapeForKey(key) {
@@ -331,6 +336,7 @@ async function readPrivateInputFile(filePath) {
     defaultFileName: defaultPrivateInputFileName,
     filePath: displayPath,
     present: existsSync(filePath),
+    entries: [],
     inputValues: new Map(),
     loadedKeys: [],
     unknownKeys: [],
@@ -355,6 +361,13 @@ async function readPrivateInputFile(filePath) {
       result.unknownKeys.push(parsed.key);
       continue;
     }
+    result.entries.push({
+      key: parsed.key,
+      value: parsed.value.trim(),
+      file: displayPath,
+      line: index + 1,
+      valueRecorded: false
+    });
     result.inputValues.set(parsed.key, parsed.value.trim());
     result.loadedKeys.push(parsed.key);
   }
@@ -362,6 +375,55 @@ async function readPrivateInputFile(filePath) {
   result.loadedKeys = [...new Set(result.loadedKeys)];
   result.unknownKeys = [...new Set(result.unknownKeys)];
   return result;
+}
+
+function privateInputFileRemediation({ privateInputFilePresent, privateInputFileKeyPresent, privateInputFilePlaceholder, privateInputFileShapeReady }) {
+  if (privateInputFilePresent !== true) {
+    return "create-private-input-file";
+  }
+  if (privateInputFileKeyPresent !== true) {
+    return "add-private-input-file-row";
+  }
+  if (privateInputFilePlaceholder === true) {
+    return "replace-private-input-file-placeholder";
+  }
+  if (privateInputFileShapeReady !== true) {
+    return "fix-private-input-file-shape";
+  }
+  return "ready";
+}
+
+function buildPrivateInputFileLocationRows(inputRows, privateInputFile) {
+  const entryByKey = new Map(privateInputFile.entries.map((entry) => [entry.key, entry]));
+  return inputRows.map((row) => {
+    const entry = entryByKey.get(row.key) ?? null;
+    const privateInputFileKeyPresent = Boolean(entry?.value?.trim());
+    const privateInputFilePlaceholder = privateInputFileKeyPresent && isPlaceholderValue(entry.value);
+    const privateInputFileShapeReady =
+      privateInputFileKeyPresent && privateInputFilePlaceholder === false && shapeReadyForKey(row.key, entry.value);
+    return {
+      order: row.order,
+      key: row.key,
+      privateInputFilePath: privateInputFile.filePath,
+      privateInputFilePresent: privateInputFile.present,
+      privateInputFileKeyPresent,
+      privateInputFileLine: entry?.line ?? null,
+      processEnvPresent: row.processEnvPresent,
+      inputSource: row.inputSource,
+      inputPresent: row.inputPresent,
+      inputShapeReady: row.inputShapeReady,
+      privateInputFilePlaceholder,
+      privateInputFileShapeReady,
+      expectedShape: row.expectedShape,
+      remediation: privateInputFileRemediation({
+        privateInputFilePresent: privateInputFile.present,
+        privateInputFileKeyPresent,
+        privateInputFilePlaceholder,
+        privateInputFileShapeReady
+      }),
+      valueRecorded: false
+    };
+  });
 }
 
 async function readSyntheticEnvRows(filePath) {
@@ -399,6 +461,15 @@ function formatInputRows(rows) {
     .join("\n");
 }
 
+function formatPrivateInputFileLocationRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.privateInputFilePath)} | ${escapeCell(row.privateInputFileLine ?? "add")} | ${readyLabel(row.privateInputFilePresent)} | ${readyLabel(row.privateInputFileKeyPresent)} | ${readyLabel(row.privateInputFilePlaceholder)} | ${readyLabel(row.privateInputFileShapeReady)} | ${escapeCell(row.expectedShape)} | ${escapeCell(row.remediation)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function formatSyntheticRows(rows) {
   return rows.length > 0
     ? rows
@@ -424,6 +495,10 @@ function buildMarkdown(report) {
 - Private input file path: ${report.privateInputFilePath}
 - Private input file present: ${readyLabel(report.privateInputFilePresent)}
 - Private input file loaded keys: ${report.privateInputFileLoadedKeyCount} (${report.privateInputFileLoadedKeySummary})
+- Private input file location rows: ${report.privateInputFileLocationRowCount}
+- Private input file placeholder locations: ${report.privateInputFileLocationPlaceholderCount}
+- Private input file invalid-shape locations: ${report.privateInputFileLocationInvalidShapeCount}
+- Private input file missing key rows: ${report.privateInputFileLocationMissingKeyCount}
 - Private input source rows: ${report.privateInputSourceRowCount}
 - Preflight command exit code: ${report.preflightExitCode}
 - Apply command exit code: ${report.applyExitCode}
@@ -447,6 +522,12 @@ function buildMarkdown(report) {
 | order | key | source | process env present | private input file present | private input file key present | interactive present | input present | shape ready | expected shape | value recorded |
 |---:|---|---|---:|---:|---:|---:|---:|---:|---|---:|
 ${formatInputRows(report.wizardInputRows)}
+
+## Private Input File Location Rows
+
+| order | key | private input file | line | file present | key present | file placeholder | file shape ready | expected shape | remediation | value recorded |
+|---:|---|---|---:|---:|---:|---:|---:|---|---|---:|
+${formatPrivateInputFileLocationRows(report.privateInputFileLocationRows)}
 
 ## Synthetic Fixture Rows
 
@@ -498,6 +579,7 @@ async function main() {
   const privateInputFile = await readPrivateInputFile(privateInputFilePath);
   const { inputValues, inputSources } = await collectInputValues(privateInputFile);
   const inputRows = buildInputRows({ inputValues, inputSources, privateInputFile });
+  const privateInputFileLocationRows = buildPrivateInputFileLocationRows(inputRows, privateInputFile);
   const inputReady = inputRows.every((row) => row.inputPresent === true && row.inputShapeReady === true);
   const privateValueCandidates = [...inputValues.values()].filter((value) => value.trim().length >= 8);
   const prepareResult = inputReady ? await ensureRealLocalEnv(localEnvPath) : { prepareEnvRun: false, prepareEnvExitCode: null };
@@ -576,6 +658,20 @@ async function main() {
     privateInputFileMalformedLines: privateInputFile.malformedLines,
     privateInputFileMalformedLineCount: privateInputFile.malformedLines.length,
     privateInputFileValueRecorded: false,
+    privateInputFileLocationRows,
+    privateInputFileLocationRowCount: privateInputFileLocationRows.length,
+    privateInputFileLocationPresentRowCount: privateInputFileLocationRows.filter((row) => row.privateInputFileKeyPresent === true).length,
+    privateInputFileLocationMissingKeyCount: privateInputFileLocationRows.filter((row) => row.privateInputFileKeyPresent !== true).length,
+    privateInputFileLocationPlaceholderCount: privateInputFileLocationRows.filter((row) => row.privateInputFilePlaceholder === true).length,
+    privateInputFileLocationInvalidShapeCount: privateInputFileLocationRows.filter(
+      (row) => row.privateInputFileKeyPresent === true && row.privateInputFilePlaceholder === false && row.privateInputFileShapeReady !== true
+    ).length,
+    privateInputFilePlaceholderLocations: privateInputFileLocationRows
+      .filter((row) => row.privateInputFilePlaceholder === true)
+      .map((row) => `${row.privateInputFilePath}:${row.privateInputFileLine ?? "add"} ${row.key}`),
+    privateInputFileShapeInvalidLocations: privateInputFileLocationRows
+      .filter((row) => row.privateInputFileKeyPresent === true && row.privateInputFilePlaceholder === false && row.privateInputFileShapeReady !== true)
+      .map((row) => `${row.privateInputFilePath}:${row.privateInputFileLine ?? "add"} ${row.key}`),
     wizardInputRows: inputRows,
     wizardInputRowCount: inputRows.length,
     privateInputSourceRows: inputRows,
@@ -648,6 +744,16 @@ async function main() {
   check(report.privateInputFileKey === privateInputFileKey, "release-channel setup wizard should expose the private input file key");
   check(report.privateInputFileDefaultName === defaultPrivateInputFileName, "release-channel setup wizard should expose the default private input file name");
   check(report.privateInputFileValueRecorded === false, "release-channel setup wizard should not record private input file values");
+  check(report.privateInputFileLocationRowCount === 4, "release-channel setup wizard should create four private input file location rows");
+  check(report.privateInputFileLocationRows.every((row) => row.valueRecorded === false), "release-channel setup wizard private input file location rows should be value-free");
+  check(
+    report.privateInputFileLocationRows.every((row) => row.privateInputFilePath === report.privateInputFilePath),
+    "release-channel setup wizard location rows should identify the private input file path"
+  );
+  check(
+    report.privateInputFileLocationRows.every((row) => typeof row.expectedShape === "string" && row.expectedShape.length > 0),
+    "release-channel setup wizard location rows should expose expected input shapes"
+  );
   check(report.privateInputSourceRowCount === 4, "release-channel setup wizard should expose four private input source rows");
   check(report.privateInputSourceRows.every((row) => row.valueRecorded === false), "release-channel setup wizard source rows should be value-free");
   check(report.privateValuesRecorded === false, "release-channel setup wizard should not record private values");
@@ -680,6 +786,10 @@ async function main() {
   if (privateInputFileSuccessSmoke) {
     check(report.privateInputFilePresent === true, "release-channel setup wizard input-file smoke should load a private input file");
     check(report.privateInputFileLoadedKeyCount === 4, "release-channel setup wizard input-file smoke should load four private input keys");
+    check(report.privateInputFileLocationRowCount === 4, "release-channel setup wizard input-file smoke should expose four private input file location rows");
+    check(report.privateInputFileLocationPresentRowCount === 4, "release-channel setup wizard input-file smoke should expose four present private input file location rows");
+    check(report.privateInputFileLocationPlaceholderCount === 0, "release-channel setup wizard input-file smoke should have no private input file placeholder rows");
+    check(report.privateInputFileLocationInvalidShapeCount === 0, "release-channel setup wizard input-file smoke should have no private input file invalid-shape rows");
     check(report.privateInputSourceFileCount === 4, "release-channel setup wizard input-file smoke should use four private input-file rows");
     check(report.privateInputSourceProcessEnvCount === 0, "release-channel setup wizard input-file smoke should not use process env rows");
     check(report.privateInputSourceInteractiveCount === 0, "release-channel setup wizard input-file smoke should not use interactive rows");
@@ -700,6 +810,9 @@ async function main() {
     console.error(`- Local env file loaded: ${readyLabel(report.localEnvFileLoaded)}`);
     console.error(`- Private input file present: ${readyLabel(report.privateInputFilePresent)}`);
     console.error(`- Private input file loaded keys: ${report.privateInputFileLoadedKeyCount}`);
+    console.error(`- Private input file location rows: ${report.privateInputFileLocationRowCount}`);
+    console.error(`- Private input file placeholder locations: ${report.privateInputFileLocationPlaceholderCount}`);
+    console.error(`- Private input file invalid-shape locations: ${report.privateInputFileLocationInvalidShapeCount}`);
     console.error(`- Real local env read: ${readyLabel(report.realLocalEnvRead)}`);
     console.error(`- Real local env modified: ${readyLabel(report.realLocalEnvModified)}`);
     console.error(`- Preflight ready: ${readyLabel(report.preflightReady)}`);
@@ -726,6 +839,9 @@ async function main() {
   console.log(`- Local env prepared by wizard: ${readyLabel(report.prepareEnvRun)}`);
   console.log(`- Private input file present: ${readyLabel(report.privateInputFilePresent)}`);
   console.log(`- Private input file loaded keys: ${report.privateInputFileLoadedKeyCount}`);
+  console.log(`- Private input file location rows: ${report.privateInputFileLocationRowCount}`);
+  console.log(`- Private input file placeholder locations: ${report.privateInputFileLocationPlaceholderCount}`);
+  console.log(`- Private input file invalid-shape locations: ${report.privateInputFileLocationInvalidShapeCount}`);
   console.log(`- Private input source rows: ${report.privateInputSourceRowCount}`);
   console.log(`- Real local env read: ${readyLabel(report.realLocalEnvRead)}`);
   console.log(`- Real local env modified: ${readyLabel(report.realLocalEnvModified)}`);
