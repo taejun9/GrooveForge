@@ -214,6 +214,9 @@ async function runCase(testCase) {
     report.nextWriteCommand === commandNames.apply &&
     report.guidedSetupFallbackCommand === commandNames.fallback &&
     report.recommendedOperatorProofCommand === commandNames.proof &&
+    report.operatorReceiptReady === true &&
+    report.operatorReceiptRowCount === 6 &&
+    report.operatorReceiptRows.every((row) => row.valueRecorded === false) &&
     report.realLocalEnvRead === false &&
     report.realLocalEnvModified === false &&
     report.privateValuesRecorded === false &&
@@ -223,6 +226,12 @@ async function runCase(testCase) {
     remediationRows.every((row) => row.valueRecorded === false);
 
   check(report?.preflightRemediationRowCount === 4, `${testCase.id} remediation report should expose four remediation rows`);
+  check(report?.operatorReceiptReady === true, `${testCase.id} remediation report should expose a ready operator receipt`);
+  check(report?.operatorReceiptRowCount === 6, `${testCase.id} remediation report should expose six operator receipt rows`);
+  check(
+    report?.operatorReceiptRows.every((row) => row.valueRecorded === false),
+    `${testCase.id} remediation report operator receipt rows should be value-free`
+  );
   check(report?.realLocalEnvRead === false, `${testCase.id} remediation report should not read real local env`);
   check(report?.realLocalEnvModified === false, `${testCase.id} remediation report should not modify real local env`);
   check(report?.privateValuesRecorded === false, `${testCase.id} remediation report should not record private values`);
@@ -251,6 +260,7 @@ async function runCase(testCase) {
     placeholderInputCount: report?.preflightRemediationPlaceholderInputCount ?? 0,
     invalidShapeCount: report?.preflightRemediationInvalidShapeCount ?? 0,
     remediationRowCount: report?.preflightRemediationRowCount ?? 0,
+    operatorReceiptRowCount: report?.operatorReceiptRowCount ?? 0,
     childExitCode: child.status,
     ready: rowReady,
     valueRecorded: false

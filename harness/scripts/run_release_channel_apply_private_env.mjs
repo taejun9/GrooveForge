@@ -314,6 +314,85 @@ function buildProcessEnvInputChecklistRows(inputRows) {
   }));
 }
 
+function buildOperatorReceiptRows({
+  inputRows,
+  localEnvFileLoaded,
+  preflightReady,
+  applyReady,
+  currentReadyKeyCount,
+  currentEnvEditTarget
+}) {
+  const inputReadyCount = inputRows.filter((row) => row.inputShapeReady === true).length;
+  const missingInputCount = inputRows.filter((row) => row.inputPresent !== true).length;
+  const placeholderInputCount = inputRows.filter((row) => row.inputPlaceholder === true).length;
+  const invalidShapeCount = inputRows.filter(
+    (row) => row.inputPresent === true && row.inputPlaceholder === false && row.inputShapeReady !== true
+  ).length;
+  const allInputsReady = inputReadyCount === inputRows.length;
+  return [
+    {
+      order: 1,
+      step: "process-env-inputs",
+      status: allInputsReady ? "ready" : "blocked",
+      command: privateEnvApplyPreflightCommand,
+      target: "process.env",
+      expectedEvidence: `${inputReadyCount}/${inputRows.length} inputs shape-ready; missing ${missingInputCount}; placeholders ${placeholderInputCount}; invalid shape ${invalidShapeCount}`,
+      operatorAction: allInputsReady ? "rerun-preflight" : "set-four-process-env-inputs-with-allowed-channel-and-HTTPS-URL-shapes",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      step: "ignored-env-target",
+      status: localEnvFileLoaded ? "loaded" : "missing",
+      command: localEnvFileLoaded ? privateEnvApplyPreflightCommand : "npm run release:prepare-env",
+      target: currentEnvEditTarget,
+      expectedEvidence: localEnvFileLoaded ? "ignored local env target loaded" : "ignored local env scaffold required",
+      operatorAction: localEnvFileLoaded ? "continue-with-preflight" : "create-ignored-env-scaffold",
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      step: "preflight-receipt",
+      status: preflightReady ? "ready" : "blocked",
+      command: privateEnvApplyPreflightCommand,
+      target: "release-channel private inputs",
+      expectedEvidence: preflightReady ? "preflight ready without writing local env" : "preflight blocks before writing local env",
+      operatorAction: preflightReady ? "run-private-env-apply" : "fix-process-env-inputs-and-rerun-preflight",
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      step: "private-env-write",
+      status: applyReady ? "complete" : preflightReady ? "ready-to-run" : "waiting-for-preflight",
+      command: privateEnvApplyCommand,
+      target: currentEnvEditTarget,
+      expectedEvidence: `${currentReadyKeyCount}/${releaseChannelMetadataKeys.length} current rows ready after apply`,
+      operatorAction: applyReady ? "run-strict-proof-chain" : "run-after-preflight-ready",
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      step: "strict-proof-chain",
+      status: applyReady ? "ready-to-run" : "waiting-for-private-env-write",
+      command: strictOperatorProofCommand,
+      target: "post-edit release proof chain",
+      expectedEvidence: "strict live-check then post-edit proof, progress refresh, and private-value leak audit",
+      operatorAction: applyReady ? "run-strict-proof-chain" : "run-after-four-current-rows-are-ready",
+      valueRecorded: false
+    },
+    {
+      order: 6,
+      step: "hard-gate-boundary",
+      status: "waiting-for-downstream-external-proofs",
+      command: "npm run release:external-check",
+      target: "external distribution gate",
+      expectedEvidence: "hard gate remains unclaimed until signing, notarization, manual QA, channel QA, and upload proofs pass",
+      operatorAction: "run-only-after-private-proof-and-downstream-external-proofs",
+      valueRecorded: false
+    }
+  ];
+}
+
 function applyRowsToLines(lines, planRows, inputValues) {
   const nextLines = [...lines];
   let modified = false;
@@ -410,6 +489,15 @@ function formatProcessEnvInputChecklistRows(rows) {
     .join("\n");
 }
 
+function formatOperatorReceiptRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.step)} | ${escapeCell(row.status)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.target)} | ${escapeCell(row.expectedEvidence)} | ${escapeCell(row.operatorAction)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function buildMarkdown(report) {
   return `# ${appName} Release-Channel Private Env Apply
 
@@ -434,6 +522,9 @@ function buildMarkdown(report) {
 - Current blocker after apply: ${report.currentFirstBlocker}
 - Process env input checklist rows: ${report.processEnvInputChecklistRowCount}
 - Preflight remediation rows: ${report.preflightRemediationRowCount}
+- Operator receipt ready: ${readyLabel(report.operatorReceiptReady)}
+- Operator receipt rows: ${report.operatorReceiptRowCount}
+- Current operator first command: \`${report.currentOperatorFirstCommand}\`
 - Next write command: \`${report.nextWriteCommand}\`
 - Guided setup fallback command: \`${report.guidedSetupFallbackCommand}\`
 - First strict proof command: \`${report.firstStrictProofCommand}\`
@@ -462,6 +553,12 @@ ${formatPlanRows(report.applyPlanRows)}
 | order | key | input present | input placeholder | input shape ready | expected shape | local env loaded | remediation | next command | write command | proof command | value recorded |
 |---:|---|---:|---:|---:|---|---:|---|---|---|---|---:|
 ${formatPreflightRemediationRows(report.preflightRemediationRows)}
+
+## Operator Receipt
+
+| order | step | status | command | target | expected evidence | operator action | value recorded |
+|---:|---|---|---|---|---|---|---:|
+${formatOperatorReceiptRows(report.operatorReceiptRows)}
 
 ## After Apply Rows
 
@@ -537,6 +634,20 @@ async function main() {
     blockedRows.length === 0 &&
     inputRows.every((row) => row.inputShapeReady === true) &&
     planRows.every((row) => row.shouldApply === true || row.skippedCurrent === true);
+  const applyReady =
+    preflightOnly === false &&
+    localEnvFileLoaded === true &&
+    blockedRows.length === 0 &&
+    currentReadyKeyCount === releaseChannelMetadataKeys.length &&
+    afterRows.every((row) => row.valueRecorded === false);
+  const operatorReceiptRows = buildOperatorReceiptRows({
+    inputRows,
+    localEnvFileLoaded,
+    preflightReady,
+    applyReady,
+    currentReadyKeyCount,
+    currentEnvEditTarget: displayLocalEnvTarget(filePath)
+  });
   const report = {
     appName,
     bundleId,
@@ -602,6 +713,15 @@ async function main() {
     preflightRemediationPlaceholderInputCount: preflightRemediationRows.filter((row) => row.inputPlaceholder === true).length,
     preflightRemediationInvalidShapeCount: preflightRemediationRows.filter((row) => row.inputPresent === true && row.inputPlaceholder === false && row.inputShapeReady !== true).length,
     preflightRemediationReadyRowCount: preflightRemediationRows.filter((row) => row.remediation === "ready-to-apply" || row.remediation === "already-current").length,
+    operatorReceiptReady: operatorReceiptRows.length === 6 && operatorReceiptRows.every((row) => row.valueRecorded === false),
+    operatorReceiptRows,
+    operatorReceiptRowCount: operatorReceiptRows.length,
+    operatorReceiptReadyRowCount: operatorReceiptRows.filter((row) => row.status === "ready" || row.status === "loaded" || row.status === "complete" || row.status === "ready-to-run").length,
+    operatorReceiptBlockedRowCount: operatorReceiptRows.filter((row) => row.status === "blocked" || row.status === "missing").length,
+    operatorReceiptCurrentCommand: privateEnvApplyPreflightCommand,
+    operatorReceiptWriteCommand: privateEnvApplyCommand,
+    operatorReceiptProofCommand: strictOperatorProofCommand,
+    operatorReceiptHardGateCommand: "npm run release:external-check",
     localEnvModified,
     realLocalEnvRead: resolvedLocalEnvRoot === root,
     realLocalEnvModified: resolvedLocalEnvRoot === root && localEnvModified === true,
@@ -619,12 +739,7 @@ async function main() {
           ? `Current release-channel metadata still has ${releaseChannelMetadataKeys.length - currentReadyKeyCount} non-ready rows.`
           : "Ignored local distribution env file is not loaded.",
     releaseChannelPrivateEnvApplyPreflightReady: preflightReady,
-    releaseChannelPrivateEnvApplyReady:
-      preflightOnly === false &&
-      localEnvFileLoaded === true &&
-      blockedRows.length === 0 &&
-      currentReadyKeyCount === releaseChannelMetadataKeys.length &&
-      afterRows.every((row) => row.valueRecorded === false),
+    releaseChannelPrivateEnvApplyReady: applyReady,
     privateValuesRecorded: false,
     localEnvValueRecorded: false,
     releaseUrlValueRecorded: false,
@@ -663,6 +778,13 @@ async function main() {
   check(report.applyPlanRows.every((row) => row.valueRecorded === false), "release-channel private env apply plan rows should be value-free");
   check(report.preflightRemediationRows.every((row) => row.valueRecorded === false), "release-channel private env apply preflight remediation rows should be value-free");
   check(report.preflightRemediationRows.every((row) => row.guidedSetupFallbackCommand === guidedSetupFallbackCommand), "release-channel private env apply should keep guided setup as a fallback command");
+  check(report.operatorReceiptReady === true, "release-channel private env apply should write a value-free operator receipt");
+  check(report.operatorReceiptRowCount === 6, "release-channel private env apply operator receipt should include six rows");
+  check(report.operatorReceiptRows.every((row) => row.valueRecorded === false), "release-channel private env apply operator receipt rows should be value-free");
+  check(report.operatorReceiptRows[0]?.command === privateEnvApplyPreflightCommand, "release-channel private env apply operator receipt should start with preflight");
+  check(report.operatorReceiptRows.some((row) => row.command === privateEnvApplyCommand), "release-channel private env apply operator receipt should include the write command");
+  check(report.operatorReceiptRows.some((row) => row.command === strictOperatorProofCommand), "release-channel private env apply operator receipt should include the strict proof chain");
+  check(report.operatorReceiptRows.some((row) => row.command === "npm run release:external-check"), "release-channel private env apply operator receipt should include the hard-gate boundary");
   check(report.currentOperatorFirstCommand === privateEnvApplyPreflightCommand, "release-channel private env apply should keep preflight as the current first operator command");
   check(report.nextWriteCommand === privateEnvApplyCommand, "release-channel private env apply should expose the private env write command");
   check(report.guidedSetupFallbackCommand === guidedSetupFallbackCommand, "release-channel private env apply should expose the guided setup fallback command separately");
@@ -718,6 +840,7 @@ async function main() {
     console.error(`- Current env edit target: ${report.currentEnvEditTarget}`);
     console.error(`- Process env input checklist rows: ${report.processEnvInputChecklistRowCount}`);
     console.error(`- Preflight remediation rows: ${report.preflightRemediationRowCount}`);
+    console.error(`- Operator receipt rows: ${report.operatorReceiptRowCount}`);
     console.error(`- Missing input rows: ${report.preflightRemediationMissingInputCount}`);
     console.error(`- Placeholder input rows: ${report.preflightRemediationPlaceholderInputCount}`);
     console.error(`- Shape-invalid input rows: ${report.preflightRemediationInvalidShapeCount}`);
@@ -752,6 +875,7 @@ async function main() {
   console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);
   console.log(`- Process env input checklist rows: ${report.processEnvInputChecklistRowCount}`);
   console.log(`- Preflight remediation rows: ${report.preflightRemediationRowCount}`);
+  console.log(`- Operator receipt rows: ${report.operatorReceiptRowCount}`);
   console.log(`- Missing input rows: ${report.preflightRemediationMissingInputCount}`);
   console.log(`- Placeholder input rows: ${report.preflightRemediationPlaceholderInputCount}`);
   console.log(`- Shape-invalid input rows: ${report.preflightRemediationInvalidShapeCount}`);

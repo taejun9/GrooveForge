@@ -114,6 +114,17 @@ if (report) {
   check(report.currentReadyKeyCount === 0, "preflight report should leave current-ready rows unchanged");
   check(report.currentPlaceholderKeyCount === 4, "preflight report should leave placeholder keys unchanged");
   check(report.recommendedOperatorProofCommand === "npm run release:private-edit-strict-proof", "preflight report should keep strict proof chain");
+  check(report.operatorReceiptReady === true, "preflight report should include a ready value-free operator receipt");
+  check(report.operatorReceiptRowCount === 6, "preflight report operator receipt should include six rows");
+  check(report.operatorReceiptRows.every((row) => row.valueRecorded === false), "preflight report operator receipt rows should be value-free");
+  check(
+    report.operatorReceiptRows.some((row) => row.command === "npm run release:channel-apply-private-env"),
+    "preflight report operator receipt should include the write command"
+  );
+  check(
+    report.operatorReceiptRows.some((row) => row.command === "npm run release:private-edit-strict-proof"),
+    "preflight report operator receipt should include the strict proof chain"
+  );
   check(report.privateValuesRecorded === false, "preflight report should not record private values");
   check(report.localEnvValueRecorded === false, "preflight report should not record local env values");
   check(report.networkProbeAttempted === false, "preflight report should not probe networks");
@@ -143,6 +154,7 @@ console.log("- Synthetic env modified: no");
 console.log("- Would apply rows: 4");
 console.log("- Applied rows: 0");
 console.log("- Preflight ready: yes");
+console.log("- Operator receipt rows: 6");
 console.log("- Real local env read: no");
 console.log("- Real local env modified: no");
 console.log("- Private values recorded: no");

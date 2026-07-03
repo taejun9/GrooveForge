@@ -204,6 +204,8 @@ function buildMarkdown(report) {
 - Preflight ready: ${readyLabel(report.preflightReady)}
 - Apply ready: ${readyLabel(report.applyReady)}
 - Strict live-check ready: ${readyLabel(report.strictLiveCheckReady)}
+- Preflight operator receipt rows: ${report.preflightOperatorReceiptRowCount}
+- Apply operator receipt rows: ${report.applyOperatorReceiptRowCount}
 - Release-channel changed keys: ${report.releaseChannelChangedKeyCount}/${report.releaseChannelKeyCount}
 - Unrelated private keys preserved: ${report.unrelatedPrivatePreservedKeyCount}/${report.unrelatedPrivateKeyCount}
 - Changed key values recorded: no
@@ -306,6 +308,12 @@ if (preflightReport) {
   check(preflightReport.realLocalEnvModified === false, "targeted preflight report should not modify real local env");
   check(preflightReport.wouldApplyKeyCount === 4, "targeted preflight report should identify four would-apply keys");
   check(preflightReport.appliedKeyCount === 0, "targeted preflight report should not apply keys");
+  check(preflightReport.operatorReceiptReady === true, "targeted preflight report should include a ready operator receipt");
+  check(preflightReport.operatorReceiptRowCount === 6, "targeted preflight report should include six operator receipt rows");
+  check(
+    preflightReport.operatorReceiptRows.every((row) => row.valueRecorded === false),
+    "targeted preflight operator receipt rows should be value-free"
+  );
 }
 if (applyReport) {
   check(applyReport.releaseChannelPrivateEnvApplyReady === true, "targeted apply report should be ready");
@@ -315,6 +323,12 @@ if (applyReport) {
   check(applyReport.appliedKeyCount === 4, "targeted apply report should apply four keys");
   check(applyReport.currentReadyKeyCount === 4, "targeted apply report should have four current-ready keys");
   check(applyReport.currentPlaceholderKeyCount === 0, "targeted apply report should clear release-channel placeholders");
+  check(applyReport.operatorReceiptReady === true, "targeted apply report should include a ready operator receipt");
+  check(applyReport.operatorReceiptRowCount === 6, "targeted apply report should include six operator receipt rows");
+  check(
+    applyReport.operatorReceiptRows.every((row) => row.valueRecorded === false),
+    "targeted apply operator receipt rows should be value-free"
+  );
 }
 if (strictReport) {
   check(strictReport.strictReady === true, "targeted strict live-check report should be strict-ready");
@@ -347,6 +361,8 @@ const report = {
   preflightReady: preflight.status === 0 && preflightReport?.releaseChannelPrivateEnvApplyPreflightReady === true,
   applyReady: apply.status === 0 && applyReport?.releaseChannelPrivateEnvApplyReady === true,
   strictLiveCheckReady: strict.status === 0 && strictReport?.strictReady === true,
+  preflightOperatorReceiptRowCount: preflightReport?.operatorReceiptRowCount ?? 0,
+  applyOperatorReceiptRowCount: applyReport?.operatorReceiptRowCount ?? 0,
   releaseChannelKeyCount: releaseChannelMetadataKeys.length,
   releaseChannelChangedKeyCount: releaseChangedKeys.length,
   releaseChannelChangedKeys: releaseChangedKeys,
@@ -420,6 +436,8 @@ console.log(`- JSON: ${relative(jsonPath)}`);
 console.log("- Preflight ready: yes");
 console.log("- Apply ready: yes");
 console.log("- Strict live-check ready: yes");
+console.log(`- Preflight operator receipt rows: ${report.preflightOperatorReceiptRowCount}`);
+console.log(`- Apply operator receipt rows: ${report.applyOperatorReceiptRowCount}`);
 console.log(`- Release-channel changed keys: ${report.releaseChannelChangedKeyCount}/${report.releaseChannelKeyCount}`);
 console.log(`- Unrelated private keys preserved: ${report.unrelatedPrivatePreservedKeyCount}/${report.unrelatedPrivateKeyCount}`);
 console.log(`- Current operator command: ${report.currentOperatorFirstCommand}`);

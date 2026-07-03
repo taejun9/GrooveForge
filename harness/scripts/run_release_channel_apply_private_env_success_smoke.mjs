@@ -106,6 +106,17 @@ if (report) {
   check(report.currentReadyKeyCount === 4, "success report should show four current-ready keys");
   check(report.currentPlaceholderKeyCount === 0, "success report should clear placeholder keys");
   check(report.recommendedOperatorProofCommand === "npm run release:private-edit-strict-proof", "success report should keep strict proof chain");
+  check(report.operatorReceiptReady === true, "success report should include a ready value-free operator receipt");
+  check(report.operatorReceiptRowCount === 6, "success report operator receipt should include six rows");
+  check(report.operatorReceiptRows.every((row) => row.valueRecorded === false), "success report operator receipt rows should be value-free");
+  check(
+    report.operatorReceiptRows.some((row) => row.command === "npm run release:channel-apply-private-env"),
+    "success report operator receipt should include the write command"
+  );
+  check(
+    report.operatorReceiptRows.some((row) => row.command === "npm run release:private-edit-strict-proof"),
+    "success report operator receipt should include the strict proof chain"
+  );
   check(report.privateValuesRecorded === false, "success report should not record private values");
   check(report.localEnvValueRecorded === false, "success report should not record local env values");
   check(report.networkProbeAttempted === false, "success report should not probe networks");
@@ -134,6 +145,7 @@ console.log(`- Synthetic env root: ${syntheticRootRelative}`);
 console.log("- Synthetic env modified: yes");
 console.log("- Applied rows: 4");
 console.log("- Current ready rows: 4/4");
+console.log("- Operator receipt rows: 6");
 console.log("- Real local env read: no");
 console.log("- Real local env modified: no");
 console.log("- Private values recorded: no");

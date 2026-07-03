@@ -98,6 +98,7 @@ function reportIsValueFree(report) {
     rowsValueFree(report.processEnvInputChecklistRows) &&
     rowsValueFree(report.applyPlanRows) &&
     rowsValueFree(report.preflightRemediationRows) &&
+    rowsValueFree(report.operatorReceiptRows) &&
     rowsValueFree(report.afterApplyRows)
   );
 }
@@ -130,6 +131,15 @@ function formatProcessEnvInputRows(rows) {
     .join("\n");
 }
 
+function formatOperatorReceiptRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.step)} | ${escapeCell(row.status)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.target)} | ${escapeCell(row.expectedEvidence)} | ${escapeCell(row.operatorAction)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function buildMarkdown(report) {
   return `# ${appName} Release-Channel Preflight Blocked Smoke
 
@@ -148,6 +158,8 @@ function buildMarkdown(report) {
 - Process env checklist rows: ${report.processEnvInputChecklistRowCount}
 - Blocked rows: ${report.blockedKeyCount}
 - Preflight remediation rows: ${report.preflightRemediationRowCount}
+- Operator receipt ready: ${readyLabel(report.operatorReceiptReady)}
+- Operator receipt rows: ${report.operatorReceiptRowCount}
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
 - Next write command: \`${report.nextWriteCommand}\`
 - Proof command after apply: \`${report.recommendedOperatorProofCommand}\`
@@ -170,6 +182,12 @@ ${formatProcessEnvInputRows(report.processEnvInputChecklistRows)}
 | order | key | input present | input placeholder | input shape ready | remediation | next command | value recorded |
 |---:|---|---:|---:|---:|---|---|---:|
 ${formatRows(report.preflightRemediationRows)}
+
+## Operator Receipt
+
+| order | step | status | command | target | expected evidence | operator action | value recorded |
+|---:|---|---|---|---|---|---|---:|
+${formatOperatorReceiptRows(report.operatorReceiptRows)}
 
 ## Boundary
 
@@ -224,6 +242,13 @@ check(report.processEnvInputChecklistRows.every((row) => row.valueRecorded === f
 check(report.processEnvInputChecklistRows.every((row) => row.preflightCommand === preflightCommand), "blocked preflight checklist rows should include the preflight command");
 check(report.processEnvInputChecklistRows.every((row) => row.writeCommand === applyCommand), "blocked preflight checklist rows should include the write command");
 check(report.processEnvInputChecklistRows.every((row) => row.proofCommand === strictProofCommand), "blocked preflight checklist rows should include the strict proof command");
+check(report.operatorReceiptReady === true, "blocked preflight should include a ready value-free operator receipt");
+check(report.operatorReceiptRowCount === 6, "blocked preflight operator receipt should include six rows");
+check(report.operatorReceiptRows.every((row) => row.valueRecorded === false), "blocked preflight operator receipt rows should be value-free");
+check(report.operatorReceiptRows[0]?.command === preflightCommand, "blocked preflight operator receipt should start with the preflight command");
+check(report.operatorReceiptRows.some((row) => row.command === applyCommand), "blocked preflight operator receipt should include the write command");
+check(report.operatorReceiptRows.some((row) => row.command === strictProofCommand), "blocked preflight operator receipt should include the strict proof chain");
+check(report.operatorReceiptRows.some((row) => row.command === hardGateCommand), "blocked preflight operator receipt should include the hard-gate boundary");
 check(
   report.preflightRemediationRows.every((row) => [preflightCommand, prepareEnvCommand].includes(row.nextCommand)),
   "blocked preflight remediation rows should point to prepare-env when the ignored env is missing or preflight when process env inputs are missing"
@@ -264,6 +289,9 @@ const blockedReport = {
   blockedKeyCount: report.blockedKeyCount,
   preflightRemediationRowCount: report.preflightRemediationRowCount,
   preflightRemediationRows: report.preflightRemediationRows,
+  operatorReceiptReady: report.operatorReceiptReady,
+  operatorReceiptRowCount: report.operatorReceiptRowCount,
+  operatorReceiptRows: report.operatorReceiptRows,
   currentOperatorFirstCommand: report.currentOperatorFirstCommand,
   nextWriteCommand: report.nextWriteCommand,
   recommendedOperatorProofCommand: report.recommendedOperatorProofCommand,
@@ -316,6 +344,7 @@ console.log("- Real local env modified: no");
 console.log(`- Missing process env inputs: ${report.inputMissingKeys.length}/${releaseChannelMetadataKeys.length}`);
 console.log(`- Process env checklist rows: ${report.processEnvInputChecklistRowCount}`);
 console.log(`- Preflight remediation rows: ${report.preflightRemediationRowCount}`);
+console.log(`- Operator receipt rows: ${report.operatorReceiptRowCount}`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
 console.log(`- Next write command: ${report.nextWriteCommand}`);
 console.log(`- Next proof after apply: ${report.recommendedOperatorProofCommand}`);
