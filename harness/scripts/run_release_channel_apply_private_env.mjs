@@ -406,6 +406,56 @@ function buildPrivateInputSourceRows(inputRows) {
   }));
 }
 
+function privateInputFileRemediation({ privateInputFilePresent, privateInputFileKeyPresent, privateInputFilePlaceholder, privateInputFileShapeReady }) {
+  if (privateInputFilePresent !== true) {
+    return "create-private-input-file";
+  }
+  if (privateInputFileKeyPresent !== true) {
+    return "add-private-input-file-row";
+  }
+  if (privateInputFilePlaceholder === true) {
+    return "replace-private-input-file-placeholder";
+  }
+  if (privateInputFileShapeReady !== true) {
+    return "fix-private-input-file-shape";
+  }
+  return "ready";
+}
+
+function buildPrivateInputFileLocationRows(inputRows, privateInput) {
+  const entryByKey = new Map(privateInput.entries.map((entry) => [entry.key, entry]));
+  return inputRows.map((row) => {
+    const entry = entryByKey.get(row.key) ?? null;
+    const privateInputFileKeyPresent = Boolean(entry?.value?.trim());
+    const privateInputFilePlaceholder = privateInputFileKeyPresent && isPlaceholderValue(entry.value);
+    const privateInputFileShapeReady =
+      privateInputFileKeyPresent && privateInputFilePlaceholder === false && shapeReadyForKey(row.key, entry.value);
+    return {
+      order: row.order,
+      key: row.key,
+      privateInputFilePath: privateInput.filePath,
+      privateInputFilePresent: privateInput.present,
+      privateInputFileKeyPresent,
+      privateInputFileLine: entry?.line ?? null,
+      processEnvPresent: row.processEnvPresent,
+      inputSource: row.inputSource,
+      inputPresent: row.inputPresent,
+      inputPlaceholder: row.inputPlaceholder,
+      inputShapeReady: row.inputShapeReady,
+      privateInputFilePlaceholder,
+      privateInputFileShapeReady,
+      expectedShape: row.expectedShape,
+      remediation: privateInputFileRemediation({
+        privateInputFilePresent: privateInput.present,
+        privateInputFileKeyPresent,
+        privateInputFilePlaceholder,
+        privateInputFileShapeReady
+      }),
+      valueRecorded: false
+    };
+  });
+}
+
 function buildOperatorReceiptRows({
   inputRows,
   localEnvFileLoaded,
@@ -590,6 +640,15 @@ function formatPrivateInputSourceRows(rows) {
     .join("\n");
 }
 
+function formatPrivateInputFileLocationRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.privateInputFilePath)} | ${escapeCell(row.privateInputFileLine ?? "add")} | ${readyLabel(row.privateInputFilePresent)} | ${readyLabel(row.privateInputFileKeyPresent)} | ${readyLabel(row.privateInputFilePlaceholder)} | ${readyLabel(row.privateInputFileShapeReady)} | ${escapeCell(row.expectedShape)} | ${escapeCell(row.remediation)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function formatOperatorReceiptRows(rows) {
   return rows
     .map(
@@ -628,6 +687,10 @@ function buildMarkdown(report) {
 - Private input file loaded keys: ${report.privateInputFileLoadedKeyCount} (${report.privateInputFileLoadedKeySummary})
 - Private input file unknown keys: ${report.privateInputFileUnknownKeyCount}
 - Private input file malformed lines: ${report.privateInputFileMalformedLineCount}
+- Private input file location rows: ${report.privateInputFileLocationRowCount}
+- Private input file placeholder locations: ${report.privateInputFileLocationPlaceholderCount}
+- Private input file invalid-shape locations: ${report.privateInputFileLocationInvalidShapeCount}
+- Private input file missing key rows: ${report.privateInputFileLocationMissingKeyCount}
 - Process env input checklist rows: ${report.processEnvInputChecklistRowCount}
 - Private input source rows: ${report.privateInputSourceRowCount}
 - Preflight remediation rows: ${report.preflightRemediationRowCount}
@@ -656,6 +719,12 @@ ${formatProcessEnvInputChecklistRows(report.processEnvInputChecklistRows)}
 | order | key | input source | process env present | private input file present | private input file key present | input present | input shape ready | expected shape | value recorded |
 |---:|---|---|---:|---:|---:|---:|---:|---|---:|
 ${formatPrivateInputSourceRows(report.privateInputSourceRows)}
+
+## Private Input File Location Rows
+
+| order | key | private input file | line | file present | key present | file placeholder | file shape ready | expected shape | remediation | value recorded |
+|---:|---|---|---:|---:|---:|---:|---:|---|---|---:|
+${formatPrivateInputFileLocationRows(report.privateInputFileLocationRows)}
 
 ## Apply Plan Rows
 
@@ -715,6 +784,7 @@ async function main() {
   const inputRows = buildInputRows(privateInputFile);
   const processEnvInputChecklistRows = buildProcessEnvInputChecklistRows(inputRows);
   const privateInputSourceRows = buildPrivateInputSourceRows(inputRows);
+  const privateInputFileLocationRows = buildPrivateInputFileLocationRows(inputRows, privateInputFile);
   const inputValues = new Map(
     releaseChannelMetadataKeys.map((key) => [
       key,
@@ -832,6 +902,20 @@ async function main() {
     privateInputSourceReadyCount: privateInputSourceRows.filter((row) => row.inputShapeReady === true).length,
     privateInputSourceProcessEnvCount: privateInputSourceRows.filter((row) => row.inputSource === "process.env" && row.inputPresent === true).length,
     privateInputSourceFileCount: privateInputSourceRows.filter((row) => row.inputSource === "private-input-file").length,
+    privateInputFileLocationRows,
+    privateInputFileLocationRowCount: privateInputFileLocationRows.length,
+    privateInputFileLocationPresentRowCount: privateInputFileLocationRows.filter((row) => row.privateInputFileKeyPresent === true).length,
+    privateInputFileLocationMissingKeyCount: privateInputFileLocationRows.filter((row) => row.privateInputFileKeyPresent !== true).length,
+    privateInputFileLocationPlaceholderCount: privateInputFileLocationRows.filter((row) => row.privateInputFilePlaceholder === true).length,
+    privateInputFileLocationInvalidShapeCount: privateInputFileLocationRows.filter(
+      (row) => row.privateInputFileKeyPresent === true && row.privateInputFilePlaceholder === false && row.privateInputFileShapeReady !== true
+    ).length,
+    privateInputFilePlaceholderLocations: privateInputFileLocationRows
+      .filter((row) => row.privateInputFilePlaceholder === true)
+      .map((row) => `${row.privateInputFilePath}:${row.privateInputFileLine ?? "add"} ${row.key}`),
+    privateInputFileShapeInvalidLocations: privateInputFileLocationRows
+      .filter((row) => row.privateInputFileKeyPresent === true && row.privateInputFilePlaceholder === false && row.privateInputFileShapeReady !== true)
+      .map((row) => `${row.privateInputFilePath}:${row.privateInputFileLine ?? "add"} ${row.key}`),
     applyPlanRows: planRows.map(({ lineIndex, ...row }) => row),
     applyPlanRowCount: planRows.length,
     wouldApplyKeyCount: wouldApplyRows.length,
@@ -911,6 +995,16 @@ async function main() {
   check(report.privateInputFileValueRecorded === false, "release-channel private env apply should not record private input file values");
   check(report.privateInputSourceRowCount === 4, "release-channel private env apply should create four private input source rows");
   check(report.privateInputSourceRows.every((row) => row.valueRecorded === false), "release-channel private env apply source rows should be value-free");
+  check(report.privateInputFileLocationRowCount === 4, "release-channel private env apply should create four private input file location rows");
+  check(report.privateInputFileLocationRows.every((row) => row.valueRecorded === false), "release-channel private env apply private input file location rows should be value-free");
+  check(
+    report.privateInputFileLocationRows.every((row) => row.privateInputFilePath === report.privateInputFilePath),
+    "release-channel private env apply location rows should identify the private input file path"
+  );
+  check(
+    report.privateInputFileLocationRows.every((row) => typeof row.expectedShape === "string" && row.expectedShape.length > 0),
+    "release-channel private env apply location rows should expose expected input shapes"
+  );
   check(report.inputKeyCount === 4, "release-channel private env apply should inspect four input keys");
   check(report.processEnvInputChecklistRowCount === 4, "release-channel private env apply should create four process env input checklist rows");
   check(
@@ -989,6 +1083,9 @@ async function main() {
     console.error(`- Current env edit target: ${report.currentEnvEditTarget}`);
     console.error(`- Private input file present: ${report.privateInputFilePresent ? "yes" : "no"}`);
     console.error(`- Private input file loaded keys: ${report.privateInputFileLoadedKeyCount}`);
+    console.error(`- Private input file location rows: ${report.privateInputFileLocationRowCount}`);
+    console.error(`- Private input file placeholder locations: ${report.privateInputFileLocationPlaceholderCount}`);
+    console.error(`- Private input file invalid-shape locations: ${report.privateInputFileLocationInvalidShapeCount}`);
     console.error(`- Private input source rows: ${report.privateInputSourceRowCount}`);
     console.error(`- Process env input checklist rows: ${report.processEnvInputChecklistRowCount}`);
     console.error(`- Preflight remediation rows: ${report.preflightRemediationRowCount}`);
@@ -1027,6 +1124,9 @@ async function main() {
   console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);
   console.log(`- Private input file present: ${report.privateInputFilePresent ? "yes" : "no"}`);
   console.log(`- Private input file loaded keys: ${report.privateInputFileLoadedKeyCount}`);
+  console.log(`- Private input file location rows: ${report.privateInputFileLocationRowCount}`);
+  console.log(`- Private input file placeholder locations: ${report.privateInputFileLocationPlaceholderCount}`);
+  console.log(`- Private input file invalid-shape locations: ${report.privateInputFileLocationInvalidShapeCount}`);
   console.log(`- Private input source rows: ${report.privateInputSourceRowCount}`);
   console.log(`- Process env input checklist rows: ${report.processEnvInputChecklistRowCount}`);
   console.log(`- Preflight remediation rows: ${report.preflightRemediationRowCount}`);

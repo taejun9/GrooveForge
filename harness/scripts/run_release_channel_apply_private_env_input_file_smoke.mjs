@@ -144,11 +144,36 @@ function sourceRowsReady(report) {
   );
 }
 
+function locationRowsReady(report) {
+  return (
+    Array.isArray(report?.privateInputFileLocationRows) &&
+    report.privateInputFileLocationRows.length === releaseChannelMetadataKeys.length &&
+    report.privateInputFileLocationRows.every(
+      (row) =>
+        row.privateInputFilePresent === true &&
+        row.privateInputFileKeyPresent === true &&
+        Number.isInteger(row.privateInputFileLine) &&
+        row.privateInputFileLine > 0 &&
+        row.privateInputFileShapeReady === true &&
+        row.valueRecorded === false
+    )
+  );
+}
+
 function formatRows(rows) {
   return rows
     .map(
       (row) =>
         `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.inputSource)} | ${readyLabel(row.processEnvPresent)} | ${readyLabel(row.privateInputFilePresent)} | ${readyLabel(row.privateInputFileKeyPresent)} | ${readyLabel(row.inputShapeReady)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
+function formatLocationRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.privateInputFilePath)} | ${escapeCell(row.privateInputFileLine ?? "add")} | ${readyLabel(row.privateInputFileKeyPresent)} | ${readyLabel(row.privateInputFilePlaceholder)} | ${readyLabel(row.privateInputFileShapeReady)} | ${escapeCell(row.expectedShape)} | ${escapeCell(row.remediation)} | ${readyLabel(row.valueRecorded)} |`
     )
     .join("\n");
 }
@@ -166,6 +191,8 @@ function buildMarkdown(report) {
 - Private input file loaded keys: ${report.privateInputFileLoadedKeyCount}/${report.requiredInputKeyCount}
 - Preflight input source rows ready: ${readyLabel(report.preflightInputSourceRowsReady)}
 - Apply input source rows ready: ${readyLabel(report.applyInputSourceRowsReady)}
+- Preflight private input file location rows ready: ${readyLabel(report.preflightPrivateInputFileLocationRowsReady)}
+- Apply private input file location rows ready: ${readyLabel(report.applyPrivateInputFileLocationRowsReady)}
 - Synthetic env modified: ${readyLabel(report.syntheticEnvModified)}
 - Real local env read: ${readyLabel(report.realLocalEnvRead)}
 - Real local env modified: ${readyLabel(report.realLocalEnvModified)}
@@ -185,6 +212,12 @@ function buildMarkdown(report) {
 | order | key | input source | process env present | private input file present | private input file key present | input shape ready | value recorded |
 |---:|---|---|---:|---:|---:|---:|---:|
 ${formatRows(report.inputSourceRows)}
+
+## Private Input File Location Rows
+
+| order | key | private input file | line | key present | file placeholder | file shape ready | expected shape | remediation | value recorded |
+|---:|---|---|---:|---:|---:|---:|---|---|---:|
+${formatLocationRows(report.privateInputFileLocationRows)}
 
 ## Boundary
 
@@ -268,12 +301,14 @@ check(preflightReport?.releaseChannelPrivateEnvApplyReady === false, "input-file
 check(preflightReport?.localEnvModified === false, "input-file preflight report should not modify local env");
 check(preflightReport?.wouldApplyKeyCount === releaseChannelMetadataKeys.length, "input-file preflight report should identify four would-apply keys");
 check(sourceRowsReady(preflightReport), "input-file preflight report should show private-input-file source rows");
+check(locationRowsReady(preflightReport), "input-file preflight report should show value-free private input file location rows");
 check(applyReport?.releaseChannelPrivateEnvApplyReady === true, "input-file apply report should be ready");
 check(applyReport?.appliedKeyCount === releaseChannelMetadataKeys.length, "input-file apply report should apply four keys");
 check(applyReport?.currentReadyKeyCount === releaseChannelMetadataKeys.length, "input-file apply report should produce four current-ready rows");
 check(applyReport?.realLocalEnvRead === false, "input-file apply report should not read real local env");
 check(applyReport?.realLocalEnvModified === false, "input-file apply report should not modify real local env");
 check(sourceRowsReady(applyReport), "input-file apply report should show private-input-file source rows");
+check(locationRowsReady(applyReport), "input-file apply report should show value-free private input file location rows");
 check(strictReport?.strictReady === true, "input-file strict live-check report should be strict-ready");
 check(strictReport?.releaseChannelLiveCheckCurrentReadyCount === releaseChannelMetadataKeys.length, "input-file strict live-check should see four current-ready rows");
 check(strictReport?.realLocalEnvRead === false, "input-file strict live-check should not read real local env");
@@ -301,7 +336,13 @@ const report = {
   requiredInputKeyCount: releaseChannelMetadataKeys.length,
   preflightInputSourceRowsReady: sourceRowsReady(preflightReport),
   applyInputSourceRowsReady: sourceRowsReady(applyReport),
+  preflightPrivateInputFileLocationRowsReady: locationRowsReady(preflightReport),
+  applyPrivateInputFileLocationRowsReady: locationRowsReady(applyReport),
   inputSourceRows: applyReport?.privateInputSourceRows ?? [],
+  privateInputFileLocationRows: applyReport?.privateInputFileLocationRows ?? [],
+  privateInputFileLocationRowCount: applyReport?.privateInputFileLocationRowCount ?? 0,
+  privateInputFileLocationPlaceholderCount: applyReport?.privateInputFileLocationPlaceholderCount ?? 0,
+  privateInputFileLocationInvalidShapeCount: applyReport?.privateInputFileLocationInvalidShapeCount ?? 0,
   syntheticEnvModified: afterApplyText !== beforeEnvText,
   currentReadyKeyCount: applyReport?.currentReadyKeyCount ?? 0,
   currentOperatorFirstCommand: commandNames.preflight,
@@ -351,6 +392,7 @@ console.log(`- Synthetic env root: ${smokeRootRelative}`);
 console.log("- Private input file present: yes");
 console.log("- Private input file loaded keys: 4");
 console.log("- Input source rows: 4");
+console.log("- Private input file location rows: 4");
 console.log("- Preflight ready: yes");
 console.log("- Apply ready: yes");
 console.log("- Strict live-check ready: yes");
