@@ -83,6 +83,8 @@
     "release:channel-apply-private-env-targeted-smoke": "node harness/scripts/run_release_channel_apply_private_env_targeted_smoke.mjs",
     "release:channel-apply-private-env-input-file-smoke": "node harness/scripts/run_release_channel_apply_private_env_input_file_smoke.mjs",
     "release:channel-apply-private-env-success-smoke": "node harness/scripts/run_release_channel_apply_private_env_success_smoke.mjs",
+    "release:channel-apply-private-env-proof": "node harness/scripts/run_release_channel_apply_private_env_proof.mjs",
+    "release:channel-apply-private-env-proof-smoke": "node harness/scripts/run_release_channel_apply_private_env_proof_smoke.mjs",
     "release:channel-setup-wizard": "node harness/scripts/run_release_channel_setup_wizard.mjs",
     "release:channel-setup-wizard-success-smoke": "node harness/scripts/run_release_channel_setup_wizard.mjs --success-smoke",
     "release:channel-setup-wizard-input-file-success-smoke": "node harness/scripts/run_release_channel_setup_wizard.mjs --input-file-success-smoke",
