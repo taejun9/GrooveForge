@@ -21,7 +21,8 @@ const scaffoldPath = path.join(packageRoot, `${appName}-${packageJson.version}-$
 const prepareEnvMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-prepare-env.md`);
 const prepareEnvJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-prepare-env.json`);
 const args = process.argv.slice(2);
-const writeLocal = args.includes("--write-local");
+const writeLocalSmoke = args.includes("--write-local-smoke");
+const writeLocal = args.includes("--write-local") || writeLocalSmoke;
 const force = args.includes("--force");
 const failures = [];
 const placeholderPattern = /^(|<[^>]+>|CHANGE_ME|REPLACE_ME|TODO|TBD|example|example-.+|your-.+|https:\/\/example\.com.*)$/i;
@@ -123,8 +124,8 @@ function localEnvCandidatePaths() {
   return [localEnvPath];
 }
 
-async function readExistingLocalEnvPlaceholderAudit() {
-  const filesChecked = [...new Set(localEnvCandidatePaths())];
+async function readExistingLocalEnvPlaceholderAudit(files = localEnvCandidatePaths()) {
+  const filesChecked = [...new Set(files)];
   const placeholderKeys = [];
   const placeholderEditLocations = [];
   const presentFiles = [];
@@ -316,9 +317,13 @@ function buildMarkdown(summary) {
 
 - Prepare env report ready: ${summary.releasePrepareEnvReady ? "yes" : "no"}
 - Scaffold written: ${summary.scaffoldWritten ? "yes" : "no"}
+- Write smoke: ${summary.writeLocalSmoke ? "yes" : "no"}
 - Local env write requested: ${summary.localEnvWriteRequested ? "yes" : "no"}
 - Local env written: ${summary.localEnvWritten ? "yes" : "no"}
 - Local env already exists: ${summary.localEnvAlreadyExists ? "yes" : "no"}
+- Local env write target: ${summary.localEnvWriteTarget}
+- Local env write target is real root: ${summary.localEnvWriteTargetIsRealRoot ? "yes" : "no"}
+- Real root local env modified: ${summary.realRootLocalEnvModified ? "yes" : "no"}
 - Force overwrite requested: ${summary.forceOverwrite ? "yes" : "no"}
 - Manual QA checklist digest available: ${summary.manualQaChecklistDigestAvailable ? "yes" : "no"}
 - Manual QA checklist digest applied: ${summary.manualQaChecklistDigestApplied ? "yes" : "no"}
@@ -335,6 +340,7 @@ function buildMarkdown(summary) {
 ## Commands
 
 - Smoke command: \`${summary.smokeCommand}\`
+- Write smoke command: \`${summary.writeSmokeCommand}\`
 - Prepare local env command: \`${summary.prepareLocalEnvCommand}\`
 - Force overwrite command: \`${summary.forceOverwriteCommand}\`
 - Doctor command: \`${summary.doctorCommand}\`
@@ -345,6 +351,9 @@ function buildMarkdown(summary) {
 - Template path: ${summary.templatePath}
 - Build scaffold path: ${summary.scaffoldPath}
 - Local env path: ${summary.localEnvPath}
+- Local env write target: ${summary.localEnvWriteTarget}
+- Smoke local env directory: ${summary.smokeLocalEnvDirectory}
+- Real root local env path: ${summary.realRootLocalEnvPath}
 - Manual QA evidence path: ${summary.manualQaPath}
 
 ## Scaffold Keys
@@ -395,23 +404,29 @@ const manualQa = await readJsonIfExists(manualQaPath);
 const manualQaDigest = manualQa?.manualQaChecklistSha256;
 const manualQaChecklistDigestAvailable = validDigest(manualQaDigest);
 const scaffold = renderScaffold(templateEntries, manualQaDigest);
-const localEnvAlreadyExists = existsSync(localEnvPath);
+const smokeLocalEnvDirectory = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-prepare-env-write-smoke`);
+const smokeLocalEnvPath = path.join(smokeLocalEnvDirectory, localEnvFileName);
+const localEnvWritePath = writeLocalSmoke ? smokeLocalEnvPath : localEnvPath;
+const localEnvAlreadyExists = existsSync(localEnvWritePath);
+const realRootLocalEnvContentBefore = existsSync(localEnvPath) ? await readFile(localEnvPath, "utf8") : null;
 const localEnvWriteBlockers = [];
 let localEnvWritten = false;
 
-if (writeLocal && localEnvAlreadyExists && !force) {
-  localEnvWriteBlockers.push(`${localEnvFileName} already exists; rerun with --force only when you intentionally want to replace it.`);
+if (writeLocal && localEnvAlreadyExists && !force && !writeLocalSmoke) {
+  localEnvWriteBlockers.push(`${displayLocalEnvTarget(localEnvWritePath)} already exists; rerun with --force only when you intentionally want to replace it.`);
 }
 
 await mkdir(packageRoot, { recursive: true });
 await writeFile(scaffoldPath, scaffold, "utf8");
 
 if (writeLocal && localEnvWriteBlockers.length === 0) {
-  await writeFile(localEnvPath, scaffold, "utf8");
+  await mkdir(path.dirname(localEnvWritePath), { recursive: true });
+  await writeFile(localEnvWritePath, scaffold, "utf8");
   localEnvWritten = true;
 }
 
-const existingLocalEnvPlaceholderAudit = await readExistingLocalEnvPlaceholderAudit();
+const realRootLocalEnvContentAfter = existsSync(localEnvPath) ? await readFile(localEnvPath, "utf8") : null;
+const existingLocalEnvPlaceholderAudit = await readExistingLocalEnvPlaceholderAudit(writeLocalSmoke ? [localEnvWritePath] : localEnvCandidatePaths());
 
 const releasePrepareEnvReport = {
   appName,
@@ -421,6 +436,7 @@ const releasePrepareEnvReport = {
   platform: process.platform,
   arch: process.arch,
   smokeCommand: "npm run release:prepare-env-smoke",
+  writeSmokeCommand: "npm run release:prepare-env-write-smoke",
   prepareLocalEnvCommand: "npm run release:prepare-env",
   forceOverwriteCommand: "npm run release:prepare-env -- --force",
   doctorCommand: "npm run release:doctor",
@@ -440,10 +456,18 @@ const releasePrepareEnvReport = {
   scaffoldGuidanceSectionCount: scaffoldGuidanceSections.length,
   scaffoldGuidanceSections: scaffoldGuidanceSections.map(({ id, label, beforeKey }) => ({ id, label, beforeKey })),
   scaffoldWritten: true,
+  writeLocalSmoke,
   localEnvWriteRequested: writeLocal,
   localEnvWriteAttempted: writeLocal && localEnvWriteBlockers.length === 0,
   localEnvWritten,
   localEnvAlreadyExists,
+  localEnvWriteTarget: relative(localEnvWritePath),
+  localEnvWriteTargetIsRealRoot: path.resolve(localEnvWritePath) === path.resolve(localEnvPath),
+  smokeLocalEnvDirectory: writeLocalSmoke ? relative(smokeLocalEnvDirectory) : "none",
+  realRootLocalEnvPath: relative(localEnvPath),
+  realRootLocalEnvPresentBefore: realRootLocalEnvContentBefore !== null,
+  realRootLocalEnvPresentAfter: realRootLocalEnvContentAfter !== null,
+  realRootLocalEnvModified: realRootLocalEnvContentBefore !== realRootLocalEnvContentAfter,
   forceOverwrite: force,
   localEnvWriteBlockers,
   ...existingLocalEnvPlaceholderAudit,
@@ -490,6 +514,11 @@ check(releasePrepareEnvReport.templateKeys.length === distributionPrivateInputKe
 check(releasePrepareEnvReport.missingTemplateKeys.length === 0, `release prepare env template is missing keys: ${releasePrepareEnvReport.missingTemplateKeys.join(", ")}`);
 check(releasePrepareEnvReport.extraTemplateKeys.length === 0, `release prepare env template has unexpected keys: ${releasePrepareEnvReport.extraTemplateKeys.join(", ")}`);
 check(releasePrepareEnvReport.scaffoldWritten === true, "release prepare env should write the build scaffold");
+check(releasePrepareEnvReport.writeSmokeCommand === "npm run release:prepare-env-write-smoke", "release prepare env should include the write smoke command");
+check(typeof releasePrepareEnvReport.writeLocalSmoke === "boolean", "release prepare env should report write-smoke mode");
+check(typeof releasePrepareEnvReport.localEnvWriteTarget === "string", "release prepare env should report the local env write target");
+check(typeof releasePrepareEnvReport.localEnvWriteTargetIsRealRoot === "boolean", "release prepare env should report whether the write target is the real root env");
+check(typeof releasePrepareEnvReport.realRootLocalEnvModified === "boolean", "release prepare env should report whether the real root env changed");
 check(releasePrepareEnvReport.scaffoldGuidanceSectionCount === 5, "release prepare env should include guided scaffold sections");
 check(Array.isArray(releasePrepareEnvReport.existingLocalEnvFilesChecked), "release prepare env should include existing local env files checked");
 check(Array.isArray(releasePrepareEnvReport.existingLocalEnvPresentFiles), "release prepare env should include existing local env present files");
@@ -554,9 +583,24 @@ check(releasePrepareEnvReport.releaseUploadAttempted === false, "release prepare
 check(releasePrepareEnvReport.notarySubmissionAttempted === false, "release prepare env should not submit to Apple notary services");
 check(releasePrepareEnvReport.signingAttempted === false, "release prepare env should not sign artifacts");
 check(releasePrepareEnvReport.releaseGateClaimedExternalDistribution === false, "release prepare env should not claim external distribution completion");
+if (writeLocalSmoke) {
+  check(releasePrepareEnvReport.localEnvWriteRequested === true, "release prepare env write smoke should request local env writing");
+  check(releasePrepareEnvReport.localEnvWriteAttempted === true, "release prepare env write smoke should attempt local env writing");
+  check(releasePrepareEnvReport.localEnvWritten === true, "release prepare env write smoke should write the smoke local env target");
+  check(releasePrepareEnvReport.localEnvWriteTargetIsRealRoot === false, "release prepare env write smoke should not target the real root local env file");
+  check(releasePrepareEnvReport.realRootLocalEnvModified === false, "release prepare env write smoke should not modify the real root local env file");
+  check(releasePrepareEnvReport.existingLocalEnvFileLoaded === true, "release prepare env write smoke should audit the written smoke local env target");
+  check(
+    releasePrepareEnvReport.existingReleaseChannelPlaceholderKeyCount === releaseChannelMetadataKeys.length,
+    "release prepare env write smoke should report all release-channel placeholders in the smoke target"
+  );
+}
 check(markdown.includes("Release Prepare Env"), "release prepare env Markdown should include title");
 check(markdown.includes("Prepare local env command: `npm run release:prepare-env`"), "release prepare env Markdown should include local env command");
+check(markdown.includes("Write smoke command: `npm run release:prepare-env-write-smoke`"), "release prepare env Markdown should include write smoke command");
 check(markdown.includes("Hard external distribution gate: `npm run release:external-check`"), "release prepare env Markdown should include hard gate command");
+check(markdown.includes("Local env write target:"), "release prepare env Markdown should include local env write target");
+check(markdown.includes("Real root local env modified:"), "release prepare env Markdown should include real root modification status");
 check(markdown.includes("Existing local env placeholder keys:"), "release prepare env Markdown should include existing local env placeholder key status");
 check(markdown.includes("Existing release-channel placeholder keys:"), "release prepare env Markdown should include release-channel placeholder key status");
 check(markdown.includes("## Existing Local Env Placeholder Audit"), "release prepare env Markdown should include existing local env placeholder audit section");
@@ -580,8 +624,12 @@ console.log("GrooveForge release prepare env passed.");
 console.log(`- Markdown: ${relative(prepareEnvMarkdownPath)}`);
 console.log(`- JSON: ${relative(prepareEnvJsonPath)}`);
 console.log(`- Build scaffold: ${relative(scaffoldPath)}`);
+console.log(`- Write smoke: ${releasePrepareEnvReport.writeLocalSmoke ? "yes" : "no"}`);
 console.log(`- Local env write requested: ${releasePrepareEnvReport.localEnvWriteRequested ? "yes" : "no"}`);
 console.log(`- Local env written: ${releasePrepareEnvReport.localEnvWritten ? "yes" : "no"}`);
+console.log(`- Local env write target: ${releasePrepareEnvReport.localEnvWriteTarget}`);
+console.log(`- Local env write target is real root: ${releasePrepareEnvReport.localEnvWriteTargetIsRealRoot ? "yes" : "no"}`);
+console.log(`- Real root local env modified: ${releasePrepareEnvReport.realRootLocalEnvModified ? "yes" : "no"}`);
 console.log(`- Manual QA checklist digest available: ${releasePrepareEnvReport.manualQaChecklistDigestAvailable ? "yes" : "no"}`);
 console.log(`- Manual QA checklist digest applied: ${releasePrepareEnvReport.manualQaChecklistDigestApplied ? "yes" : "no"}`);
 console.log(`- Existing local env file loaded: ${releasePrepareEnvReport.existingLocalEnvFileLoaded ? "yes" : "no"}`);
