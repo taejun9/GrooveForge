@@ -67,6 +67,9 @@ type LaunchSmokePaletteRouteEvidence = {
 };
 
 type LaunchSmokePaletteEvidence = {
+  dualBeginner: LaunchSmokePaletteRouteEvidence;
+  dualProducer: LaunchSmokePaletteRouteEvidence;
+  dualReadout: LaunchSmokePaletteRouteEvidence;
   guided: LaunchSmokePaletteRouteEvidence;
   opened: boolean;
   producer: LaunchSmokePaletteRouteEvidence;
@@ -455,7 +458,7 @@ function launchSmokeFailures(evidence: LaunchSmokeEvidence): string[] {
 function launchSmokePaletteFailures(evidence: LaunchSmokePaletteEvidence): string[] {
   const failures: string[] = [];
   if (!evidence.opened || !evidence.searchPresent || !evidence.resultPresent) {
-    failures.push("live Quick Actions palette should open, accept Audience Session searches, and leave an execution result");
+    failures.push("live Quick Actions palette should open, accept Audience Session and Dual Audience Readiness searches, and leave an execution result");
   }
   if (!evidence.guided.actionPresent) {
     failures.push("live Quick Actions palette should show Enter Guided after first-time composer search");
@@ -517,6 +520,32 @@ function launchSmokePaletteFailures(evidence: LaunchSmokePaletteEvidence): strin
   if (!evidence.producer.resultNextCheck.includes("Review Queue") || !evidence.producer.resultNextCheck.includes("Export Preflight")) {
     failures.push("live Quick Actions producer result should guide the next Review Queue / Export Preflight check");
   }
+  if (!evidence.dualReadout.actionPresent) {
+    failures.push("live Quick Actions palette should show Dual Audience Readiness Route Readout");
+  }
+  if (evidence.dualReadout.spotlightAction !== "dual-audience-readiness-route-readout-action") {
+    failures.push(
+      `live Quick Actions Dual Audience spotlight should target dual-audience-readiness-route-readout-action, got ${evidence.dualReadout.spotlightAction}`
+    );
+  }
+  if (!evidence.dualReadout.spotlightTitle.includes("Review Dual Audience Readiness")) {
+    failures.push(`live Quick Actions Dual Audience spotlight should name Dual Audience Readiness, got ${evidence.dualReadout.spotlightTitle}`);
+  }
+  if (!evidence.dualReadout.resultMetricValue.includes("Dual Audience Readiness Route Readout")) {
+    failures.push("live Quick Actions Dual Audience readout result metric should include the route readout");
+  }
+  if (!evidence.dualBeginner.actionPresent || !evidence.dualBeginner.resultMetricValue.includes("First-time composer lane")) {
+    failures.push("live Quick Actions Dual Audience beginner lane should execute with first-time composer lane evidence");
+  }
+  if (!evidence.dualBeginner.resultNextCheck.includes("First Beat Path")) {
+    failures.push("live Quick Actions Dual Audience beginner lane should guide the next First Beat Path check");
+  }
+  if (!evidence.dualProducer.actionPresent || !evidence.dualProducer.resultMetricValue.includes("Professional producer lane")) {
+    failures.push("live Quick Actions Dual Audience producer lane should execute with professional producer lane evidence");
+  }
+  if (!evidence.dualProducer.resultNextCheck.includes("Export Preflight") && !evidence.dualProducer.resultNextCheck.includes("Production Snapshot")) {
+    failures.push("live Quick Actions Dual Audience producer lane should guide the next producer delivery check");
+  }
   return failures;
 }
 
@@ -556,17 +585,14 @@ function launchSmokeVisualFailures(evidence: LaunchSmokeVisualEvidence): string[
   return failures;
 }
 
-async function waitForLaunchSmokePaint(win: BrowserWindow): Promise<void> {
-  await win.webContents.executeJavaScript(`
-    new Promise((resolve) => {
-      const afterPaint = () => window.setTimeout(resolve, 80);
-      window.requestAnimationFrame(() => window.requestAnimationFrame(afterPaint));
-    });
-  `);
+async function waitForLaunchSmokePaint(): Promise<void> {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 500);
+  });
 }
 
 async function collectLaunchSmokeVisualEvidence(win: BrowserWindow): Promise<LaunchSmokeVisualEvidence> {
-  await waitForLaunchSmokePaint(win);
+  await waitForLaunchSmokePaint();
   const screenshot = await win.webContents.capturePage();
   const { width, height } = screenshot.getSize();
   const pngBytes = screenshot.toPNG().byteLength;
@@ -626,6 +652,21 @@ async function collectLaunchSmokeVisualEvidence(win: BrowserWindow): Promise<Lau
     uniqueSampledColors: sampledColors.size,
     width
   };
+}
+
+function collectLaunchSmokeVisualEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeVisualEvidence> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Timed out collecting live screenshot visual evidence.")), 30000);
+    void collectLaunchSmokeVisualEvidence(win)
+      .then((evidence) => {
+        clearTimeout(timeout);
+        resolve(evidence);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
 }
 
 async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmokeEvidence> {
@@ -723,6 +764,9 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         location: window.location.href,
         missingText: expectedText.filter((text) => !bodyText.includes(text)),
         palette: {
+          dualBeginner: emptyRoute,
+          dualProducer: emptyRoute,
+          dualReadout: emptyRoute,
           guided: emptyRoute,
           opened: false,
           producer: emptyRoute,
@@ -746,12 +790,18 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
 }
 
 function collectLaunchSmokeEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeEvidence> {
-  return Promise.race([
-    collectLaunchSmokeEvidence(win),
-    new Promise<never>((_resolve, reject) => {
-      setTimeout(() => reject(new Error("Timed out collecting launch smoke DOM evidence.")), 30000);
-    })
-  ]);
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Timed out collecting launch smoke DOM evidence.")), 30000);
+    void collectLaunchSmokeEvidence(win)
+      .then((evidence) => {
+        clearTimeout(timeout);
+        resolve(evidence);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
 }
 
 async function collectLaunchSmokePaletteEvidence(win: BrowserWindow): Promise<LaunchSmokePaletteEvidence> {
@@ -771,12 +821,18 @@ async function collectLaunchSmokePaletteEvidence(win: BrowserWindow): Promise<La
 }
 
 function collectLaunchSmokePaletteEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokePaletteEvidence> {
-  return Promise.race([
-    collectLaunchSmokePaletteEvidence(win),
-    new Promise<never>((_resolve, reject) => {
-      setTimeout(() => reject(new Error("Timed out collecting live Quick Actions palette evidence.")), 120000);
-    })
-  ]);
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Timed out collecting live Quick Actions palette evidence.")), 30000);
+    void collectLaunchSmokePaletteEvidence(win)
+      .then((evidence) => {
+        clearTimeout(timeout);
+        resolve(evidence);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
 }
 
 async function collectProjectIoSmokeEvidence(win: BrowserWindow): Promise<ProjectIoSmokeEvidence> {
@@ -868,10 +924,11 @@ function projectIoSmokeFailures(evidence: ProjectIoSmokeEvidence): string[] {
 
 function installLaunchSmoke(win: BrowserWindow): void {
   let finished = false;
+  let lastProgress: Record<string, unknown> = { phase: "waiting-ready-to-show" };
   const timeout = setTimeout(() => {
     if (!finished) {
       finished = true;
-      launchSmokeFailure("Timed out before the production desktop renderer completed the launch smoke.");
+      launchSmokeFailure("Timed out before the production desktop renderer completed the launch smoke.", { lastProgress });
     }
   }, launchSmokeTimeoutMs);
 
@@ -893,6 +950,7 @@ function installLaunchSmoke(win: BrowserWindow): void {
   });
 
   const poll = (deadline: number): void => {
+    lastProgress = { phase: "collecting-dom" };
     void collectLaunchSmokeEvidenceWithTimeout(win)
       .then((evidence) => {
         if (finished) {
@@ -900,7 +958,9 @@ function installLaunchSmoke(win: BrowserWindow): void {
         }
 
         const failures = launchSmokeFailures(evidence);
+        lastProgress = { phase: "dom-collected", evidence, failures };
         if (failures.length === 0) {
+          lastProgress = { phase: "collecting-palette", evidence };
           return collectLaunchSmokePaletteEvidenceWithTimeout(win)
             .then((paletteEvidence) => {
               if (finished) {
@@ -909,6 +969,7 @@ function installLaunchSmoke(win: BrowserWindow): void {
 
               const paletteFailures = launchSmokePaletteFailures(paletteEvidence);
               const evidenceWithPalette = { ...evidence, palette: paletteEvidence };
+              lastProgress = { phase: "palette-collected", evidence: evidenceWithPalette, failures: paletteFailures };
               if (paletteFailures.length > 0) {
                 if (Date.now() >= deadline) {
                   fail("Production desktop live Quick Actions palette smoke failed.", {
@@ -921,13 +982,20 @@ function installLaunchSmoke(win: BrowserWindow): void {
                 return;
               }
 
-              return collectLaunchSmokeVisualEvidence(win)
+              lastProgress = { phase: "collecting-visual", evidence: evidenceWithPalette };
+              return collectLaunchSmokeVisualEvidenceWithTimeout(win)
                 .then((visualEvidence) => {
                   if (finished) {
                     return;
                   }
 
                   const visualFailures = launchSmokeVisualFailures(visualEvidence);
+                  lastProgress = {
+                    phase: "visual-collected",
+                    evidence: evidenceWithPalette,
+                    visualEvidence,
+                    failures: visualFailures
+                  };
                   if (visualFailures.length > 0) {
                     if (Date.now() >= deadline) {
                       fail("Production desktop visual launch smoke failed.", {
@@ -979,7 +1047,8 @@ function installLaunchSmoke(win: BrowserWindow): void {
   };
 
   win.once("ready-to-show", () => {
-    poll(Date.now() + launchSmokeTimeoutMs - 1000);
+    lastProgress = { phase: "ready-to-show" };
+    poll(Date.now() + launchSmokeTimeoutMs - 35000);
   });
 }
 

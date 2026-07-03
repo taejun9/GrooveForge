@@ -153,6 +153,19 @@ function createAudienceSessionSmokeAction({ id, resultTargetId, title }) {
   };
 }
 
+function createDualAudienceSmokeAction({ id, resultTargetId, title }) {
+  return {
+    id,
+    title,
+    detail:
+      "Dual Audience Readiness Route Readout / First-time composer lane: Next guided step / Professional producer lane: Producer review / First Beat Path / Export Preflight / Production Snapshot",
+    group: "Project",
+    keywords: "dual audience readiness first-time composer lane professional producer lane route readout",
+    resultTargetId,
+    run() {}
+  };
+}
+
 function validateAudienceSessionQuickActionResults(quickActions, workstation) {
   const guidedProject = { ...workstation.starterProject, mode: "guided" };
   const studioProject = { ...workstation.starterProject, mode: "studio" };
@@ -228,6 +241,85 @@ function validateAudienceSessionQuickActionResults(quickActions, workstation) {
     }
     for (const needle of testCase.auditionNeedles) {
       checkIncludes(result.auditionCue, needle, `${testCase.label} audition cue`);
+    }
+    for (const needle of testCase.nextNeedles) {
+      checkIncludes(result.nextCheck, needle, `${testCase.label} next check`);
+    }
+  }
+}
+
+function validateDualAudienceQuickActionResults(quickActions, workstation) {
+  const cases = [
+    {
+      label: "Dual Audience Readiness route readout result",
+      action: createDualAudienceSmokeAction({
+        id: "dual-audience-readiness-route-readout-action",
+        resultTargetId: "beginner",
+        title: "Review Dual Audience Readiness: 1/2 lanes ready"
+      }),
+      metricNeedles: [
+        "Dual Audience Readiness Route Readout",
+        "First-time composer lane",
+        "Professional producer lane",
+        "Pattern A",
+        "selected-pattern events",
+        "editable project events",
+        "Choose the first-time composer or professional producer lane"
+      ],
+      nextNeedles: ["first-time composer lane", "Export Preflight", "Production Snapshot"]
+    },
+    {
+      label: "Dual Audience Readiness beginner lane result",
+      action: createDualAudienceSmokeAction({
+        id: "dual-audience-readiness-beginner-action",
+        resultTargetId: "beginner",
+        title: "Open Dual Audience First-time composer lane"
+      }),
+      metricNeedles: [
+        "Open first-time composer lane",
+        "First-time composer lane",
+        "First Beat Path",
+        "Pattern A",
+        "selected-pattern events"
+      ],
+      nextNeedles: ["First Beat Path", "guided beat-making step"]
+    },
+    {
+      label: "Dual Audience Readiness producer lane result",
+      action: createDualAudienceSmokeAction({
+        id: "dual-audience-readiness-producer-action",
+        resultTargetId: "producer",
+        title: "Open Dual Audience Professional producer lane"
+      }),
+      metricNeedles: [
+        "Open professional producer lane",
+        "Professional producer lane",
+        "Export Preflight",
+        "Production Snapshot",
+        "Pattern A",
+        "editable project events"
+      ],
+      nextNeedles: ["Export Preflight", "Production Snapshot"]
+    }
+  ];
+
+  for (const testCase of cases) {
+    const result = quickActions.createQuickActionResult(
+      testCase.action,
+      workstation.starterProject,
+      workstation.starterProject,
+      "complete"
+    );
+
+    check(result.actionId === testCase.action.id, `${testCase.label} should return the executed action id`);
+    check(result.status === "Focused", `${testCase.label} should report Focused status`);
+    check(result.tone === "good", `${testCase.label} should report a good tone`);
+    check(result.metric.id === "dual-audience-readiness-route", `${testCase.label} should use the Dual Audience metric id`);
+    check(result.metric.label === "Dual Audience Readiness", `${testCase.label} should use the Dual Audience metric label`);
+    check(result.metric.tone === "good", `${testCase.label} metric should report a good tone`);
+
+    for (const needle of testCase.metricNeedles) {
+      checkIncludes(result.metric.after, needle, `${testCase.label} after metric`);
     }
     for (const needle of testCase.nextNeedles) {
       checkIncludes(result.nextCheck, needle, `${testCase.label} next check`);
@@ -336,6 +428,100 @@ function validateAudienceSessionQuickActionPalette(guidancePanels, palette) {
   check(selectedRows.join(",") === "beginner,producer", "Audience Session palette actions should run the selected row callbacks in order");
 }
 
+function createDualAudienceSmokeRows() {
+  return [
+    {
+      id: "beginner",
+      laneLabel: "First-time composer lane",
+      label: "First-time composer",
+      statusLabel: "Next guided step",
+      metricLabel: "4/5 beat checks / 80% path",
+      detailLabel: "First Beat Path / Compose: add 808 bass",
+      nextCheckLabel: "Follow First Beat Path for the next direct beat-making step.",
+      actionLabel: "Open First Beat Path",
+      tone: "warn",
+      firstBeatPathStep: {
+        id: "compose",
+        label: "Compose",
+        value: "808 bass",
+        detail: "Add 808 bass",
+        jumpLabel: "Compose",
+        tone: "warn"
+      }
+    },
+    {
+      id: "producer",
+      laneLabel: "Professional producer lane",
+      label: "Professional producer",
+      statusLabel: "Producer review",
+      metricLabel: "7/8 producer checks / Export Preflight",
+      detailLabel: "Production Snapshot / Mix: check headroom",
+      nextCheckLabel: "Use Export Preflight or Production Snapshot for the next producer delivery check.",
+      actionLabel: "Open Export Preflight",
+      tone: "warn",
+      exportPreflightCard: {
+        id: "mix",
+        label: "Mix",
+        value: "Review",
+        detail: "Check headroom",
+        focusLabel: "Focus Mix",
+        tone: "warn"
+      }
+    }
+  ];
+}
+
+function validateDualAudienceQuickActionPalette(guidancePanels, palette) {
+  const runs = [];
+  const actions = guidancePanels.createDualAudienceReadinessQuickActions({
+    onFocusExportPreflight(card) {
+      runs.push(`export:${card.id}`);
+    },
+    onFocusProductionSnapshot(metric) {
+      runs.push(`snapshot:${metric.id}`);
+    },
+    onFocusRouteReadout() {
+      runs.push("route");
+    },
+    onJumpFirstBeatPath(step) {
+      runs.push(`firstBeat:${step.id}`);
+    },
+    rows: createDualAudienceSmokeRows()
+  });
+
+  check(actions.length === 3, "Dual Audience palette smoke should create route, beginner, and producer actions");
+  check(actions.every((action) => action.group === "Project"), "Dual Audience palette actions should remain Project-group actions");
+
+  const routeAction = actions.find((action) => action.id === "dual-audience-readiness-route-readout-action");
+  const beginnerAction = actions.find((action) => action.id === "dual-audience-readiness-beginner-action");
+  const producerAction = actions.find((action) => action.id === "dual-audience-readiness-producer-action");
+  check(routeAction?.title.includes("Review Dual Audience Readiness"), "Dual Audience palette should expose route readout title");
+  check(beginnerAction?.title === "Open Dual Audience First-time composer lane", "Dual Audience palette should expose beginner lane title");
+  check(producerAction?.title === "Open Dual Audience Professional producer lane", "Dual Audience palette should expose producer lane title");
+  check(beginnerAction?.resultTargetId === "beginner", "Dual Audience palette should keep beginner result target");
+  check(producerAction?.resultTargetId === "producer", "Dual Audience palette should keep producer result target");
+
+  const routeSearch = palette.filterQuickActions(actions, "dual audience readiness", "all");
+  const beginnerSearch = palette.filterQuickActions(actions, "first-time composer lane", "project");
+  const producerSearch = palette.filterQuickActions(actions, "professional producer lane", "project");
+
+  check(routeSearch[0]?.id === "dual-audience-readiness-route-readout-action", "Dual Audience palette search should find route readout first");
+  check(beginnerSearch.some((action) => action.id === "dual-audience-readiness-beginner-action"), "Dual Audience palette search should find beginner lane");
+  check(producerSearch.some((action) => action.id === "dual-audience-readiness-producer-action"), "Dual Audience palette search should find producer lane");
+
+  const routeSearchResult = palette.createQuickActionSearchResult("dual audience readiness", "all", actions);
+  check(routeSearchResult.tone === "good", "Dual Audience palette search result should be actionable");
+  check(
+    routeSearchResult.metricValue.includes("Review Dual Audience Readiness"),
+    "Dual Audience palette search result should target the route readout"
+  );
+
+  routeAction?.run();
+  beginnerAction?.run();
+  producerAction?.run();
+  check(runs.join(",") === "route,firstBeat:compose,export:mix", "Dual Audience palette actions should run route and lane handlers");
+}
+
 installBrowserMocks();
 
 const server = await createServer({
@@ -353,7 +539,15 @@ try {
     await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
     await server.ssrLoadModule("/src/domain/workstation.ts")
   );
+  validateDualAudienceQuickActionResults(
+    await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
+    await server.ssrLoadModule("/src/domain/workstation.ts")
+  );
   validateAudienceSessionQuickActionPalette(
+    await server.ssrLoadModule("/src/ui/workstationGuidancePanels.tsx"),
+    await server.ssrLoadModule("/src/ui/workstationAppQuickActionPalette.ts")
+  );
+  validateDualAudienceQuickActionPalette(
     await server.ssrLoadModule("/src/ui/workstationGuidancePanels.tsx"),
     await server.ssrLoadModule("/src/ui/workstationAppQuickActionPalette.ts")
   );
@@ -377,6 +571,7 @@ try {
     );
     console.log("- Audience Session result: Enter Guided and Enter Studio Quick Actions return Entered status, route metrics, and route-specific follow-up");
     console.log("- Audience Session palette: Enter Guided and Enter Studio are searchable through Quick Actions query and scope filters");
+    console.log("- Dual Audience Readiness palette: route readout plus both audience lanes are searchable and return focused route metrics");
     console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack");
   }
 } finally {

@@ -104,8 +104,14 @@ function checkResult(result) {
   const missingTestIds = expectedLiveTestIds.filter((testId) => evidence?.testIds?.[testId] !== true);
   check(missingTestIds.length === 0, `live desktop renderer is missing test ids: ${missingTestIds.join(", ")}`);
   check(evidence?.palette?.opened === true, "live desktop Quick Actions palette should open during launch smoke");
-  check(evidence?.palette?.searchPresent === true, "live desktop Quick Actions palette should accept Audience Session search input");
-  check(evidence?.palette?.resultPresent === true, "live desktop Quick Actions palette should leave an Audience Session execution result");
+  check(
+    evidence?.palette?.searchPresent === true,
+    "live desktop Quick Actions palette should accept Audience Session and Dual Audience Readiness search input"
+  );
+  check(
+    evidence?.palette?.resultPresent === true,
+    "live desktop Quick Actions palette should leave Audience Session and Dual Audience Readiness execution results"
+  );
   check(evidence?.palette?.guided?.actionPresent === true, "live desktop Quick Actions palette should show Enter Guided from first-time composer search");
   check(
     evidence?.palette?.guided?.spotlightAction === "audience-session-enter-beginner",
@@ -169,6 +175,41 @@ function checkResult(result) {
     String(evidence?.palette?.producer?.resultNextCheck ?? "").includes("Review Queue") &&
       String(evidence?.palette?.producer?.resultNextCheck ?? "").includes("Export Preflight"),
     "live desktop Quick Actions producer result should guide the next Review Queue / Export Preflight check"
+  );
+  check(
+    evidence?.palette?.dualReadout?.actionPresent === true,
+    "live desktop Quick Actions palette should show Dual Audience Readiness Route Readout"
+  );
+  check(
+    evidence?.palette?.dualReadout?.spotlightAction === "dual-audience-readiness-route-readout-action",
+    "live desktop Quick Actions Dual Audience spotlight should target dual-audience-readiness-route-readout-action"
+  );
+  check(
+    String(evidence?.palette?.dualReadout?.spotlightTitle ?? "").includes("Review Dual Audience Readiness"),
+    "live desktop Quick Actions Dual Audience spotlight should name Dual Audience Readiness"
+  );
+  check(
+    String(evidence?.palette?.dualReadout?.resultMetricValue ?? "").includes("Dual Audience Readiness Route Readout"),
+    "live desktop Quick Actions Dual Audience readout result should include the route readout"
+  );
+  check(
+    evidence?.palette?.dualBeginner?.actionPresent === true &&
+      String(evidence?.palette?.dualBeginner?.resultMetricValue ?? "").includes("First-time composer lane"),
+    "live desktop Quick Actions Dual Audience beginner lane should execute with first-time composer lane evidence"
+  );
+  check(
+    String(evidence?.palette?.dualBeginner?.resultNextCheck ?? "").includes("First Beat Path"),
+    "live desktop Quick Actions Dual Audience beginner lane should guide the next First Beat Path check"
+  );
+  check(
+    evidence?.palette?.dualProducer?.actionPresent === true &&
+      String(evidence?.palette?.dualProducer?.resultMetricValue ?? "").includes("Professional producer lane"),
+    "live desktop Quick Actions Dual Audience producer lane should execute with professional producer lane evidence"
+  );
+  check(
+    String(evidence?.palette?.dualProducer?.resultNextCheck ?? "").includes("Export Preflight") ||
+      String(evidence?.palette?.dualProducer?.resultNextCheck ?? "").includes("Production Snapshot"),
+    "live desktop Quick Actions Dual Audience producer lane should guide the next producer delivery check"
   );
 
   const visual = evidence?.visual;
@@ -296,6 +337,9 @@ child.on("exit", (code, signal) => {
   );
   console.log("- Audience session rows: First-time composer, Professional producer");
   console.log("- Audience session Quick Actions: renderer palette search and run evidence passed for Enter Guided and Enter Studio");
+  console.log(
+    "- Dual Audience Readiness Quick Actions: route readout, first-time composer lane, and professional producer lane search/run evidence passed"
+  );
   console.log(
     "- Beginner path: Audience Session Readout, Dual Audience Readiness, Enter Guided, Guide Quick Start, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
   );

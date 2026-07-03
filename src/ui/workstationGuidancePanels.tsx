@@ -111,7 +111,7 @@ type GuideQuickStartContextItem = {
   tone: MixCoachTone;
 };
 
-type DualAudienceReadinessLane = {
+export type DualAudienceReadinessLane = {
   id: "beginner" | "producer";
   laneLabel: string;
   label: string;
@@ -444,7 +444,7 @@ export function DualAudienceReadinessStrip({
   );
 }
 
-function createDualAudienceReadinessRows({
+export function createDualAudienceReadinessRows({
   beatReadinessChecks,
   exportPreflightSummary,
   firstBeatPathSummary,
@@ -563,6 +563,78 @@ export function createAudienceSessionQuickActions({
       run: () => onSelectAudience(row)
     };
   });
+}
+
+export function createDualAudienceReadinessQuickActions({
+  onFocusExportPreflight,
+  onFocusProductionSnapshot,
+  onFocusRouteReadout,
+  onJumpFirstBeatPath,
+  rows
+}: {
+  onFocusExportPreflight: (card: ExportPreflightCard) => void;
+  onFocusProductionSnapshot: (metric: ProductionSnapshotMetric) => void;
+  onFocusRouteReadout: () => void;
+  onJumpFirstBeatPath: (step: FirstBeatPathStep) => void;
+  rows: DualAudienceReadinessLane[];
+}): QuickAction[] {
+  const readyLaneCount = rows.filter((row) => row.tone === "good").length;
+  const priorityRow = rows.find((row) => row.tone === "danger") ?? rows.find((row) => row.tone === "warn") ?? rows[0];
+  const beginnerLane = rows.find((row) => row.id === "beginner") ?? rows[0];
+  const producerLane = rows.find((row) => row.id === "producer") ?? rows[1] ?? rows[0];
+  const routeDetail = [
+    `${readyLaneCount}/${rows.length} lanes ready`,
+    `${beginnerLane?.laneLabel ?? "First-time composer lane"}: ${beginnerLane?.statusLabel ?? "Ready"}`,
+    `${producerLane?.laneLabel ?? "Professional producer lane"}: ${producerLane?.statusLabel ?? "Ready"}`,
+    `Priority ${priorityRow?.laneLabel ?? "Dual Audience Readiness"}: ${
+      priorityRow?.nextCheckLabel ?? "Check first-time composer and professional producer routes"
+    }`,
+    "Visible Dual Audience Readiness actions unchanged"
+  ].join(" / ");
+
+  function runLaneAction(row: DualAudienceReadinessLane): void {
+    if (row.id === "beginner" && row.firstBeatPathStep) {
+      onJumpFirstBeatPath(row.firstBeatPathStep);
+      return;
+    }
+
+    if (row.exportPreflightCard) {
+      onFocusExportPreflight(row.exportPreflightCard);
+      return;
+    }
+
+    if (row.productionSnapshotMetric) {
+      onFocusProductionSnapshot(row.productionSnapshotMetric);
+    }
+  }
+
+  const routeAction: QuickAction = {
+    id: "dual-audience-readiness-route-readout-action",
+    title: `Review Dual Audience Readiness: ${readyLaneCount}/${rows.length} lanes ready`,
+    detail: routeDetail,
+    group: "Project",
+    keywords: `Quick Actions Dual Audience Readiness Route Readout review dual audience readiness first-time composer lane professional producer lane beginner producer guided studio delivery scan route readout direct beat workstation ${routeDetail}`,
+    resultTargetId: priorityRow?.id,
+    run: onFocusRouteReadout
+  };
+
+  const laneActions: QuickAction[] = rows.map((row) => ({
+    id: `dual-audience-readiness-${row.id}-action`,
+    title: `Open Dual Audience ${row.laneLabel}`,
+    detail: [
+      row.statusLabel,
+      row.metricLabel,
+      row.detailLabel,
+      row.nextCheckLabel,
+      `Visible ${row.laneLabel} action unchanged`
+    ].join(" / "),
+    group: "Project",
+    keywords: `dual audience readiness ${row.id} ${row.label} ${row.laneLabel} ${row.statusLabel} ${row.metricLabel} ${row.detailLabel} ${row.nextCheckLabel} guided studio producer beginner route command palette direct beat workstation`,
+    resultTargetId: row.id,
+    run: () => runLaneAction(row)
+  }));
+
+  return [routeAction, ...laneActions];
 }
 
 export function ReferenceAlignmentReadout({

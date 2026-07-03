@@ -37,6 +37,8 @@ The first-run Audience Session Readout should make that split actionable: first-
 
 The first-run Dual Audience Readiness strip should keep that promise visible after mode choice by summarizing the first-time composer next step and the professional producer delivery scan from existing local First Beat Path, Beat Readiness, Session Pass, Production Snapshot, and Export Preflight signals. It is a read-only navigation surface, not a scoring engine, genre lock, style imitation feature, remote service, or export mutation.
 
+Dual Audience Readiness should also be discoverable from Quick Actions and Command Reference: command-palette users get a read-only route readout plus explicit first-time composer and professional producer lane commands that use the same existing First Beat Path, Export Preflight, and Production Snapshot focus routes as the visible strip.
+
 The first-session acceptance test is concrete: choose BPM/key/style, program drums, write 808/bass, add melody/chords, shape sounds, arrange sections, balance the mix, set the master posture, and export WAV/stems without importing audio. A product draft that cannot explain this path before mentioning extension features is not aligned.
 
 ## Product Boundary

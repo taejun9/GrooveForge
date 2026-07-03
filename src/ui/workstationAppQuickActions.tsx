@@ -835,6 +835,8 @@ import {
   createGuideQuickStartCompletionBreakdownItems,
   createGuideQuickStartCompletionScore,
   createAudienceSessionQuickActions,
+  createDualAudienceReadinessQuickActions,
+  createDualAudienceReadinessRows,
   createModeSwitchButtonContext,
   createModeSwitchQuickActions,
   createModeSwitchResult,
@@ -1488,6 +1490,7 @@ export function createQuickActions({
   onSelectPattern,
   onSelectStyle,
   onSelectAudienceSessionRow,
+  onFocusDualAudienceReadinessRouteReadout,
   onSwitchMode,
   onUsePatternInSelectedBlock,
   onSetKeyboardCaptureEnabled,
@@ -1874,6 +1877,7 @@ export function createQuickActions({
   onSelectPattern: (pattern: PatternSlot) => void;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
   onSelectAudienceSessionRow: (row: AudienceSessionReadoutRow) => void;
+  onFocusDualAudienceReadinessRouteReadout: () => void;
   onSwitchMode: (mode: ProjectState["mode"]) => void;
   onUsePatternInSelectedBlock: (pattern: PatternSlot) => void;
   onSetKeyboardCaptureEnabled: (enabled: boolean) => void;
@@ -2993,6 +2997,20 @@ export function createQuickActions({
   const audienceSessionActions = createAudienceSessionQuickActions({
     onSelectAudience: onSelectAudienceSessionRow,
     summary: audienceSessionReadoutSummary
+  });
+  const dualAudienceReadinessRows = createDualAudienceReadinessRows({
+    beatReadinessChecks,
+    exportPreflightSummary,
+    firstBeatPathSummary,
+    productionSnapshotSummary,
+    sessionPassSummary
+  });
+  const dualAudienceReadinessActions = createDualAudienceReadinessQuickActions({
+    onFocusExportPreflight,
+    onFocusProductionSnapshot,
+    onFocusRouteReadout: onFocusDualAudienceReadinessRouteReadout,
+    onJumpFirstBeatPath,
+    rows: dualAudienceReadinessRows
   });
   const modeSwitchActions = createModeSwitchQuickActions({
     firstBeatPathSummary,
@@ -5610,6 +5628,7 @@ export function createQuickActions({
       run: () => onFocusSessionPass(sessionPassCard)
     },
     ...sessionPassActions,
+    ...dualAudienceReadinessActions,
     ...audienceSessionActions,
     ...modeSwitchActions,
     {
@@ -7488,6 +7507,7 @@ export function createQuickActionResult(
     action.id === "stem-audition-readout-action" ||
     action.id === "stem-audition-route-readout-action" ||
     action.id === "timbre-check" ||
+    action.id.startsWith("dual-audience-readiness-") ||
     action.id === "session-pass-route-readout-action" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
@@ -8921,6 +8941,70 @@ export function audienceSessionQuickActionRoute(action: QuickAction): {
   }
 
   return null;
+}
+
+export function dualAudienceReadinessQuickActionLane(action: QuickAction): {
+  laneLabel: string;
+  nextCheck: string;
+  routeLabel: string;
+} | null {
+  if (!action.id.startsWith("dual-audience-readiness-")) {
+    return null;
+  }
+
+  if (action.id === "dual-audience-readiness-route-readout-action") {
+    return {
+      laneLabel: "Dual Audience Readiness",
+      nextCheck: "Choose the first-time composer or professional producer lane before changing the beat.",
+      routeLabel: "Dual Audience Readiness Route Readout"
+    };
+  }
+
+  if (action.id === "dual-audience-readiness-beginner-action" || action.resultTargetId === "beginner") {
+    return {
+      laneLabel: "First-time composer lane",
+      nextCheck: "Follow First Beat Path for the next direct beat-making step.",
+      routeLabel: "Open first-time composer lane"
+    };
+  }
+
+  if (action.id === "dual-audience-readiness-producer-action" || action.resultTargetId === "producer") {
+    return {
+      laneLabel: "Professional producer lane",
+      nextCheck: "Use Export Preflight or Production Snapshot for the next producer delivery check.",
+      routeLabel: "Open professional producer lane"
+    };
+  }
+
+  return null;
+}
+
+export function quickActionDualAudienceReadinessMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const lane = dualAudienceReadinessQuickActionLane(action);
+  if (!lane) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+
+  return {
+    id: "dual-audience-readiness-route",
+    label: "Dual Audience Readiness",
+    value: [
+      lane.routeLabel,
+      lane.laneLabel,
+      action.detail,
+      `${modeLabel(project.mode)} mode`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} selected-pattern events`,
+      `${projectEventTotal(project)} editable project events`,
+      `${arrangementTotalBars(project)} bars`,
+      lane.nextCheck
+    ].join(" / ")
+  };
 }
 
 export function quickActionAudienceSessionMetricSnapshot(
@@ -16514,6 +16598,16 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("dual-audience-readiness-")) {
+    return (
+      quickActionDualAudienceReadinessMetricSnapshot(project, action) ?? {
+        id: "dual-audience-readiness-route",
+        label: "Dual Audience Readiness",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id.startsWith("audience-session-enter-")) {
     return (
       quickActionAudienceSessionMetricSnapshot(project, action) ?? {
@@ -21461,6 +21555,32 @@ export function quickActionResultFollowup(
       auditionCue: "Keep the beat playing only if you are comparing the same music against the new session goal.",
       nextCheck: "Run Delivery Target Align only when arrangement length, master, mix posture, and stem expectation should change."
     };
+  }
+
+  const dualAudienceReadinessLane = dualAudienceReadinessQuickActionLane(action);
+  if (dualAudienceReadinessLane) {
+    if (action.id === "dual-audience-readiness-route-readout-action") {
+      return {
+        auditionCue:
+          "Read both Dual Audience Readiness lanes before choosing Guided first-beat work or Studio delivery review.",
+        nextCheck:
+          "Open the first-time composer lane for First Beat Path or the professional producer lane for Export Preflight and Production Snapshot."
+      };
+    }
+
+    return dualAudienceReadinessLane.laneLabel === "First-time composer lane"
+      ? {
+          auditionCue:
+            "Use the first-time composer lane to audition the current direct beat-writing step before changing notes, arrangement, mix, or export.",
+          nextCheck:
+            "Confirm the Dual Audience Readiness result names First Beat Path, then complete the next guided beat-making step."
+        }
+      : {
+          auditionCue:
+            "Use the professional producer lane to scan delivery, mix, and handoff posture before changing the beat.",
+          nextCheck:
+            "Confirm the Dual Audience Readiness result names Export Preflight or Production Snapshot before the next delivery check."
+        };
   }
 
   const audienceSessionRoute = audienceSessionQuickActionRoute(action);

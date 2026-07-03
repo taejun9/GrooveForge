@@ -59,6 +59,9 @@ type GrooveforgeLaunchSmokeRouteEvidence = {
 };
 
 type GrooveforgeLaunchSmokePaletteEvidence = {
+  dualBeginner: GrooveforgeLaunchSmokeRouteEvidence;
+  dualProducer: GrooveforgeLaunchSmokeRouteEvidence;
+  dualReadout: GrooveforgeLaunchSmokeRouteEvidence;
   guided: GrooveforgeLaunchSmokeRouteEvidence;
   opened: boolean;
   producer: GrooveforgeLaunchSmokeRouteEvidence;

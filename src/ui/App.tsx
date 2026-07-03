@@ -710,6 +710,7 @@ import {
   createGuideQuickStartCompletionBottleneckLabel,
   createGuideQuickStartCompletionBreakdownItems,
   createGuideQuickStartCompletionScore,
+  createDualAudienceReadinessRows,
   createModeSwitchButtonContext,
   createModeSwitchQuickActions,
   createModeSwitchResult,
@@ -6895,6 +6896,29 @@ export function App(): ReactElement {
     setAudienceSessionActionResult(createAudienceSessionActionResult(row, audienceSessionReadoutSummary, mode));
   }
 
+  function focusDualAudienceReadinessRouteReadout(): void {
+    const rows = createDualAudienceReadinessRows({
+      beatReadinessChecks,
+      exportPreflightSummary,
+      firstBeatPathSummary,
+      productionSnapshotSummary,
+      sessionPassSummary
+    });
+    const readyLaneCount = rows.filter((row) => row.tone === "good").length;
+    const priorityRow = rows.find((row) => row.tone === "danger") ?? rows.find((row) => row.tone === "warn") ?? rows[0];
+    if (typeof document !== "undefined") {
+      document.querySelector<HTMLElement>('[data-testid="dual-audience-readiness"]')?.scrollIntoView({
+        block: "start",
+        behavior: "auto"
+      });
+    }
+    setProjectStatus(
+      `Dual Audience Readiness Route Readout Pattern ${project.selectedPattern}: ${readyLaneCount}/${rows.length} lanes ready / ${
+        priorityRow?.laneLabel ?? "Dual Audience Readiness"
+      } / ${priorityRow?.nextCheckLabel ?? "Choose the matching audience lane"} / direct lane actions unchanged`
+    );
+  }
+
   function applyProjectKey(key: string): void {
     const changed = updateProject((current) => retargetProjectKey(current, key), `Retargeted project to ${key}`);
     if (changed) {
@@ -9122,6 +9146,7 @@ export function App(): ReactElement {
     onSelectPattern: selectPattern,
     onSelectStyle: selectStyle,
     onSelectAudienceSessionRow: selectAudienceSessionRow,
+    onFocusDualAudienceReadinessRouteReadout: focusDualAudienceReadinessRouteReadout,
     onSwitchMode: switchProjectMode,
     onUsePatternInSelectedBlock: usePatternInSelectedBlockFromCompare,
     onSetKeyboardCaptureEnabled: setKeyboardCaptureEnabled,
@@ -9362,23 +9387,84 @@ export function App(): ReactElement {
       };
     };
 
+    const runDualAudienceReadinessRoute = (
+      actionId: string
+    ): Pick<GrooveforgeLaunchSmokeRouteEvidence, "resultMetricValue" | "resultNextCheck" | "resultStatus" | "resultTitle"> => {
+      const action = quickActions.find((candidate) => candidate.id === actionId);
+      if (!action || action.disabled) {
+        return {
+          resultMetricValue: "Action unavailable",
+          resultNextCheck: "Quick Actions must expose the Dual Audience Readiness route before launch smoke can run it.",
+          resultStatus: "Unavailable",
+          resultTitle: actionId
+        };
+      }
+
+      const beforeProject = projectRef.current;
+      action.run();
+      const result = createQuickActionResult(
+        action,
+        beforeProject,
+        projectRef.current,
+        "complete",
+        selectedArrangementIndex,
+        handoffExportReceiptRef.current,
+        null
+      );
+      setQuickActionResult(result);
+      setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
+      setQuickActionsOpen(false);
+
+      return {
+        resultMetricValue: `${result.metric.before} -> ${result.metric.after}`,
+        resultNextCheck: result.nextCheck,
+        resultStatus: result.status,
+        resultTitle: result.title
+      };
+    };
+
     window.__grooveforgeLaunchSmoke = {
       collectAudienceSessionQuickActionEvidence: () => {
-        const guided = {
-          ...routeEvidence("first-time composer", "audience-session-enter-beginner"),
-          ...runAudienceSessionRoute("audience-session-enter-beginner")
-        };
         const producer = {
-          ...routeEvidence("professional producer", "audience-session-enter-producer"),
+          ...routeEvidence("enter studio professional producer", "audience-session-enter-producer"),
           ...runAudienceSessionRoute("audience-session-enter-producer")
+        };
+        const dualReadout = {
+          ...routeEvidence("dual audience readiness", "dual-audience-readiness-route-readout-action"),
+          ...runDualAudienceReadinessRoute("dual-audience-readiness-route-readout-action")
+        };
+        const dualBeginner = {
+          ...routeEvidence("open dual audience first-time composer lane", "dual-audience-readiness-beginner-action"),
+          ...runDualAudienceReadinessRoute("dual-audience-readiness-beginner-action")
+        };
+        const dualProducer = {
+          ...routeEvidence("open dual audience professional producer lane", "dual-audience-readiness-producer-action"),
+          ...runDualAudienceReadinessRoute("dual-audience-readiness-producer-action")
+        };
+        const guided = {
+          ...routeEvidence("enter guided first-time composer", "audience-session-enter-beginner"),
+          ...runAudienceSessionRoute("audience-session-enter-beginner")
         };
 
         return {
+          dualBeginner,
+          dualProducer,
+          dualReadout,
           guided,
           opened: true,
           producer,
-          resultPresent: guided.resultTitle.length > 0 && producer.resultTitle.length > 0,
-          searchPresent: guided.searchMetricValue.length > 0 && producer.searchMetricValue.length > 0
+          resultPresent:
+            guided.resultTitle.length > 0 &&
+            producer.resultTitle.length > 0 &&
+            dualReadout.resultTitle.length > 0 &&
+            dualBeginner.resultTitle.length > 0 &&
+            dualProducer.resultTitle.length > 0,
+          searchPresent:
+            guided.searchMetricValue.length > 0 &&
+            producer.searchMetricValue.length > 0 &&
+            dualReadout.searchMetricValue.length > 0 &&
+            dualBeginner.searchMetricValue.length > 0 &&
+            dualProducer.searchMetricValue.length > 0
         };
       }
     };

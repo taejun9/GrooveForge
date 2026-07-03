@@ -312,6 +312,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Audience Session Readout rows, Enter Guided first-time composer route, Enter Studio professional producer route, active lane, readiness posture, direct visible readout action, audition cue, and next check before Audience Session commands switch workflow mode."
       },
       {
+        id: "dual-audience-readiness",
+        command: "Dual Audience Readiness",
+        shortcut: "Quick Actions / Readout",
+        target: "First-time composer lane / Professional producer lane",
+        context:
+          "Dual Audience Readiness Route Readout, first-time composer lane command, professional producer lane command, lane readiness posture, First Beat Path route, Export Preflight or Production Snapshot route, audition cue, and next check before choosing an audience readiness lane."
+      },
+      {
         id: "first-beat-path",
         command: "First Beat Path",
         shortcut: "Quick Actions / Readout",
