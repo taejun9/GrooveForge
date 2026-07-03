@@ -47,6 +47,8 @@ const releaseChannelMetadataKeys = [
 const recommendedPrivateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const releaseChannelApplyPrivateEnvPreflightBlockedSmokeCommand =
+  "npm run release:channel-apply-private-env-preflight-blocked-smoke";
 const sensitivePrivateKeys = [
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
   "GROOVEFORGE_RELEASE_NOTES_URL",
@@ -283,6 +285,25 @@ function runExternalPreflight() {
     };
   }
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+  const receiptResult = spawnSync(npmCommand, ["run", "release:channel-apply-private-env-preflight-blocked-smoke"], {
+    cwd: root,
+    env: process.env,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  if (receiptResult.error) {
+    fail(
+      `Could not run ${releaseChannelApplyPrivateEnvPreflightBlockedSmokeCommand}.`,
+      receiptResult.error.message
+    );
+  }
+  if (receiptResult.status !== 0) {
+    fail(
+      `${releaseChannelApplyPrivateEnvPreflightBlockedSmokeCommand} exited with status ${receiptResult.status ?? 1}.`,
+      `${receiptResult.stdout ?? ""}\n${receiptResult.stderr ?? ""}`
+    );
+  }
+
   const result = spawnSync(npmCommand, ["run", "release:external-preflight"], {
     cwd: root,
     env: process.env,
