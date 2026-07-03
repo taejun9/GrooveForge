@@ -97,8 +97,10 @@ npm run desktop:distribution-bundle-manifest-smoke
 npm run desktop:distribution-env-template-smoke
 npm run release:prepare-env-smoke
 npm run release:prepare-env-write-smoke
+npm run release:channel-private-input-template-smoke
 npm run desktop:distribution-private-inputs-smoke
 npm run release:channel-unblock-smoke
+npm run release:channel-private-input-template
 npm run release:channel-apply-private-env-preflight
 npm run release:channel-apply-private-env-preflight-smoke
 npm run release:channel-apply-private-env-preflight-blocked-smoke
@@ -139,6 +141,8 @@ npm run release:check
 npm run release:progress
 npm run release:doctor
 npm run release:channel-unblock-smoke
+npm run release:channel-private-input-template
+npm run release:channel-private-input-template-smoke
 npm run release:channel-apply-private-env
 npm run release:channel-apply-private-env-success-smoke
 npm run release:channel-setup-wizard
