@@ -19,9 +19,14 @@ const manualQaPath = path.join(packageRoot, `${appName}-${packageJson.version}-$
 const privateInputsPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-private-inputs.json`);
 const distributionEnvTemplateArtifactPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-env-template.json`);
 const externalNextActionsPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-next-actions.json`);
+const releaseChannelPreflightBlockedPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-apply-private-env-preflight-blocked-smoke.json`);
 const distributionTemplatePath = path.join(root, "harness", "templates", "distribution-private-inputs.env.example");
 const operatorRunbookMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-operator-runbook.md`);
 const operatorRunbookJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-operator-runbook.json`);
+const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
+const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const privateEditStrictProofCommand = "npm run release:private-edit-strict-proof";
+const hardGateCommand = "npm run release:external-check";
 const sensitivePrivateKeys = [
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
   "GROOVEFORGE_RELEASE_NOTES_URL",
@@ -93,6 +98,10 @@ function stringArrayValue(values) {
 
 function valueFreeObjectRows(values) {
   return Array.isArray(values) ? values.filter((value) => value && typeof value === "object" && value.valueRecorded === false) : [];
+}
+
+function objectRows(values) {
+  return Array.isArray(values) ? values.filter((value) => value && typeof value === "object") : [];
 }
 
 function escapeCell(value) {
@@ -191,6 +200,33 @@ function commandStep(order, label, command, evidencePaths, note) {
   };
 }
 
+function sanitizeCurrentOperatorCommandRows(rows) {
+  return objectRows(rows).map((row, index) => ({
+    order: Number.isInteger(row.order) ? row.order : index + 1,
+    ready: row.ready === true,
+    step: textValue(row.step),
+    command: textValue(row.command),
+    role: textValue(row.role),
+    expectedOperatorInput: textValue(row.expectedOperatorInput),
+    expectedEvidence: textValue(row.expectedEvidence),
+    sourceField: textValue(row.sourceField),
+    valueRecorded: row.valueRecorded === false ? false : true
+  }));
+}
+
+function sanitizePreflightOperatorReceiptRows(rows) {
+  return objectRows(rows).map((row, index) => ({
+    order: Number.isInteger(row.order) ? row.order : index + 1,
+    step: textValue(row.step),
+    status: textValue(row.status),
+    command: textValue(row.command),
+    target: textValue(row.target),
+    expectedEvidence: textValue(row.expectedEvidence),
+    operatorAction: textValue(row.operatorAction),
+    valueRecorded: row.valueRecorded === false ? false : true
+  }));
+}
+
 function buildCurrentActionSummary(externalNextActions) {
   const currentRequiredKeys = stringArrayValue(externalNextActions?.currentRequiredKeys);
   const currentPlaceholderKeys = stringArrayValue(externalNextActions?.currentPlaceholderKeys);
@@ -200,6 +236,22 @@ function buildCurrentActionSummary(externalNextActions) {
   const currentPlaceholderRemediationRows = valueFreeObjectRows(externalNextActions?.currentPlaceholderRemediationRows);
   const currentProofChecklistRows = valueFreeObjectRows(externalNextActions?.currentProofChecklistRows);
   const currentCommandVerificationRows = valueFreeObjectRows(externalNextActions?.currentCommandVerificationRows);
+  const currentOperatorCommandRows = sanitizeCurrentOperatorCommandRows(externalNextActions?.currentOperatorCommandRows);
+  const currentOperatorFirstCommand = textValue(externalNextActions?.currentOperatorFirstCommand);
+  const currentOperatorPreflightCommand = textValue(externalNextActions?.currentOperatorPreflightCommand);
+  const currentOperatorApplyCommand = textValue(externalNextActions?.currentOperatorApplyCommand);
+  const currentOperatorStrictProofCommand = textValue(externalNextActions?.currentOperatorStrictProofCommand);
+  const currentOperatorCommandSequenceReady =
+    externalNextActions?.currentOperatorCommandSequenceReady === true &&
+    currentOperatorCommandRows.length > 0 &&
+    currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false) &&
+    currentOperatorFirstCommand !== "none" &&
+    currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand &&
+    currentOperatorApplyCommand === releaseChannelApplyPrivateEnvCommand &&
+    currentOperatorStrictProofCommand === privateEditStrictProofCommand &&
+    externalNextActions?.currentOperatorPreflightBeforeApply === true &&
+    externalNextActions?.currentOperatorApplyBeforeStrictProof === true &&
+    externalNextActions?.currentOperatorValueRecorded === false;
   return {
     currentActionSourceReady: Boolean(externalNextActions),
     currentActionSourcePath: relative(externalNextActionsPath),
@@ -238,7 +290,63 @@ function buildCurrentActionSummary(externalNextActions) {
     currentCommandVerificationRowCount: integerValue(externalNextActions?.currentCommandVerificationRowCount),
     currentCommandVerificationRowSummary: textValue(externalNextActions?.currentCommandVerificationRowSummary),
     currentCommandVerificationRows,
+    currentOperatorCommandSequenceReady,
+    currentOperatorCommandRowCount: currentOperatorCommandRows.length,
+    currentOperatorCommandSummary:
+      currentOperatorCommandRows.length > 0
+        ? `${currentOperatorCommandRows.length} value-free current operator command rows`
+        : "none",
+    currentOperatorCommandRows,
+    currentOperatorFirstCommand,
+    currentOperatorPreflightCommand,
+    currentOperatorApplyCommand,
+    currentOperatorStrictProofCommand,
+    currentOperatorBlockerRefreshCommand: textValue(externalNextActions?.currentOperatorBlockerRefreshCommand),
+    currentOperatorNextActionsRefreshCommand: textValue(externalNextActions?.currentOperatorNextActionsRefreshCommand),
+    currentOperatorPreflightBeforeApply: externalNextActions?.currentOperatorPreflightBeforeApply === true,
+    currentOperatorApplyBeforeStrictProof: externalNextActions?.currentOperatorApplyBeforeStrictProof === true,
+    currentOperatorValueRecorded: externalNextActions?.currentOperatorValueRecorded === false ? false : true,
     currentActionValueRecorded: false
+  };
+}
+
+function buildPreflightOperatorReceiptSummary(releaseChannelPreflightBlocked) {
+  const preflightOperatorReceiptRows = sanitizePreflightOperatorReceiptRows(releaseChannelPreflightBlocked?.operatorReceiptRows);
+  const preflightOperatorReceiptFirstCommand = textValue(preflightOperatorReceiptRows[0]?.command);
+  const preflightOperatorReceiptIncludesApply = preflightOperatorReceiptRows.some((row) => row.command === releaseChannelApplyPrivateEnvCommand);
+  const preflightOperatorReceiptIncludesStrictProof = preflightOperatorReceiptRows.some((row) => row.command === privateEditStrictProofCommand);
+  const preflightOperatorReceiptIncludesHardGate = preflightOperatorReceiptRows.some((row) => row.command === hardGateCommand);
+  const preflightOperatorReceiptSourceReady =
+    releaseChannelPreflightBlocked?.blockedSmokeReady === true &&
+    releaseChannelPreflightBlocked?.expectedBlockedExitObserved === true &&
+    releaseChannelPreflightBlocked?.operatorReceiptReady === true &&
+    integerValue(releaseChannelPreflightBlocked?.operatorReceiptRowCount) === 6 &&
+    preflightOperatorReceiptRows.length === 6 &&
+    preflightOperatorReceiptFirstCommand === releaseChannelApplyPrivateEnvPreflightCommand &&
+    preflightOperatorReceiptIncludesApply === true &&
+    preflightOperatorReceiptIncludesStrictProof === true &&
+    preflightOperatorReceiptIncludesHardGate === true &&
+    preflightOperatorReceiptRows.every((row) => row.valueRecorded === false);
+  return {
+    preflightOperatorReceiptSourceReady,
+    preflightOperatorReceiptSourcePath: relative(releaseChannelPreflightBlockedPath),
+    preflightOperatorReceiptBlockedSmokeReady: releaseChannelPreflightBlocked?.blockedSmokeReady === true,
+    preflightOperatorReceiptExpectedBlockedExitObserved: releaseChannelPreflightBlocked?.expectedBlockedExitObserved === true,
+    preflightOperatorReceiptReady: releaseChannelPreflightBlocked?.operatorReceiptReady === true,
+    preflightOperatorReceiptRows,
+    preflightOperatorReceiptRowCount: preflightOperatorReceiptRows.length,
+    preflightOperatorReceiptSummary:
+      preflightOperatorReceiptRows.length > 0
+        ? `${preflightOperatorReceiptRows.length} value-free private-env handoff rows`
+        : "none",
+    preflightOperatorReceiptFirstCommand,
+    preflightOperatorReceiptIncludesApply,
+    preflightOperatorReceiptIncludesStrictProof,
+    preflightOperatorReceiptIncludesHardGate,
+    preflightOperatorReceiptValueRecorded:
+      preflightOperatorReceiptRows.length > 0 && preflightOperatorReceiptRows.every((row) => row.valueRecorded === false)
+        ? false
+        : true
   };
 }
 
@@ -306,6 +414,30 @@ function formatCommandVerificationRows(rows) {
     .join("\n");
 }
 
+function formatCurrentOperatorCommandRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | none | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order ?? "?"} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.step)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${escapeCell(row.expectedEvidence)} | ${row.valueRecorded === false ? "no" : "yes"} |`
+    )
+    .join("\n");
+}
+
+function formatPreflightOperatorReceiptRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | none | none | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order ?? "?"} | ${escapeCell(row.step)} | ${escapeCell(row.status)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.target)} | ${escapeCell(row.expectedEvidence)} | ${escapeCell(row.operatorAction)} | ${row.valueRecorded === false ? "no" : "yes"} |`
+    )
+    .join("\n");
+}
+
 function formatBlockers(blockers) {
   return blockers.length > 0 ? blockers.map((blocker) => `- ${blocker}`).join("\n") : "- None.";
 }
@@ -328,6 +460,10 @@ function buildMarkdown(summary) {
 - Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})
 - Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})
 - Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})
+- Current operator command sequence ready: ${summary.currentOperatorCommandSequenceReady ? "yes" : "no"}
+- Current operator first command: \`${summary.currentOperatorFirstCommand}\`
+- Preflight operator receipt source ready: ${summary.preflightOperatorReceiptSourceReady ? "yes" : "no"}
+- Preflight operator receipt rows: ${summary.preflightOperatorReceiptRowCount} (${summary.preflightOperatorReceiptSummary})
 - Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}
 - Private values recorded: no
 - Network probe attempted: no
@@ -353,6 +489,10 @@ function buildMarkdown(summary) {
 - Current rerun command: \`${summary.currentRerunCommand}\`
 - Current command sequence: ${summary.currentCommandSequenceCount} (${summary.currentCommandSequenceSummary})
 - Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})
+- Current operator command sequence ready: ${summary.currentOperatorCommandSequenceReady ? "yes" : "no"}
+- Current operator first command: \`${summary.currentOperatorFirstCommand}\`
+- Current operator preflight before apply: ${summary.currentOperatorPreflightBeforeApply ? "yes" : "no"}
+- Current operator apply before strict proof: ${summary.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}
 
 ### Current Edit Guidance
 
@@ -371,6 +511,25 @@ ${formatProofChecklistRows(summary.currentProofChecklistRows)}
 | order | command | role | expectation | proof target | value recorded |
 |---:|---|---|---|---|---:|
 ${formatCommandVerificationRows(summary.currentCommandVerificationRows)}
+
+### Current Operator Command Sequence
+
+| order | ready | step | command | role | expected evidence | value recorded |
+|---:|---:|---|---|---|---|---:|
+${formatCurrentOperatorCommandRows(summary.currentOperatorCommandRows)}
+
+### Preflight Operator Receipt
+
+- Source artifact: ${summary.preflightOperatorReceiptSourcePath}
+- Source ready: ${summary.preflightOperatorReceiptSourceReady ? "yes" : "no"}
+- First command: \`${summary.preflightOperatorReceiptFirstCommand}\`
+- Includes apply command: ${summary.preflightOperatorReceiptIncludesApply ? "yes" : "no"}
+- Includes strict proof command: ${summary.preflightOperatorReceiptIncludesStrictProof ? "yes" : "no"}
+- Includes hard gate: ${summary.preflightOperatorReceiptIncludesHardGate ? "yes" : "no"}
+
+| order | step | status | command | target | expected evidence | operator action | value recorded |
+|---:|---|---|---|---|---|---|---:|
+${formatPreflightOperatorReceiptRows(summary.preflightOperatorReceiptRows)}
 
 ## Command Sequence
 
@@ -422,8 +581,10 @@ async function createRunbookSummary() {
   const privateInputs = await readJsonIfExists(privateInputsPath);
   const distributionEnvTemplateArtifact = await readJsonIfExists(distributionEnvTemplateArtifactPath);
   const externalNextActions = await readJsonIfExists(externalNextActionsPath);
+  const releaseChannelPreflightBlocked = await readJsonIfExists(releaseChannelPreflightBlockedPath);
   const templateText = await readTextIfExists(distributionTemplatePath);
   const requiredPrivateInputKeys = parseTemplateKeys(templateText);
+  const preflightOperatorReceiptSummary = buildPreflightOperatorReceiptSummary(releaseChannelPreflightBlocked);
   const completionStatusDesktopProjectIoReady = completionStatus?.desktopProjectIoEvidenceReady === true;
   const completionStatusPkgPayloadProjectIoReady = completionStatus?.pkgPayloadProjectIoReady === true;
   const externalGateDesktopProjectIoReady = gateRequirementReady(externalGate, "Desktop project IO evidence ready");
@@ -449,9 +610,16 @@ async function createRunbookSummary() {
     evidence(privateInputsPath, "Private inputs"),
     evidence(distributionEnvTemplateArtifactPath, "Distribution env template artifact"),
     evidence(externalNextActionsPath, "External next actions current proof rows"),
+    evidence(releaseChannelPreflightBlockedPath, "Release-channel preflight Operator Receipt"),
     evidence(distributionTemplatePath, "Distribution private inputs template")
   ];
-  const sourceEvidenceReady = Boolean(completionStatus) && Boolean(externalRemediation) && Boolean(externalGate) && desktopProjectIoEvidenceReady && requiredPrivateInputKeys.length > 0;
+  const sourceEvidenceReady =
+    Boolean(completionStatus) &&
+    Boolean(externalRemediation) &&
+    Boolean(externalGate) &&
+    desktopProjectIoEvidenceReady &&
+    requiredPrivateInputKeys.length > 0 &&
+    preflightOperatorReceiptSummary.preflightOperatorReceiptSourceReady === true;
   const phaseBlockers = unique(operatorPhases.flatMap((phase) => phase.blockers));
   const operatorRunbookBlockers = unique([
     ...(sourceEvidenceReady ? [] : ["Operator runbook source evidence is incomplete; run npm run release:check first."]),
@@ -460,6 +628,7 @@ async function createRunbookSummary() {
     ...(externalGatePkgPayloadProjectIoReady ? [] : ["PKG payload project IO requirement is not ready in external gate evidence."]),
     ...(manualQa?.manualQaChecklistSha256 ? [] : ["Manual QA checklist digest evidence is missing."]),
     ...(requiredPrivateInputKeys.includes("GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256") ? [] : ["Distribution template is missing the manual QA checklist digest key."]),
+    ...(preflightOperatorReceiptSummary.preflightOperatorReceiptSourceReady ? [] : ["Release-channel preflight Operator Receipt evidence is missing or not ready."]),
     ...phaseBlockers
   ]);
 
@@ -519,6 +688,8 @@ async function createRunbookSummary() {
       externalRemediationPresent: Boolean(externalRemediation),
       externalGatePresent: Boolean(externalGate),
       externalNextActionsPresent: Boolean(externalNextActions),
+      releaseChannelPreflightBlockedPresent: Boolean(releaseChannelPreflightBlocked),
+      preflightOperatorReceiptSourceReady: preflightOperatorReceiptSummary.preflightOperatorReceiptSourceReady,
       desktopProjectIoEvidenceReady,
       pkgPayloadProjectIoStatusReady: completionStatusPkgPayloadProjectIoReady,
       pkgPayloadProjectIoGateRequirementReady: externalGatePkgPayloadProjectIoReady,
@@ -530,6 +701,7 @@ async function createRunbookSummary() {
     },
     evidenceChecklist,
     ...buildCurrentActionSummary(externalNextActions),
+    ...preflightOperatorReceiptSummary,
     commandSequence: buildCommandSequence({ completionStatus, externalRemediation, externalGate, manualQa, privateInputs }),
     operatorPhases,
     operatorRunbookBlockers
@@ -562,6 +734,7 @@ check(summary.evidenceChecklist.some((item) => item.label === "PKG payload proje
 check(summary.evidenceChecklist.some((item) => item.label === "Desktop project IO gate requirement"), "external operator runbook should include desktop project IO gate evidence");
 check(summary.evidenceChecklist.some((item) => item.label === "PKG payload project IO gate requirement"), "external operator runbook should include PKG payload project IO gate evidence");
 check(summary.evidenceChecklist.some((item) => item.label === "External next actions current proof rows"), "external operator runbook should include external next-actions evidence");
+check(summary.evidenceChecklist.some((item) => item.label === "Release-channel preflight Operator Receipt"), "external operator runbook should include release-channel preflight Operator Receipt evidence");
 check(summary.operatorPhases.every((phase) => phase.valueRecorded === false), "external operator phases should not record values");
 check(summary.commandSequence.every((step) => step.valueRecorded === false), "external operator commands should not record values");
 check(summary.evidenceChecklist.every((item) => item.valueRecorded === false), "external operator evidence checklist should not record values");
@@ -574,11 +747,32 @@ check(Array.isArray(summary.currentProofChecklistRows), "external operator runbo
 check(summary.currentProofChecklistRows.every((row) => row.valueRecorded === false), "external operator current proof checklist rows should not record values");
 check(Array.isArray(summary.currentCommandVerificationRows), "external operator runbook should expose current command verification rows");
 check(summary.currentCommandVerificationRows.every((row) => row.valueRecorded === false), "external operator current command verification rows should not record values");
+check(Array.isArray(summary.currentOperatorCommandRows), "external operator runbook should expose current operator command rows");
+check(summary.currentOperatorCommandRows.every((row) => row.valueRecorded === false), "external operator current operator command rows should not record values");
 if (summary.currentActionSourceReady) {
   check(summary.currentNextCommand !== "none", "external operator runbook should mirror the current next command when next-actions evidence exists");
   check(summary.currentProofChecklistRowCount === summary.currentProofChecklistRows.length, "external operator runbook should mirror current proof checklist row count");
   check(summary.currentCommandVerificationRowCount === summary.currentCommandVerificationRows.length, "external operator runbook should mirror current command verification row count");
+  check(summary.currentOperatorCommandSequenceReady === true, "external operator runbook should mirror a ready current operator command sequence");
+  check(summary.currentOperatorCommandRowCount === summary.currentOperatorCommandRows.length, "external operator runbook should mirror current operator command row count");
+  check(summary.currentOperatorCommandRows.length >= 5, "external operator runbook current operator sequence should include preflight, apply, strict proof, blocker refresh, and next-actions refresh");
+  check(summary.currentOperatorFirstCommand === releaseChannelApplyPrivateEnvPreflightCommand || summary.currentOperatorFirstCommand === "npm run release:prepare-env", "external operator runbook current operator first command should be prepare-env or private-env preflight");
+  check(summary.currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "external operator runbook should mirror private-env preflight command");
+  check(summary.currentOperatorApplyCommand === releaseChannelApplyPrivateEnvCommand, "external operator runbook should mirror private-env apply command");
+  check(summary.currentOperatorStrictProofCommand === privateEditStrictProofCommand, "external operator runbook should mirror private-edit strict proof command");
+  check(summary.currentOperatorPreflightBeforeApply === true, "external operator runbook current operator sequence should place preflight before apply");
+  check(summary.currentOperatorApplyBeforeStrictProof === true, "external operator runbook current operator sequence should place apply before strict proof");
+  check(summary.currentOperatorValueRecorded === false, "external operator runbook current operator sequence should be value-free");
 }
+check(summary.preflightOperatorReceiptSourceReady === true, "external operator runbook should include ready private-env preflight Operator Receipt source");
+check(summary.preflightOperatorReceiptReady === true, "external operator runbook should mirror a ready private-env preflight Operator Receipt");
+check(summary.preflightOperatorReceiptRowCount === 6, "external operator runbook preflight Operator Receipt should include six rows");
+check(summary.preflightOperatorReceiptFirstCommand === releaseChannelApplyPrivateEnvPreflightCommand, "external operator runbook preflight Operator Receipt should start with private-env preflight");
+check(summary.preflightOperatorReceiptIncludesApply === true, "external operator runbook preflight Operator Receipt should include private-env apply");
+check(summary.preflightOperatorReceiptIncludesStrictProof === true, "external operator runbook preflight Operator Receipt should include private-edit strict proof");
+check(summary.preflightOperatorReceiptIncludesHardGate === true, "external operator runbook preflight Operator Receipt should include the external hard gate");
+check(summary.preflightOperatorReceiptRows.every((row) => row.valueRecorded === false), "external operator runbook preflight Operator Receipt rows should be value-free");
+check(summary.preflightOperatorReceiptValueRecorded === false, "external operator runbook preflight Operator Receipt should not record values");
 check(summary.requiredPrivateInputKeys.includes("GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256"), "external operator runbook should include manual QA digest key");
 check(summary.requiredPrivateInputKeys.includes("GROOVEFORGE_DEVELOPER_ID_IDENTITY"), "external operator runbook should include Developer ID identity key name");
 check(summary.manualQaChecklistSha256 === null || /^[a-f0-9]{64}$/.test(summary.manualQaChecklistSha256), "external operator runbook should record only a valid manual QA digest when available");
@@ -607,6 +801,8 @@ check(markdown.includes("Current Action"), "external operator runbook Markdown s
 check(markdown.includes("Current Edit Guidance"), "external operator runbook Markdown should include current edit guidance");
 check(markdown.includes("Current Proof Checklist Rows"), "external operator runbook Markdown should include current proof checklist rows");
 check(markdown.includes("Current Command Verification Rows"), "external operator runbook Markdown should include current command verification rows");
+check(markdown.includes("Current Operator Command Sequence"), "external operator runbook Markdown should include current operator command sequence");
+check(markdown.includes("Preflight Operator Receipt"), "external operator runbook Markdown should include preflight Operator Receipt");
 check(markdown.includes("Command Sequence"), "external operator runbook Markdown should include command sequence");
 check(markdown.includes("Desktop project IO evidence ready:"), "external operator runbook Markdown should include desktop project IO readiness");
 check(markdown.includes("Hard gate remains `npm run release:external-check`"), "external operator runbook Markdown should keep the hard gate authoritative");
@@ -638,6 +834,15 @@ console.log(`- Current first blocker: ${summary.currentFirstBlocker}`);
 console.log(`- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})`);
 console.log(`- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})`);
 console.log(`- Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})`);
+console.log(`- Current operator command sequence ready: ${summary.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
+console.log(`- Current operator command rows: ${summary.currentOperatorCommandRowCount} (${summary.currentOperatorCommandSummary})`);
+console.log(`- Current operator first command: ${summary.currentOperatorFirstCommand}`);
+console.log(`- Current operator preflight before apply: ${summary.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
+console.log(`- Current operator apply before strict proof: ${summary.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
+console.log(`- Preflight operator receipt source ready: ${summary.preflightOperatorReceiptSourceReady ? "yes" : "no"}`);
+console.log(`- Preflight operator receipt rows: ${summary.preflightOperatorReceiptRowCount} (${summary.preflightOperatorReceiptSummary})`);
+console.log(`- Preflight operator receipt first command: ${summary.preflightOperatorReceiptFirstCommand}`);
+console.log(`- Preflight operator receipt includes hard gate: ${summary.preflightOperatorReceiptIncludesHardGate ? "yes" : "no"}`);
 console.log(`- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}`);
 console.log("- Private values recorded: no");
 if (summary.operatorRunbookBlockers.length > 0) {
