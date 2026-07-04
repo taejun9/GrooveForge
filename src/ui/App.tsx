@@ -56,6 +56,7 @@ import {
   ArrangementMuteTrack,
   ArrangementSection,
   ArrangementTemplateId,
+  AudienceStarterProjectId,
   BassNote,
   BeatBlueprint,
   BeatBlueprintId,
@@ -89,6 +90,7 @@ import {
   SoundDesign,
   activeDeliveryTarget,
   activePattern,
+  audienceStarterProjectLabel,
   applyBeatBlueprint,
   applyDeliveryTarget,
   applyArrangementMovePreset,
@@ -116,6 +118,7 @@ import {
   createPatternVariation,
   createStylePatternSet,
   createEmptyPatternData,
+  createAudienceStarterProject,
   defaultCustomDeliveryTarget,
   defaultDrumVelocity,
   deleteProjectSnapshot,
@@ -7061,6 +7064,19 @@ export function App(): ReactElement {
     focusBeatBlueprintsPanel();
   }
 
+  function createAudienceStarter(starterId: AudienceStarterProjectId): void {
+    const label = audienceStarterProjectLabel(starterId);
+    const changed = updateProject(() => createAudienceStarterProject(starterId), `Built ${label} starter project`);
+    if (changed) {
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(0);
+      setSelectedArrangementIndex(0);
+      selectTransportLoopScope("arrangement", false);
+      setProjectStatus(`Built ${label} starter project`);
+    }
+  }
+
   function selectDeliveryTarget(targetId: DeliveryTargetId): void {
     const target = deliveryTargetForId(targetId, projectRef.current.customDeliveryTarget);
     updateProject((current) => {
@@ -9205,6 +9221,7 @@ export function App(): ReactElement {
     onSelectPattern: selectPattern,
     onSelectStyle: selectStyle,
     onSelectAudienceSessionRow: selectAudienceSessionRow,
+    onCreateAudienceStarter: createAudienceStarter,
     onFocusAudienceCompletionRouteReadout: focusAudienceCompletionRouteReadout,
     onFocusDualAudienceReadinessRouteReadout: focusDualAudienceReadinessRouteReadout,
     onSwitchMode: switchProjectMode,
@@ -9961,6 +9978,7 @@ export function App(): ReactElement {
       <AudienceSessionReadout
         result={audienceSessionActionResult}
         summary={audienceSessionReadoutSummary}
+        onCreateStarter={createAudienceStarter}
         onSelectAudience={selectAudienceSessionRow}
       />
 

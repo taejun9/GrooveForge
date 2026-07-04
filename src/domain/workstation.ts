@@ -255,6 +255,8 @@ export type ProjectFile = {
   project: ProjectState;
 };
 
+export type AudienceStarterProjectId = "beginner" | "producer";
+
 export const steps = Array.from({ length: 16 }, (_, index) => index);
 export const stepsPerBar = 16;
 export const minArrangementBars = 1;
@@ -1260,6 +1262,104 @@ export function applyDeliveryTarget(project: ProjectState, targetId: DeliveryTar
     masterCeilingDb: masterPresetCeilingDb(target.preferredMasterPreset),
     mixer: applyDeliveryTargetMixer(project.mixer, target)
   };
+}
+
+export function createAudienceStarterProject(starterId: AudienceStarterProjectId): ProjectState {
+  return starterId === "producer" ? createProfessionalProducerStarterProject() : createFirstTimeComposerStarterProject();
+}
+
+export function audienceStarterProjectLabel(starterId: AudienceStarterProjectId): string {
+  return starterId === "producer" ? "Professional producer studio pass" : "First-time composer first beat";
+}
+
+export function audienceStarterProjectDetail(starterId: AudienceStarterProjectId): string {
+  return starterId === "producer"
+    ? "Studio mode / house / C minor / 26 bars / Beat Store delivery"
+    : "Guided mode / lofi / A minor / 8 bars / Starter Sketch delivery";
+}
+
+function createFirstTimeComposerStarterProject(): ProjectState {
+  const styleId: StyleId = "lofi";
+  const key = "A minor";
+  const style = styleProfiles.find((profile) => profile.id === styleId) ?? styleProfiles[0];
+  const baseProject: ProjectState = {
+    ...cloneProjectCore(starterProject),
+    title: "First Guided Beat",
+    mode: "guided",
+    bpm: 86,
+    key,
+    styleId,
+    selectedPattern: "A",
+    swing: style.defaultSwing,
+    sound: soundPresetDesign(styleSoundPreset(styleId)),
+    patterns: createStylePatternSet(styleId, key),
+    sessionBrief: {
+      artist: "First session",
+      vibe: "warm direct-composition starter",
+      reference: "local beat sketch",
+      notes: "Guided path: setup, compose, arrange, mix, master, deliver without imported audio."
+    },
+    snapshots: []
+  };
+  const patternedProject = {
+    ...baseProject,
+    patterns: {
+      ...baseProject.patterns,
+      A: {
+        ...applyPatternFillPreset(applyDrumGroovePreset(baseProject.patterns.A, "pocket"), "melody_turn", key),
+        chordEvents: createChordProgressionPreset("moody", key)
+      },
+      B: applyPatternFillPreset(createPatternVariation(baseProject.patterns.B, "hook"), "bass_pickup", key),
+      C: applyPatternFillPreset(createPatternVariation(baseProject.patterns.C, "breakdown"), "clear_tail", key)
+    }
+  };
+
+  return applyDeliveryTarget(patternedProject, "starter_sketch");
+}
+
+function createProfessionalProducerStarterProject(): ProjectState {
+  const blueprintProject = applyBeatBlueprint(
+    {
+      ...cloneProjectCore(starterProject),
+      snapshots: []
+    },
+    "club_bounce"
+  );
+  const retargetedProject = retargetProjectKey(blueprintProject, "C minor");
+  const studioProject: ProjectState = {
+    ...retargetedProject,
+    title: "Producer Fast Pass",
+    mode: "studio",
+    selectedPattern: "B",
+    sessionBrief: {
+      artist: "Producer demo",
+      vibe: "fast club-ready beat-store pass",
+      reference: "working producer arrangement scan",
+      notes: "Studio path: blueprint, key retarget, pattern variation, delivery target, mix/master, handoff."
+    },
+    snapshots: []
+  };
+  const patternedProject = {
+    ...studioProject,
+    patterns: {
+      ...studioProject.patterns,
+      A: applyDrumGroovePreset(studioProject.patterns.A, "push"),
+      B: {
+        ...applyPatternFillPreset(
+          applyPatternFillPreset(createPatternVariation(studioProject.patterns.B, "hook"), "drum_fill", studioProject.key),
+          "melody_turn",
+          studioProject.key
+        ),
+        chordEvents: createChordProgressionPreset("lift", studioProject.key)
+      },
+      C: {
+        ...applyPatternFillPreset(createPatternVariation(studioProject.patterns.C, "switchup"), "bass_pickup", studioProject.key),
+        chordEvents: createChordProgressionPreset("bounce", studioProject.key)
+      }
+    }
+  };
+
+  return applyMasterAutomationPreset(applyDeliveryTarget(patternedProject, "beat_store"), "intro_outro");
 }
 
 export function soundPresetLabel(preset: SoundPresetId): string {

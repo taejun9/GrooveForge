@@ -23,10 +23,6 @@ function cloneProject(project) {
   return workstation.parseProjectFile(workstation.serializeProjectFile(project));
 }
 
-function styleProfile(styleId) {
-  return workstation.styleProfiles.find((profile) => profile.id === styleId) ?? workstation.styleProfiles[0];
-}
-
 function patternEventCounts(pattern) {
   const drumHits = workstation.drumLanes.reduce(
     (count, lane) => count + pattern.drumPattern[lane].filter(Boolean).length,
@@ -57,86 +53,6 @@ function projectEventCounts(project) {
 
 function usedPatterns(project) {
   return new Set(project.arrangement.map((block) => block.pattern));
-}
-
-function createBeginnerGuidedFirstBeat() {
-  const styleId = "lofi";
-  const key = "A minor";
-  const style = styleProfile(styleId);
-  let project = {
-    ...cloneProject(workstation.starterProject),
-    title: "First Guided Beat",
-    mode: "guided",
-    bpm: 86,
-    key,
-    styleId,
-    selectedPattern: "A",
-    swing: style.defaultSwing,
-    sound: workstation.soundPresetDesign(workstation.styleSoundPreset(styleId)),
-    patterns: workstation.createStylePatternSet(styleId, key),
-    sessionBrief: {
-      artist: "First session",
-      vibe: "warm direct-composition starter",
-      reference: "local beat sketch",
-      notes: "Guided path: setup, compose, arrange, mix, master, deliver without imported audio."
-    },
-    snapshots: []
-  };
-
-  project = {
-    ...project,
-    patterns: {
-      ...project.patterns,
-      A: {
-        ...workstation.applyPatternFillPreset(workstation.applyDrumGroovePreset(project.patterns.A, "pocket"), "melody_turn", key),
-        chordEvents: workstation.createChordProgressionPreset("moody", key)
-      },
-      B: workstation.applyPatternFillPreset(workstation.createPatternVariation(project.patterns.B, "hook"), "bass_pickup", key),
-      C: workstation.applyPatternFillPreset(workstation.createPatternVariation(project.patterns.C, "breakdown"), "clear_tail", key)
-    }
-  };
-
-  return workstation.applyDeliveryTarget(project, "starter_sketch");
-}
-
-function createProducerFastPass() {
-  let project = cloneProject(workstation.starterProject);
-  project = workstation.applyBeatBlueprint(project, "club_bounce");
-  project = workstation.retargetProjectKey(project, "C minor");
-  project = {
-    ...project,
-    title: "Producer Fast Pass",
-    mode: "studio",
-    selectedPattern: "B",
-    sessionBrief: {
-      artist: "Producer demo",
-      vibe: "fast club-ready beat-store pass",
-      reference: "working producer arrangement scan",
-      notes: "Studio path: blueprint, key retarget, pattern variation, delivery target, mix/master, handoff."
-    },
-    snapshots: []
-  };
-  project = {
-    ...project,
-    patterns: {
-      ...project.patterns,
-      A: workstation.applyDrumGroovePreset(project.patterns.A, "push"),
-      B: {
-        ...workstation.applyPatternFillPreset(
-          workstation.applyPatternFillPreset(workstation.createPatternVariation(project.patterns.B, "hook"), "drum_fill", project.key),
-          "melody_turn",
-          project.key
-        ),
-        chordEvents: workstation.createChordProgressionPreset("lift", project.key)
-      },
-      C: {
-        ...workstation.applyPatternFillPreset(workstation.createPatternVariation(project.patterns.C, "switchup"), "bass_pickup", project.key),
-        chordEvents: workstation.createChordProgressionPreset("bounce", project.key)
-      }
-    }
-  };
-  project = workstation.applyDeliveryTarget(project, "beat_store");
-  return workstation.applyMasterAutomationPreset(project, "intro_outro");
 }
 
 function validateWorkflowProject(workflow) {
@@ -213,7 +129,7 @@ function validateWorkflowProject(workflow) {
 const workflows = [
   {
     label: "beginner:guided-first-beat",
-    project: createBeginnerGuidedFirstBeat(),
+    project: workstation.createAudienceStarterProject("beginner"),
     expected: {
       title: "First Guided Beat",
       mode: "guided",
@@ -232,7 +148,7 @@ const workflows = [
   },
   {
     label: "producer:fast-pass",
-    project: createProducerFastPass(),
+    project: workstation.createAudienceStarterProject("producer"),
     expected: {
       title: "Producer Fast Pass",
       mode: "studio",

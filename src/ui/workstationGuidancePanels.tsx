@@ -10,7 +10,7 @@ import {
   Target
 } from "lucide-react";
 import { useEffect, useState, type ReactElement, type Ref } from "react";
-import type { ProjectState } from "../domain/workstation";
+import type { AudienceStarterProjectId, ProjectState } from "../domain/workstation";
 import type {
   BeatReadinessCheck,
   FirstBeatPathStepId,
@@ -61,6 +61,11 @@ type GuideQuickStartResult = {
 const audienceSessionActionTestIds: Record<AudienceSessionReadoutRow["id"], string> = {
   beginner: "audience-session-action-beginner",
   producer: "audience-session-action-producer"
+};
+
+const audienceStarterActionTestIds: Record<AudienceStarterProjectId, string> = {
+  beginner: "audience-starter-action-beginner",
+  producer: "audience-starter-action-producer"
 };
 
 type GuideQuickStartDecision = {
@@ -281,8 +286,10 @@ export function ModeSwitchResultStrip({ result }: { result: ModeSwitchResult }):
 export function AudienceSessionReadout({
   result,
   summary,
+  onCreateStarter,
   onSelectAudience
 }: {
+  onCreateStarter: (starterId: AudienceStarterProjectId) => void;
   result: AudienceSessionActionResult | null;
   summary: AudienceSessionReadoutSummary;
   onSelectAudience: (row: AudienceSessionReadoutRow) => void;
@@ -333,6 +340,17 @@ export function AudienceSessionReadout({
             >
               <ArrowRight size={13} aria-hidden="true" />
               <span>{row.actionLabel}</span>
+            </button>
+            <button
+              aria-label={`Build starter project for ${row.label}`}
+              className="audience-session-action secondary"
+              data-testid={audienceStarterActionTestIds[row.id]}
+              title={`Build starter project: ${row.actionDetail} / ${row.nextCheck}`}
+              type="button"
+              onClick={() => onCreateStarter(row.id)}
+            >
+              <Music2 size={13} aria-hidden="true" />
+              <span>Build Starter</span>
             </button>
           </div>
         ))}
@@ -821,33 +839,52 @@ function readinessStatusLabel(tone: MixCoachTone, good: string, warn: string, da
 }
 
 export function createAudienceSessionQuickActions({
+  onCreateStarter,
   onSelectAudience,
   summary
 }: {
+  onCreateStarter: (starterId: AudienceStarterProjectId) => void;
   onSelectAudience: (row: AudienceSessionReadoutRow) => void;
   summary: AudienceSessionReadoutSummary;
 }): QuickAction[] {
-  return summary.rows.map((row) => {
+  return summary.rows.flatMap((row) => {
     const routeKeywords =
       row.id === "beginner"
         ? "guide guided beginner first time first-time composer new composer first beat path"
         : "guide studio professional producer pro producer scan review queue export preflight";
-    return {
-      id: `audience-session-enter-${row.id}`,
-      title: `${row.actionLabel}: ${row.label}`,
-      detail: [
-        `Audience Session ${row.label}`,
-        `Route ${row.actionDetail}`,
-        `Readiness ${row.status}: ${row.value}`,
-        `Context ${row.detail}`,
-        `Next ${row.nextCheck}`,
-        "Visible Audience Session action unchanged"
-      ].join(" / "),
-      group: "Project",
-      keywords: `audience session readout enter ${routeKeywords} ${row.id} ${row.label} ${row.actionLabel} ${row.actionDetail} ${row.status} ${row.value} ${row.detail} ${row.nextCheck} direct beat workstation sample free`,
-      resultTargetId: row.id,
-      run: () => onSelectAudience(row)
-    };
+    return [
+      {
+        id: `audience-session-enter-${row.id}`,
+        title: `${row.actionLabel}: ${row.label}`,
+        detail: [
+          `Audience Session ${row.label}`,
+          `Route ${row.actionDetail}`,
+          `Readiness ${row.status}: ${row.value}`,
+          `Context ${row.detail}`,
+          `Next ${row.nextCheck}`,
+          "Visible Audience Session action unchanged"
+        ].join(" / "),
+        group: "Project",
+        keywords: `audience session readout enter ${routeKeywords} ${row.id} ${row.label} ${row.actionLabel} ${row.actionDetail} ${row.status} ${row.value} ${row.detail} ${row.nextCheck} direct beat workstation sample free`,
+        resultTargetId: row.id,
+        run: () => onSelectAudience(row)
+      },
+      {
+        id: `audience-starter-${row.id}`,
+        title: `Build Starter Project: ${row.label}`,
+        detail: [
+          `Audience Starter ${row.label}`,
+          `Route ${row.actionDetail}`,
+          `Readiness ${row.status}: ${row.value}`,
+          `Context ${row.detail}`,
+          "Creates editable drums, 808/bass, melody/chords, arrangement, mix/master, and delivery target"
+        ].join(" / "),
+        group: "Create",
+        keywords: `audience starter project build ${row.id} ${row.label} editable drums 808 bass melody chords arrangement mix master delivery direct beat workstation sample free`,
+        resultTargetId: row.id,
+        run: () => onCreateStarter(row.id)
+      }
+    ];
   });
 }
 

@@ -176,6 +176,7 @@ import {
   ArrangementMuteTrack,
   ArrangementSection,
   ArrangementTemplateId,
+  AudienceStarterProjectId,
   BassNote,
   BeatBlueprint,
   BeatBlueprintId,
@@ -209,6 +210,8 @@ import {
   SoundDesign,
   activeDeliveryTarget,
   activePattern,
+  audienceStarterProjectDetail,
+  audienceStarterProjectLabel,
   applyBeatBlueprint,
   applyDeliveryTarget,
   applyArrangementMovePreset,
@@ -1489,6 +1492,7 @@ export function createQuickActions({
   onRunPatternCompareDecision,
   onFollowAudiblePattern,
   onFollowAudibleArrangementBlock,
+  onCreateAudienceStarter,
   onSelectArrangementBlock,
   onSelectPattern,
   onSelectStyle,
@@ -1882,6 +1886,7 @@ export function createQuickActions({
   onSelectPattern: (pattern: PatternSlot) => void;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
   onSelectAudienceSessionRow: (row: AudienceSessionReadoutRow) => void;
+  onCreateAudienceStarter: (starterId: AudienceStarterProjectId) => void;
   onFocusAudienceCompletionRouteReadout: () => void;
   onFocusDualAudienceReadinessRouteReadout: () => void;
   onSwitchMode: (mode: ProjectState["mode"]) => void;
@@ -3002,6 +3007,7 @@ export function createQuickActions({
     run: () => onFocusModeFocus(card)
   }));
   const audienceSessionActions = createAudienceSessionQuickActions({
+    onCreateStarter: onCreateAudienceStarter,
     onSelectAudience: onSelectAudienceSessionRow,
     summary: audienceSessionReadoutSummary
   });
@@ -16738,6 +16744,26 @@ export function quickActionResultMetricSnapshot(
         value: `${modeLabel(project.mode)} mode`
       }
     );
+  }
+
+  if (action.id.startsWith("audience-starter-")) {
+    const starterId: AudienceStarterProjectId = action.id.endsWith("producer") ? "producer" : "beginner";
+    const target = activeDeliveryTarget(project);
+    const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+    return {
+      id: "audience-starter",
+      label: "Audience Starter",
+      value: [
+        phase === "before" ? "current project" : "starter project",
+        audienceStarterProjectLabel(starterId),
+        audienceStarterProjectDetail(starterId),
+        `${project.mode === "studio" ? "Studio" : "Guided"} mode`,
+        `${styleName} / ${project.key} / ${project.bpm} BPM`,
+        barCountLabel(arrangementTotalBars(project)),
+        `${projectEventTotal(project)} editable events`,
+        `delivery ${target.name}`
+      ].join(" / ")
+    };
   }
 
   if (action.id.startsWith("mode-switch-")) {

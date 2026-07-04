@@ -79,7 +79,9 @@ function validateFirstRunRenderer(html) {
       "Audience Completion Route",
       "First-time composer completion",
       'data-testid="audience-session-action-beginner"',
+      'data-testid="audience-starter-action-beginner"',
       "Enter Guided",
+      "Build Starter",
       "First Beat Path",
       "Beat Spine",
       "Composer Guide",
@@ -94,6 +96,7 @@ function validateFirstRunRenderer(html) {
       "Professional producer completion",
       'data-testid="audience-completion-route-producer"',
       'data-testid="audience-session-action-producer"',
+      'data-testid="audience-starter-action-producer"',
       "Enter Studio",
       "Studio",
       "Review Queue",
@@ -464,35 +467,54 @@ function createAudienceSessionSmokeSummary() {
 
 function validateAudienceSessionQuickActionPalette(guidancePanels, palette) {
   const selectedRows = [];
+  const starterRows = [];
   const summary = createAudienceSessionSmokeSummary();
   const actions = guidancePanels.createAudienceSessionQuickActions({
+    onCreateStarter(starterId) {
+      starterRows.push(starterId);
+    },
     onSelectAudience(row) {
       selectedRows.push(row.id);
     },
     summary
   });
 
-  check(actions.length === 2, "Audience Session palette smoke should create two route actions");
-  check(actions.every((action) => action.group === "Project"), "Audience Session palette actions should remain Project-group actions");
+  check(actions.length === 4, "Audience Session palette smoke should create two route actions and two starter actions");
 
   const beginnerAction = actions.find((action) => action.id === "audience-session-enter-beginner");
   const producerAction = actions.find((action) => action.id === "audience-session-enter-producer");
+  const beginnerStarterAction = actions.find((action) => action.id === "audience-starter-beginner");
+  const producerStarterAction = actions.find((action) => action.id === "audience-starter-producer");
   check(beginnerAction?.title === "Enter Guided: First-time composer", "Audience Session palette should expose Enter Guided title");
   check(producerAction?.title === "Enter Studio: Professional producer", "Audience Session palette should expose Enter Studio title");
+  check(beginnerStarterAction?.title === "Build Starter Project: First-time composer", "Audience Session palette should expose beginner starter title");
+  check(producerStarterAction?.title === "Build Starter Project: Professional producer", "Audience Session palette should expose producer starter title");
+  check(beginnerAction?.group === "Project", "Audience Session route actions should remain Project-group actions");
+  check(producerAction?.group === "Project", "Audience Session route actions should remain Project-group actions");
+  check(beginnerStarterAction?.group === "Create", "Audience Starter beginner action should be a Create command");
+  check(producerStarterAction?.group === "Create", "Audience Starter producer action should be a Create command");
   check(beginnerAction?.resultTargetId === "beginner", "Audience Session palette should keep beginner result target");
   check(producerAction?.resultTargetId === "producer", "Audience Session palette should keep producer result target");
+  check(beginnerStarterAction?.resultTargetId === "beginner", "Audience Starter palette should keep beginner result target");
+  check(producerStarterAction?.resultTargetId === "producer", "Audience Starter palette should keep producer result target");
 
   const audienceSearch = palette.filterQuickActions(actions, "audience session", "all");
   const guidedSearch = palette.filterQuickActions(actions, "enter guided", "guide");
   const studioSearch = palette.filterQuickActions(actions, "enter studio", "guide");
   const producerSearch = palette.filterQuickActions(actions, "professional producer", "project");
   const beginnerSearch = palette.filterQuickActions(actions, "first-time composer", "project");
+  const starterSearch = palette.filterQuickActions(actions, "build starter project", "create");
+  const beginnerStarterSearch = palette.filterQuickActions(actions, "first-time composer starter", "create");
+  const producerStarterSearch = palette.filterQuickActions(actions, "professional producer starter", "create");
 
   check(audienceSearch.length === 2, "Audience Session palette all-scope search should show both routes");
   check(guidedSearch[0]?.id === "audience-session-enter-beginner", "Audience Session palette guide search should find Enter Guided");
   check(studioSearch[0]?.id === "audience-session-enter-producer", "Audience Session palette guide search should find Enter Studio");
   check(producerSearch[0]?.id === "audience-session-enter-producer", "Audience Session palette project search should find producer route");
   check(beginnerSearch[0]?.id === "audience-session-enter-beginner", "Audience Session palette project search should find beginner route");
+  check(starterSearch.length === 2, "Audience Starter palette create search should show both starter actions");
+  check(beginnerStarterSearch[0]?.id === "audience-starter-beginner", "Audience Starter palette create search should find beginner starter");
+  check(producerStarterSearch[0]?.id === "audience-starter-producer", "Audience Starter palette create search should find producer starter");
 
   const guidedScopeOptions = palette.createQuickActionScopeOptions(actions, "enter guided");
   const guideScope = guidedScopeOptions.find((option) => option.id === "guide");
@@ -523,7 +545,10 @@ function validateAudienceSessionQuickActionPalette(guidancePanels, palette) {
 
   beginnerAction?.run();
   producerAction?.run();
+  beginnerStarterAction?.run();
+  producerStarterAction?.run();
   check(selectedRows.join(",") === "beginner,producer", "Audience Session palette actions should run the selected row callbacks in order");
+  check(starterRows.join(",") === "beginner,producer", "Audience Starter palette actions should run the starter callbacks in order");
 }
 
 function createDualAudienceSmokeRows() {
@@ -787,7 +812,7 @@ try {
       "- Producer path: Dual Audience Readiness, Audience Completion Route, Studio switch, Review Queue, Production Snapshot, Mix Coach, Handoff Pack, Quick Actions, Command Reference"
     );
     console.log("- Audience Session result: Enter Guided and Enter Studio Quick Actions return Entered status, route metrics, and route-specific follow-up");
-    console.log("- Audience Session palette: Enter Guided and Enter Studio are searchable through Quick Actions query and scope filters");
+    console.log("- Audience Session palette: Enter Guided, Enter Studio, and Audience Starter project actions are searchable through Quick Actions query and scope filters");
     console.log("- Dual Audience Readiness palette: route readout plus both audience lanes are searchable and return focused route metrics");
     console.log("- Audience Completion Route palette: route readout plus both audience completion lanes are searchable and return focused route metrics");
     console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack, Delivery Bundle ZIP");

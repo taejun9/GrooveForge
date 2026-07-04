@@ -60,6 +60,10 @@ function checkWavBytes(bytes, label) {
   check(ascii(bytes, 36, 4) === "data", `${label} WAV missing data chunk`);
 }
 
+function styleProfile(workstation, styleId) {
+  return workstation.styleProfiles.find((profile) => profile.id === styleId) ?? workstation.styleProfiles[0];
+}
+
 function checkMidiBytes(bytes, label) {
   check(bytes.byteLength > 128, `${label} MIDI should include arrangement events`);
   check(ascii(bytes, 0, 4) === "MThd", `${label} MIDI missing MThd header`);
@@ -112,10 +116,6 @@ function checkRenderedGroup(html, label, needles) {
   };
 }
 
-function styleProfile(workstation, styleId) {
-  return workstation.styleProfiles.find((profile) => profile.id === styleId) ?? workstation.styleProfiles[0];
-}
-
 function cloneProject(workstation, project) {
   return workstation.parseProjectFile(workstation.serializeProjectFile(project));
 }
@@ -150,86 +150,6 @@ function projectEventCounts(workstation, project) {
 
 function usedPatterns(project) {
   return new Set(project.arrangement.map((block) => block.pattern));
-}
-
-function createBeginnerGuidedFirstBeat(workstation) {
-  const styleId = "lofi";
-  const key = "A minor";
-  const style = styleProfile(workstation, styleId);
-  let project = {
-    ...cloneProject(workstation, workstation.starterProject),
-    title: "Persona Beginner First Beat",
-    mode: "guided",
-    bpm: 86,
-    key,
-    styleId,
-    selectedPattern: "A",
-    swing: style.defaultSwing,
-    sound: workstation.soundPresetDesign(workstation.styleSoundPreset(styleId)),
-    patterns: workstation.createStylePatternSet(styleId, key),
-    sessionBrief: {
-      artist: "First-time composer",
-      vibe: "guided direct-composition starter",
-      reference: "local first beat",
-      notes: "Beginner path covers setup, compose, arrange, mix, master, and deliver without imported audio."
-    },
-    snapshots: []
-  };
-
-  project = {
-    ...project,
-    patterns: {
-      ...project.patterns,
-      A: {
-        ...workstation.applyPatternFillPreset(workstation.applyDrumGroovePreset(project.patterns.A, "pocket"), "melody_turn", key),
-        chordEvents: workstation.createChordProgressionPreset("moody", key)
-      },
-      B: workstation.applyPatternFillPreset(workstation.createPatternVariation(project.patterns.B, "hook"), "bass_pickup", key),
-      C: workstation.applyPatternFillPreset(workstation.createPatternVariation(project.patterns.C, "breakdown"), "clear_tail", key)
-    }
-  };
-
-  return workstation.applyDeliveryTarget(project, "starter_sketch");
-}
-
-function createProducerFastPass(workstation) {
-  let project = cloneProject(workstation, workstation.starterProject);
-  project = workstation.applyBeatBlueprint(project, "club_bounce");
-  project = workstation.retargetProjectKey(project, "C minor");
-  project = {
-    ...project,
-    title: "Persona Producer Fast Pass",
-    mode: "studio",
-    selectedPattern: "B",
-    sessionBrief: {
-      artist: "Professional producer",
-      vibe: "fast club-ready beat-store pass",
-      reference: "working producer arrangement scan",
-      notes: "Studio path covers blueprint, key retarget, pattern variation, delivery target, mix/master, and handoff."
-    },
-    snapshots: []
-  };
-  project = {
-    ...project,
-    patterns: {
-      ...project.patterns,
-      A: workstation.applyDrumGroovePreset(project.patterns.A, "push"),
-      B: {
-        ...workstation.applyPatternFillPreset(
-          workstation.applyPatternFillPreset(workstation.createPatternVariation(project.patterns.B, "hook"), "drum_fill", project.key),
-          "melody_turn",
-          project.key
-        ),
-        chordEvents: workstation.createChordProgressionPreset("lift", project.key)
-      },
-      C: {
-        ...workstation.applyPatternFillPreset(workstation.createPatternVariation(project.patterns.C, "switchup"), "bass_pickup", project.key),
-        chordEvents: workstation.createChordProgressionPreset("bounce", project.key)
-      }
-    }
-  };
-  project = workstation.applyDeliveryTarget(project, "beat_store");
-  return workstation.applyMasterAutomationPreset(project, "intro_outro");
 }
 
 function validateWorkflowProject({ workstation, render, midi, handoff, label, persona, project, expected }) {
@@ -1105,7 +1025,7 @@ const workflowRows = [
     handoff,
     label: "beginner:guided-first-beat",
     persona: "first-time composer",
-    project: createBeginnerGuidedFirstBeat(workstation),
+    project: workstation.createAudienceStarterProject("beginner"),
     expected: {
       mode: "guided",
       styleId: "lofi",
@@ -1128,7 +1048,7 @@ const workflowRows = [
     handoff,
     label: "producer:fast-pass",
     persona: "professional producer",
-    project: createProducerFastPass(workstation),
+    project: workstation.createAudienceStarterProject("producer"),
     expected: {
       mode: "studio",
       styleId: "house",
@@ -1152,7 +1072,7 @@ const deliveryPackageRows = await Promise.all([
     midi,
     handoff,
     workflowRow: workflowRows[0],
-    project: createBeginnerGuidedFirstBeat(workstation),
+    project: workstation.createAudienceStarterProject("beginner"),
     packageSlug: "first-time-composer-guided"
   }),
   writePersonaDeliveryPackage({
@@ -1161,7 +1081,7 @@ const deliveryPackageRows = await Promise.all([
     midi,
     handoff,
     workflowRow: workflowRows[1],
-    project: createProducerFastPass(workstation),
+    project: workstation.createAudienceStarterProject("producer"),
     packageSlug: "professional-producer-studio"
   })
 ]);
