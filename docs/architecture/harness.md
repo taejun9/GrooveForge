@@ -62,6 +62,7 @@ npm run harness:smoke
 npm run desktop:local-delivery-package-smoke
 npm run desktop:local-package-reopen-smoke
 npm run desktop:local-delivery-zip-smoke
+npm run delivery:bundle-zip-smoke
 npm run typecheck
 npm run build
 npm run desktop:smoke
@@ -246,6 +247,8 @@ External next-actions builds a separate value-free Current Operator Command Sequ
 `npm run desktop:local-package-reopen-smoke` runs after the local delivery package smoke. It reads the ignored package back from disk, verifies manifest paths, byte sizes, SHA-256 checksums, WAV headers, MIDI header, Handoff sections, project roundtrip, and regenerated mix/stem/MIDI/Handoff output from the reopened project without recording private values or claiming external distribution completion.
 
 `npm run desktop:local-delivery-zip-smoke` runs after the local package reopen smoke. It reads the ignored package and reopen evidence, writes a single ignored ZIP archive containing the project JSON, full mix WAV, four stem WAVs, arrangement MIDI, Handoff Sheet, and package manifest files, then verifies archive-safe paths, stored ZIP entries, local headers, central directory records, EOCD metadata, byte sizes, CRC-32 checksums, and source SHA-256 matches without recording private values or claiming external distribution completion.
+
+`npm run delivery:bundle-zip-smoke` exercises the dependency-free in-app delivery bundle ZIP generator used by the toolbar, Handoff Pack, and Quick Actions Bundle export. It creates one sample-free local ZIP with project JSON, full mix WAV, four stem WAVs, arrangement MIDI, Handoff Sheet, manifest JSON, and manifest Markdown, then verifies project roundtrip, WAV/MIDI/Handoff headers, central directory entries, local headers, stored ZIP method, CRC-32 values, safe entry names, and value-free/local-first posture without recording private values or claiming external distribution completion.
 
 `npm run desktop:external-remediation-smoke` runs after the dry-run external distribution gate. It writes ignored Markdown/JSON remediation artifacts that translate remaining hard-gate blockers into ordered operator action groups, required key names, evidence paths, prerequisite commands, and rerun commands without recording private values or claiming external distribution completion.
 

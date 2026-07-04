@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode, Ref } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { deliveryBundleZipFileName, exportDeliveryBundleZip } from "../audio/deliveryBundle";
 import { exportMidi, midiFileName } from "../audio/midi";
 import {
   analyzeExport,
@@ -6818,6 +6819,38 @@ export function App(): ReactElement {
     }
   }
 
+  function handleExportDeliveryBundle(): void {
+    const fileName = deliveryBundleZipFileName(project);
+    void exportDeliveryBundleZip(project, exportAnalysis, stemAnalyses)
+      .then((result) => {
+        recordHandoffExportReceipt(
+          createHandoffExportReceipt({
+            itemId: "bundle",
+            statusLabel: "Exported bundle",
+            fileLabel: result.fileName,
+            detailLabel: `${result.manifest.artifactCount} artifacts / ${result.manifest.entries.length} checked entries`,
+            nextLabel: "Confirm ZIP opens before sending",
+            tone: "good"
+          })
+        );
+        setProjectStatus(`Exported ${result.fileName}`);
+      })
+      .catch((error) => {
+        console.error(error);
+        recordHandoffExportReceipt(
+          createHandoffExportReceipt({
+            itemId: "bundle",
+            statusLabel: "Bundle failed",
+            fileLabel: fileName,
+            detailLabel: "No delivery bundle ZIP download completed",
+            nextLabel: "Review Handoff Package Check before retry",
+            tone: "danger"
+          })
+        );
+        setProjectStatus("Bundle export failed");
+      });
+  }
+
   function toggleMetronome(): void {
     updateProject(
       (current) => ({ ...current, metronomeEnabled: !current.metronomeEnabled }),
@@ -9233,6 +9266,7 @@ export function App(): ReactElement {
     onUpdateSelectedChordLength: updateSelectedChordLength,
     onUpdateSelectedChordVelocity: updateSelectedChordVelocity,
     onUpdateSelectedChordProbability: updateSelectedChordProbability,
+    onExportDeliveryBundle: handleExportDeliveryBundle,
     onExportHandoffSheet: handleExportHandoffSheet,
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
@@ -9812,6 +9846,10 @@ export function App(): ReactElement {
             <Download size={18} aria-hidden="true" />
             <span>Sheet</span>
           </button>
+          <button className="icon-button" data-testid="export-delivery-bundle" type="button" title="Export delivery bundle ZIP" onClick={handleExportDeliveryBundle}>
+            <Download size={18} aria-hidden="true" />
+            <span>Bundle</span>
+          </button>
         </div>
       </header>
 
@@ -10109,6 +10147,7 @@ export function App(): ReactElement {
         packageCheckResult={handoffPackageCheckResult}
         project={project}
         stemAnalyses={stemAnalyses}
+        onExportDeliveryBundle={handleExportDeliveryBundle}
         onExportHandoffSheet={handleExportHandoffSheet}
         onExportMidi={handleExportMidi}
         onExportStems={handleExportStems}

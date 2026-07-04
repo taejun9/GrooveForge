@@ -154,6 +154,7 @@ export {
 export type { NextMoveQuickActionSource } from "./workstationAppQuickActionPalette";
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode, Ref } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { deliveryBundleZipFileName } from "../audio/deliveryBundle";
 import { exportMidi, midiFileName } from "../audio/midi";
 import {
   analyzeExport,
@@ -1553,6 +1554,7 @@ export function createQuickActions({
   onUpdateSelectedChordLength,
   onUpdateSelectedChordVelocity,
   onUpdateSelectedChordProbability,
+  onExportDeliveryBundle,
   onExportHandoffSheet,
   onExportMidi,
   onExportStems,
@@ -1941,6 +1943,7 @@ export function createQuickActions({
   onUpdateSelectedChordLength: (length: number) => void;
   onUpdateSelectedChordVelocity: (velocity: number) => void;
   onUpdateSelectedChordProbability: (probability: number) => void;
+  onExportDeliveryBundle: () => void;
   onExportHandoffSheet: () => void;
   onExportMidi: () => void;
   onExportStems: () => void;
@@ -4298,6 +4301,7 @@ export function createQuickActions({
     analysis: exportAnalysis,
     project,
     stemAnalyses,
+    onExportDeliveryBundle,
     onExportHandoffSheet,
     onExportMidi,
     onExportStems,
@@ -7334,6 +7338,14 @@ export function createQuickActions({
       group: "Export",
       keywords: "export sheet handoff notes session brief delivery target mix stems",
       run: onExportHandoffSheet
+    },
+    {
+      id: "export-delivery-bundle",
+      title: "Export delivery bundle",
+      detail: "Write one ZIP with project JSON, mix, stems, MIDI, Handoff Sheet, and manifest.",
+      group: "Export",
+      keywords: "export delivery bundle zip package archive project wav stems midi handoff manifest beginner producer",
+      run: onExportDeliveryBundle
     }
   ];
 }
@@ -8555,6 +8567,8 @@ export function directExportQuickActionTarget(actionId: string): DirectExportQui
       return { id: "midi", label: "MIDI Export", metricId: "export-midi" };
     case "export-handoff-sheet":
       return { id: "sheet", label: "Handoff Sheet", metricId: "export-handoff-sheet" };
+    case "export-delivery-bundle":
+      return { id: "bundle", label: "Delivery Bundle", metricId: "export-delivery-bundle" };
     default:
       return null;
   }
@@ -8582,6 +8596,8 @@ export function directExportQuickActionPosture(
       return `${handoffSheetFileName(project)} / ${sessionBriefFilledFields(project.sessionBrief)}/4 brief / ${
         activeDeliveryTarget(project).name
       }`;
+    case "bundle":
+      return `${deliveryBundleZipFileName(project)} / project + mix + stems + MIDI + sheet + manifest`;
   }
 }
 
@@ -8673,7 +8689,7 @@ export function quickActionDirectExportsReadoutMetricSnapshot(
   const receipt = exportReceipt ?? emptyHandoffExportReceipt();
   const pattern = activePattern(project);
   const usedSlots = usedPatternSlots(project);
-  const directTargets = ["export-wav", "export-stems", "export-midi", "export-handoff-sheet"]
+  const directTargets = ["export-wav", "export-stems", "export-midi", "export-handoff-sheet", "export-delivery-bundle"]
     .map(directExportQuickActionTarget)
     .filter((target): target is DirectExportQuickActionTarget => target !== null);
   const targetPosture = directTargets.map((target) =>
@@ -8740,6 +8756,7 @@ export function quickActionDirectExportDeliveryMetricParts(
     ).join(" + ")}`,
     `midi ${midiFileName(project)} / ${barCountLabel(bars)}`,
     `sheet ${handoffSheetFileName(project)} / brief ${sessionBriefFilledFields(project.sessionBrief)}/4 / ${briefStatus.value}`,
+    `bundle ${deliveryBundleZipFileName(project)} / project + mix + stems + MIDI + sheet + manifest`,
     `receipt ${directExportQuickActionReceiptLabel(target, receipt)} / ${receipt.nextLabel}`,
     `send ${sendOrder.statusLabel} / ${sendOrder.nextLabel}`,
     `sequence ${sendOrder.sequenceLabel}`,
@@ -8762,6 +8779,8 @@ export function directExportQuickActionFileLabel(project: ProjectState, target: 
       return midiFileName(project);
     case "sheet":
       return handoffSheetFileName(project);
+    case "bundle":
+      return deliveryBundleZipFileName(project);
   }
 }
 
@@ -8786,6 +8805,8 @@ export function directExportQuickActionReadinessLabel(
       }`;
     case "sheet":
       return `sheet ${sessionBriefFilledFields(project.sessionBrief)}/4 brief / ${activeDeliveryTarget(project).name}`;
+    case "bundle":
+      return `bundle ${deliveryBundleZipFileName(project)} / ${stemWavFileNames(project).length} stems / manifest`;
   }
 }
 
@@ -10195,6 +10216,7 @@ export function quickActionHandoffNextExportDeliveryMetricParts(
     ).length} files`,
     `midi ${midiFileName(project)} / ${barCountLabel(bars)}`,
     `sheet ${handoffSheetFileName(project)} / brief ${sessionBriefFilledFields(project.sessionBrief)}/4 / ${briefStatus.value}`,
+    `bundle ${deliveryBundleZipFileName(project)} / project + mix + stems + MIDI + sheet + manifest`,
     `receipt ${handoffNextExportReceiptLabel(receipt, targetId)} / ${receipt.nextLabel}`,
     `send ${sendOrder.statusLabel} / ${sendOrder.nextLabel} / ${targetItemLabel}`,
     `sequence ${sendOrder.sequenceLabel}`,
@@ -10233,6 +10255,8 @@ export function handoffNextExportDirectTarget(itemId: HandoffPackItem["id"]): Di
       return { id: "midi", label: "MIDI Export", metricId: "handoff-next-midi" };
     case "sheet":
       return { id: "sheet", label: "Handoff Sheet", metricId: "handoff-next-sheet" };
+    case "bundle":
+      return { id: "bundle", label: "Delivery Bundle", metricId: "handoff-next-bundle" };
   }
 }
 
@@ -13681,6 +13705,8 @@ export function handoffExportReceiptItemLabel(itemId: HandoffPackItem["id"]): st
       return "Arrangement MIDI";
     case "sheet":
       return "Handoff Sheet";
+    case "bundle":
+      return "Delivery Bundle";
   }
 }
 

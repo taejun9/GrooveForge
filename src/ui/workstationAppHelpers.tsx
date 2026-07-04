@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode, Ref } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { deliveryBundleZipFileName } from "../audio/deliveryBundle";
 import { exportMidi, midiFileName } from "../audio/midi";
 import {
   analyzeExport,
@@ -6770,6 +6771,7 @@ export function HandoffPack({
   packageCheckResult,
   project,
   stemAnalyses,
+  onExportDeliveryBundle,
   onExportHandoffSheet,
   onExportMidi,
   onExportStems,
@@ -6786,6 +6788,7 @@ export function HandoffPack({
   packageCheckResult: HandoffPackageCheckFocusResult | null;
   project: ProjectState;
   stemAnalyses: StemExportAnalyses;
+  onExportDeliveryBundle: () => void;
   onExportHandoffSheet: () => void;
   onExportMidi: () => void;
   onExportStems: () => void;
@@ -6797,6 +6800,7 @@ export function HandoffPack({
     analysis,
     project,
     stemAnalyses,
+    onExportDeliveryBundle,
     onExportHandoffSheet,
     onExportMidi,
     onExportStems,
@@ -7118,6 +7122,8 @@ export function handoffExportFormatPriorityNextCheck(metric: HandoffExportFormat
       return "Next: confirm arrangement length before MIDI export.";
     case "sheet":
       return "Next: confirm brief context before Handoff Sheet export.";
+    case "bundle":
+      return "Next: confirm bundle ZIP contents after deliverable formats are ready.";
   }
 }
 
@@ -7156,7 +7162,7 @@ export function createHandoffPackageCheckPriority(summary: HandoffPackageCheckSu
 export function handoffPackageCheckPriorityNextCheck(card: HandoffPackageCheckCard): string {
   switch (card.focusId) {
     case "files":
-      return "Next: verify WAV, stems, MIDI, and Handoff Sheet files.";
+      return "Next: verify WAV, stems, MIDI, Handoff Sheet, and delivery bundle files.";
     case "order":
       return "Next: follow the current Send Order item.";
     case "receipt":
@@ -12461,6 +12467,7 @@ export function createHandoffPackItems({
   project,
   stemAnalyses,
   onExportHandoffSheet,
+  onExportDeliveryBundle,
   onExportMidi,
   onExportStems,
   onExportWav
@@ -12469,6 +12476,7 @@ export function createHandoffPackItems({
   project: ProjectState;
   stemAnalyses: StemExportAnalyses;
   onExportHandoffSheet: () => void;
+  onExportDeliveryBundle?: () => void;
   onExportMidi: () => void;
   onExportStems: () => void;
   onExportWav: () => void;
@@ -12482,6 +12490,7 @@ export function createHandoffPackItems({
     audibleStems.length === stemTrackIds.length ? "good" : audibleStems.length >= Math.min(2, stemTrackIds.length) ? "warn" : "danger";
   const midiTone: MixCoachTone = bars >= 8 ? "good" : bars >= 4 ? "warn" : "danger";
   const sheetTone: MixCoachTone = briefFields >= 2 ? "good" : briefFields >= 1 ? "warn" : "danger";
+  const bundleTone = weakestTone([exportTone, stemTone, midiTone, sheetTone]);
   const audibleStemLabel = audibleStems.length > 0 ? audibleStems.map(stemTrackLabel).join("/") : "No audible stems";
 
   return [
@@ -12520,6 +12529,15 @@ export function createHandoffPackItems({
       tone: sheetTone,
       buttonLabel: "Sheet",
       run: onExportHandoffSheet
+    },
+    {
+      id: "bundle",
+      label: "Delivery Bundle",
+      value: bundleTone === "good" ? "Ready" : bundleTone === "warn" ? "Review" : "Blocked",
+      detail: `${deliveryBundleZipFileName(project)} / project, mix, stems, MIDI, sheet, manifest`,
+      tone: bundleTone,
+      buttonLabel: "Bundle",
+      run: onExportDeliveryBundle ?? (() => undefined)
     }
   ];
 }
@@ -12585,7 +12603,7 @@ export function createHandoffPackSendOrderSummary(
 }
 
 export function handoffPackSendOrder(items: HandoffPackItem[]): HandoffPackItem[] {
-  const order: HandoffPackItem["id"][] = ["wav", "stems", "midi", "sheet"];
+  const order: HandoffPackItem["id"][] = ["wav", "stems", "midi", "sheet", "bundle"];
   return order.flatMap((id) => {
     const item = items.find((candidate) => candidate.id === id);
     return item ? [item] : [];
@@ -12616,7 +12634,7 @@ export function emptyHandoffExportReceipt(): HandoffExportReceipt {
     itemId: null,
     statusLabel: "No export receipt",
     fileLabel: "Run a deliverable",
-    detailLabel: "Latest explicit WAV, Stems, MIDI, or Sheet result appears here",
+    detailLabel: "Latest explicit WAV, Stems, MIDI, Sheet, or Bundle result appears here",
     nextLabel: "This readout does not create files",
     tone: "warn"
   });
@@ -12660,6 +12678,13 @@ export function createHandoffFileManifest(
       fileLabel: handoffSheetFileName(project),
       detail: `${briefFields}/4 brief fields`,
       tone: itemTone("sheet")
+    },
+    {
+      id: "bundle",
+      label: "Delivery Bundle",
+      fileLabel: deliveryBundleZipFileName(project),
+      detail: "Project, mix, stems, MIDI, Handoff Sheet, and manifest ZIP",
+      tone: itemTone("bundle")
     }
   ];
 }
@@ -12714,16 +12739,17 @@ export function createHandoffExportFormatSummary(
   const stemTone = audibleStems.length === stemTrackIds.length ? "good" : audibleStems.length > 0 ? "warn" : "danger";
   const midiTone: MixCoachTone = bars >= 8 ? "good" : bars >= 4 ? "warn" : "danger";
   const sheetTone: MixCoachTone = briefFields >= 2 ? "good" : briefFields >= 1 ? "warn" : "danger";
-  const tone = weakestTone([exportTone, stemTone, midiTone, sheetTone, ...items.map((item) => item.tone)]);
+  const bundleTone = weakestTone([exportTone, stemTone, midiTone, sheetTone]);
+  const tone = weakestTone([exportTone, stemTone, midiTone, sheetTone, bundleTone, ...items.map((item) => item.tone)]);
   const statusLabel = tone === "good" ? "Format ready" : tone === "warn" ? "Format review" : "Format blocker";
   const stemDetail = audibleStems.length > 0 ? audibleStems.map(stemTrackLabel).join("/") : "No audible stems";
 
   return {
     statusLabel,
     titleLabel: formatLabel,
-    detailLabel: `${mixWavFileName(project)} / ${stemFiles.length} stems / ${midiFileName(project)}`,
+    detailLabel: `${mixWavFileName(project)} / ${stemFiles.length} stems / ${midiFileName(project)} / ${deliveryBundleZipFileName(project)}`,
     durationLabel,
-    detailTitle: `${statusLabel} / ${formatLabel} / ${durationLabel} / ${mixWavFileName(project)} / ${stemFiles.length} stem WAVs / ${midiFileName(project)} / ${handoffSheetFileName(project)}`,
+    detailTitle: `${statusLabel} / ${formatLabel} / ${durationLabel} / ${mixWavFileName(project)} / ${stemFiles.length} stem WAVs / ${midiFileName(project)} / ${handoffSheetFileName(project)} / ${deliveryBundleZipFileName(project)}`,
     tone,
     metrics: [
       {
@@ -12753,6 +12779,13 @@ export function createHandoffExportFormatSummary(
         value: `${briefFields}/4 brief`,
         detail: `${target.name} / ${handoffSheetFileName(project)}`,
         tone: sheetTone
+      },
+      {
+        id: "bundle",
+        label: "Bundle",
+        value: bundleTone === "good" ? "Ready" : bundleTone === "warn" ? "Review" : "Blocked",
+        detail: `${deliveryBundleZipFileName(project)} / project, mix, stems, MIDI, sheet, manifest`,
+        tone: bundleTone
       }
     ]
   };
@@ -12786,6 +12819,8 @@ export function handoffExportFormatFocusAudition(metric: HandoffExportFormatMetr
       return "Scan Arrangement and Pattern A/B/C assignments so the MIDI reflects the intended song form.";
     case "sheet":
       return "Review Session Brief and Delivery Target so the Handoff Sheet carries useful context.";
+    case "bundle":
+      return "Confirm mix, stems, MIDI, and sheet posture before creating the single transfer ZIP.";
   }
 }
 
@@ -12799,6 +12834,8 @@ export function handoffExportFormatFocusNextCheck(metric: HandoffExportFormatMet
       return "Run MIDI export when arrangement length and Pattern assignments match the handoff.";
     case "sheet":
       return "Fill missing brief fields before exporting the Handoff Sheet.";
+    case "bundle":
+      return "Run bundle export after the planned deliverables are ready or intentionally reviewed.";
   }
 }
 
@@ -12859,7 +12896,7 @@ export function createHandoffPackageCheckSummary(
   const target = activeDeliveryTarget(project);
   const readyCount = items.filter((item) => item.tone === "good").length;
   const stemFiles = stemWavFileNames(project);
-  const plannedFileCount = 1 + stemFiles.length + 1 + 1;
+  const plannedFileCount = 1 + stemFiles.length + 1 + 1 + 1;
   const briefFields = sessionBriefFilledFields(project.sessionBrief);
   const receiptTone: MixCoachTone = receipt.itemId ? receipt.tone : "warn";
   const filesTone = weakestTone(items.map((item) => item.tone));
@@ -12987,7 +13024,7 @@ export function handoffPackageCheckFocusResultMetric(summary: HandoffPackageChec
 export function handoffPackageCheckFocusResultAudition(card: HandoffPackageCheckCard): string {
   switch (card.focusId) {
     case "files":
-      return "Inspect WAV, stems, MIDI, and Handoff Sheet statuses before sending files.";
+      return "Inspect WAV, stems, MIDI, Handoff Sheet, and bundle statuses before sending files.";
     case "order":
       return "Follow Send Order from the next deliverable before rerunning exports.";
     case "receipt":

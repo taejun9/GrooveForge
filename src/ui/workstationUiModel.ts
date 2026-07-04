@@ -547,7 +547,7 @@ export type MixSnapshotQuickActionTarget = {
 };
 
 export type DirectExportQuickActionTarget = {
-  id: "wav" | "stems" | "midi" | "sheet";
+  id: "wav" | "stems" | "midi" | "sheet" | "bundle";
   label: string;
   metricId: string;
 };
@@ -4162,7 +4162,7 @@ export type ProjectFileResult = {
 };
 
 export type HandoffPackItem = {
-  id: "wav" | "stems" | "midi" | "sheet";
+  id: "wav" | "stems" | "midi" | "sheet" | "bundle";
   label: string;
   value: string;
   detail: string;

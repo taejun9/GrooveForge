@@ -131,7 +131,10 @@ function validateFirstRunRenderer(html) {
       "Mix WAV",
       "Stem WAV",
       "Export MIDI",
-      "Handoff Sheet"
+      "Handoff Sheet",
+      'data-testid="export-delivery-bundle"',
+      "Delivery Bundle",
+      "Export delivery bundle"
     ]
   };
 
@@ -787,7 +790,7 @@ try {
     console.log("- Audience Session palette: Enter Guided and Enter Studio are searchable through Quick Actions query and scope filters");
     console.log("- Dual Audience Readiness palette: route readout plus both audience lanes are searchable and return focused route metrics");
     console.log("- Audience Completion Route palette: route readout plus both audience completion lanes are searchable and return focused route metrics");
-    console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack");
+    console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack, Delivery Bundle ZIP");
   }
 } finally {
   await server.close();
