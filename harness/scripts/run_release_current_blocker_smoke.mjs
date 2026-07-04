@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,7 @@ const bundleId = "app.grooveforge.desktop";
 const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
+const completedPlansDir = path.join(root, "docs", "exec_plans", "completed");
 const releaseDoctorJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-doctor.json`);
 const externalNextActionsJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-next-actions.json`);
 const externalProofBundleJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-proof-bundle.json`);
@@ -51,6 +52,8 @@ const releaseChannelPrivateInputTemplateRole =
   "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
 const releaseChannelPrivateInputTemplateDefaultPath = ".env.release-channel.local";
 const releaseChannelPrivateInputTemplatePrivateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
+const releaseProgressAfterWorkRefreshCommand = "npm run release:completion-summary-refresh-smoke";
+const releaseProgressSourceRefreshCommand = "npm run release:progress-refresh-smoke";
 const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
 const releaseChannelSetupWizardRole =
   "guided local-only fallback for first-time operators when private release-channel inputs are missing, placeholders, or shape-invalid";
@@ -297,6 +300,68 @@ function formatTenPlanCadenceRolloverRows(rows) {
 
 function planLabel(planNumber) {
   return `plan-${String(planNumber).padStart(3, "0")}`;
+}
+
+function completedPlanRowsMatch(left, right) {
+  const leftRows = valueFreeObjectRows(left);
+  const rightRows = valueFreeObjectRows(right);
+  return (
+    leftRows.length === rightRows.length &&
+    leftRows.every((row, index) => {
+      const other = rightRows[index] ?? {};
+      return (
+        integerValue(row.number) === integerValue(other.number) &&
+        textValue(row.fileName) === textValue(other.fileName) &&
+        textValue(row.path) === textValue(other.path)
+      );
+    })
+  );
+}
+
+async function buildCompletedPlanWindow() {
+  const names = await readdir(completedPlansDir);
+  const planRows = names
+    .map((name) => {
+      const match = name.match(/^plan-(\d{3,})-[a-z0-9][a-z0-9-]*\.md$/);
+      return match ? { number: Number.parseInt(match[1], 10), fileName: name } : null;
+    })
+    .filter((row) => row && Number.isInteger(row.number))
+    .sort((left, right) => left.number - right.number);
+  const latest = planRows.at(-1) ?? { number: 0, fileName: "none" };
+  const windowStart = latest.number > 0 ? Math.floor((latest.number - 1) / 10) * 10 + 1 : 1;
+  const windowEnd = windowStart + 9;
+  const windowRows = planRows
+    .filter((row) => row.number >= windowStart && row.number <= windowEnd)
+    .map((row) => ({
+      number: row.number,
+      fileName: row.fileName,
+      path: relative(path.join(completedPlansDir, row.fileName)),
+      valueRecorded: false
+    }));
+  const tenPlanProgressReportDue = windowRows.length === 10;
+  const nextScheduledTenPlanProgressReportAt = tenPlanProgressReportDue ? windowEnd + 10 : windowEnd;
+
+  return {
+    completedPlanSource: relative(completedPlansDir),
+    completedPlanCount: planRows.length,
+    latestCompletedPlanNumber: latest.number,
+    latestCompletedPlanLabel: latest.number > 0 ? planLabel(latest.number) : "none",
+    latestCompletedPlanPath: latest.fileName === "none" ? "none" : relative(path.join(completedPlansDir, latest.fileName)),
+    currentTenPlanWindowStart: windowStart,
+    currentTenPlanWindowEnd: windowEnd,
+    currentTenPlanWindowCompletedCount: windowRows.length,
+    currentTenPlanWindowTotal: 10,
+    currentTenPlanWindowLabel: `${windowStart}-${windowEnd}: ${windowRows.length}/10`,
+    currentTenPlanWindowRowCount: windowRows.length,
+    currentTenPlanWindowRowSummary: windowRows.length > 0 ? `${windowRows.length} completed plan filenames` : "none",
+    currentTenPlanWindowRows: windowRows,
+    tenPlanProgressReportDue,
+    currentTenPlanReportBoundaryAt: windowEnd,
+    currentTenPlanReportBoundaryLabel: planLabel(windowEnd),
+    nextScheduledTenPlanProgressReportAt,
+    nextScheduledTenPlanProgressReportLabel: planLabel(nextScheduledTenPlanProgressReportAt),
+    completedPlanValueRecorded: false
+  };
 }
 
 function formatAudienceRows(rows) {
@@ -1705,6 +1770,7 @@ function buildReport({
   externalProofBundle,
   externalGate,
   releaseProgress,
+  completedPlanWindow,
   releaseChannelPreflightBlocked,
   releaseChannelPlaceholderInputReceipt
 }) {
@@ -1972,6 +2038,22 @@ function buildReport({
     integerValue(releaseProgress.tenPlanProgressReportRolloverRowCount) === tenPlanProgressReportRolloverRows.length &&
     tenPlanProgressReportRolloverRows.length === 2 &&
     tenPlanProgressReportRolloverRows.every((row) => row.ready === true && row.valueRecorded === false);
+  const completedPlanWindowRows = valueFreeObjectRows(completedPlanWindow.currentTenPlanWindowRows);
+  const releaseProgressSourceTenPlanProgressLabel = textValue(releaseProgress.currentTenPlanWindowLabel);
+  const releaseProgressSourceTenPlanWindowRowCount = integerValue(releaseProgress.currentTenPlanWindowRowCount);
+  const releaseProgressSourceTenPlanReportDue = releaseProgress.tenPlanProgressReportDue === true;
+  const releaseProgressSourceRowsFresh = completedPlanRowsMatch(
+    releaseProgress.currentTenPlanWindowRows,
+    completedPlanWindow.currentTenPlanWindowRows
+  );
+  const releaseProgressSourceFreshnessReady =
+    releaseProgressSourceTenPlanProgressLabel === completedPlanWindow.currentTenPlanWindowLabel &&
+    releaseProgressSourceTenPlanWindowRowCount === integerValue(completedPlanWindow.currentTenPlanWindowRowCount) &&
+    releaseProgressSourceTenPlanReportDue === (completedPlanWindow.tenPlanProgressReportDue === true) &&
+    releaseProgressSourceRowsFresh;
+  const releaseProgressSourceFreshnessSummary = releaseProgressSourceFreshnessReady
+    ? `fresh: release progress source matches completed plans at ${completedPlanWindow.currentTenPlanWindowLabel}`
+    : `stale: release progress source ${releaseProgressSourceTenPlanProgressLabel} differs from completed plans ${completedPlanWindow.currentTenPlanWindowLabel}; run ${releaseProgressAfterWorkRefreshCommand}`;
   const releaseChannelPostEditReceiptRows = valueFreeObjectRows(releaseProgress.releaseChannelPostEditReceiptRows);
   const releaseChannelPostEditReceiptReady =
     releaseProgress.releaseChannelPostEditReceiptReady === true &&
@@ -2495,6 +2577,35 @@ function buildReport({
     consistencyReady: consistencyRows.every((row) => row.ready),
     userFacingCompletionPercent: releaseProgress.userFacingCompletionPercent,
     userFacingRemainingPercent: releaseProgress.userFacingRemainingPercent,
+    completedPlanProgressSource: completedPlanWindow.completedPlanSource,
+    completedPlanCount: integerValue(completedPlanWindow.completedPlanCount),
+    latestCompletedPlanNumber: integerValue(completedPlanWindow.latestCompletedPlanNumber),
+    latestCompletedPlanLabel: textValue(completedPlanWindow.latestCompletedPlanLabel),
+    latestCompletedPlanPath: textValue(completedPlanWindow.latestCompletedPlanPath),
+    completedPlanTenPlanProgressLabel: textValue(completedPlanWindow.currentTenPlanWindowLabel),
+    completedPlanTenPlanWindowStart: integerValue(completedPlanWindow.currentTenPlanWindowStart),
+    completedPlanTenPlanWindowEnd: integerValue(completedPlanWindow.currentTenPlanWindowEnd),
+    completedPlanTenPlanWindowCompletedCount: integerValue(completedPlanWindow.currentTenPlanWindowCompletedCount),
+    completedPlanTenPlanWindowTotal: integerValue(completedPlanWindow.currentTenPlanWindowTotal),
+    completedPlanTenPlanWindowRowCount: integerValue(completedPlanWindow.currentTenPlanWindowRowCount),
+    completedPlanTenPlanWindowRowSummary: textValue(completedPlanWindow.currentTenPlanWindowRowSummary, "none"),
+    completedPlanTenPlanWindowRows: completedPlanWindowRows,
+    completedPlanTenPlanReportDue: completedPlanWindow.tenPlanProgressReportDue === true,
+    completedPlanTenPlanReportBoundaryAt: integerValue(completedPlanWindow.currentTenPlanReportBoundaryAt),
+    completedPlanTenPlanReportBoundaryLabel: textValue(completedPlanWindow.currentTenPlanReportBoundaryLabel, "none"),
+    completedPlanNextScheduledTenPlanProgressReportAt: integerValue(completedPlanWindow.nextScheduledTenPlanProgressReportAt),
+    completedPlanNextScheduledTenPlanProgressReportLabel: textValue(completedPlanWindow.nextScheduledTenPlanProgressReportLabel, "none"),
+    completedPlanValueRecorded: completedPlanWindow.completedPlanValueRecorded === true ? true : false,
+    releaseProgressSourceTenPlanProgressLabel,
+    releaseProgressSourceTenPlanWindowRowCount,
+    releaseProgressSourceTenPlanWindowRowSummary: textValue(releaseProgress.currentTenPlanWindowRowSummary, "none"),
+    releaseProgressSourceTenPlanReportDue,
+    releaseProgressSourceRowsFresh,
+    releaseProgressSourceFreshnessReady,
+    releaseProgressSourceFreshnessSummary,
+    releaseProgressSourceRefreshCommand,
+    releaseProgressAfterWorkRefreshCommand,
+    releaseProgressFreshnessValueRecorded: false,
     currentTenPlanProgressLabel: releaseProgress.currentTenPlanWindowLabel,
     currentTenPlanWindowRowCount: integerValue(releaseProgress.currentTenPlanWindowRowCount),
     currentTenPlanWindowRowSummary: textValue(releaseProgress.currentTenPlanWindowRowSummary, "none"),
@@ -3062,7 +3173,7 @@ function buildReport({
   };
 }
 
-function validateReport(report, { releaseDoctor, externalNextActions, externalProofBundle, externalGate, releaseProgress }) {
+function validateReport(report, { releaseDoctor, externalNextActions, externalProofBundle, externalGate, releaseProgress, completedPlanWindow }) {
   const rawPriorityActions = valueFreeObjectRows(externalNextActions.priorityActions);
   const rawNextPriorityAction = rawPriorityActions[1] ?? {};
   const rawNextReadyCriteria = stringArrayValue(rawNextPriorityAction.readyCriteria);
@@ -3518,6 +3629,51 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentCommandVerificationRows.every((row) => row.valueRecorded === false), "release current blocker command verification rows should not record values");
   check(report.currentNextCommandConsensus === true, "release current blocker should prove next command consensus");
   check(report.currentFirstBlockerConsensus === true, "release current blocker should prove proof/gate/progress blocker consensus");
+  check(report.completedPlanProgressSource === relative(completedPlansDir), "release current blocker should identify completed-plan source");
+  check(report.completedPlanCount >= report.completedPlanTenPlanWindowRowCount, "release current blocker completed-plan count should cover current 10-plan rows");
+  check(report.latestCompletedPlanNumber === integerValue(completedPlanWindow.latestCompletedPlanNumber), "release current blocker should identify latest completed plan number");
+  check(report.latestCompletedPlanLabel === textValue(completedPlanWindow.latestCompletedPlanLabel), "release current blocker should identify latest completed plan label");
+  check(report.latestCompletedPlanPath === textValue(completedPlanWindow.latestCompletedPlanPath), "release current blocker should identify latest completed plan path");
+  check(report.completedPlanTenPlanWindowEnd === report.completedPlanTenPlanWindowStart + 9, "release current blocker completed-plan window end should match start plus nine");
+  check(report.completedPlanTenPlanWindowTotal === 10, "release current blocker completed-plan window should use a 10-plan total");
+  check(report.completedPlanTenPlanWindowCompletedCount === report.completedPlanTenPlanWindowRowCount, "release current blocker completed-plan window count should match rows");
+  check(report.completedPlanTenPlanWindowRowCount === report.completedPlanTenPlanWindowRows.length, "release current blocker completed-plan window row count should match rows");
+  check(
+    report.completedPlanTenPlanProgressLabel ===
+      `${report.completedPlanTenPlanWindowStart}-${report.completedPlanTenPlanWindowEnd}: ${report.completedPlanTenPlanWindowCompletedCount}/10`,
+    "release current blocker completed-plan window label should be derived from completed plans"
+  );
+  check(report.completedPlanTenPlanWindowRows.every((row) => row.valueRecorded === false), "release current blocker completed-plan window rows should not record values");
+  check(
+    report.completedPlanTenPlanWindowRows.every((row) => Number.isInteger(row.number) && typeof row.fileName === "string" && String(row.path).startsWith("docs/exec_plans/completed/")),
+    "release current blocker completed-plan window rows should identify completed plan filenames"
+  );
+  check(report.completedPlanTenPlanReportDue === (report.completedPlanTenPlanWindowRowCount === 10), "release current blocker completed-plan report due posture should match completed window count");
+  check(report.completedPlanTenPlanReportBoundaryAt === report.completedPlanTenPlanWindowEnd, "release current blocker completed-plan report boundary should match completed window end");
+  check(report.completedPlanTenPlanReportBoundaryLabel === planLabel(report.completedPlanTenPlanReportBoundaryAt), "release current blocker completed-plan report boundary label should match boundary number");
+  check(report.completedPlanValueRecorded === false, "release current blocker completed-plan freshness guard should not record values");
+  check(report.releaseProgressSourceTenPlanProgressLabel === releaseProgress.currentTenPlanWindowLabel, "release current blocker freshness guard should mirror release progress source label");
+  check(report.releaseProgressSourceTenPlanWindowRowCount === releaseProgress.currentTenPlanWindowRowCount, "release current blocker freshness guard should mirror release progress source row count");
+  check(report.releaseProgressSourceTenPlanReportDue === releaseProgress.tenPlanProgressReportDue, "release current blocker freshness guard should mirror release progress source report due posture");
+  check(report.releaseProgressSourceRowsFresh === completedPlanRowsMatch(releaseProgress.currentTenPlanWindowRows, completedPlanWindow.currentTenPlanWindowRows), "release current blocker freshness guard should compare source rows with completed plans");
+  check(
+    report.releaseProgressSourceFreshnessReady ===
+      (report.releaseProgressSourceTenPlanProgressLabel === report.completedPlanTenPlanProgressLabel &&
+        report.releaseProgressSourceTenPlanWindowRowCount === report.completedPlanTenPlanWindowRowCount &&
+        report.releaseProgressSourceTenPlanReportDue === report.completedPlanTenPlanReportDue &&
+        report.releaseProgressSourceRowsFresh === true),
+    "release current blocker freshness guard should derive source freshness from completed plans"
+  );
+  if (!fromExisting) {
+    check(report.releaseProgressSourceFreshnessReady === true, "release current blocker refresh should keep release progress source fresh against completed plans");
+  }
+  check(typeof report.releaseProgressSourceFreshnessSummary === "string" && report.releaseProgressSourceFreshnessSummary.length > 0, "release current blocker freshness guard should include a summary");
+  if (!report.releaseProgressSourceFreshnessReady) {
+    check(report.releaseProgressSourceFreshnessSummary.includes(releaseProgressAfterWorkRefreshCommand), "release current blocker stale freshness guard should name the after-work refresh command");
+  }
+  check(report.releaseProgressSourceRefreshCommand === releaseProgressSourceRefreshCommand, "release current blocker freshness guard should expose source-only refresh command");
+  check(report.releaseProgressAfterWorkRefreshCommand === releaseProgressAfterWorkRefreshCommand, "release current blocker freshness guard should expose after-work completion refresh command");
+  check(report.releaseProgressFreshnessValueRecorded === false, "release current blocker freshness guard should not record values");
   check(report.currentTenPlanWindowRowCount === report.currentTenPlanWindowRows.length, "release current blocker 10-plan row count should match rows");
   check(report.currentTenPlanProgressLabel === releaseProgress.currentTenPlanWindowLabel, "release current blocker should mirror release progress 10-plan label");
   check(report.currentTenPlanWindowRowCount === releaseProgress.currentTenPlanWindowRowCount, "release current blocker should mirror release progress 10-plan row count");
@@ -4109,7 +4265,12 @@ function buildMarkdown(report) {
     `- Local env diagnostic rows: ${report.currentLocalEnvDiagnosticRowCount} (${report.currentLocalEnvDiagnosticSummary})`,
     `- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`,
     `- Remaining completion: ${Number(report.userFacingRemainingPercent).toFixed(6)}%`,
-    `- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`,
+    `- Completed-plan current 10-plan progress: ${report.completedPlanTenPlanProgressLabel}`,
+    `- Release progress source freshness: ${report.releaseProgressSourceFreshnessReady ? "fresh" : "stale"}`,
+    `- Release progress source 10-plan progress: ${report.releaseProgressSourceTenPlanProgressLabel}`,
+    `- Release progress source refresh command: \`${report.releaseProgressSourceRefreshCommand}\``,
+    `- After-work completion refresh command: \`${report.releaseProgressAfterWorkRefreshCommand}\``,
+    `- Current 10-plan progress: ${report.currentTenPlanProgressLabel}${report.releaseProgressSourceFreshnessReady ? "" : ` (stale release-progress source; completed plans: ${report.completedPlanTenPlanProgressLabel})`}`,
     `- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`,
     `- 10-plan report due: ${report.tenPlanProgressReportDue ? "yes" : "no"}`,
     `- 10-plan report cadence: ${report.tenPlanProgressReportCadence}`,
@@ -4206,7 +4367,26 @@ function buildMarkdown(report) {
     `- Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})`,
     `- Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})`,
     "",
+    "## Release Progress Freshness Guard",
+    "",
+    `- Freshness ready: ${report.releaseProgressSourceFreshnessReady ? "yes" : "no"}`,
+    `- Freshness summary: ${report.releaseProgressSourceFreshnessSummary}`,
+    `- Completed-plan source: ${report.completedPlanProgressSource}`,
+    `- Latest completed plan: ${report.latestCompletedPlanLabel} (${report.latestCompletedPlanPath})`,
+    `- Completed-plan current 10-plan progress: ${report.completedPlanTenPlanProgressLabel}`,
+    `- Completed-plan rows: ${report.completedPlanTenPlanWindowRowCount} (${report.completedPlanTenPlanWindowRowSummary})`,
+    `- Release progress source 10-plan progress: ${report.releaseProgressSourceTenPlanProgressLabel}`,
+    `- Release progress source rows: ${report.releaseProgressSourceTenPlanWindowRowCount} (${report.releaseProgressSourceTenPlanWindowRowSummary})`,
+    `- Release progress source report due: ${report.releaseProgressSourceTenPlanReportDue ? "yes" : "no"}`,
+    `- Completed-plan report due: ${report.completedPlanTenPlanReportDue ? "yes" : "no"}`,
+    `- Source rows fresh: ${report.releaseProgressSourceRowsFresh ? "yes" : "no"}`,
+    `- Source-only refresh command: \`${report.releaseProgressSourceRefreshCommand}\``,
+    `- After-work completion refresh command: \`${report.releaseProgressAfterWorkRefreshCommand}\``,
+    `- Value recorded: ${report.releaseProgressFreshnessValueRecorded ? "yes" : "no"}`,
+    "",
     "## Current 10-Plan Window Rows",
+    "",
+    `- Rows source: ${relative(releaseProgressJsonPath)}; verify freshness above before treating existing evidence as current.`,
     "",
     "| plan | file | path | value recorded |",
     "|---|---|---|---|",
@@ -4864,6 +5044,7 @@ const externalNextActions = await readRequiredJson(externalNextActionsJsonPath, 
 const externalProofBundle = await readRequiredJson(externalProofBundleJsonPath, "External proof bundle");
 const externalGate = await readRequiredJson(externalGateJsonPath, "External distribution gate");
 const releaseProgress = await readRequiredJson(releaseProgressJsonPath, "Release progress report");
+const completedPlanWindow = await buildCompletedPlanWindow();
 const releaseChannelPreflightBlocked = await readRequiredJson(
   releaseChannelPreflightBlockedJsonPath,
   "Release-channel private env preflight blocked smoke"
@@ -4878,10 +5059,11 @@ const report = buildReport({
   externalProofBundle,
   externalGate,
   releaseProgress,
+  completedPlanWindow,
   releaseChannelPreflightBlocked,
   releaseChannelPlaceholderInputReceipt
 });
-validateReport(report, { releaseDoctor, externalNextActions, externalProofBundle, externalGate, releaseProgress });
+validateReport(report, { releaseDoctor, externalNextActions, externalProofBundle, externalGate, releaseProgress, completedPlanWindow });
 
 await mkdir(packageRoot, { recursive: true });
 const markdown = buildMarkdown(report);
@@ -4891,6 +5073,10 @@ check(!/GROOVEFORGE_RELEASE_NOTES_URL=https?:\/\//i.test(markdown), "release cur
 check(!/GROOVEFORGE_SUPPORT_URL=https?:\/\//i.test(markdown), "release current blocker Markdown should not include support URL assignments with values");
 check(markdown.includes("Audience Acceptance Matrix"), "release current blocker Markdown should include audience acceptance matrix");
 check(markdown.includes("10-plan report due:"), "release current blocker Markdown should include 10-plan report due posture");
+check(markdown.includes("Release Progress Freshness Guard"), "release current blocker Markdown should include release progress freshness guard");
+check(markdown.includes("Release progress source freshness:"), "release current blocker Markdown should include release progress source freshness posture");
+check(markdown.includes("Completed-plan current 10-plan progress:"), "release current blocker Markdown should include completed-plan progress");
+check(markdown.includes("After-work completion refresh command:"), "release current blocker Markdown should include after-work completion refresh command");
 check(markdown.includes("10-plan report cadence:"), "release current blocker Markdown should include 10-plan report cadence");
 check(markdown.includes("Current 10-plan report boundary:"), "release current blocker Markdown should include current 10-plan report boundary");
 check(markdown.includes("Next 10-plan report at:"), "release current blocker Markdown should include next 10-plan report number");
@@ -5090,7 +5276,12 @@ console.log(`- Current input shape checklist rows: ${report.currentInputShapeChe
 console.log(`- Local env diagnostics ready: ${report.currentLocalEnvDiagnosticsReady ? "yes" : "no"}`);
 console.log(`- Local env diagnostic rows: ${report.currentLocalEnvDiagnosticRowCount} (${report.currentLocalEnvDiagnosticSummary})`);
 console.log(`- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`);
-console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`);
+console.log(`- Completed-plan current 10-plan progress: ${report.completedPlanTenPlanProgressLabel}`);
+console.log(`- Release progress source freshness: ${report.releaseProgressSourceFreshnessReady ? "fresh" : "stale"}`);
+console.log(`- Release progress source 10-plan progress: ${report.releaseProgressSourceTenPlanProgressLabel}`);
+console.log(`- Release progress source refresh command: ${report.releaseProgressSourceRefreshCommand}`);
+console.log(`- After-work completion refresh command: ${report.releaseProgressAfterWorkRefreshCommand}`);
+console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}${report.releaseProgressSourceFreshnessReady ? "" : ` (stale release-progress source; completed plans: ${report.completedPlanTenPlanProgressLabel})`}`);
 console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
 console.log(`- 10-plan report due: ${report.tenPlanProgressReportDue ? "yes" : "no"}`);
 console.log(`- 10-plan report cadence: ${report.tenPlanProgressReportCadence}`);
