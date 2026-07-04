@@ -425,6 +425,17 @@ function placeholderInputCommandRows(values) {
   }));
 }
 
+function placeholderInputFileLocationSummary(rows) {
+  return rows.length > 0
+    ? rows
+        .map((row) => {
+          const line = Number.isInteger(row.privateInputFileLine) ? `:${row.privateInputFileLine}` : "";
+          return `${row.privateInputFilePath}${line} ${row.key}`;
+        })
+        .join(", ")
+    : "none";
+}
+
 function formatPlaceholderInputReceiptRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | none | none | none | no | no | no | no | none | none | no |";
@@ -1972,6 +1983,14 @@ function buildReport({
     releaseChannelPostEditOperatorReceiptRows.every((row) => row.ready === true && row.valueRecorded === false);
   const placeholderReceiptRows = placeholderInputReceiptRows(releaseChannelPlaceholderInputReceipt.privateInputFileLocationRows);
   const placeholderReceiptCommandRows = placeholderInputCommandRows(releaseChannelPlaceholderInputReceipt.commandRows);
+  const placeholderReceiptMissingLocationRows = placeholderReceiptRows.filter((row) => row.privateInputFileKeyPresent !== true);
+  const placeholderReceiptPlaceholderLocationRows = placeholderReceiptRows.filter((row) => row.privateInputFilePlaceholder === true);
+  const placeholderReceiptInvalidShapeLocationRows = placeholderReceiptRows.filter(
+    (row) =>
+      row.privateInputFileKeyPresent === true &&
+      row.privateInputFilePlaceholder !== true &&
+      row.privateInputFileShapeReady !== true
+  );
   const placeholderReceiptModes = [
     "missing-private-input-file",
     "incomplete-private-input-file",
@@ -2577,6 +2596,18 @@ function buildReport({
     placeholderInputReceiptPrivateInputFileInvalidShapeKeySummary: textValue(
       releaseChannelPlaceholderInputReceipt.privateInputFileInvalidShapeKeySummary,
       "none"
+    ),
+    placeholderInputReceiptPrivateInputFileMissingLocationCount: placeholderReceiptMissingLocationRows.length,
+    placeholderInputReceiptPrivateInputFileMissingLocationSummary: placeholderInputFileLocationSummary(
+      placeholderReceiptMissingLocationRows
+    ),
+    placeholderInputReceiptPrivateInputFilePlaceholderLocationCount: placeholderReceiptPlaceholderLocationRows.length,
+    placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary: placeholderInputFileLocationSummary(
+      placeholderReceiptPlaceholderLocationRows
+    ),
+    placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount: placeholderReceiptInvalidShapeLocationRows.length,
+    placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary: placeholderInputFileLocationSummary(
+      placeholderReceiptInvalidShapeLocationRows
     ),
     placeholderInputReceiptRows: placeholderReceiptRows,
     placeholderInputReceiptRowCount: placeholderReceiptRows.length,
@@ -3555,6 +3586,29 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check([0, 1].includes(report.placeholderInputReceiptSourcePreflightExitStatus), "release current blocker placeholder input receipt should preserve preflight exit 0 or expected blocked 1");
   check(report.placeholderInputReceiptRowCount === releaseChannelMetadataKeys.length, "release current blocker placeholder input receipt should include four private input rows");
   check(report.placeholderInputReceiptRows.every((row) => row.valueRecorded === false), "release current blocker placeholder input rows should be value-free");
+  check(
+    report.placeholderInputReceiptPrivateInputFileMissingLocationCount === report.placeholderInputReceiptRows.filter((row) => row.privateInputFileKeyPresent !== true).length,
+    "release current blocker placeholder input missing location count should match rows"
+  );
+  check(
+    report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount === report.placeholderInputReceiptRows.filter((row) => row.privateInputFilePlaceholder === true).length,
+    "release current blocker placeholder input placeholder location count should match rows"
+  );
+  check(
+    report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount ===
+      report.placeholderInputReceiptRows.filter(
+        (row) =>
+          row.privateInputFileKeyPresent === true &&
+          row.privateInputFilePlaceholder !== true &&
+          row.privateInputFileShapeReady !== true
+      ).length,
+    "release current blocker placeholder input invalid-shape location count should match rows"
+  );
+  check(
+    report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount === 0 ||
+      report.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary !== "none",
+    "release current blocker placeholder input placeholder location summary should include the private input file path when placeholders exist"
+  );
   check(report.placeholderInputReceiptCommandRows.every((row) => row.valueRecorded === false), "release current blocker placeholder input command rows should be value-free");
   check(report.placeholderInputReceiptCommandRows.some((row) => row.command === releaseChannelPrivateInputTemplateCommand), "release current blocker placeholder input receipt should include the template command");
   check(report.placeholderInputReceiptCommandRows.some((row) => row.command === releaseChannelApplyPrivateEnvPreflightCommand), "release current blocker placeholder input receipt should include the preflight command");
@@ -4073,6 +4127,9 @@ function buildMarkdown(report) {
     `- Placeholder private input file present: ${report.placeholderInputReceiptPrivateInputFilePresent ? "yes" : "no"}`,
     `- Placeholder private input loaded keys: ${report.placeholderInputReceiptPrivateInputFileLoadedKeyCount} (${report.placeholderInputReceiptPrivateInputFileLoadedKeySummary})`,
     `- Placeholder private input missing/placeholder/invalid rows: ${report.placeholderInputReceiptPrivateInputFileMissingKeyCount}/${report.placeholderInputReceiptPrivateInputFilePlaceholderKeyCount}/${report.placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount}`,
+    `- Placeholder private input missing locations: ${report.placeholderInputReceiptPrivateInputFileMissingLocationCount} (${report.placeholderInputReceiptPrivateInputFileMissingLocationSummary})`,
+    `- Placeholder private input placeholder locations: ${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount} (${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary})`,
+    `- Placeholder private input invalid-shape locations: ${report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount} (${report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary})`,
     `- Placeholder input next operator command: \`${report.placeholderInputReceiptNextOperatorCommand}\``,
     `- Preflight process env checklist source ready: ${report.preflightProcessEnvChecklistSourceReady ? "yes" : "no"}`,
     `- Preflight process env checklist rows: ${report.preflightProcessEnvChecklistRowCount} (${report.preflightProcessEnvChecklistSummary})`,
@@ -4270,6 +4327,9 @@ function buildMarkdown(report) {
     `- Private input missing/placeholder/invalid rows: ${report.placeholderInputReceiptPrivateInputFileMissingKeyCount}/${report.placeholderInputReceiptPrivateInputFilePlaceholderKeyCount}/${report.placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount}`,
     `- Private input placeholder keys: ${report.placeholderInputReceiptPrivateInputFilePlaceholderKeyCount} (${report.placeholderInputReceiptPrivateInputFilePlaceholderKeySummary})`,
     `- Private input invalid-shape keys: ${report.placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount} (${report.placeholderInputReceiptPrivateInputFileInvalidShapeKeySummary})`,
+    `- Private input missing locations: ${report.placeholderInputReceiptPrivateInputFileMissingLocationCount} (${report.placeholderInputReceiptPrivateInputFileMissingLocationSummary})`,
+    `- Private input placeholder locations: ${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount} (${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary})`,
+    `- Private input invalid-shape locations: ${report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount} (${report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary})`,
     `- Next operator command: \`${report.placeholderInputReceiptNextOperatorCommand}\``,
     `- Next proof command: \`${report.placeholderInputReceiptNextProofCommand}\``,
     `- Value recorded: ${report.placeholderInputReceiptValueRecorded ? "yes" : "no"}`,
@@ -5039,6 +5099,9 @@ console.log(`- Placeholder private input file present: ${report.placeholderInput
 console.log(`- Placeholder private input loaded keys: ${report.placeholderInputReceiptPrivateInputFileLoadedKeyCount}`);
 console.log(
   `- Placeholder private input missing/placeholder/invalid rows: ${report.placeholderInputReceiptPrivateInputFileMissingKeyCount}/${report.placeholderInputReceiptPrivateInputFilePlaceholderKeyCount}/${report.placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount}`
+);
+console.log(
+  `- Placeholder private input placeholder locations: ${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount} (${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary})`
 );
 console.log(`- Placeholder input next operator command: ${report.placeholderInputReceiptNextOperatorCommand}`);
 console.log(`- Post-edit proof sequence receipt ready: ${report.postEditProofSequenceReceiptReady ? "yes" : "no"}`);

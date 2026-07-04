@@ -429,6 +429,12 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     placeholderInputReceiptPrivateInputFilePlaceholderKeySummary: textValue(currentBlocker.placeholderInputReceiptPrivateInputFilePlaceholderKeySummary),
     placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount: integerValue(currentBlocker.placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount),
     placeholderInputReceiptPrivateInputFileInvalidShapeKeySummary: textValue(currentBlocker.placeholderInputReceiptPrivateInputFileInvalidShapeKeySummary),
+    placeholderInputReceiptPrivateInputFileMissingLocationCount: integerValue(currentBlocker.placeholderInputReceiptPrivateInputFileMissingLocationCount),
+    placeholderInputReceiptPrivateInputFileMissingLocationSummary: textValue(currentBlocker.placeholderInputReceiptPrivateInputFileMissingLocationSummary),
+    placeholderInputReceiptPrivateInputFilePlaceholderLocationCount: integerValue(currentBlocker.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount),
+    placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary: textValue(currentBlocker.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary),
+    placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount: integerValue(currentBlocker.placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount),
+    placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary: textValue(currentBlocker.placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary),
     placeholderInputReceiptRowCount: integerValue(currentBlocker.placeholderInputReceiptRowCount),
     placeholderInputReceiptCommandRowCount: integerValue(currentBlocker.placeholderInputReceiptCommandRowCount),
     placeholderInputReceiptNextOperatorCommand: textValue(currentBlocker.placeholderInputReceiptNextOperatorCommand),
@@ -619,6 +625,12 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     placeholderInputReceiptPrivateInputFilePlaceholderKeySummary: completionSummary.placeholderInputReceiptPrivateInputFilePlaceholderKeySummary,
     placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount: completionSummary.placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount,
     placeholderInputReceiptPrivateInputFileInvalidShapeKeySummary: completionSummary.placeholderInputReceiptPrivateInputFileInvalidShapeKeySummary,
+    placeholderInputReceiptPrivateInputFileMissingLocationCount: completionSummary.placeholderInputReceiptPrivateInputFileMissingLocationCount,
+    placeholderInputReceiptPrivateInputFileMissingLocationSummary: completionSummary.placeholderInputReceiptPrivateInputFileMissingLocationSummary,
+    placeholderInputReceiptPrivateInputFilePlaceholderLocationCount: completionSummary.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount,
+    placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary: completionSummary.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary,
+    placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount: completionSummary.placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount,
+    placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary: completionSummary.placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary,
     placeholderInputReceiptRowCount: completionSummary.placeholderInputReceiptRowCount,
     placeholderInputReceiptCommandRowCount: completionSummary.placeholderInputReceiptCommandRowCount,
     placeholderInputReceiptNextOperatorCommand: completionSummary.placeholderInputReceiptNextOperatorCommand,
@@ -804,6 +816,9 @@ function buildMarkdown(report) {
 - Placeholder private input file present: ${readyLabel(report.completionSummary.placeholderInputReceiptPrivateInputFilePresent)}
 - Placeholder private input loaded keys: ${report.completionSummary.placeholderInputReceiptPrivateInputFileLoadedKeyCount} (${report.completionSummary.placeholderInputReceiptPrivateInputFileLoadedKeySummary})
 - Placeholder private input missing/placeholder/invalid rows: ${report.completionSummary.placeholderInputReceiptPrivateInputFileMissingKeyCount}/${report.completionSummary.placeholderInputReceiptPrivateInputFilePlaceholderKeyCount}/${report.completionSummary.placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount}
+- Placeholder private input missing locations: ${report.completionSummary.placeholderInputReceiptPrivateInputFileMissingLocationCount} (${report.completionSummary.placeholderInputReceiptPrivateInputFileMissingLocationSummary})
+- Placeholder private input placeholder locations: ${report.completionSummary.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount} (${report.completionSummary.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary})
+- Placeholder private input invalid-shape locations: ${report.completionSummary.placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount} (${report.completionSummary.placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary})
 - Placeholder input next operator command: \`${report.completionSummary.placeholderInputReceiptNextOperatorCommand}\`
 - Completion blocker action receipt ready: ${readyLabel(report.completionSummary.completionBlockerActionReceiptReady)}
 - Completion blocker action rows: ${report.completionSummary.completionBlockerActionRowCount}
@@ -983,6 +998,26 @@ function validateReport(report, markdown) {
   check(report.placeholderInputReceiptCommandRowCount >= 5, "release progress refresh should expose placeholder input command rows");
   check(report.placeholderInputReceiptValueRecorded === false, "release progress refresh placeholder input receipt should remain value-free");
   check(report.completionSummary.placeholderInputReceiptValueRecorded === false, "release progress refresh summary placeholder input receipt should remain value-free");
+  check(
+    report.completionSummary.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount ===
+      report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount,
+    "release progress refresh summary should mirror placeholder input private file placeholder location count"
+  );
+  check(
+    report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount === 0 ||
+      report.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary !== "none",
+    "release progress refresh should expose private input placeholder file/line locations"
+  );
+  check(
+    report.placeholderInputReceiptPrivateInputFileMissingLocationCount === 0 ||
+      report.placeholderInputReceiptPrivateInputFileMissingLocationSummary !== "none",
+    "release progress refresh should expose private input missing file/key locations"
+  );
+  check(
+    report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount === 0 ||
+      report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary !== "none",
+    "release progress refresh should expose private input invalid-shape file/key locations"
+  );
   check(report.completionBlockerActionReceiptReady === true, "release progress refresh should expose ready completion blocker action receipt");
   check(
     report.completionSummary.completionBlockerActionReceiptReady === report.completionBlockerActionReceiptReady,
@@ -1292,6 +1327,9 @@ console.log(`- Placeholder private input file present: ${report.placeholderInput
 console.log(`- Placeholder private input loaded keys: ${report.placeholderInputReceiptPrivateInputFileLoadedKeyCount}`);
 console.log(
   `- Placeholder private input missing/placeholder/invalid rows: ${report.placeholderInputReceiptPrivateInputFileMissingKeyCount}/${report.placeholderInputReceiptPrivateInputFilePlaceholderKeyCount}/${report.placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount}`
+);
+console.log(
+  `- Placeholder private input placeholder locations: ${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount} (${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary})`
 );
 console.log(`- Placeholder input next operator command: ${report.placeholderInputReceiptNextOperatorCommand}`);
 console.log(`- Current first blocker: ${report.currentFirstBlocker}`);

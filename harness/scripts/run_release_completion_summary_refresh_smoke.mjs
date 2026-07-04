@@ -554,6 +554,12 @@ function buildReport({ progressRefresh, completionSummary, externalResume, opera
     placeholderInputReceiptPrivateInputFilePlaceholderKeySummary: textValue(completionSummary.placeholderInputReceiptPrivateInputFilePlaceholderKeySummary),
     placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount: integerValue(completionSummary.placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount),
     placeholderInputReceiptPrivateInputFileInvalidShapeKeySummary: textValue(completionSummary.placeholderInputReceiptPrivateInputFileInvalidShapeKeySummary),
+    placeholderInputReceiptPrivateInputFileMissingLocationCount: integerValue(completionSummary.placeholderInputReceiptPrivateInputFileMissingLocationCount),
+    placeholderInputReceiptPrivateInputFileMissingLocationSummary: textValue(completionSummary.placeholderInputReceiptPrivateInputFileMissingLocationSummary),
+    placeholderInputReceiptPrivateInputFilePlaceholderLocationCount: integerValue(completionSummary.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount),
+    placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary: textValue(completionSummary.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary),
+    placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount: integerValue(completionSummary.placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount),
+    placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary: textValue(completionSummary.placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary),
     placeholderInputReceiptRowCount: integerValue(completionSummary.placeholderInputReceiptRowCount),
     placeholderInputReceiptCommandRowCount: integerValue(completionSummary.placeholderInputReceiptCommandRowCount),
     placeholderInputReceiptNextOperatorCommand: textValue(completionSummary.placeholderInputReceiptNextOperatorCommand),
@@ -929,6 +935,9 @@ function buildMarkdown(report) {
 - Placeholder private input file present: ${readyLabel(report.placeholderInputReceiptPrivateInputFilePresent)}
 - Placeholder private input loaded keys: ${report.placeholderInputReceiptPrivateInputFileLoadedKeyCount} (${report.placeholderInputReceiptPrivateInputFileLoadedKeySummary})
 - Placeholder private input missing/placeholder/invalid rows: ${report.placeholderInputReceiptPrivateInputFileMissingKeyCount}/${report.placeholderInputReceiptPrivateInputFilePlaceholderKeyCount}/${report.placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount}
+- Placeholder private input missing locations: ${report.placeholderInputReceiptPrivateInputFileMissingLocationCount} (${report.placeholderInputReceiptPrivateInputFileMissingLocationSummary})
+- Placeholder private input placeholder locations: ${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount} (${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary})
+- Placeholder private input invalid-shape locations: ${report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount} (${report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary})
 - Placeholder input next operator command: \`${report.placeholderInputReceiptNextOperatorCommand}\`
 - Completion blocker action receipt ready: ${readyLabel(report.completionBlockerActionReceiptReady)}
 - Completion blocker action rows: ${report.completionBlockerActionRowCount}
@@ -1277,6 +1286,21 @@ function validateReport(report, markdown) {
   check(report.placeholderInputReceiptRowCount === 4, "release completion summary refresh should expose four placeholder input receipt rows");
   check(report.placeholderInputReceiptCommandRowCount >= 5, "release completion summary refresh should expose placeholder input command rows");
   check(report.placeholderInputReceiptValueRecorded === false, "release completion summary refresh placeholder input receipt should stay value-free");
+  check(
+    report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount === 0 ||
+      report.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary !== "none",
+    "release completion summary refresh should expose private input placeholder file/line locations"
+  );
+  check(
+    report.placeholderInputReceiptPrivateInputFileMissingLocationCount === 0 ||
+      report.placeholderInputReceiptPrivateInputFileMissingLocationSummary !== "none",
+    "release completion summary refresh should expose private input missing file/key locations"
+  );
+  check(
+    report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount === 0 ||
+      report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary !== "none",
+    "release completion summary refresh should expose private input invalid-shape file/key locations"
+  );
   check(report.completionBlockerActionReceiptReady === true, "release completion summary refresh should expose ready completion blocker action receipt");
   check(report.completionBlockerActionRowCount === report.completionBlockerActionRows.length, "release completion summary refresh blocker action row count should match rows");
   check(report.completionBlockerActionRowCount === 7, "release completion summary refresh blocker action receipt should include seven rows");
@@ -1744,6 +1768,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("Placeholder input receipt ready:"), "release completion summary refresh Markdown should include placeholder input receipt readiness");
   check(markdown.includes("Placeholder input receipt mode:"), "release completion summary refresh Markdown should include placeholder input receipt mode");
   check(markdown.includes("Placeholder private input missing/placeholder/invalid rows:"), "release completion summary refresh Markdown should include placeholder input row counts");
+  check(markdown.includes("Placeholder private input placeholder locations:"), "release completion summary refresh Markdown should include placeholder input file/line locations");
   check(markdown.includes("npm run release:progress-refresh-smoke"), "release completion summary refresh Markdown should cite progress refresh command");
   check(markdown.includes("npm run release:completion-summary-smoke"), "release completion summary refresh Markdown should cite completion summary command");
   check(markdown.includes("npm run release:10-plan-checkpoint-smoke"), "release completion summary refresh Markdown should cite checkpoint command");
@@ -1877,6 +1902,9 @@ async function main() {
   console.log(`- Placeholder private input loaded keys: ${report.placeholderInputReceiptPrivateInputFileLoadedKeyCount}`);
   console.log(
     `- Placeholder private input missing/placeholder/invalid rows: ${report.placeholderInputReceiptPrivateInputFileMissingKeyCount}/${report.placeholderInputReceiptPrivateInputFilePlaceholderKeyCount}/${report.placeholderInputReceiptPrivateInputFileInvalidShapeKeyCount}`
+  );
+  console.log(
+    `- Placeholder private input placeholder locations: ${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount} (${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary})`
   );
   console.log(`- Placeholder input next operator command: ${report.placeholderInputReceiptNextOperatorCommand}`);
   console.log(`- Real operator preflight receipt ready: ${report.realOperatorPreflightReceiptReady ? "yes" : "no"}`);
