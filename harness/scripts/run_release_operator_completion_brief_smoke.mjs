@@ -32,6 +32,9 @@ const releasePrepareEnvCommand = "npm run release:prepare-env";
 const privateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const releaseChannelApplyPrivateEnvProofCommand = "npm run release:channel-apply-private-env-proof";
+const releaseChannelApplyPrivateEnvProofRole =
+  "run private env preflight, apply only after preflight readiness, strict proof, and completion readout as one value-free operator proof runner";
 const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
 const privateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
 const defaultPrivateInputFileName = ".env.release-channel.local";
@@ -460,6 +463,23 @@ function nextActionRows({ completionReportPacket, currentBlocker }) {
   ];
 }
 
+function privateEnvProofRunnerRows({ currentOperatorPreflightBeforeApply, currentOperatorApplyBeforeStrictProof }) {
+  return [
+    {
+      order: 1,
+      command: releaseChannelApplyPrivateEnvProofCommand,
+      role: releaseChannelApplyPrivateEnvProofRole,
+      firstCommand: releaseChannelApplyPrivateEnvPreflightCommand,
+      nextWriteCommand: releaseChannelApplyPrivateEnvCommand,
+      strictProofCommand: privateEditOperatorProofCommand,
+      afterPreflight: currentOperatorPreflightBeforeApply === true,
+      applyBeforeStrictProof: currentOperatorApplyBeforeStrictProof === true,
+      sourceField: "operatorBrief.releaseChannelApplyPrivateEnvProofCommand",
+      valueRecorded: false
+    }
+  ];
+}
+
 function formatSourceRows(rows) {
   return rows
     .map((row) => `| ${escapeCell(row.label)} | ${escapeCell(row.path)} | \`${escapeCell(row.command)}\` | ${readyLabel(row.present)} | ${readyLabel(row.ready)} | ${escapeCell(row.progressLabel)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
@@ -499,6 +519,15 @@ function formatCurrentOperatorCommandRows(rows) {
 function formatProofRows(rows) {
   return rows
     .map((row) => `| ${row.order} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatPrivateEnvProofRunnerRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | \`${escapeCell(row.firstCommand)}\` | \`${escapeCell(row.nextWriteCommand)}\` | \`${escapeCell(row.strictProofCommand)}\` | ${readyLabel(row.afterPreflight)} | ${readyLabel(row.applyBeforeStrictProof)} | ${escapeCell(row.sourceField)} | ${row.valueRecorded === false ? "no" : "yes"} |`
+    )
     .join("\n");
 }
 
@@ -554,6 +583,8 @@ function buildMarkdown(report) {
 - Preflight operator receipt first command: \`${report.preflightOperatorReceiptFirstCommand}\`
 - Preflight operator receipt includes hard gate: ${readyLabel(report.preflightOperatorReceiptIncludesHardGate)}
 - Private-edit operator proof command: \`${report.privateEditOperatorProofCommand}\`
+- Private env apply proof runner command: \`${report.releaseChannelPrivateEnvApplyProofCommand}\`
+- Private env apply proof runner after preflight: ${readyLabel(report.releaseChannelPrivateEnvApplyProofAfterPreflight)}
 - Post-clearance next action: ${report.postClearanceNextPriorityActionLabel}
 - Post-clearance proof command: \`${report.postClearanceNextActionPreviewProofCommand}\`
 - Update-feed checkpoint ready: ${readyLabel(report.updateFeedCheckpointReady)}
@@ -614,6 +645,12 @@ ${formatCurrentOperatorCommandRows(report.currentOperatorCommandRows)}
 | order | command | role | value recorded |
 |---:|---|---|---:|
 ${formatProofRows(report.privateEditProofCommandRows)}
+
+## Private-Env Proof Runner
+
+| order | command | role | first command | write command | strict proof command | after preflight | apply before strict proof | source | value recorded |
+|---:|---|---|---|---|---|---:|---:|---|---:|
+${formatPrivateEnvProofRunnerRows(report.privateEnvProofRunnerRows)}
 
 ## Post-Clearance Next Action Rows
 
@@ -712,6 +749,19 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
   const operatorBriefFirstCommandMatchesCurrentOperator = operatorBriefFirstCommand === currentOperatorFirstCommand;
   const operatorBriefFirstCommandMatchesCurrentOperatorStart = operatorBriefFirstCommand === currentOperatorStartCommand;
   const proofRows = objectRows(completionReportPacket.privateEditProofCommandRows);
+  const privateEnvProofRows = privateEnvProofRunnerRows({
+    currentOperatorApplyBeforeStrictProof,
+    currentOperatorPreflightBeforeApply
+  });
+  const privateEnvProofRunnerReady =
+    privateEnvProofRows.length === 1 &&
+    privateEnvProofRows[0]?.command === releaseChannelApplyPrivateEnvProofCommand &&
+    privateEnvProofRows[0]?.firstCommand === releaseChannelApplyPrivateEnvPreflightCommand &&
+    privateEnvProofRows[0]?.nextWriteCommand === releaseChannelApplyPrivateEnvCommand &&
+    privateEnvProofRows[0]?.strictProofCommand === privateEditOperatorProofCommand &&
+    privateEnvProofRows[0]?.afterPreflight === true &&
+    privateEnvProofRows[0]?.applyBeforeStrictProof === true &&
+    privateEnvProofRows[0]?.valueRecorded === false;
   const postClearanceRows = nextActionRows({ completionReportPacket, currentBlocker });
   const sourceBoundaryReady = sourcePrivacyBoundaryReady({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness });
   const sourceMissingBriefContext =
@@ -747,6 +797,7 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     operatorRows.every((row) => row.valueRecorded === false) &&
     currentOperatorCommandSequenceReady === true &&
     operatorBriefFirstCommandMatchesCurrentOperator === true &&
+    privateEnvProofRunnerReady === true &&
     proofRows.length === 5 &&
     proofRows.every((row) => row.valueRecorded === false) &&
     postClearanceRows.length === 3 &&
@@ -880,6 +931,13 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     privateEditProofCommandRows: proofRows,
     privateEditProofCommandCount: proofRows.length,
     privateEditProofCommandSummary: textValue(completionReportPacket.privateEditProofCommandSummary),
+    releaseChannelPrivateEnvApplyProofCommand: releaseChannelApplyPrivateEnvProofCommand,
+    releaseChannelPrivateEnvApplyProofRole: releaseChannelApplyPrivateEnvProofRole,
+    releaseChannelPrivateEnvApplyProofAfterPreflight: privateEnvProofRows[0]?.afterPreflight === true,
+    releaseChannelPrivateEnvApplyProofValueRecorded: privateEnvProofRows[0]?.valueRecorded === true ? true : false,
+    privateEnvProofRunnerReady,
+    privateEnvProofRunnerRows: privateEnvProofRows,
+    privateEnvProofRunnerRowCount: privateEnvProofRows.length,
     strictProofHandoffReceiptReady: completionReportPacket.strictProofHandoffReceiptReady === true,
     privateEditBlockedSmokeReady: completionReportPacket.privateEditBlockedSmokeReady === true,
     privateEditBlockedSmokeCurrentPlaceholderKeyCount: integerValue(completionReportPacket.privateEditBlockedSmokeCurrentPlaceholderKeyCount),
@@ -1050,6 +1108,28 @@ check(
 check(report.privateEditOperatorProofCommand === privateEditOperatorProofCommand, "release operator completion brief should expose the private-edit strict proof command");
 check(report.privateEditProofCommandCount === 5, "release operator completion brief should include five private-edit proof commands");
 check(report.privateEditProofCommandRows.every((row) => row.valueRecorded === false), "release operator completion brief proof command rows should be value-free");
+check(report.privateEnvProofRunnerReady === true, "release operator completion brief should expose the private env apply proof runner");
+check(report.privateEnvProofRunnerRowCount === 1, "release operator completion brief should include one private env proof runner row");
+check(
+  report.releaseChannelPrivateEnvApplyProofCommand === releaseChannelApplyPrivateEnvProofCommand,
+  "release operator completion brief should expose the private env apply proof runner command"
+);
+check(
+  report.releaseChannelPrivateEnvApplyProofRole === releaseChannelApplyPrivateEnvProofRole,
+  "release operator completion brief should describe the private env apply proof runner role"
+);
+check(
+  report.releaseChannelPrivateEnvApplyProofAfterPreflight === true,
+  "release operator completion brief should keep proof runner after preflight readiness"
+);
+check(
+  report.releaseChannelPrivateEnvApplyProofValueRecorded === false,
+  "release operator completion brief private env apply proof runner should be value-free"
+);
+check(
+  report.privateEnvProofRunnerRows.every((row) => row.valueRecorded === false),
+  "release operator completion brief private env proof runner rows should be value-free"
+);
 check(report.strictProofHandoffReceiptReady === true, "release operator completion brief should include strict proof handoff readiness");
 check(report.privateEditBlockedSmokeReady === true, "release operator completion brief should include blocked smoke readiness");
 check(report.finalHandoffSuccessRedactionReady === true, "release operator completion brief should include final handoff success-redaction readiness");
@@ -1154,6 +1234,8 @@ console.log(`- Preflight operator receipt rows: ${report.preflightOperatorReceip
 console.log(`- Preflight operator receipt first command: ${report.preflightOperatorReceiptFirstCommand}`);
 console.log(`- Preflight operator receipt includes hard gate: ${report.preflightOperatorReceiptIncludesHardGate ? "yes" : "no"}`);
 console.log(`- Private-edit operator proof command: ${report.privateEditOperatorProofCommand}`);
+console.log(`- Private env apply proof runner command: ${report.releaseChannelPrivateEnvApplyProofCommand}`);
+console.log(`- Private env apply proof runner after preflight: ${report.releaseChannelPrivateEnvApplyProofAfterPreflight ? "yes" : "no"}`);
 console.log(`- Post-clearance next action: ${report.postClearanceNextPriorityActionLabel}`);
 console.log(`- Post-clearance proof command: ${report.postClearanceNextActionPreviewProofCommand}`);
 console.log(`- Update-feed checkpoint ready: ${report.updateFeedCheckpointReady ? "yes" : "no"}`);
