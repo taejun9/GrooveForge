@@ -240,7 +240,7 @@ Run the value-free Developer ID operator packet after update metadata evidence e
 npm run release:developer-id-operator-packet-smoke
 ```
 
-Run the value-free external completion run packet when the operator needs one ordered receipt that ties the current completion summary, release-channel metadata step, auto-update feed step, update metadata step, Developer ID/notarization/Gatekeeper/manual QA steps, leak audit, and hard gate together without running the hard gate or recording private values:
+Run the value-free external completion run packet when the operator needs one ordered receipt that ties the current completion summary, current private input placeholder rows, release-channel metadata step, auto-update feed step, update metadata step, Developer ID/notarization/Gatekeeper/manual QA steps, leak audit, and hard gate together without running the hard gate or recording private values:
 
 ```sh
 npm run release:external-completion-run-packet-smoke
@@ -491,7 +491,7 @@ Completion reports should cite `npm run release:channel-apply-private-env-proof`
 
 Completion reports should cite the Developer ID operator packet artifact when explaining Developer ID signing, notarization, stapled Gatekeeper, manual QA, distribution-channel blockers, and proof order.
 
-Completion reports should cite the external completion resume packet artifact when explaining the first blocked run row and next resume command from the ordered external completion run, including its value-free private input file key/default, operator default path, current blocked-smoke path, loaded-key count, and guided setup fallback.
+Completion reports should cite the external completion resume packet artifact when explaining the first blocked run row and next resume command from the ordered external completion run, including its current private input placeholder location count/summary/rows plus value-free private input file key/default, operator default path, current blocked-smoke path, loaded-key count, and guided setup fallback.
 
 Completion reports should cite the current-blocker, progress refresh, completion summary, and completion summary refresh artifacts when explaining `npm run release:channel-setup-wizard` as a guided fallback for missing, placeholder, or shape-invalid private release-channel inputs, while keeping the source current operator start command as `npm run release:prepare-env` when the ignored env scaffold is missing or `npm run release:channel-apply-private-env-preflight` once the scaffold exists.
 

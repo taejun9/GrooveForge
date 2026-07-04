@@ -116,6 +116,17 @@ function valueFreeRows(rows) {
   return objectRows(rows).every((row) => row.valueRecorded === false);
 }
 
+function copyCurrentPrivateInputPlaceholderLocationRow(row) {
+  return {
+    key: textValue(row.key),
+    file: textValue(row.file),
+    line: integerValue(row.line),
+    location: textValue(row.location),
+    placeholder: row.placeholder === true,
+    valueRecorded: false
+  };
+}
+
 function commandOrder(rows, command) {
   const row = objectRows(rows).find((item) => item.command === command);
   return integerValue(row?.order);
@@ -396,6 +407,11 @@ function buildReport({ completionSummaryRefresh, completionSummary, updateFeedPa
   const readyRows = runRows.filter((row) => row.sequenceStatus === "ready");
   const completionBlockerActionRows = objectRows(completionSummary.completionBlockerActionRows);
   const completionBlockerFocusRows = objectRows(completionSummary.completionBlockerFocusRows);
+  const currentPrivateInputPlaceholderLocations = objectRows(
+    completionSummary.currentPrivateInputPlaceholderLocations
+  )
+    .filter((row) => row.valueRecorded === false)
+    .map(copyCurrentPrivateInputPlaceholderLocationRow);
   return {
     appName,
     bundleId,
@@ -425,6 +441,13 @@ function buildReport({ completionSummaryRefresh, completionSummary, updateFeedPa
     currentFirstBlocker: textValue(completionSummary.firstBlocker),
     currentNextCommand: textValue(completionSummary.nextCommand),
     currentEnvEditTarget: textValue(completionSummary.currentEnvEditTarget, ".env.distribution.local"),
+    currentPrivateInputPlaceholderLocationCount: integerValue(
+      completionSummary.currentPrivateInputPlaceholderLocationCount
+    ),
+    currentPrivateInputPlaceholderLocationSummary: textValue(
+      completionSummary.currentPrivateInputPlaceholderLocationSummary
+    ),
+    currentPrivateInputPlaceholderLocations,
     currentOperatorCommandSequenceReady: completionSummary.currentOperatorCommandSequenceReady === true,
     currentOperatorCommandRows,
     currentOperatorCommandRowCount: integerValue(completionSummary.currentOperatorCommandRowCount),
@@ -571,6 +594,15 @@ function formatCurrentOperatorCommandRows(rows) {
     .join("\n");
 }
 
+function formatCurrentPrivateInputPlaceholderLocationRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${escapeCell(row.key)} | ${escapeCell(row.file)} | ${integerValue(row.line)} | ${escapeCell(row.location)} | ${readyLabel(row.placeholder)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function formatCompletionActionRows(rows) {
   return rows
     .map(
@@ -602,6 +634,7 @@ function buildMarkdown(report) {
 - Current first blocker: ${report.currentFirstBlocker}
 - Current next command: \`${report.currentNextCommand}\`
 - Current env edit target: ${report.currentEnvEditTarget}
+- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})
 - Current operator command sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
@@ -687,6 +720,12 @@ ${formatRunRows(report.runRows)}
 |---:|---|---|---:|---:|
 ${formatCurrentOperatorCommandRows(report.currentOperatorCommandRows)}
 
+## Current Private Input Placeholder Locations
+
+| key | file | line | location | placeholder | value recorded |
+|---|---|---:|---|---:|---:|
+${formatCurrentPrivateInputPlaceholderLocationRows(report.currentPrivateInputPlaceholderLocations)}
+
 ## Current Completion Blocker Actions
 
 | order | item | ready | current state | operator action | evidence | proof command | source field | value recorded |
@@ -736,6 +775,19 @@ function validateReport(report, markdown) {
   check(report.completionPercent === 99.999999, "external completion run packet should preserve completion percent");
   check(report.remainingPercent === 0.000001, "external completion run packet should preserve remaining percent");
   check(report.currentEnvEditTarget !== "none", "external completion run packet should expose current env edit target");
+  check(
+    report.currentPrivateInputPlaceholderLocationCount === report.currentPrivateInputPlaceholderLocations.length,
+    "external completion run packet current private input placeholder location count should match locations"
+  );
+  check(
+    report.currentPrivateInputPlaceholderLocations.every((row) => row.valueRecorded === false),
+    "external completion run packet current private input placeholder locations should not record values"
+  );
+  check(
+    report.currentPrivateInputPlaceholderLocationCount === 0 ||
+      report.currentPrivateInputPlaceholderLocationSummary !== "none",
+    "external completion run packet should expose current private input placeholder file/line locations"
+  );
   check(report.currentOperatorCommandSequenceReady === true, "external completion run packet current operator command sequence should be ready");
   check(
     report.currentOperatorCommandRowCount === report.currentOperatorCommandRows.length,
@@ -885,6 +937,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("## Current Operator Command Sequence"), "external completion run packet Markdown should include current operator command sequence");
   check(markdown.includes("Current operator start command:"), "external completion run packet Markdown should include current operator start command");
   check(markdown.includes("First run matches current operator start command:"), "external completion run packet Markdown should include first-run/start-command match");
+  check(markdown.includes("Current private input placeholder locations:"), "external completion run packet Markdown should include current private input placeholder locations");
+  check(markdown.includes("Current Private Input Placeholder Locations"), "external completion run packet Markdown should include current private input placeholder location rows");
   check(markdown.includes("Current blocker run rows"), "external completion run packet Markdown should include current blocker row summary");
   check(markdown.includes("External distribution claimed: no"), "external completion run packet Markdown should keep external distribution unclaimed");
 
@@ -925,6 +979,7 @@ console.log(`- Remaining completion: ${report.remainingPercent}%`);
 console.log(`- Current first blocker: ${report.currentFirstBlocker}`);
 console.log(`- Current next command: ${report.currentNextCommand}`);
 console.log(`- First run command: ${report.runRows[0]?.command}`);
+console.log(`- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})`);
 console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
