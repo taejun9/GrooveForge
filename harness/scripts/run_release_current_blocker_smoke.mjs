@@ -52,6 +52,7 @@ const releaseChannelPrivateInputTemplateRole =
   "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
 const releaseChannelPrivateInputTemplateDefaultPath = ".env.release-channel.local";
 const releaseChannelPrivateInputTemplatePrivateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
+const releaseChannelPrivateInputSourceLabel = "process env values or ignored private input file rows";
 const releaseProgressAfterWorkRefreshCommand = "npm run release:completion-summary-refresh-smoke";
 const releaseProgressSourceRefreshCommand = "npm run release:progress-refresh-smoke";
 const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
@@ -1192,7 +1193,7 @@ function currentActionAcceptanceBlockerRows({
 
       if (lower.includes("without placeholder values")) {
         sourceField = "externalProofBundle.currentPlaceholderKeys/currentPlaceholderEditLocations";
-        operatorAction = `Set private release-channel process env values or add/replace the ignored private input file rows, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${currentEnvEditTarget}: ${currentPlaceholderEditLocationSummary}.`;
+        operatorAction = `Set private release-channel metadata through ${releaseChannelPrivateInputSourceLabel}, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${currentEnvEditTarget}: ${currentPlaceholderEditLocationSummary}.`;
       } else if (lower.includes("private-inputs") || lower.includes("private inputs")) {
         sourceField = "releaseDoctor.privateInputsReady/channelMetadataReady/privateValuesRecorded";
         operatorAction = `Run ${currentNextCommand} after ${releaseChannelApplyPrivateEnvPreflightCommand} verifies and ${releaseChannelApplyPrivateEnvCommand} applies the current release-channel metadata placeholders.`;
@@ -2356,13 +2357,15 @@ function buildReport({
     doctorFirstBlocker: textValue(releaseDoctor.currentActionFirstBlocker),
     currentOperatorAction: textValue(externalProofBundle.currentOperatorAction),
     releaseChannelPrivateEnvApplyPreflightCommand: releaseChannelApplyPrivateEnvPreflightCommand,
-    releaseChannelPrivateEnvApplyPreflightRole: "verify operator-owned release-channel process env values before writing the ignored local env",
+    releaseChannelPrivateEnvApplyPreflightRole:
+      "verify operator-owned release-channel metadata from process env or the ignored private input file before writing the ignored local env",
     releaseChannelPrivateEnvApplyPreflightBeforeApply:
       releaseChannelApplyPrivateEnvPreflightCommand === "npm run release:channel-apply-private-env-preflight" &&
       releaseChannelApplyPrivateEnvCommand === "npm run release:channel-apply-private-env",
     releaseChannelPrivateEnvApplyPreflightValueRecorded: false,
     releaseChannelPrivateEnvApplyCommand: releaseChannelApplyPrivateEnvCommand,
-    releaseChannelPrivateEnvApplyRole: "apply operator-owned release-channel process env values into the ignored local env before strict proof",
+    releaseChannelPrivateEnvApplyRole:
+      "apply operator-owned release-channel metadata from process env or the ignored private input file into the ignored local env before strict proof",
     releaseChannelPrivateEnvApplyBeforeStrictProof:
       releaseChannelApplyPrivateEnvCommand === "npm run release:channel-apply-private-env" &&
       recommendedPrivateEditOperatorProofCommand === "npm run release:private-edit-strict-proof",
@@ -4234,13 +4237,15 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.releaseChannelPrivateEnvApplyCommand === releaseChannelApplyPrivateEnvCommand, "release current blocker should expose private env apply command");
   check(report.releaseChannelPrivateEnvApplyPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release current blocker should expose private env apply preflight command");
   check(
-    report.releaseChannelPrivateEnvApplyPreflightRole === "verify operator-owned release-channel process env values before writing the ignored local env",
+    report.releaseChannelPrivateEnvApplyPreflightRole ===
+      "verify operator-owned release-channel metadata from process env or the ignored private input file before writing the ignored local env",
     "release current blocker should describe private env apply preflight role"
   );
   check(report.releaseChannelPrivateEnvApplyPreflightBeforeApply === true, "release current blocker should place private env apply preflight before apply");
   check(report.releaseChannelPrivateEnvApplyPreflightValueRecorded === false, "release current blocker private env apply preflight command should not record values");
   check(
-    report.releaseChannelPrivateEnvApplyRole === "apply operator-owned release-channel process env values into the ignored local env before strict proof",
+    report.releaseChannelPrivateEnvApplyRole ===
+      "apply operator-owned release-channel metadata from process env or the ignored private input file into the ignored local env before strict proof",
     "release current blocker should describe private env apply role"
   );
   check(report.releaseChannelPrivateEnvApplyBeforeStrictProof === true, "release current blocker should place private env apply before strict proof");

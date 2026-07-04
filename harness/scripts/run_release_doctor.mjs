@@ -26,6 +26,7 @@ const releaseChannelMetadataKeys = [
 const privateEditStrictProofCommand = "npm run release:private-edit-strict-proof";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const releaseChannelPrivateInputSourceLabel = "process env values or ignored private input file rows";
 const releaseChannelEnvKeyGuidance = {
   GROOVEFORGE_DISTRIBUTION_CHANNEL: "Use one of direct-download, private-beta, or managed-release.",
   GROOVEFORGE_RELEASE_DOWNLOAD_URL: "Use a safe absolute HTTPS URL without credentials or URL fragments.",
@@ -299,6 +300,15 @@ function currentLocalEnvEditTarget(localEnvPresentFiles = []) {
   return displayLocalEnvTarget(firstPresentFile || distributionLocalEnvDefaults.defaultEnvFileName);
 }
 
+function releaseChannelInputSourceOperatorAction({
+  editTarget = distributionLocalEnvDefaults.defaultEnvFileName,
+  detail = "the four current release-channel metadata keys",
+  locationSummary = ""
+} = {}) {
+  const locationClause = locationSummary && locationSummary !== "none" ? `: ${locationSummary}` : "";
+  return `Set private release-channel metadata through ${releaseChannelPrivateInputSourceLabel} for ${detail}, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${editTarget}${locationClause}.`;
+}
+
 function localEnvCandidatePaths() {
   const configuredPath = process.env[distributionLocalEnvDefaults.configuredFileKey]?.trim();
   if (configuredPath) {
@@ -509,7 +519,7 @@ function buildCurrentAction({
       currentActionNextCommand: "npm run release:prepare-env",
       currentActionOperatorStartCommand: "npm run release:prepare-env",
       currentActionFirstBlocker: "Ignored local distribution env file is not loaded.",
-      currentActionOperatorAction: `Run \`npm run release:prepare-env\` to create ${currentEnvEditTarget}, then set private release-channel process env values, run \`${releaseChannelApplyPrivateEnvPreflightCommand}\`, and run \`${releaseChannelApplyPrivateEnvCommand}\`.`,
+      currentActionOperatorAction: `Run \`npm run release:prepare-env\` to create ${currentEnvEditTarget}, then set private release-channel metadata through ${releaseChannelPrivateInputSourceLabel}, run \`${releaseChannelApplyPrivateEnvPreflightCommand}\`, and run \`${releaseChannelApplyPrivateEnvCommand}\`.`,
       currentActionRequiredKeys: releaseChannelMetadataKeys,
       currentActionPlaceholderKeys: [],
       currentActionPrerequisiteCommands: [],
@@ -520,8 +530,12 @@ function buildCurrentAction({
   if (releaseChannelPlaceholderKeys.length > 0) {
     const keySummary = releaseChannelPlaceholderKeys.join(", ");
     const checklist = [
-      `Set private process env values for the current release-channel keys, run \`${releaseChannelApplyPrivateEnvPreflightCommand}\`, then run \`${releaseChannelApplyPrivateEnvCommand}\` to update ${currentEnvEditTarget}: ${keySummary}.`,
-      "Use real operator-owned release/support URLs and one allowed distribution channel value through process env.",
+      releaseChannelInputSourceOperatorAction({
+        editTarget: currentEnvEditTarget,
+        detail: "the current release-channel keys",
+        locationSummary: keySummary
+      }),
+      "Use real operator-owned release/support URLs and one allowed distribution channel value through process env or the ignored private input file.",
       "Keep real values out of committed files and generated reports.",
       "Rerun `npm run release:current-blocker` after applying metadata to refresh the value-free blocker evidence.",
       "Rerun `npm run release:next-actions` after the doctor report updates."
@@ -532,7 +546,11 @@ function buildCurrentAction({
       currentActionNextCommand: "npm run release:doctor",
       currentActionOperatorStartCommand: releaseChannelApplyPrivateEnvPreflightCommand,
       currentActionFirstBlocker: `Current release-channel metadata still contains ${releaseChannelPlaceholderKeys.length} placeholder keys.`,
-      currentActionOperatorAction: `Set private process env values for the current release-channel keys (${releaseChannelPlaceholderKeys.length}), run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${currentEnvEditTarget}: ${keySummary}.`,
+      currentActionOperatorAction: releaseChannelInputSourceOperatorAction({
+        editTarget: currentEnvEditTarget,
+        detail: `the current release-channel keys (${releaseChannelPlaceholderKeys.length})`,
+        locationSummary: keySummary
+      }),
       currentActionPostEditProofCommand: privateEditStrictProofCommand,
       currentActionPostEditProofRole: "Run the strict value-free proof chain after applying release-channel metadata through the private env helper.",
       currentActionRequiredKeys: releaseChannelMetadataKeys,

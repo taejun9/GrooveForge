@@ -25,10 +25,10 @@ const releaseChannelPrivateInputTemplateRole =
   "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvPreflightRole =
-  "verify operator-owned release-channel process env values before writing the ignored local env";
+  "verify operator-owned release-channel metadata from process env or the ignored private input file before writing the ignored local env";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const releaseChannelApplyPrivateEnvRole =
-  "apply operator-owned release-channel process env values into the ignored local env before strict proof";
+  "apply operator-owned release-channel metadata from process env or the ignored private input file into the ignored local env before strict proof";
 const releaseChannelApplyPrivateEnvProofCommand = "npm run release:channel-apply-private-env-proof";
 const releaseChannelApplyPrivateEnvProofRole =
   "run private env preflight, apply only after preflight readiness, strict proof, and completion readout as one value-free operator proof runner";

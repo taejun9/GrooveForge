@@ -32,6 +32,7 @@ const releaseChannelPrivateInputTemplateRole =
 const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const releaseChannelPrivateInputSourceLabel = "process env or ignored private input file";
 const privateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
 const defaultPrivateInputFileName = ".env.release-channel.local";
 const operatorPrivateInputFileDefaultPath = defaultPrivateInputFileName;
@@ -225,13 +226,13 @@ function operatorCommandRows(mode, currentEnvEditTarget) {
           {
             order: 4,
             command: releaseChannelApplyPrivateEnvPreflightCommand,
-            role: `verify the four private release-channel process env values before writing ${currentEnvEditTarget}`,
+            role: `verify the four private release-channel metadata rows from ${releaseChannelPrivateInputSourceLabel} before writing ${currentEnvEditTarget}`,
             valueRecorded: false
           },
           {
             order: 5,
             command: releaseChannelApplyPrivateEnvCommand,
-            role: `apply the four private release-channel metadata values from process env into ${currentEnvEditTarget} after preflight passes`,
+            role: `apply the four private release-channel metadata rows from ${releaseChannelPrivateInputSourceLabel} into ${currentEnvEditTarget} after preflight passes`,
             valueRecorded: false
           }
         ]
@@ -251,13 +252,13 @@ function operatorCommandRows(mode, currentEnvEditTarget) {
           {
             order: 3,
             command: releaseChannelApplyPrivateEnvPreflightCommand,
-            role: `verify the four private release-channel process env values before writing ${currentEnvEditTarget}`,
+            role: `verify the four private release-channel metadata rows from ${releaseChannelPrivateInputSourceLabel} before writing ${currentEnvEditTarget}`,
             valueRecorded: false
           },
           {
             order: 4,
             command: releaseChannelApplyPrivateEnvCommand,
-            role: `apply the four private release-channel metadata values from process env into ${currentEnvEditTarget} after preflight passes`,
+            role: `apply the four private release-channel metadata rows from ${releaseChannelPrivateInputSourceLabel} into ${currentEnvEditTarget} after preflight passes`,
             valueRecorded: false
           }
         ];
@@ -311,21 +312,21 @@ function currentOperatorCommandRows(mode, currentEnvEditTarget) {
           },
           {
             command: releaseChannelApplyPrivateEnvPreflightCommand,
-            role: `verify the four private release-channel process env values before writing ${currentEnvEditTarget}`
+            role: `verify the four private release-channel metadata rows from ${releaseChannelPrivateInputSourceLabel} before writing ${currentEnvEditTarget}`
           },
           {
             command: releaseChannelApplyPrivateEnvCommand,
-            role: `apply the four private release-channel metadata values from process env into ${currentEnvEditTarget} after preflight passes`
+            role: `apply the four private release-channel metadata rows from ${releaseChannelPrivateInputSourceLabel} into ${currentEnvEditTarget} after preflight passes`
           }
         ]
       : [
           {
             command: releaseChannelApplyPrivateEnvPreflightCommand,
-            role: `verify the four private release-channel process env values before writing ${currentEnvEditTarget}`
+            role: `verify the four private release-channel metadata rows from ${releaseChannelPrivateInputSourceLabel} before writing ${currentEnvEditTarget}`
           },
           {
             command: releaseChannelApplyPrivateEnvCommand,
-            role: `apply the four private release-channel metadata values from process env into ${currentEnvEditTarget} after preflight passes`
+            role: `apply the four private release-channel metadata rows from ${releaseChannelPrivateInputSourceLabel} into ${currentEnvEditTarget} after preflight passes`
           }
         ];
   const followUpRows = [

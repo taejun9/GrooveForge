@@ -47,6 +47,7 @@ const releaseChannelMetadataKeys = [
 const recommendedPrivateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const releaseChannelPrivateInputSourceLabel = "process env values or ignored private input file rows";
 const releaseChannelPrivateInputTemplateCommand = "npm run release:channel-private-input-template";
 const releaseChannelPrivateInputTemplateRole =
   "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
@@ -195,6 +196,15 @@ function currentLocalEnvEditTarget(evidence = {}) {
   }
   const configuredPath = process.env[distributionLocalEnvDefaults.configuredFileKey]?.trim();
   return displayLocalEnvTarget(configuredPath || distributionLocalEnvDefaults.defaultEnvFileName);
+}
+
+function releaseChannelInputSourceOperatorAction({
+  editTarget = distributionLocalEnvDefaults.defaultEnvFileName,
+  detail = "the four current release-channel metadata keys",
+  locationSummary = ""
+} = {}) {
+  const locationClause = locationSummary && locationSummary !== "none" ? `: ${locationSummary}` : "";
+  return `Set private release-channel metadata through ${releaseChannelPrivateInputSourceLabel} for ${detail}, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${editTarget}${locationClause}.`;
 }
 
 function localEnvCandidatePaths() {
@@ -863,7 +873,11 @@ function currentActionAcceptanceEvidence(criterion, { currentActionSummary = {},
       sourceField: "currentRequiredKeys/currentPlaceholderKeys/currentPlaceholderEditLocations",
       operatorAction:
         placeholderCount > 0
-          ? `Set private release-channel process env values, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${currentActionSummary.currentEnvEditTarget ?? ".env.distribution.local"}: ${currentActionSummary.currentPlaceholderEditLocationSummary ?? "current placeholder edit locations"}.`
+          ? releaseChannelInputSourceOperatorAction({
+              editTarget: currentActionSummary.currentEnvEditTarget ?? ".env.distribution.local",
+              detail: "the current release-channel placeholder keys",
+              locationSummary: currentActionSummary.currentPlaceholderEditLocationSummary ?? "current placeholder edit locations"
+            })
           : "Keep the current release-channel keys placeholder-free in the ignored local env file.",
       expectedSignal: "current required keys present and current placeholder key count is 0"
     };
@@ -1719,8 +1733,11 @@ function buildReleaseChannelPostEditOperatorReceiptSummary({
           (missingLocalEnv && placeholderKeys.length === 0 && placeholderLocations.length === 0)),
       currentState: `${placeholderKeys.length} current release-channel placeholder keys at ${placeholderLocationSummary}`,
       operatorAction: missingLocalEnv
-        ? `Run ${currentStepCommand} to create ${currentActionSummary.currentEnvEditTarget}, then set private process env values, run ${releaseChannelApplyPrivateEnvPreflightCommand}, and run ${releaseChannelApplyPrivateEnvCommand} for the four current release-channel metadata keys.`
-        : `Set private process env values, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${currentActionSummary.currentEnvEditTarget} for the four current release-channel metadata keys.`,
+        ? `Run ${currentStepCommand} to create ${currentActionSummary.currentEnvEditTarget}, then set private release-channel metadata through ${releaseChannelPrivateInputSourceLabel} for the four current release-channel metadata keys, run ${releaseChannelApplyPrivateEnvPreflightCommand}, and run ${releaseChannelApplyPrivateEnvCommand}.`
+        : releaseChannelInputSourceOperatorAction({
+            editTarget: currentActionSummary.currentEnvEditTarget,
+            detail: "the four current release-channel metadata keys"
+          }),
       expectedPostEditSignal: "0 current placeholder keys after apply helper; values still redacted in reports",
       command: missingLocalEnv ? currentStepCommand : releaseChannelApplyPrivateEnvPreflightCommand,
       proofCommand,
@@ -1865,7 +1882,7 @@ function buildCurrentOperatorCommandSequenceSummary({
       step: "Private metadata preflight",
       command: releaseChannelApplyPrivateEnvPreflightCommand,
       role: "operator-preflight",
-      expectedOperatorInput: "operator-owned release-channel process env values are present and shape-valid",
+      expectedOperatorInput: "operator-owned release-channel metadata is present and shape-valid in process env or the ignored private input file",
       expectedEvidence: `preflight verifies the current release-channel metadata keys before writing ${currentEnvEditTarget}`,
       sourceField: "releaseChannelApplyPrivateEnvPreflightCommand/currentInputShapeChecklistRows"
     },
@@ -2599,9 +2616,9 @@ function buildActionChecklist(action, context = {}) {
   }
   if (context.shouldReplacePlaceholders) {
     const locationSummary = formatEditLocationSummary(action.placeholderEditLocations);
-    return [
-      `Set private release-channel process env values for current placeholder keys at ${locationSummary}.`,
-      `Run \`${releaseChannelApplyPrivateEnvPreflightCommand}\` to verify the process env values before any ignored local env write.`,
+      return [
+      `Set private release-channel metadata through ${releaseChannelPrivateInputSourceLabel} for current placeholder keys at ${locationSummary}.`,
+      `Run \`${releaseChannelApplyPrivateEnvPreflightCommand}\` to verify the selected private input source before any ignored local env write.`,
       `Run \`${releaseChannelApplyPrivateEnvCommand}\` to apply only the listed current-action placeholders into the ignored local env file after preflight passes.`,
       "Follow the current value-free key guidance for allowed channel and safe HTTPS URL constraints.",
       `Rerun \`${rerunCommand}\` after applying the private env metadata.`,
@@ -2648,7 +2665,11 @@ function buildPriorityActions(remediation, context = {}) {
           ])
         : shouldReplacePlaceholders
           ? unique([
-              `Set private process env values for the current release-channel keys (${placeholderKeys.length}), run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${localEnvEditTarget}: ${placeholderKeys.join(", ")}.`,
+              releaseChannelInputSourceOperatorAction({
+                editTarget: localEnvEditTarget,
+                detail: `the current release-channel keys (${placeholderKeys.length})`,
+                locationSummary: placeholderKeys.join(", ")
+              }),
               `The full local env still has ${localEnvPlaceholderKeyCount} placeholder keys across all external distribution groups.`,
               "Keep those private values out of committed files and generated reports.",
               group.operatorActions ?? []

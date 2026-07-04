@@ -26,10 +26,11 @@ const releaseChannelPrivateInputTemplateRole =
   "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvPreflightRole =
-  "verify operator-owned release-channel process env values before writing the ignored local env";
+  "verify operator-owned release-channel metadata from process env or the ignored private input file before writing the ignored local env";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const releaseChannelApplyPrivateEnvRole =
-  "apply operator-owned release-channel process env values into the ignored local env before strict proof";
+  "apply operator-owned release-channel metadata from process env or the ignored private input file into the ignored local env before strict proof";
+const releaseChannelPrivateInputSourceLabel = "process env values or ignored private input file rows";
 const releaseChannelApplyPrivateEnvProofCommand = "npm run release:channel-apply-private-env-proof";
 const releaseChannelApplyPrivateEnvProofRole =
   "run private env preflight, apply only after preflight readiness, strict proof, and completion readout as one value-free operator proof runner";
@@ -183,6 +184,15 @@ function formatKeyList(keys) {
   return keys.length > 0 ? keys.join(", ") : "none";
 }
 
+function releaseChannelInputSourceOperatorAction({
+  editTarget = ".env.distribution.local",
+  detail = "the four current release-channel metadata keys",
+  locationSummary = ""
+} = {}) {
+  const locationClause = locationSummary && locationSummary !== "none" ? `: ${locationSummary}` : "";
+  return `set private release-channel metadata through ${releaseChannelPrivateInputSourceLabel} for ${detail}, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${editTarget}${locationClause}`;
+}
+
 function sanitizeCompletionBlockerFocusRows(rows) {
   return objectRows(rows).map((row, index) => ({
     order: index + 1,
@@ -215,7 +225,7 @@ function buildCompletionBlockerActionRows(currentBlocker) {
       item: "Edit target",
       ready: currentEnvEditTarget !== "none",
       currentState: currentBlocker.currentPlaceholderKeyCount > 0 ? "blocked" : "ready",
-      operatorAction: `set process env values, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${currentEnvEditTarget}`,
+      operatorAction: releaseChannelInputSourceOperatorAction({ editTarget: currentEnvEditTarget }),
       evidence: currentEnvEditTarget,
       proofCommand: firstProofCommand,
       sourceField: "currentBlocker.currentEnvEditTarget",
@@ -237,7 +247,11 @@ function buildCompletionBlockerActionRows(currentBlocker) {
       item: "Placeholder keys to replace",
       ready: currentPlaceholderKeys.length === integerValue(currentBlocker.currentPlaceholderKeyCount),
       currentState: `${currentPlaceholderKeys.length} placeholders`,
-      operatorAction: `verify private release-channel metadata with ${releaseChannelApplyPrivateEnvPreflightCommand}, then replace placeholder markers through ${releaseChannelApplyPrivateEnvCommand}`,
+      operatorAction: releaseChannelInputSourceOperatorAction({
+        editTarget: currentEnvEditTarget,
+        detail: "the current release-channel placeholder keys",
+        locationSummary: formatKeyList(currentPlaceholderKeys)
+      }),
       evidence: formatKeyList(currentPlaceholderKeys),
       proofCommand: firstProofCommand,
       sourceField: "currentBlocker.currentPlaceholderKeys",

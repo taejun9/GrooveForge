@@ -158,13 +158,13 @@ function buildReport({ liveCheck, currentBlocker, refreshRows }) {
     {
       order: 1,
       command: releaseChannelApplyPrivateEnvPreflightCommand,
-      role: "verify operator-owned current release-channel metadata from process env before writing the ignored local env file",
+      role: "verify operator-owned current release-channel metadata from process env or the ignored private input file before writing the ignored local env file",
       valueRecorded: false
     },
     {
       order: 2,
       command: releaseChannelApplyPrivateEnvCommand,
-      role: "apply only operator-owned current release-channel metadata from process env into the ignored local env file after preflight passes",
+      role: "apply only operator-owned current release-channel metadata from process env or the ignored private input file into the ignored local env file after preflight passes",
       valueRecorded: false
     },
     {

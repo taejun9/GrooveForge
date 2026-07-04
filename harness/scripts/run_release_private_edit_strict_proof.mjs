@@ -71,6 +71,7 @@ const releaseChannelMetadataKeys = [
 ];
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const releaseChannelPrivateInputSourceLabel = "process env values or ignored private input file rows";
 
 function check(condition, message) {
   if (!condition) {
@@ -320,7 +321,7 @@ function buildReport({
           placeholderKeyCount: integerValue(strictLiveCheck?.currentPlaceholderKeyCount),
           placeholderKeys: stringArrayValue(strictLiveCheck?.currentPlaceholderKeys),
           strictFailureRowCount: strictFailureRows.length,
-          manualAction: `set private release-channel process env values, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand}`,
+          manualAction: `set private release-channel metadata through ${releaseChannelPrivateInputSourceLabel}, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand}`,
           returnCommand: successSmoke
             ? "npm run release:private-edit-strict-proof-success-smoke"
             : blockedSmoke
