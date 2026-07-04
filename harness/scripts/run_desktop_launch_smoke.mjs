@@ -24,6 +24,9 @@ const expectedLiveTestIds = [
   "audience-session-readout",
   "audience-session-action-beginner",
   "audience-session-action-producer",
+  "audience-route-bridge",
+  "audience-route-bridge-readiness-action",
+  "audience-route-bridge-completion-action",
   "dual-audience-readiness",
   "dual-audience-readiness-beginner",
   "dual-audience-readiness-producer",
@@ -109,11 +112,11 @@ function checkResult(result) {
   check(evidence?.palette?.opened === true, "live desktop Quick Actions palette should open during launch smoke");
   check(
     evidence?.palette?.searchPresent === true,
-    "live desktop Quick Actions palette should accept Audience Session, Dual Audience Readiness, and Audience Completion Route search input"
+    "live desktop Quick Actions palette should accept Audience Session, Audience Route Bridge, Dual Audience Readiness, and Audience Completion Route search input"
   );
   check(
     evidence?.palette?.resultPresent === true,
-    "live desktop Quick Actions palette should leave Audience Session, Dual Audience Readiness, and Audience Completion Route execution results"
+    "live desktop Quick Actions palette should leave Audience Session, Audience Route Bridge, Dual Audience Readiness, and Audience Completion Route execution results"
   );
   check(evidence?.palette?.guided?.actionPresent === true, "live desktop Quick Actions palette should show Enter Guided from first-time composer search");
   check(
@@ -178,6 +181,45 @@ function checkResult(result) {
     String(evidence?.palette?.producer?.resultNextCheck ?? "").includes("Review Queue") &&
       String(evidence?.palette?.producer?.resultNextCheck ?? "").includes("Export Preflight"),
     "live desktop Quick Actions producer result should guide the next Review Queue / Export Preflight check"
+  );
+  check(
+    evidence?.palette?.routeBridge?.actionPresent === true,
+    "live desktop Quick Actions palette should show Audience Route Bridge Readout"
+  );
+  check(
+    evidence?.palette?.routeBridge?.spotlightAction === "audience-route-bridge-readout-action",
+    "live desktop Quick Actions Audience Route Bridge spotlight should target audience-route-bridge-readout-action"
+  );
+  check(
+    String(evidence?.palette?.routeBridge?.spotlightTitle ?? "").includes("Review Audience Route Bridge"),
+    "live desktop Quick Actions Audience Route Bridge spotlight should name Audience Route Bridge"
+  );
+  check(
+    String(evidence?.palette?.routeBridge?.resultMetricValue ?? "").includes("Audience Route Bridge Readout"),
+    "live desktop Quick Actions Audience Route Bridge readout result should include the bridge readout"
+  );
+  check(
+    evidence?.palette?.routeBridgeReadiness?.actionPresent === true &&
+      String(evidence?.palette?.routeBridgeReadiness?.resultMetricValue ?? "").includes("Bridge readiness lane"),
+    "live desktop Quick Actions Audience Route Bridge readiness should execute with readiness lane evidence"
+  );
+  check(
+    String(evidence?.palette?.routeBridgeReadiness?.resultNextCheck ?? "").includes("First Beat Path") ||
+      String(evidence?.palette?.routeBridgeReadiness?.resultNextCheck ?? "").includes("Export Preflight") ||
+      String(evidence?.palette?.routeBridgeReadiness?.resultNextCheck ?? "").includes("Production Snapshot"),
+    "live desktop Quick Actions Audience Route Bridge readiness should guide the next active readiness check"
+  );
+  check(
+    evidence?.palette?.routeBridgeCompletion?.actionPresent === true &&
+      String(evidence?.palette?.routeBridgeCompletion?.resultMetricValue ?? "").includes("Bridge completion lane"),
+    "live desktop Quick Actions Audience Route Bridge completion should execute with completion lane evidence"
+  );
+  check(
+    String(evidence?.palette?.routeBridgeCompletion?.resultNextCheck ?? "").includes("First Beat Path") ||
+      String(evidence?.palette?.routeBridgeCompletion?.resultNextCheck ?? "").includes("Export Preflight") ||
+      String(evidence?.palette?.routeBridgeCompletion?.resultNextCheck ?? "").includes("Production Snapshot") ||
+      String(evidence?.palette?.routeBridgeCompletion?.resultNextCheck ?? "").includes("Handoff Package Check"),
+    "live desktop Quick Actions Audience Route Bridge completion should guide the next active completion check"
   );
   check(
     evidence?.palette?.dualReadout?.actionPresent === true,
@@ -378,6 +420,7 @@ child.on("exit", (code, signal) => {
   );
   console.log("- Audience session rows: First-time composer, Professional producer");
   console.log("- Audience session Quick Actions: renderer palette search and run evidence passed for Enter Guided and Enter Studio");
+  console.log("- Audience Route Bridge Quick Actions: readout, readiness, and completion search/run evidence passed");
   console.log(
     "- Dual Audience Readiness Quick Actions: route readout, first-time composer lane, and professional producer lane search/run evidence passed"
   );
@@ -385,10 +428,10 @@ child.on("exit", (code, signal) => {
     "- Audience Completion Route Quick Actions: route readout, first-time composer completion, and professional producer completion search/run evidence passed"
   );
   console.log(
-    "- Beginner path: Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Enter Guided, Guide Quick Start, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
+    "- Beginner path: Audience Session Readout, Audience Route Bridge, Dual Audience Readiness, Audience Completion Route, Enter Guided, Guide Quick Start, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
   );
   console.log(
-    "- Producer path: Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Enter Studio, Studio mode, Review Queue, Production Snapshot, Mix Coach, Handoff Pack, Quick Actions, Command Reference"
+    "- Producer path: Audience Session Readout, Audience Route Bridge, Dual Audience Readiness, Audience Completion Route, Enter Studio, Studio mode, Review Queue, Production Snapshot, Mix Coach, Handoff Pack, Quick Actions, Command Reference"
   );
   console.log("- Workstation path: transport, compose, sound, arrange, mix, master, export controls, Handoff Pack");
 });

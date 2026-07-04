@@ -701,6 +701,7 @@ import {
   snapshotCompareDirectMetricItems
 } from "./workstationSnapshotCompare";
 import {
+  AudienceRouteBridge,
   AudienceCompletionRouteStrip,
   AudienceSessionReadout,
   DualAudienceReadinessStrip,
@@ -715,6 +716,7 @@ import {
   createGuideQuickStartCompletionBottleneckLabel,
   createGuideQuickStartCompletionBreakdownItems,
   createGuideQuickStartCompletionScore,
+  createAudienceRouteBridgeSummary,
   createAudienceCompletionRouteRows,
   createDualAudienceReadinessRows,
   createModeSwitchButtonContext,
@@ -6934,6 +6936,27 @@ export function App(): ReactElement {
     setAudienceSessionActionResult(createAudienceSessionActionResult(row, audienceSessionReadoutSummary, mode));
   }
 
+  function focusAudienceRouteBridgeReadout(): void {
+    const summary = createAudienceRouteBridgeSummary({
+      audienceSessionSummary: audienceSessionReadoutSummary,
+      beatReadinessChecks,
+      exportPreflightSummary,
+      firstBeatPathSummary,
+      handoffPackageCheckSummary,
+      productionSnapshotSummary,
+      sessionPassSummary
+    });
+    if (typeof document !== "undefined") {
+      document.querySelector<HTMLElement>('[data-testid="audience-route-bridge"]')?.scrollIntoView({
+        block: "start",
+        behavior: "auto"
+      });
+    }
+    setProjectStatus(
+      `Audience Route Bridge Readout Pattern ${project.selectedPattern}: ${summary.activeAudienceLabel} / ${summary.detailLabel} / ${summary.readinessLane.laneLabel} / ${summary.completionLane.laneLabel} / direct bridge actions unchanged`
+    );
+  }
+
   function focusDualAudienceReadinessRouteReadout(): void {
     const rows = createDualAudienceReadinessRows({
       beatReadinessChecks,
@@ -9237,6 +9260,7 @@ export function App(): ReactElement {
     onSelectStyle: selectStyle,
     onSelectAudienceSessionRow: selectAudienceSessionRow,
     onCreateAudienceStarter: createAudienceStarter,
+    onFocusAudienceRouteBridgeReadout: focusAudienceRouteBridgeReadout,
     onFocusAudienceCompletionRouteReadout: focusAudienceCompletionRouteReadout,
     onFocusDualAudienceReadinessRouteReadout: focusDualAudienceReadinessRouteReadout,
     onSwitchMode: switchProjectMode,
@@ -9516,6 +9540,42 @@ export function App(): ReactElement {
       };
     };
 
+    const runAudienceRouteBridgeRoute = (
+      actionId: string
+    ): Pick<GrooveforgeLaunchSmokeRouteEvidence, "resultMetricValue" | "resultNextCheck" | "resultStatus" | "resultTitle"> => {
+      const action = quickActions.find((candidate) => candidate.id === actionId);
+      if (!action || action.disabled) {
+        return {
+          resultMetricValue: "Action unavailable",
+          resultNextCheck: "Quick Actions must expose the Audience Route Bridge before launch smoke can run it.",
+          resultStatus: "Unavailable",
+          resultTitle: actionId
+        };
+      }
+
+      const beforeProject = projectRef.current;
+      action.run();
+      const result = createQuickActionResult(
+        action,
+        beforeProject,
+        projectRef.current,
+        "complete",
+        selectedArrangementIndex,
+        handoffExportReceiptRef.current,
+        null
+      );
+      setQuickActionResult(result);
+      setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
+      setQuickActionsOpen(false);
+
+      return {
+        resultMetricValue: `${result.metric.before} -> ${result.metric.after}`,
+        resultNextCheck: result.nextCheck,
+        resultStatus: result.status,
+        resultTitle: result.title
+      };
+    };
+
     const runAudienceCompletionRoute = (
       actionId: string
     ): Pick<GrooveforgeLaunchSmokeRouteEvidence, "resultMetricValue" | "resultNextCheck" | "resultStatus" | "resultTitle"> => {
@@ -9558,6 +9618,18 @@ export function App(): ReactElement {
           ...routeEvidence("enter studio professional producer", "audience-session-enter-producer"),
           ...runAudienceSessionRoute("audience-session-enter-producer")
         };
+        const routeBridge = {
+          ...routeEvidence("audience route bridge", "audience-route-bridge-readout-action"),
+          ...runAudienceRouteBridgeRoute("audience-route-bridge-readout-action")
+        };
+        const routeBridgeReadiness = {
+          ...routeEvidence("open bridge readiness", "audience-route-bridge-readiness-action"),
+          ...runAudienceRouteBridgeRoute("audience-route-bridge-readiness-action")
+        };
+        const routeBridgeCompletion = {
+          ...routeEvidence("open bridge completion", "audience-route-bridge-completion-action"),
+          ...runAudienceRouteBridgeRoute("audience-route-bridge-completion-action")
+        };
         const dualReadout = {
           ...routeEvidence("dual audience readiness", "dual-audience-readiness-route-readout-action"),
           ...runDualAudienceReadinessRoute("dual-audience-readiness-route-readout-action")
@@ -9583,7 +9655,7 @@ export function App(): ReactElement {
           ...runAudienceCompletionRoute("audience-completion-route-producer-action")
         };
         const guided = {
-          ...routeEvidence("audience-session-enter-beginner", "audience-session-enter-beginner"),
+          ...routeEvidence("enter guided first time composer", "audience-session-enter-beginner"),
           ...runAudienceSessionRoute("audience-session-enter-beginner")
         };
 
@@ -9597,9 +9669,15 @@ export function App(): ReactElement {
           guided,
           opened: true,
           producer,
+          routeBridge,
+          routeBridgeCompletion,
+          routeBridgeReadiness,
           resultPresent:
             guided.resultTitle.length > 0 &&
             producer.resultTitle.length > 0 &&
+            routeBridge.resultTitle.length > 0 &&
+            routeBridgeReadiness.resultTitle.length > 0 &&
+            routeBridgeCompletion.resultTitle.length > 0 &&
             dualReadout.resultTitle.length > 0 &&
             dualBeginner.resultTitle.length > 0 &&
             dualProducer.resultTitle.length > 0 &&
@@ -9609,6 +9687,9 @@ export function App(): ReactElement {
           searchPresent:
             guided.searchMetricValue.length > 0 &&
             producer.searchMetricValue.length > 0 &&
+            routeBridge.searchMetricValue.length > 0 &&
+            routeBridgeReadiness.searchMetricValue.length > 0 &&
+            routeBridgeCompletion.searchMetricValue.length > 0 &&
             dualReadout.searchMetricValue.length > 0 &&
             dualBeginner.searchMetricValue.length > 0 &&
             dualProducer.searchMetricValue.length > 0 &&
@@ -9995,6 +10076,20 @@ export function App(): ReactElement {
         summary={audienceSessionReadoutSummary}
         onCreateStarter={createAudienceStarter}
         onSelectAudience={selectAudienceSessionRow}
+      />
+
+      <AudienceRouteBridge
+        audienceSessionSummary={audienceSessionReadoutSummary}
+        beatReadinessChecks={beatReadinessChecks}
+        exportPreflightSummary={exportPreflightSummary}
+        firstBeatPathSummary={firstBeatPathSummary}
+        handoffPackageCheckSummary={handoffPackageCheckSummary}
+        productionSnapshotSummary={productionSnapshotSummary}
+        sessionPassSummary={sessionPassSummary}
+        onFocusExportPreflight={focusExportPreflightCard}
+        onFocusHandoffPackageCheck={focusHandoffPackageCheckCard}
+        onFocusProductionSnapshot={focusProductionSnapshotMetric}
+        onJumpFirstBeatPath={jumpToFirstBeatPathStep}
       />
 
       <DualAudienceReadinessStrip

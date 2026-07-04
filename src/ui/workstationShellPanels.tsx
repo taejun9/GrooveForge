@@ -320,6 +320,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Build Starter Project commands for first-time composer and professional producer local project creation, starter follow-up routes into First Beat Path, Dual Audience Readiness, Review Queue, Export Preflight, and Handoff Package Check, editable drums, 808/bass, melody/chords, arrangement, mix/master, Delivery Target, Session Brief state, Audience Starter result metric, and sample-free direct composition posture before creating a starter project."
       },
       {
+        id: "audience-route-bridge",
+        command: "Audience Route Bridge",
+        shortcut: "Quick Actions / Readout",
+        target: "Active audience lane / readiness / completion",
+        context:
+          "Audience Route Bridge Readout, Bridge Readiness command, Bridge Completion command, active first-time composer or professional producer lane, Dual Audience Readiness priority, Audience Completion Route priority, audition cue, and next check before choosing the next workflow action."
+      },
+      {
         id: "dual-audience-readiness",
         command: "Dual Audience Readiness",
         shortcut: "Quick Actions / Readout",

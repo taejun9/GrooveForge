@@ -838,6 +838,8 @@ import {
   createGuideQuickStartCompletionBottleneckLabel,
   createGuideQuickStartCompletionBreakdownItems,
   createGuideQuickStartCompletionScore,
+  createAudienceRouteBridgeQuickActions,
+  createAudienceRouteBridgeSummary,
   createAudienceCompletionRouteQuickActions,
   createAudienceCompletionRouteRows,
   createAudienceSessionQuickActions,
@@ -1497,6 +1499,7 @@ export function createQuickActions({
   onSelectPattern,
   onSelectStyle,
   onSelectAudienceSessionRow,
+  onFocusAudienceRouteBridgeReadout,
   onFocusAudienceCompletionRouteReadout,
   onFocusDualAudienceReadinessRouteReadout,
   onSwitchMode,
@@ -1887,6 +1890,7 @@ export function createQuickActions({
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
   onSelectAudienceSessionRow: (row: AudienceSessionReadoutRow) => void;
   onCreateAudienceStarter: (starterId: AudienceStarterProjectId) => void;
+  onFocusAudienceRouteBridgeReadout: () => void;
   onFocusAudienceCompletionRouteReadout: () => void;
   onFocusDualAudienceReadinessRouteReadout: () => void;
   onSwitchMode: (mode: ProjectState["mode"]) => void;
@@ -3010,6 +3014,23 @@ export function createQuickActions({
     onCreateStarter: onCreateAudienceStarter,
     onSelectAudience: onSelectAudienceSessionRow,
     summary: audienceSessionReadoutSummary
+  });
+  const audienceRouteBridgeSummary = createAudienceRouteBridgeSummary({
+    audienceSessionSummary: audienceSessionReadoutSummary,
+    beatReadinessChecks,
+    exportPreflightSummary,
+    firstBeatPathSummary,
+    handoffPackageCheckSummary,
+    productionSnapshotSummary,
+    sessionPassSummary
+  });
+  const audienceRouteBridgeActions = createAudienceRouteBridgeQuickActions({
+    bridgeSummary: audienceRouteBridgeSummary,
+    onFocusExportPreflight,
+    onFocusHandoffPackageCheck,
+    onFocusProductionSnapshot,
+    onFocusRouteReadout: onFocusAudienceRouteBridgeReadout,
+    onJumpFirstBeatPath
   });
   const dualAudienceReadinessRows = createDualAudienceReadinessRows({
     beatReadinessChecks,
@@ -5661,6 +5682,7 @@ export function createQuickActions({
     ...audienceCompletionRouteActions,
     ...dualAudienceReadinessActions,
     ...audienceSessionActions,
+    ...audienceRouteBridgeActions,
     ...modeSwitchActions,
     {
       id: "session-brief-compass-focus",
@@ -7546,6 +7568,7 @@ export function createQuickActionResult(
     action.id === "stem-audition-readout-action" ||
     action.id === "stem-audition-route-readout-action" ||
     action.id === "timbre-check" ||
+    action.id.startsWith("audience-route-bridge-") ||
     action.id.startsWith("audience-completion-route-") ||
     action.id.startsWith("dual-audience-readiness-") ||
     action.id === "session-pass-route-readout-action" ||
@@ -9026,6 +9049,74 @@ export function dualAudienceReadinessQuickActionLane(action: QuickAction): {
   }
 
   return null;
+}
+
+export function audienceRouteBridgeQuickActionLane(action: QuickAction): {
+  laneLabel: string;
+  nextCheck: string;
+  routeLabel: string;
+} | null {
+  if (!action.id.startsWith("audience-route-bridge-")) {
+    return null;
+  }
+
+  if (action.id === "audience-route-bridge-readout-action") {
+    return {
+      laneLabel: "Audience Route Bridge",
+      nextCheck: "Choose the active audience lane, then open its readiness or completion action.",
+      routeLabel: "Audience Route Bridge Readout"
+    };
+  }
+
+  if (action.id === "audience-route-bridge-readiness-action" || action.resultTargetId === "readiness") {
+    return {
+      laneLabel: "Bridge readiness lane",
+      nextCheck: "Open the active Dual Audience Readiness next check before changing the beat.",
+      routeLabel: "Open Bridge Readiness"
+    };
+  }
+
+  if (action.id === "audience-route-bridge-completion-action" || action.resultTargetId === "completion") {
+    return {
+      laneLabel: "Bridge completion lane",
+      nextCheck: "Open the active Audience Completion Route next check before export or handoff.",
+      routeLabel: "Open Bridge Completion"
+    };
+  }
+
+  return null;
+}
+
+export function quickActionAudienceRouteBridgeMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const lane = audienceRouteBridgeQuickActionLane(action);
+  if (!lane) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+
+  return {
+    id: "audience-route-bridge",
+    label: "Audience Route Bridge",
+    value: [
+      lane.routeLabel,
+      lane.laneLabel,
+      action.detail,
+      `${modeLabel(project.mode)} mode`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} selected-pattern events`,
+      `${projectEventTotal(project)} editable project events`,
+      `${arrangementTotalBars(project)} bars`,
+      "active audience route bridge",
+      "project data unchanged",
+      "playback unchanged",
+      "export unchanged",
+      lane.nextCheck
+    ].join(" / ")
+  };
 }
 
 export function quickActionDualAudienceReadinessMetricSnapshot(
@@ -16716,6 +16807,16 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("audience-route-bridge-")) {
+    return (
+      quickActionAudienceRouteBridgeMetricSnapshot(project, action) ?? {
+        id: "audience-route-bridge",
+        label: "Audience Route Bridge",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id.startsWith("audience-completion-route-")) {
     return (
       quickActionAudienceCompletionRouteMetricSnapshot(project, action) ?? {
@@ -21721,6 +21822,32 @@ export function quickActionResultFollowup(
       auditionCue: "Keep the beat playing only if you are comparing the same music against the new session goal.",
       nextCheck: "Run Delivery Target Align only when arrangement length, master, mix posture, and stem expectation should change."
     };
+  }
+
+  const audienceRouteBridgeLane = audienceRouteBridgeQuickActionLane(action);
+  if (audienceRouteBridgeLane) {
+    if (action.id === "audience-route-bridge-readout-action") {
+      return {
+        auditionCue:
+          "Read the Audience Route Bridge before choosing the active first-time composer or professional producer next check.",
+        nextCheck:
+          "Open Bridge Readiness for First Beat Path, Export Preflight, or Production Snapshot, then Bridge Completion for Export Preflight or Handoff Package Check."
+      };
+    }
+
+    return action.id === "audience-route-bridge-readiness-action"
+      ? {
+          auditionCue:
+            "Use Bridge Readiness to audition the active audience lane before changing notes, arrangement, mix, export, or handoff.",
+          nextCheck:
+            "Confirm the Audience Route Bridge readiness result names First Beat Path, Export Preflight, or Production Snapshot before the next workflow action."
+        }
+      : {
+          auditionCue:
+            "Use Bridge Completion to confirm the active audience lane can move from beat-making into export or handoff.",
+          nextCheck:
+            "Confirm the Audience Route Bridge completion result names First Beat Path, Export Preflight, Production Snapshot, or Handoff Package Check before delivery."
+        };
   }
 
   const audienceCompletionRouteLane = audienceCompletionRouteQuickActionLane(action);

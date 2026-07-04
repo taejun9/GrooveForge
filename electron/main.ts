@@ -76,6 +76,9 @@ type LaunchSmokePaletteEvidence = {
   guided: LaunchSmokePaletteRouteEvidence;
   opened: boolean;
   producer: LaunchSmokePaletteRouteEvidence;
+  routeBridge: LaunchSmokePaletteRouteEvidence;
+  routeBridgeCompletion: LaunchSmokePaletteRouteEvidence;
+  routeBridgeReadiness: LaunchSmokePaletteRouteEvidence;
   resultPresent: boolean;
   searchPresent: boolean;
 };
@@ -462,7 +465,7 @@ function launchSmokePaletteFailures(evidence: LaunchSmokePaletteEvidence): strin
   const failures: string[] = [];
   if (!evidence.opened || !evidence.searchPresent || !evidence.resultPresent) {
     failures.push(
-      "live Quick Actions palette should open, accept Audience Session, Dual Audience Readiness, and Audience Completion Route searches, and leave an execution result"
+      "live Quick Actions palette should open, accept Audience Session, Audience Route Bridge, Dual Audience Readiness, and Audience Completion Route searches, and leave an execution result"
     );
   }
   if (!evidence.guided.actionPresent) {
@@ -524,6 +527,41 @@ function launchSmokePaletteFailures(evidence: LaunchSmokePaletteEvidence): strin
   }
   if (!evidence.producer.resultNextCheck.includes("Review Queue") || !evidence.producer.resultNextCheck.includes("Export Preflight")) {
     failures.push("live Quick Actions producer result should guide the next Review Queue / Export Preflight check");
+  }
+  if (!evidence.routeBridge.actionPresent) {
+    failures.push("live Quick Actions palette should show Audience Route Bridge Readout");
+  }
+  if (evidence.routeBridge.spotlightAction !== "audience-route-bridge-readout-action") {
+    failures.push(
+      `live Quick Actions Audience Route Bridge spotlight should target audience-route-bridge-readout-action, got ${evidence.routeBridge.spotlightAction}`
+    );
+  }
+  if (!evidence.routeBridge.spotlightTitle.includes("Review Audience Route Bridge")) {
+    failures.push(`live Quick Actions Audience Route Bridge spotlight should name Audience Route Bridge, got ${evidence.routeBridge.spotlightTitle}`);
+  }
+  if (!evidence.routeBridge.resultMetricValue.includes("Audience Route Bridge Readout")) {
+    failures.push("live Quick Actions Audience Route Bridge readout result metric should include the bridge readout");
+  }
+  if (!evidence.routeBridgeReadiness.actionPresent || !evidence.routeBridgeReadiness.resultMetricValue.includes("Bridge readiness lane")) {
+    failures.push("live Quick Actions Audience Route Bridge readiness should execute with readiness lane evidence");
+  }
+  if (
+    !evidence.routeBridgeReadiness.resultNextCheck.includes("First Beat Path") &&
+    !evidence.routeBridgeReadiness.resultNextCheck.includes("Export Preflight") &&
+    !evidence.routeBridgeReadiness.resultNextCheck.includes("Production Snapshot")
+  ) {
+    failures.push("live Quick Actions Audience Route Bridge readiness should guide the next active readiness check");
+  }
+  if (!evidence.routeBridgeCompletion.actionPresent || !evidence.routeBridgeCompletion.resultMetricValue.includes("Bridge completion lane")) {
+    failures.push("live Quick Actions Audience Route Bridge completion should execute with completion lane evidence");
+  }
+  if (
+    !evidence.routeBridgeCompletion.resultNextCheck.includes("First Beat Path") &&
+    !evidence.routeBridgeCompletion.resultNextCheck.includes("Export Preflight") &&
+    !evidence.routeBridgeCompletion.resultNextCheck.includes("Production Snapshot") &&
+    !evidence.routeBridgeCompletion.resultNextCheck.includes("Handoff Package Check")
+  ) {
+    failures.push("live Quick Actions Audience Route Bridge completion should guide the next active completion check");
   }
   if (!evidence.dualReadout.actionPresent) {
     failures.push("live Quick Actions palette should show Dual Audience Readiness Route Readout");
@@ -723,6 +761,9 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "audience-session-readout",
         "audience-session-action-beginner",
         "audience-session-action-producer",
+        "audience-route-bridge",
+        "audience-route-bridge-readiness-action",
+        "audience-route-bridge-completion-action",
         "dual-audience-readiness",
         "dual-audience-readiness-beginner",
         "dual-audience-readiness-producer",
@@ -746,6 +787,7 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "desktop workstation",
         "Guide Quick Start",
         "Audience session",
+        "Audience Route Bridge",
         "Dual Audience Readiness",
         "First-time composer",
         "First-time composer lane",
@@ -815,6 +857,9 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           guided: emptyRoute,
           opened: false,
           producer: emptyRoute,
+          routeBridge: emptyRoute,
+          routeBridgeCompletion: emptyRoute,
+          routeBridgeReadiness: emptyRoute,
           resultPresent: false,
           searchPresent: false
         },

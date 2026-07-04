@@ -68,6 +68,9 @@ type GrooveforgeLaunchSmokePaletteEvidence = {
   guided: GrooveforgeLaunchSmokeRouteEvidence;
   opened: boolean;
   producer: GrooveforgeLaunchSmokeRouteEvidence;
+  routeBridge: GrooveforgeLaunchSmokeRouteEvidence;
+  routeBridgeCompletion: GrooveforgeLaunchSmokeRouteEvidence;
+  routeBridgeReadiness: GrooveforgeLaunchSmokeRouteEvidence;
   resultPresent: boolean;
   searchPresent: boolean;
 };
