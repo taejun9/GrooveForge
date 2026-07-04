@@ -12,15 +12,21 @@ const bundleId = "app.grooveforge.desktop";
 const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
-const syntheticSmoke = process.argv.includes("--smoke");
-const reportStem = syntheticSmoke
-  ? "release-channel-placeholder-input-receipt-smoke"
-  : "release-channel-placeholder-input-receipt";
+const placeholderSyntheticSmoke = process.argv.includes("--smoke");
+const readySyntheticSmoke = process.argv.includes("--ready-smoke");
+const syntheticSmoke = placeholderSyntheticSmoke || readySyntheticSmoke;
+const reportStem = readySyntheticSmoke
+  ? "release-channel-placeholder-input-receipt-ready-smoke"
+  : placeholderSyntheticSmoke
+    ? "release-channel-placeholder-input-receipt-smoke"
+    : "release-channel-placeholder-input-receipt";
 const receiptArtifactNames = [
   "release-channel-placeholder-input-receipt.md",
   "release-channel-placeholder-input-receipt.json",
   "release-channel-placeholder-input-receipt-smoke.md",
-  "release-channel-placeholder-input-receipt-smoke.json"
+  "release-channel-placeholder-input-receipt-smoke.json",
+  "release-channel-placeholder-input-receipt-ready-smoke.md",
+  "release-channel-placeholder-input-receipt-ready-smoke.json"
 ];
 const markdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${reportStem}.md`);
 const jsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${reportStem}.json`);
@@ -47,6 +53,12 @@ const placeholderValues = new Map([
   ["GROOVEFORGE_RELEASE_DOWNLOAD_URL", "<release-download-https-url>"],
   ["GROOVEFORGE_RELEASE_NOTES_URL", "<release-notes-https-url>"],
   ["GROOVEFORGE_SUPPORT_URL", "<support-https-url>"]
+]);
+const readyValues = new Map([
+  ["GROOVEFORGE_DISTRIBUTION_CHANNEL", "private-beta"],
+  ["GROOVEFORGE_RELEASE_DOWNLOAD_URL", "https://downloads.invalid/grooveforge.dmg"],
+  ["GROOVEFORGE_RELEASE_NOTES_URL", "https://releases.invalid/grooveforge-notes"],
+  ["GROOVEFORGE_SUPPORT_URL", "https://support.invalid/grooveforge"]
 ]);
 const preflightCommand = "npm run release:channel-apply-private-env-preflight";
 const templateCommand = "npm run release:channel-private-input-template";
@@ -95,6 +107,7 @@ function summarizeKeys(keys) {
 
 async function writeSyntheticFixtures() {
   await mkdir(syntheticRoot, { recursive: true });
+  const privateInputValues = readySyntheticSmoke ? readyValues : placeholderValues;
   const distributionEnvLines = [
     "# Synthetic ignored distribution env for placeholder-input receipt smoke.",
     ...releaseChannelMetadataKeys.map((key) => `${key}=${placeholderValues.get(key)}`),
@@ -102,7 +115,7 @@ async function writeSyntheticFixtures() {
   ];
   const privateInputLines = [
     "# Synthetic ignored private input file for placeholder-input receipt smoke.",
-    ...releaseChannelMetadataKeys.map((key) => `${key}=${placeholderValues.get(key)}`),
+    ...releaseChannelMetadataKeys.map((key) => `${key}=${privateInputValues.get(key)}`),
     ""
   ];
   await writeFile(path.join(syntheticRoot, defaultDistributionEnvFileName), distributionEnvLines.join("\n"));
@@ -257,12 +270,16 @@ function buildReport(preflight, preflightResult) {
     platform: process.platform,
     arch: process.arch,
     platformArch,
-    reportCommand: syntheticSmoke
-      ? "npm run release:channel-placeholder-input-receipt-smoke"
-      : "npm run release:channel-placeholder-input-receipt",
+    reportCommand: readySyntheticSmoke
+      ? "npm run release:channel-placeholder-input-receipt-ready-smoke"
+      : placeholderSyntheticSmoke
+        ? "npm run release:channel-placeholder-input-receipt-smoke"
+        : "npm run release:channel-placeholder-input-receipt",
     reportStem,
     receiptArtifactNames,
     syntheticSmoke,
+    placeholderSyntheticSmoke,
+    readySyntheticSmoke,
     receiptReady,
     receiptMode: mode,
     sourcePreflightCommand: preflightCommand,
@@ -364,6 +381,7 @@ function buildMarkdown(report) {
 - Source preflight ready: ${readyLabel(report.sourcePreflightReady)}
 - Local env file loaded: ${readyLabel(report.localEnvFileLoaded)}
 - Local env modified: ${readyLabel(report.localEnvModified)}
+- Real local env read: ${readyLabel(report.realLocalEnvRead)}
 - Real local env modified: ${readyLabel(report.realLocalEnvModified)}
 - Current env edit target: \`${report.currentEnvEditTarget}\`
 - Private input file key: \`${report.privateInputFileKey}\`
@@ -403,7 +421,7 @@ The receipt is value-free. It records key names, file paths, line numbers, readi
 `;
 }
 
-function validateReport(report, markdown) {
+function validateReport(report, markdown, preflightOutput) {
   check(report.receiptReady === true, "release-channel placeholder input receipt should be ready");
   check(
     [
@@ -440,7 +458,7 @@ function validateReport(report, markdown) {
   check(report.releaseGateClaimedGatekeeperApproval === false, "placeholder input receipt should not claim Gatekeeper approval");
   check(report.releaseGateClaimedManualQaApproval === false, "placeholder input receipt should not claim manual QA approval");
   check(report.releaseGateClaimedExternalDistribution === false, "placeholder input receipt should not claim external distribution");
-  if (report.syntheticSmoke) {
+  if (report.placeholderSyntheticSmoke) {
     check(report.receiptMode === "placeholder-private-input-file", "placeholder input smoke should use placeholder-private-input-file mode");
     check(report.sourcePreflightExitStatus === 1, "placeholder input smoke should observe blocked preflight exit 1");
     check(report.sourcePreflightReady === false, "placeholder input smoke should keep preflight blocked");
@@ -450,6 +468,27 @@ function validateReport(report, markdown) {
     check(report.privateInputFileMissingKeyCount === 0, "placeholder input smoke should not report missing private input keys");
     check(report.privateInputFileInvalidShapeKeyCount === 0, "placeholder input smoke should not report invalid private input shapes");
     check(report.nextOperatorCommand === preflightCommand, "placeholder input smoke should keep preflight as the next operator command");
+  }
+  if (report.readySyntheticSmoke) {
+    check(report.receiptMode === "ready-private-input-file", "ready input smoke should use ready-private-input-file mode");
+    check(report.sourcePreflightExitStatus === 0, "ready input smoke should observe preflight exit 0");
+    check(report.sourcePreflightReady === true, "ready input smoke should mark preflight ready");
+    check(report.privateInputFilePresent === true, "ready input smoke should include a private input file");
+    check(report.privateInputFileLoadedKeyCount === releaseChannelMetadataKeys.length, "ready input smoke should load four private input keys");
+    check(report.privateInputFilePlaceholderKeyCount === 0, "ready input smoke should report zero placeholder private input keys");
+    check(report.privateInputFileMissingKeyCount === 0, "ready input smoke should report zero missing private input keys");
+    check(report.privateInputFileInvalidShapeKeyCount === 0, "ready input smoke should report zero invalid private input shapes");
+    check(report.localEnvModified === false, "ready input smoke should not modify the synthetic local env");
+    check(report.realLocalEnvRead === false, "ready input smoke should not read the real local env");
+    check(report.realLocalEnvModified === false, "ready input smoke should not modify the real local env");
+    check(
+      report.privateInputFileLocationRows.every((row) => row.privateInputFileShapeReady === true),
+      "ready input smoke should mark all private input file rows shape-ready"
+    );
+    check(report.nextOperatorCommand === applyCommand, "ready input smoke should hand off to the apply command");
+    check(JSON.stringify(report).includes("https://") === false, "ready input smoke JSON should not include URL values");
+    check(markdown.includes("https://") === false, "ready input smoke Markdown should not include URL values");
+    check(preflightOutput.includes("https://") === false, "ready input smoke console output should not include URL values");
   }
   check(markdown.includes("Release-Channel Placeholder Input Receipt"), "placeholder input receipt Markdown should include title");
   check(markdown.includes("Receipt mode:"), "placeholder input receipt Markdown should include mode");
@@ -473,7 +512,7 @@ try {
   const preflight = await readJsonRequired(preflightJsonPath, "release-channel apply preflight");
   const report = buildReport(preflight, preflightResult);
   const markdown = buildMarkdown(report);
-  validateReport(report, markdown);
+  validateReport(report, markdown, `${preflightResult.stdout}\n${preflightResult.stderr}`);
 
   if (failures.length > 0) {
     console.error("GrooveForge release-channel placeholder input receipt failed:");
