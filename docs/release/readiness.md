@@ -40,6 +40,14 @@ npm run release:source-evidence-prereq-smoke
 
 That packet reads the external proof bundle and completion summary when they exist, otherwise falls back to the expected 21 source artifacts. It writes ignored Markdown/JSON with present/missing artifact rows, refresh command rows, prerequisite notes, current operator first command, strict proof command, current private input placeholder locations, and non-claiming posture without running packaging, signing, notarization, uploads, feed publishing, channel probes, hard gates, or ignored env writes.
 
+Run the source evidence refresh smoke when those prerequisite rows need to be regenerated from local-only evidence before another completion readout:
+
+```sh
+npm run release:source-evidence-refresh-smoke
+```
+
+That refresh builds the app, regenerates local package/project-IO/release manifest/support/update/signing-readiness/completion/external runbook/proof-bundle evidence in dependency order, then reruns `npm run release:source-evidence-prereq-smoke` and fails unless all 21 source artifacts are present. It forces `GROOVEFORGE_NOTARY_SUBMIT=0`, stores only command status/duration rows plus generated-intermediate cleanup rows, and does not upload releases, publish update feeds, probe distribution channels, submit to Apple, write ignored private env files, record private values, or claim external distribution completion.
+
 Run the 10-plan checkpoint smoke directly only when manually rerunning the checkpoint from already refreshed source evidence:
 
 ```sh

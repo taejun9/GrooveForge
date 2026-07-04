@@ -64,6 +64,7 @@
     "release:progress-smoke": "node harness/scripts/run_release_progress_report.mjs --from-existing",
     "release:progress-refresh-smoke": "node harness/scripts/run_release_progress_refresh_smoke.mjs",
     "release:source-evidence-prereq-smoke": "node harness/scripts/run_release_source_evidence_prereq_smoke.mjs",
+    "release:source-evidence-refresh-smoke": "node harness/scripts/run_release_source_evidence_refresh_smoke.mjs",
     "release:completion-summary-smoke": "node harness/scripts/run_release_completion_summary_smoke.mjs",
     "release:completion-summary-refresh-smoke": "node harness/scripts/run_release_completion_summary_refresh_smoke.mjs",
     "release:10-plan-checkpoint-smoke": "node harness/scripts/run_release_10_plan_checkpoint_smoke.mjs",
