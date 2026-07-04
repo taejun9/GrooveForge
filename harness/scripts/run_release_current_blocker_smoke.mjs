@@ -493,6 +493,73 @@ function placeholderInputCommandRows(values) {
   }));
 }
 
+function inputSourceState({ present, placeholder, shapeReady, filePresent = true, keyPresent = true }) {
+  if (filePresent !== true) {
+    return "file missing";
+  }
+  if (keyPresent !== true || present !== true) {
+    return "input missing";
+  }
+  if (placeholder === true) {
+    return "placeholder";
+  }
+  if (shapeReady === true) {
+    return "ready";
+  }
+  return "shape invalid";
+}
+
+function buildReleaseChannelInputSourceHandoffRows({ processEnvRows, privateInputRows, privateInputFilePresent }) {
+  const processRowsByKey = new Map(valueFreeObjectRows(processEnvRows).map((row) => [textValue(row.key), row]));
+  const privateRowsByKey = new Map(valueFreeObjectRows(privateInputRows).map((row) => [textValue(row.key), row]));
+
+  return releaseChannelMetadataKeys.map((key, index) => {
+    const processRow = processRowsByKey.get(key) ?? {};
+    const privateRow = privateRowsByKey.get(key) ?? {};
+    const processReady = processRow.inputPresent === true && processRow.inputPlaceholder !== true && processRow.inputShapeReady === true;
+    const privateReady =
+      privateRow.privateInputFileKeyPresent === true &&
+      privateRow.privateInputFilePlaceholder !== true &&
+      privateRow.privateInputFileShapeReady === true;
+    const privateFileCanBeEdited = privateInputFilePresent === true;
+    const selectedInputSource = processReady
+      ? "process.env"
+      : privateReady || privateFileCanBeEdited
+        ? "private-input-file"
+        : "private-input-template";
+    const operatorAction =
+      selectedInputSource === "process.env"
+        ? `Run ${releaseChannelApplyPrivateEnvPreflightCommand}; process env is the current ready input source.`
+        : selectedInputSource === "private-input-file"
+          ? `Add or replace the ignored private input file row for ${key}, then run ${releaseChannelApplyPrivateEnvPreflightCommand}.`
+          : `Run ${releaseChannelPrivateInputTemplateCommand}, fill ${key}, then run ${releaseChannelApplyPrivateEnvPreflightCommand}.`;
+
+    return {
+      order: index + 1,
+      key,
+      processEnvState: inputSourceState({
+        present: processRow.inputPresent === true,
+        placeholder: processRow.inputPlaceholder === true,
+        shapeReady: processRow.inputShapeReady === true
+      }),
+      privateInputFileState: inputSourceState({
+        present: privateRow.privateInputFileKeyPresent === true,
+        placeholder: privateRow.privateInputFilePlaceholder === true,
+        shapeReady: privateRow.privateInputFileShapeReady === true,
+        filePresent: privateInputFilePresent === true,
+        keyPresent: privateRow.privateInputFileKeyPresent === true
+      }),
+      selectedInputSource,
+      expectedShape: textValue(privateRow.expectedShape, textValue(processRow.expectedShape)),
+      operatorAction,
+      preflightCommand: releaseChannelApplyPrivateEnvPreflightCommand,
+      applyCommand: releaseChannelApplyPrivateEnvCommand,
+      proofCommand: recommendedPrivateEditOperatorProofCommand,
+      valueRecorded: false
+    };
+  });
+}
+
 function placeholderInputFileLocationSummary(rows) {
   return rows.length > 0
     ? rows
@@ -524,6 +591,18 @@ function formatPlaceholderInputCommandRows(rows) {
     .map(
       (row) =>
         `| ${row.order ?? "?"} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${row.requiredBeforeApply ? "yes" : "no"} | ${row.valueRecorded === false ? "no" : "yes"} |`
+    )
+    .join("\n");
+}
+
+function formatReleaseChannelInputSourceHandoffRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | none | none | none | none | none | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order ?? "?"} | ${escapeCell(row.key)} | ${escapeCell(row.processEnvState)} | ${escapeCell(row.privateInputFileState)} | ${escapeCell(row.selectedInputSource)} | ${escapeCell(row.expectedShape)} | ${escapeCell(row.operatorAction)} | \`${escapeCell(row.preflightCommand)}\` | \`${escapeCell(row.applyCommand)}\` | \`${escapeCell(row.proofCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`
     )
     .join("\n");
 }
@@ -1113,7 +1192,7 @@ function currentActionAcceptanceBlockerRows({
 
       if (lower.includes("without placeholder values")) {
         sourceField = "externalProofBundle.currentPlaceholderKeys/currentPlaceholderEditLocations";
-        operatorAction = `Set private release-channel process env values, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${currentEnvEditTarget}: ${currentPlaceholderEditLocationSummary}.`;
+        operatorAction = `Set private release-channel process env values or add/replace the ignored private input file rows, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${currentEnvEditTarget}: ${currentPlaceholderEditLocationSummary}.`;
       } else if (lower.includes("private-inputs") || lower.includes("private inputs")) {
         sourceField = "releaseDoctor.privateInputsReady/channelMetadataReady/privateValuesRecorded";
         operatorAction = `Run ${currentNextCommand} after ${releaseChannelApplyPrivateEnvPreflightCommand} verifies and ${releaseChannelApplyPrivateEnvCommand} applies the current release-channel metadata placeholders.`;
@@ -2133,6 +2212,29 @@ function buildReport({
     preflightProcessEnvRows.every((row) => row.writeCommand === releaseChannelApplyPrivateEnvCommand) &&
     preflightProcessEnvRows.every((row) => row.proofCommand === recommendedPrivateEditOperatorProofCommand) &&
     preflightProcessEnvRows.every((row) => row.valueRecorded === false);
+  const releaseChannelInputSourceHandoffRows = buildReleaseChannelInputSourceHandoffRows({
+    processEnvRows: preflightProcessEnvRows,
+    privateInputRows: placeholderReceiptRows,
+    privateInputFilePresent: releaseChannelPlaceholderInputReceipt.privateInputFilePresent === true
+  });
+  const releaseChannelInputSourceHandoffSelectedSources = [
+    ...new Set(releaseChannelInputSourceHandoffRows.map((row) => row.selectedInputSource))
+  ];
+  const releaseChannelInputSourceHandoffReady =
+    releaseChannelInputSourceHandoffRows.length === releaseChannelMetadataKeys.length &&
+    releaseChannelInputSourceHandoffRows.every(
+      (row) =>
+        row.valueRecorded === false &&
+        row.preflightCommand === releaseChannelApplyPrivateEnvPreflightCommand &&
+        row.applyCommand === releaseChannelApplyPrivateEnvCommand &&
+        row.proofCommand === recommendedPrivateEditOperatorProofCommand &&
+        textValue(row.selectedInputSource) !== "none" &&
+        textValue(row.operatorAction) !== "none"
+    );
+  const releaseChannelInputSourceHandoffSummary =
+    releaseChannelInputSourceHandoffRows.length > 0
+      ? `${releaseChannelInputSourceHandoffRows.length} value-free input-source rows; selected ${releaseChannelInputSourceHandoffSelectedSources.join(", ")}`
+      : "none";
   const currentOperatorCommandRows = valueFreeObjectRows(releaseProgress.currentOperatorCommandRows);
   const currentOperatorCommandSequenceReady =
     releaseProgress.currentOperatorCommandSequenceReady === true &&
@@ -2766,6 +2868,19 @@ function buildReport({
         ? `${preflightProcessEnvRows.length} value-free process.env input checklist rows`
         : "none",
     preflightProcessEnvChecklistValueRecorded: false,
+    releaseChannelInputSourceHandoffReady,
+    releaseChannelInputSourceHandoffRowCount: releaseChannelInputSourceHandoffRows.length,
+    releaseChannelInputSourceHandoffSummary,
+    releaseChannelInputSourceHandoffSelectedSources,
+    releaseChannelInputSourceHandoffSelectedSourceSummary:
+      releaseChannelInputSourceHandoffSelectedSources.length > 0
+        ? releaseChannelInputSourceHandoffSelectedSources.join(", ")
+        : "none",
+    releaseChannelInputSourceHandoffRows,
+    releaseChannelInputSourceHandoffPreflightCommand: releaseChannelApplyPrivateEnvPreflightCommand,
+    releaseChannelInputSourceHandoffApplyCommand: releaseChannelApplyPrivateEnvCommand,
+    releaseChannelInputSourceHandoffProofCommand: recommendedPrivateEditOperatorProofCommand,
+    releaseChannelInputSourceHandoffValueRecorded: false,
     currentOperatorCommandSequenceReady,
     currentOperatorCommandRowCount: integerValue(releaseProgress.currentOperatorCommandRowCount),
     currentOperatorCommandSummary: textValue(releaseProgress.currentOperatorCommandSummary, "none"),
@@ -3813,6 +3928,15 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.preflightProcessEnvChecklistRows.every((row) => row.valueRecorded === false), "release current blocker preflight checklist rows should be value-free");
   check(report.preflightProcessEnvChecklistMissingCount + report.preflightProcessEnvChecklistPlaceholderCount + report.preflightProcessEnvChecklistInvalidShapeCount >= 0, "release current blocker preflight checklist should expose input blocker counts");
   check(report.preflightProcessEnvChecklistValueRecorded === false, "release current blocker preflight checklist should not record values");
+  check(report.releaseChannelInputSourceHandoffReady === true, "release current blocker should include a ready input-source handoff");
+  check(report.releaseChannelInputSourceHandoffRowCount === releaseChannelMetadataKeys.length, "release current blocker input-source handoff should include four rows");
+  check(report.releaseChannelInputSourceHandoffRows.every((row) => releaseChannelMetadataKeys.includes(row.key)), "release current blocker input-source handoff should cover release-channel keys only");
+  check(report.releaseChannelInputSourceHandoffRows.every((row) => row.preflightCommand === releaseChannelApplyPrivateEnvPreflightCommand), "release current blocker input-source handoff should point to preflight before apply");
+  check(report.releaseChannelInputSourceHandoffRows.every((row) => row.applyCommand === releaseChannelApplyPrivateEnvCommand), "release current blocker input-source handoff should point to apply after preflight");
+  check(report.releaseChannelInputSourceHandoffRows.every((row) => row.proofCommand === recommendedPrivateEditOperatorProofCommand), "release current blocker input-source handoff should point to strict proof after apply");
+  check(report.releaseChannelInputSourceHandoffRows.every((row) => row.valueRecorded === false), "release current blocker input-source handoff rows should be value-free");
+  check(report.releaseChannelInputSourceHandoffSelectedSources.every((source) => ["process.env", "private-input-file", "private-input-template"].includes(source)), "release current blocker input-source handoff should use known selected source labels");
+  check(report.releaseChannelInputSourceHandoffValueRecorded === false, "release current blocker input-source handoff should not record values");
   check(report.currentOperatorCommandSequenceReady === true, "release current blocker current operator command sequence should be ready");
   check(report.currentOperatorCommandSequenceReady === releaseProgress.currentOperatorCommandSequenceReady, "release current blocker should mirror release progress current operator command sequence readiness");
   check(report.currentOperatorCommandRowCount === releaseProgress.currentOperatorCommandRowCount, "release current blocker should mirror release progress current operator command row count");
@@ -4324,6 +4448,9 @@ function buildMarkdown(report) {
     `- Preflight process env checklist rows: ${report.preflightProcessEnvChecklistRowCount} (${report.preflightProcessEnvChecklistSummary})`,
     `- Preflight process env checklist ready rows: ${report.preflightProcessEnvChecklistReadyCount}/${report.preflightProcessEnvChecklistRowCount}`,
     `- Preflight process env checklist missing/placeholder/invalid rows: ${report.preflightProcessEnvChecklistMissingCount}/${report.preflightProcessEnvChecklistPlaceholderCount}/${report.preflightProcessEnvChecklistInvalidShapeCount}`,
+    `- Release-channel input-source handoff ready: ${report.releaseChannelInputSourceHandoffReady ? "yes" : "no"}`,
+    `- Release-channel input-source handoff rows: ${report.releaseChannelInputSourceHandoffRowCount} (${report.releaseChannelInputSourceHandoffSummary})`,
+    `- Release-channel input-source selected sources: ${report.releaseChannelInputSourceHandoffSelectedSourceSummary}`,
     `- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`,
     `- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`,
     `- Current operator first command: \`${report.currentOperatorFirstCommand}\``,
@@ -4569,6 +4696,20 @@ function buildMarkdown(report) {
     "| order | key | input source | present | placeholder | shape ready | expected shape | preflight command | write command | proof command | value recorded |",
     "|---:|---|---|---:|---:|---:|---|---|---|---|---:|",
     formatPreflightProcessEnvChecklistRows(report.preflightProcessEnvChecklistRows),
+    "",
+    "## Release-Channel Input Source Handoff",
+    "",
+    `- Handoff ready: ${report.releaseChannelInputSourceHandoffReady ? "yes" : "no"}`,
+    `- Handoff rows: ${report.releaseChannelInputSourceHandoffRowCount} (${report.releaseChannelInputSourceHandoffSummary})`,
+    `- Selected sources: ${report.releaseChannelInputSourceHandoffSelectedSourceSummary}`,
+    `- Preflight command: \`${report.releaseChannelInputSourceHandoffPreflightCommand}\``,
+    `- Apply command: \`${report.releaseChannelInputSourceHandoffApplyCommand}\``,
+    `- Proof command: \`${report.releaseChannelInputSourceHandoffProofCommand}\``,
+    `- Value recorded: ${report.releaseChannelInputSourceHandoffValueRecorded ? "yes" : "no"}`,
+    "",
+    "| order | key | process env state | private input file state | selected source | expected shape | operator action | preflight command | apply command | proof command | value recorded |",
+    "|---:|---|---|---|---|---|---|---|---|---|---:|",
+    formatReleaseChannelInputSourceHandoffRows(report.releaseChannelInputSourceHandoffRows),
     "",
     "## Current Operator Command Sequence",
     "",
@@ -5108,6 +5249,10 @@ check(markdown.includes("Preflight process env checklist source ready:"), "relea
 check(markdown.includes("Preflight process env checklist rows:"), "release current blocker Markdown should include preflight process env checklist row summary");
 check(markdown.includes("Preflight Process Env Input Checklist"), "release current blocker Markdown should include preflight process env checklist table");
 check(markdown.includes("Missing/placeholder/invalid rows:"), "release current blocker Markdown should include preflight process env blocker counts");
+check(markdown.includes("Release-channel input-source handoff ready:"), "release current blocker Markdown should include input-source handoff readiness");
+check(markdown.includes("Release-channel input-source handoff rows:"), "release current blocker Markdown should include input-source handoff row count");
+check(markdown.includes("Release-channel input-source selected sources:"), "release current blocker Markdown should include selected input sources");
+check(markdown.includes("Release-Channel Input Source Handoff"), "release current blocker Markdown should include input-source handoff section");
 check(markdown.includes("Post-edit proof sequence receipt ready:"), "release current blocker Markdown should include post-edit proof sequence readiness");
 check(markdown.includes("Post-edit proof sequence receipt rows:"), "release current blocker Markdown should include post-edit proof sequence rows");
 check(markdown.includes("Post-edit proof sequence recommended proof chain:"), "release current blocker Markdown should include post-edit proof sequence recommended proof chain");
@@ -5209,6 +5354,9 @@ console.log(`- Preflight process env checklist source ready: ${report.preflightP
 console.log(`- Preflight process env checklist rows: ${report.preflightProcessEnvChecklistRowCount} (${report.preflightProcessEnvChecklistSummary})`);
 console.log(`- Preflight process env checklist ready rows: ${report.preflightProcessEnvChecklistReadyCount}/${report.preflightProcessEnvChecklistRowCount}`);
 console.log(`- Preflight process env checklist missing/placeholder/invalid rows: ${report.preflightProcessEnvChecklistMissingCount}/${report.preflightProcessEnvChecklistPlaceholderCount}/${report.preflightProcessEnvChecklistInvalidShapeCount}`);
+console.log(`- Release-channel input-source handoff ready: ${report.releaseChannelInputSourceHandoffReady ? "yes" : "no"}`);
+console.log(`- Release-channel input-source handoff rows: ${report.releaseChannelInputSourceHandoffRowCount} (${report.releaseChannelInputSourceHandoffSummary})`);
+console.log(`- Release-channel input-source selected sources: ${report.releaseChannelInputSourceHandoffSelectedSourceSummary}`);
 console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);

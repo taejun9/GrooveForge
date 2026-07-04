@@ -50,6 +50,8 @@ Run the current blocker refresh after local release evidence exists and ignored 
 npm run release:current-blocker
 ```
 
+The current blocker receipt includes a value-free Release-Channel Input Source Handoff. That handoff compares the process-env preflight evidence with the ignored `.env.release-channel.local` receipt for the same four metadata keys, names the next selected input source, preserves preflight before apply and strict proof after apply, and records only key names, state labels, command names, file names, and line numbers.
+
 Run the fast existing-evidence current blocker receipt after progress evidence exists:
 
 ```sh
