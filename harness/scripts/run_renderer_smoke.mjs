@@ -80,6 +80,8 @@ function validateFirstRunRenderer(html) {
       "First-time composer completion",
       'data-testid="audience-session-action-beginner"',
       'data-testid="audience-starter-action-beginner"',
+      'data-testid="audience-starter-followup-beginner"',
+      "Starter follow-up: First Beat Path / Dual Audience Readiness",
       "Enter Guided",
       "Build Starter",
       "First Beat Path",
@@ -97,6 +99,8 @@ function validateFirstRunRenderer(html) {
       'data-testid="audience-completion-route-producer"',
       'data-testid="audience-session-action-producer"',
       'data-testid="audience-starter-action-producer"',
+      'data-testid="audience-starter-followup-producer"',
+      "Starter follow-up: Review Queue / Export Preflight / Handoff Package Check",
       "Enter Studio",
       "Studio",
       "Review Queue",
@@ -305,7 +309,8 @@ function validateAudienceStarterQuickActionResults(quickActions, workstation) {
         "delivery Starter Sketch"
       ],
       beforeNeedles: ["current project", "First-time composer first beat", "Trap", "F minor", "145 BPM", "editable events"],
-      nextNeedles: ["Enter Guided", "First Beat Path", "sample-free composition move"]
+      auditionNeedles: ["first-time composer starter", "First Beat Path", "Dual Audience Readiness"],
+      nextNeedles: ["Audience Starter follow-up", "First Beat Path", "Audience Completion Route"]
     },
     {
       label: "producer Audience Starter visible result",
@@ -326,7 +331,8 @@ function validateAudienceStarterQuickActionResults(quickActions, workstation) {
         "delivery Beat Store"
       ],
       beforeNeedles: ["current project", "Professional producer studio pass", "Trap", "F minor", "145 BPM", "editable events"],
-      nextNeedles: ["Enter Studio", "Review Queue", "Export Preflight"]
+      auditionNeedles: ["professional producer starter", "Review Queue", "Production Snapshot", "Export Preflight"],
+      nextNeedles: ["Audience Starter follow-up", "Review Queue", "Export Preflight", "Handoff Package Check"]
     }
   ];
 
@@ -350,6 +356,9 @@ function validateAudienceStarterQuickActionResults(quickActions, workstation) {
     }
     for (const needle of testCase.afterNeedles) {
       checkIncludes(result.metric.after, needle, `${testCase.label} after metric`);
+    }
+    for (const needle of testCase.auditionNeedles) {
+      checkIncludes(result.auditionCue, needle, `${testCase.label} audition cue`);
     }
     for (const needle of testCase.nextNeedles) {
       checkIncludes(result.nextCheck, needle, `${testCase.label} next check`);
@@ -654,6 +663,10 @@ function validateAudienceStarterCommandReference(shellPanels) {
     "Audience Starter Command Reference"
   );
   checkIncludes(commandReferenceHtml, "Build Starter Project commands", "Audience Starter Command Reference");
+  checkIncludes(commandReferenceHtml, "starter follow-up routes", "Audience Starter Command Reference");
+  checkIncludes(commandReferenceHtml, "First Beat Path", "Audience Starter Command Reference");
+  checkIncludes(commandReferenceHtml, "Review Queue", "Audience Starter Command Reference");
+  checkIncludes(commandReferenceHtml, "Handoff Package Check", "Audience Starter Command Reference");
   checkIncludes(commandReferenceHtml, "Audience Starter result metric", "Audience Starter Command Reference");
   checkIncludes(commandReferenceHtml, "sample-free direct composition posture", "Audience Starter Command Reference");
 }
@@ -925,7 +938,9 @@ try {
     );
     console.log("- Audience Session result: Enter Guided and Enter Studio Quick Actions return Entered status, route metrics, and route-specific follow-up");
     console.log("- Audience Session palette: Enter Guided, Enter Studio, and Audience Starter project actions are searchable through Quick Actions query and scope filters");
-    console.log("- Audience Starter visible result: Build Starter Project actions return Applied status, before/after starter metrics, and delivery target context");
+    console.log(
+      "- Audience Starter follow-up: Build Starter Project actions return Applied status, before/after starter metrics, delivery target context, and beginner/pro next-route guidance"
+    );
     console.log("- Audience Starter Command Reference: Build Starter Project creation row is searchable from the Guide command map");
     console.log("- Dual Audience Readiness palette: route readout plus both audience lanes are searchable and return focused route metrics");
     console.log("- Audience Completion Route palette: route readout plus both audience completion lanes are searchable and return focused route metrics");

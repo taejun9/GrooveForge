@@ -68,6 +68,11 @@ const audienceStarterActionTestIds: Record<AudienceStarterProjectId, string> = {
   producer: "audience-starter-action-producer"
 };
 
+const audienceStarterFollowupLabels: Record<AudienceStarterProjectId, string> = {
+  beginner: "Starter follow-up: First Beat Path / Dual Audience Readiness",
+  producer: "Starter follow-up: Review Queue / Export Preflight / Handoff Package Check"
+};
+
 type GuideQuickStartDecision = {
   source: "path" | "session" | "workflow";
   statusLabel: string;
@@ -330,6 +335,13 @@ export function AudienceSessionReadout({
             <small data-testid={`audience-session-card-${row.id}-value`}>{row.value}</small>
             <small data-testid={`audience-session-card-${row.id}-detail`}>{row.detail}</small>
             <em data-testid={`audience-session-card-${row.id}-next`}>{row.nextCheck}</em>
+            <em
+              className="audience-starter-followup"
+              data-testid={`audience-starter-followup-${row.id}`}
+              title={audienceStarterFollowupLabels[row.id]}
+            >
+              {audienceStarterFollowupLabels[row.id]}
+            </em>
             <button
               aria-label={`${row.actionLabel} for ${row.label}`}
               className="audience-session-action"
@@ -342,10 +354,10 @@ export function AudienceSessionReadout({
               <span>{row.actionLabel}</span>
             </button>
             <button
-              aria-label={`Build starter project for ${row.label}`}
+              aria-label={`Build starter project for ${row.label}; ${audienceStarterFollowupLabels[row.id]}`}
               className="audience-session-action secondary"
               data-testid={audienceStarterActionTestIds[row.id]}
-              title={`Build starter project: ${row.actionDetail} / ${row.nextCheck}`}
+              title={`Build starter project: ${row.actionDetail} / ${audienceStarterFollowupLabels[row.id]} / ${row.nextCheck}`}
               type="button"
               onClick={() => onCreateStarter(row.id)}
             >
@@ -877,10 +889,11 @@ export function createAudienceSessionQuickActions({
           `Route ${row.actionDetail}`,
           `Readiness ${row.status}: ${row.value}`,
           `Context ${row.detail}`,
+          audienceStarterFollowupLabels[row.id],
           "Creates editable drums, 808/bass, melody/chords, arrangement, mix/master, and delivery target"
         ].join(" / "),
         group: "Create",
-        keywords: `audience starter project build ${row.id} ${row.label} editable drums 808 bass melody chords arrangement mix master delivery direct beat workstation sample free`,
+        keywords: `audience starter project build ${row.id} ${row.label} starter follow-up first beat path dual audience readiness review queue export preflight handoff package check editable drums 808 bass melody chords arrangement mix master delivery direct beat workstation sample free`,
         resultTargetId: row.id,
         run: () => onCreateStarter(row.id)
       }

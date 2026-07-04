@@ -21613,6 +21613,24 @@ export function quickActionResultFollowup(
   const target = activeDeliveryTarget(project);
   const pattern = activePattern(project);
 
+  if (action.id === "audience-starter-beginner") {
+    return {
+      auditionCue:
+        "Loop the first-time composer starter, then use First Beat Path or Dual Audience Readiness before editing notes, arrangement, mix, or export.",
+      nextCheck:
+        "Audience Starter follow-up: open First Beat Path for the next guided beat-making step, then use Audience Completion Route before export."
+    };
+  }
+
+  if (action.id === "audience-starter-producer") {
+    return {
+      auditionCue:
+        "Loop the professional producer starter, then scan Review Queue, Production Snapshot, and Export Preflight before changing the beat.",
+      nextCheck:
+        "Audience Starter follow-up: open Review Queue or Export Preflight, then confirm Handoff Package Check before delivery."
+    };
+  }
+
   if (action.id === "beat-map-route-readout-action") {
     return {
       auditionCue:

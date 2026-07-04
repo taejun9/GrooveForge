@@ -317,7 +317,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Create",
         target: "Build first-time composer / professional producer starter",
         context:
-          "Build Starter Project commands for first-time composer and professional producer local project creation, editable drums, 808/bass, melody/chords, arrangement, mix/master, Delivery Target, Session Brief state, Audience Starter result metric, and sample-free direct composition posture before creating a starter project."
+          "Build Starter Project commands for first-time composer and professional producer local project creation, starter follow-up routes into First Beat Path, Dual Audience Readiness, Review Queue, Export Preflight, and Handoff Package Check, editable drums, 808/bass, melody/chords, arrangement, mix/master, Delivery Target, Session Brief state, Audience Starter result metric, and sample-free direct composition posture before creating a starter project."
       },
       {
         id: "dual-audience-readiness",

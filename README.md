@@ -5,7 +5,7 @@ GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats
 
 Project type: `web-first TypeScript mini DAW / beat workstation`.
 
-Audience promise: first-time beat makers should be able to follow a clear setup -> compose -> arrange -> mix -> deliver path, while working producers should be able to bypass guidance and edit events, sound, arrangement, mix, master, and handoff checks directly. Audience Starter Projects give both groups visible Build Starter Project buttons plus Quick Actions commands that create editable local first-time composer and professional producer project paths from the same domain helpers used by workflow and persona smoke validation, then show value-free result feedback with starter mode, style/key/BPM, bars, editable events, and delivery target.
+Audience promise: first-time beat makers should be able to follow a clear setup -> compose -> arrange -> mix -> deliver path, while working producers should be able to bypass guidance and edit events, sound, arrangement, mix, master, and handoff checks directly. Audience Starter Projects give both groups visible Build Starter Project buttons plus Quick Actions commands that create editable local first-time composer and professional producer project paths from the same domain helpers used by workflow and persona smoke validation, then show value-free result feedback with starter mode, style/key/BPM, bars, editable events, delivery target, and audience-specific follow-up routes into First Beat Path, Dual Audience Readiness, Review Queue, Export Preflight, and Handoff Package Check.
 
 This repository includes an agent-readable project base: concise root docs, durable project knowledge under `docs/`, and a local harness under `harness/`.
 
