@@ -551,6 +551,28 @@ function validateAudienceSessionQuickActionPalette(guidancePanels, palette) {
   check(starterRows.join(",") === "beginner,producer", "Audience Starter palette actions should run the starter callbacks in order");
 }
 
+function validateAudienceStarterCommandReference(shellPanels) {
+  const commandReferenceHtml = renderToStaticMarkup(
+    React.createElement(shellPanels.CommandReferenceDialog, {
+      open: true,
+      onClose() {},
+      onOpenQuickActions() {}
+    })
+  );
+
+  checkIncludes(commandReferenceHtml, 'data-testid="command-reference-item-audience-starter"', "Audience Starter Command Reference");
+  checkIncludes(commandReferenceHtml, "Audience Starter", "Audience Starter Command Reference");
+  checkIncludes(commandReferenceHtml, "Quick Actions / Create", "Audience Starter Command Reference");
+  checkIncludes(
+    commandReferenceHtml,
+    "Build first-time composer / professional producer starter",
+    "Audience Starter Command Reference"
+  );
+  checkIncludes(commandReferenceHtml, "Build Starter Project commands", "Audience Starter Command Reference");
+  checkIncludes(commandReferenceHtml, "Audience Starter result metric", "Audience Starter Command Reference");
+  checkIncludes(commandReferenceHtml, "sample-free direct composition posture", "Audience Starter Command Reference");
+}
+
 function createDualAudienceSmokeRows() {
   return [
     {
@@ -785,6 +807,7 @@ try {
     await server.ssrLoadModule("/src/ui/workstationGuidancePanels.tsx"),
     await server.ssrLoadModule("/src/ui/workstationAppQuickActionPalette.ts")
   );
+  validateAudienceStarterCommandReference(await server.ssrLoadModule("/src/ui/workstationShellPanels.tsx"));
   validateDualAudienceQuickActionPalette(
     await server.ssrLoadModule("/src/ui/workstationGuidancePanels.tsx"),
     await server.ssrLoadModule("/src/ui/workstationAppQuickActionPalette.ts")
@@ -813,6 +836,7 @@ try {
     );
     console.log("- Audience Session result: Enter Guided and Enter Studio Quick Actions return Entered status, route metrics, and route-specific follow-up");
     console.log("- Audience Session palette: Enter Guided, Enter Studio, and Audience Starter project actions are searchable through Quick Actions query and scope filters");
+    console.log("- Audience Starter Command Reference: Build Starter Project creation row is searchable from the Guide command map");
     console.log("- Dual Audience Readiness palette: route readout plus both audience lanes are searchable and return focused route metrics");
     console.log("- Audience Completion Route palette: route readout plus both audience completion lanes are searchable and return focused route metrics");
     console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack, Delivery Bundle ZIP");

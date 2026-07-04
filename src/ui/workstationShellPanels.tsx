@@ -312,6 +312,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Audience Session Readout rows, Enter Guided first-time composer route, Enter Studio professional producer route, active lane, readiness posture, direct visible readout action, audition cue, and next check before Audience Session commands switch workflow mode."
       },
       {
+        id: "audience-starter",
+        command: "Audience Starter",
+        shortcut: "Quick Actions / Create",
+        target: "Build first-time composer / professional producer starter",
+        context:
+          "Build Starter Project commands for first-time composer and professional producer local project creation, editable drums, 808/bass, melody/chords, arrangement, mix/master, Delivery Target, Session Brief state, Audience Starter result metric, and sample-free direct composition posture before creating a starter project."
+      },
+      {
         id: "dual-audience-readiness",
         command: "Dual Audience Readiness",
         shortcut: "Quick Actions / Readout",
