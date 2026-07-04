@@ -71,6 +71,12 @@ type LaunchSmokeAudienceStarterEvidence = LaunchSmokePaletteRouteEvidence & {
   buttonPresent: boolean;
   followupPresent: boolean;
   followupText: string;
+  visibleResultAudition: string;
+  visibleResultMetricValue: string;
+  visibleResultNextCheck: string;
+  visibleResultPresent: boolean;
+  visibleResultStatus: string;
+  visibleResultTitle: string;
 };
 
 type LaunchSmokeBridgeDirectEvidence = {
@@ -899,7 +905,13 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         ...emptyRoute,
         buttonPresent: false,
         followupPresent: false,
-        followupText: ""
+        followupText: "",
+        visibleResultAudition: "",
+        visibleResultMetricValue: "",
+        visibleResultNextCheck: "",
+        visibleResultPresent: false,
+        visibleResultStatus: "",
+        visibleResultTitle: ""
       };
       const emptyBridgeDirect = {
         buttonPresent: false,

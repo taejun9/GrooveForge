@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode, Ref } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { deliveryBundleZipFileName, exportDeliveryBundleZip } from "../audio/deliveryBundle";
 import { exportMidi, midiFileName } from "../audio/midi";
 import {
@@ -1153,6 +1154,7 @@ export function App(): ReactElement {
   const [undoRedoResult, setUndoRedoResult] = useState<UndoRedoResult | null>(null);
   const [modeSwitchResult, setModeSwitchResult] = useState<ModeSwitchResult | null>(null);
   const [audienceSessionActionResult, setAudienceSessionActionResult] = useState<AudienceSessionActionResult | null>(null);
+  const [audienceStarterResult, setAudienceStarterResult] = useState<QuickActionResult | null>(null);
   const [modeFocusResult, setModeFocusResult] = useState<ModeFocusJumpResult | null>(null);
   const [workflowNavigatorResult, setWorkflowNavigatorResult] = useState<WorkflowNavigatorJumpResult | null>(null);
   const [firstBeatPathResult, setFirstBeatPathResult] = useState<FirstBeatPathJumpResult | null>(null);
@@ -2307,6 +2309,7 @@ export function App(): ReactElement {
     setLocalDraftRecoveryResult(null);
     setModeSwitchResult(null);
     setAudienceSessionActionResult(null);
+    setAudienceStarterResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
@@ -7110,6 +7113,7 @@ export function App(): ReactElement {
           null
         );
         setQuickActionResult(result);
+        flushSync(() => setAudienceStarterResult(result));
         setQuickActionRecents((recents) => prependQuickActionRecent(recents, resultAction, result));
         setProjectStatus(`Built ${label} starter project`);
         return result;
@@ -9616,7 +9620,23 @@ export function App(): ReactElement {
       };
     };
 
-    const runAudienceStarterRoute = (starterId: AudienceStarterProjectId): GrooveforgeLaunchSmokeAudienceStarterEvidence => {
+    const readAudienceStarterVisibleResult = () => ({
+      visibleResultAudition:
+        document.querySelector('[data-testid="audience-starter-result-audition"]')?.textContent?.trim() ?? "",
+      visibleResultMetricValue:
+        document.querySelector('[data-testid="audience-starter-result-metric-value"]')?.textContent?.trim() ?? "",
+      visibleResultNextCheck:
+        document.querySelector('[data-testid="audience-starter-result-next-check"]')?.textContent?.trim() ?? "",
+      visibleResultPresent: document.querySelector('[data-testid="audience-starter-result"]') !== null,
+      visibleResultStatus:
+        document.querySelector('[data-testid="audience-starter-result-status"]')?.textContent?.trim() ?? "",
+      visibleResultTitle:
+        document.querySelector('[data-testid="audience-starter-result-title"]')?.textContent?.trim() ?? ""
+    });
+
+    const runAudienceStarterRoute = async (
+      starterId: AudienceStarterProjectId
+    ): Promise<GrooveforgeLaunchSmokeAudienceStarterEvidence> => {
       const actionId = `audience-starter-${starterId}`;
       const routeQuery =
         starterId === "producer" ? "build professional producer starter" : "build first time composer starter";
@@ -9636,12 +9656,15 @@ export function App(): ReactElement {
           resultMetricValue: "Audience Starter unavailable",
           resultNextCheck: "Audience Starter visible control and Quick Action must both be available.",
           resultStatus: "Unavailable",
-          resultTitle: action?.title ?? actionId
+          resultTitle: action?.title ?? actionId,
+          ...readAudienceStarterVisibleResult()
         };
       }
 
       const result = createAudienceStarter(starterId);
       setQuickActionsOpen(false);
+      await Promise.resolve();
+      await Promise.resolve();
       return {
         ...baseEvidence,
         buttonPresent: true,
@@ -9650,13 +9673,14 @@ export function App(): ReactElement {
         resultMetricValue: result ? `${result.metric.before} -> ${result.metric.after}` : "Audience Starter unchanged",
         resultNextCheck: result?.nextCheck ?? followupText,
         resultStatus: result?.status ?? "Unchanged",
-        resultTitle: result?.title ?? action.title
+        resultTitle: result?.title ?? action.title,
+        ...readAudienceStarterVisibleResult()
       };
     };
 
     window.__grooveforgeLaunchSmoke = {
       ...(window.__grooveforgeLaunchSmoke ?? {}),
-      collectAudienceSessionQuickActionEvidence: () => {
+      collectAudienceSessionQuickActionEvidence: async () => {
         const producer = {
           ...routeEvidence("enter studio professional producer", "audience-session-enter-producer"),
           ...runAudienceSessionRoute("audience-session-enter-producer")
@@ -9701,8 +9725,8 @@ export function App(): ReactElement {
           ...routeEvidence("enter guided first time composer", "audience-session-enter-beginner"),
           ...runAudienceSessionRoute("audience-session-enter-beginner")
         };
-        const starterBeginner = runAudienceStarterRoute("beginner");
-        const starterProducer = runAudienceStarterRoute("producer");
+        const starterBeginner = await runAudienceStarterRoute("beginner");
+        const starterProducer = await runAudienceStarterRoute("producer");
         return {
           completionBeginner,
           completionProducer,
@@ -10130,6 +10154,7 @@ export function App(): ReactElement {
 
       <AudienceSessionReadout
         result={audienceSessionActionResult}
+        starterResult={audienceStarterResult}
         summary={audienceSessionReadoutSummary}
         onCreateStarter={createAudienceStarter}
         onSelectAudience={selectAudienceSessionRow}

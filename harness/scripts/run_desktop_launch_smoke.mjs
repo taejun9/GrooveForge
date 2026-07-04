@@ -203,6 +203,11 @@ function checkResult(result) {
     "live desktop Audience Starter beginner result should guide First Beat Path and Audience Completion Route follow-up"
   );
   check(
+    String(evidence?.palette?.starterBeginner?.visibleResultMetricValue ?? "").includes("starter project") &&
+      String(evidence?.palette?.starterBeginner?.visibleResultMetricValue ?? "").includes("First-time composer"),
+    "live desktop Audience Starter beginner should expose visible starter result metric feedback"
+  );
+  check(
     evidence?.palette?.starterProducer?.buttonPresent === true &&
       evidence?.palette?.starterProducer?.followupPresent === true &&
       evidence?.palette?.starterProducer?.actionPresent === true,
@@ -219,6 +224,21 @@ function checkResult(result) {
     String(evidence?.palette?.starterProducer?.resultNextCheck ?? "").includes("Review Queue") &&
       String(evidence?.palette?.starterProducer?.resultNextCheck ?? "").includes("Handoff Package Check"),
     "live desktop Audience Starter producer result should guide Review Queue and Handoff Package Check follow-up"
+  );
+  check(
+    evidence?.palette?.starterProducer?.visibleResultPresent === true &&
+      String(evidence?.palette?.starterProducer?.visibleResultStatus ?? "").includes("Applied") &&
+      String(evidence?.palette?.starterProducer?.visibleResultTitle ?? "").includes("Professional producer") &&
+      String(evidence?.palette?.starterProducer?.visibleResultMetricValue ?? "").includes("starter project") &&
+      String(evidence?.palette?.starterProducer?.visibleResultMetricValue ?? "").includes("Professional producer") &&
+      String(evidence?.palette?.starterProducer?.visibleResultMetricValue ?? "").includes("Studio"),
+    "live desktop Audience Starter producer should expose visible starter result metric feedback"
+  );
+  check(
+    String(evidence?.palette?.starterProducer?.visibleResultAudition ?? "").includes("professional producer starter") &&
+      String(evidence?.palette?.starterProducer?.visibleResultNextCheck ?? "").includes("Review Queue") &&
+      String(evidence?.palette?.starterProducer?.visibleResultNextCheck ?? "").includes("Handoff Package Check"),
+    "live desktop Audience Starter producer visible result should expose audition and next-check feedback"
   );
   check(
     evidence?.palette?.routeBridge?.actionPresent === true,

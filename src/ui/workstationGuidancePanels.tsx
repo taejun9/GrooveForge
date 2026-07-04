@@ -32,6 +32,7 @@ import type {
   ProductionSnapshotMetric,
   ProductionSnapshotSummary,
   QuickAction,
+  QuickActionResult,
   ReferenceAlignmentCard,
   ReferenceAlignmentCardId,
   ReferenceAlignmentFocusResult,
@@ -319,12 +320,14 @@ export function ModeSwitchResultStrip({ result }: { result: ModeSwitchResult }):
 
 export function AudienceSessionReadout({
   result,
+  starterResult,
   summary,
   onCreateStarter,
   onSelectAudience
 }: {
   onCreateStarter: (starterId: AudienceStarterProjectId) => void;
   result: AudienceSessionActionResult | null;
+  starterResult: QuickActionResult | null;
   summary: AudienceSessionReadoutSummary;
   onSelectAudience: (row: AudienceSessionReadoutRow) => void;
 }): ReactElement {
@@ -396,6 +399,39 @@ export function AudienceSessionReadout({
           </div>
         ))}
       </div>
+      {starterResult && (
+        <div
+          aria-live="polite"
+          className={`quick-action-result audience-starter-result ${starterResult.tone}`}
+          data-audience-starter-result={starterResult.actionId}
+          data-testid="audience-starter-result"
+        >
+          <div className="quick-action-result-main">
+            <Music2 size={15} aria-hidden="true" />
+            <span>
+              <span data-testid="audience-starter-result-status">{starterResult.status}</span>
+              <strong data-testid="audience-starter-result-title">{starterResult.title}</strong>
+              <small data-testid="audience-starter-result-detail">{starterResult.group} / {starterResult.detail}</small>
+            </span>
+          </div>
+          <div className={`quick-action-result-metric ${starterResult.metric.tone}`} data-testid="audience-starter-result-metric">
+            <span>{starterResult.metric.label}</span>
+            <strong data-testid="audience-starter-result-metric-value">
+              {starterResult.metric.before} -&gt; {starterResult.metric.after}
+            </strong>
+          </div>
+          <div className="quick-action-result-followup" data-testid="audience-starter-result-followup">
+            <span>
+              <b>Audition</b>
+              <em data-testid="audience-starter-result-audition">{starterResult.auditionCue}</em>
+            </span>
+            <span>
+              <b>Next check</b>
+              <em data-testid="audience-starter-result-next-check">{starterResult.nextCheck}</em>
+            </span>
+          </div>
+        </div>
+      )}
       {result && (
         <div
           aria-live="polite"

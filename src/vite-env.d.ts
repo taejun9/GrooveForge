@@ -62,6 +62,12 @@ type GrooveforgeLaunchSmokeAudienceStarterEvidence = GrooveforgeLaunchSmokeRoute
   buttonPresent: boolean;
   followupPresent: boolean;
   followupText: string;
+  visibleResultAudition: string;
+  visibleResultMetricValue: string;
+  visibleResultNextCheck: string;
+  visibleResultPresent: boolean;
+  visibleResultStatus: string;
+  visibleResultTitle: string;
 };
 
 type GrooveforgeLaunchSmokePaletteEvidence = {
