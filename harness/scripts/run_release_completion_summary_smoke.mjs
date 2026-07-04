@@ -32,6 +32,9 @@ const releaseChannelApplyPrivateEnvRole =
 const releaseChannelApplyPrivateEnvProofCommand = "npm run release:channel-apply-private-env-proof";
 const releaseChannelApplyPrivateEnvProofRole =
   "run private env preflight, apply only after preflight readiness, strict proof, and completion readout as one value-free operator proof runner";
+const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
+const releaseChannelSetupWizardRole =
+  "guided local-only fallback for first-time operators when private release-channel inputs are missing, placeholders, or shape-invalid";
 
 function check(condition, message) {
   if (!condition) {
@@ -282,6 +285,20 @@ function buildReport(source, completedPlanState) {
     currentOperatorApplyBeforeStrictProof: summary.currentOperatorApplyBeforeStrictProof === true,
     currentOperatorStartCommandValueRecorded: summary.currentOperatorStartCommandValueRecorded === true ? true : false,
     currentOperatorValueRecorded: summary.currentOperatorValueRecorded === true ? true : false,
+    releaseChannelGuidedSetupFallbackCommand: textValue(
+      summary.releaseChannelGuidedSetupFallbackCommand,
+      releaseChannelSetupWizardCommand
+    ),
+    releaseChannelGuidedSetupFallbackRole: textValue(
+      summary.releaseChannelGuidedSetupFallbackRole,
+      releaseChannelSetupWizardRole
+    ),
+    releaseChannelGuidedSetupFallbackReady: summary.releaseChannelGuidedSetupFallbackReady === true,
+    releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence:
+      summary.releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence === true,
+    releaseChannelGuidedSetupFallbackValueRecorded:
+      summary.releaseChannelGuidedSetupFallbackValueRecorded === true ? true : false,
+    currentOperatorCommandRowsContainGuidedSetup: summary.currentOperatorCommandRowsContainGuidedSetup === true,
     releaseChannelPrivateInputTemplateCommand: textValue(
       summary.releaseChannelPrivateInputTemplateCommand,
       releaseChannelPrivateInputTemplateCommand
@@ -436,6 +453,10 @@ function buildMarkdown(report) {
 - Current operator start command matches first command: ${readyLabel(report.currentOperatorStartCommandMatchesFirstCommand)}
 - Current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
 - Current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
+- Guided setup fallback command: \`${report.releaseChannelGuidedSetupFallbackCommand}\`
+- Guided setup fallback ready: ${readyLabel(report.releaseChannelGuidedSetupFallbackReady)}
+- Guided setup fallback separate from primary sequence: ${readyLabel(report.releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence)}
+- Primary rows contain guided setup fallback: ${readyLabel(report.currentOperatorCommandRowsContainGuidedSetup)}
 - Private input template command: \`${report.releaseChannelPrivateInputTemplateCommand}\`
 - Private input template default path: \`${report.releaseChannelPrivateInputTemplateDefaultPath}\`
 - Private input template before preflight: ${readyLabel(report.releaseChannelPrivateInputTemplateBeforePreflight)}
@@ -484,6 +505,11 @@ ${formatCompletionBlockerFocusRows(report.completionBlockerFocusRows)}
 - Preflight command: \`${report.currentOperatorPreflightCommand}\`
 - Apply command: \`${report.currentOperatorApplyCommand}\`
 - Strict proof command: \`${report.currentOperatorStrictProofCommand}\`
+- Guided setup fallback command: \`${report.releaseChannelGuidedSetupFallbackCommand}\`
+- Guided setup fallback role: ${report.releaseChannelGuidedSetupFallbackRole}
+- Guided setup fallback ready: ${readyLabel(report.releaseChannelGuidedSetupFallbackReady)}
+- Guided setup fallback separate from primary sequence: ${readyLabel(report.releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence)}
+- Primary rows contain guided setup fallback: ${readyLabel(report.currentOperatorCommandRowsContainGuidedSetup)}
 - Current-blocker refresh command: \`${report.currentOperatorBlockerRefreshCommand}\`
 - Next-actions refresh command: \`${report.currentOperatorNextActionsRefreshCommand}\`
 - Preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
@@ -604,6 +630,15 @@ function validateReport(report, markdown) {
   check(report.currentOperatorBlockerRefreshCommand === "npm run release:current-blocker", "release completion summary current operator sequence should include current-blocker refresh");
   check(report.currentOperatorNextActionsRefreshCommand === "npm run release:next-actions", "release completion summary current operator sequence should include next-actions refresh");
   check(report.currentOperatorValueRecorded === false, "release completion summary current operator sequence should be value-free");
+  check(report.releaseChannelGuidedSetupFallbackCommand === releaseChannelSetupWizardCommand, "release completion summary should expose guided setup fallback command");
+  check(report.releaseChannelGuidedSetupFallbackRole === releaseChannelSetupWizardRole, "release completion summary should expose guided setup fallback role");
+  check(report.releaseChannelGuidedSetupFallbackReady === true, "release completion summary guided setup fallback should be ready");
+  check(
+    report.releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence === true,
+    "release completion summary guided setup fallback should stay outside primary operator sequence"
+  );
+  check(report.releaseChannelGuidedSetupFallbackValueRecorded === false, "release completion summary guided setup fallback should be value-free");
+  check(report.currentOperatorCommandRowsContainGuidedSetup === false, "release completion summary current operator rows should not include guided setup fallback");
   check(report.releaseChannelPrivateInputTemplateCommand === releaseChannelPrivateInputTemplateCommand, "release completion summary should expose private input template command");
   check(report.releaseChannelPrivateInputTemplateRole === releaseChannelPrivateInputTemplateRole, "release completion summary should expose private input template role");
   check(report.releaseChannelPrivateInputTemplateDefaultPath === ".env.release-channel.local", "release completion summary should expose private input template default path");
@@ -650,6 +685,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("Current operator start command:"), "release completion summary Markdown should include current operator start command");
   check(markdown.includes("Current operator start command role:"), "release completion summary Markdown should include current operator start command role");
   check(markdown.includes("Current operator start command matches first command:"), "release completion summary Markdown should include current operator start command match");
+  check(markdown.includes("Guided setup fallback command:"), "release completion summary Markdown should include guided setup fallback command");
+  check(markdown.includes("Guided setup fallback separate from primary sequence:"), "release completion summary Markdown should include guided fallback primary sequence boundary");
   check(markdown.includes("Placeholder input receipt ready:"), "release completion summary Markdown should include placeholder input receipt readiness");
   check(markdown.includes("Placeholder input receipt mode:"), "release completion summary Markdown should include placeholder input receipt mode");
   check(markdown.includes("Placeholder private input missing/placeholder/invalid rows:"), "release completion summary Markdown should include placeholder input row counts");
@@ -708,6 +745,9 @@ console.log(`- Current operator start command role: ${report.currentOperatorStar
 console.log(`- Current operator start command matches first command: ${report.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
+console.log(`- Guided setup fallback command: ${report.releaseChannelGuidedSetupFallbackCommand}`);
+console.log(`- Guided setup fallback ready: ${report.releaseChannelGuidedSetupFallbackReady ? "yes" : "no"}`);
+console.log(`- Guided setup fallback separate from primary sequence: ${report.releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence ? "yes" : "no"}`);
 console.log(`- Private input template command: ${report.releaseChannelPrivateInputTemplateCommand}`);
 console.log(`- Private input template default path: ${report.releaseChannelPrivateInputTemplateDefaultPath}`);
 console.log(`- Private env apply preflight command: ${report.releaseChannelPrivateEnvApplyPreflightCommand}`);

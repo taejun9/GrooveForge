@@ -51,6 +51,9 @@ const releaseChannelPrivateInputTemplateRole =
   "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
 const releaseChannelPrivateInputTemplateDefaultPath = ".env.release-channel.local";
 const releaseChannelPrivateInputTemplatePrivateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
+const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
+const releaseChannelSetupWizardRole =
+  "guided local-only fallback for first-time operators when private release-channel inputs are missing, placeholders, or shape-invalid";
 const releaseChannelMetadataKeys = [
   "GROOVEFORGE_DISTRIBUTION_CHANNEL",
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
@@ -2054,6 +2057,13 @@ function buildReport({
     integerValue(releaseProgress.currentOperatorCommandRowCount) === currentOperatorCommandRows.length &&
     currentOperatorCommandRows.length >= 5 &&
     currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false);
+  const releaseChannelGuidedSetupFallbackCommand = textValue(
+    releaseChannelPreflightBlocked.guidedSetupFallbackCommand,
+    releaseChannelSetupWizardCommand
+  );
+  const currentOperatorCommandRowsContainGuidedSetup = currentOperatorCommandRows.some(
+    (row) => textValue(row.command) === releaseChannelSetupWizardCommand
+  );
   const postEditProofSequenceReceiptRows = valueFreeObjectRows(releaseProgress.postEditProofSequenceReceiptRows);
   const postEditProofSequenceReceiptReady =
     releaseProgress.postEditProofSequenceReceiptReady === true &&
@@ -2683,6 +2693,15 @@ function buildReport({
     currentOperatorApplyBeforeStrictProof: releaseProgress.currentOperatorApplyBeforeStrictProof === true,
     currentOperatorStartCommandValueRecorded: releaseProgress.currentOperatorStartCommandValueRecorded === true ? true : false,
     currentOperatorValueRecorded: releaseProgress.currentOperatorValueRecorded === true ? true : false,
+    releaseChannelGuidedSetupFallbackCommand,
+    releaseChannelGuidedSetupFallbackRole: releaseChannelSetupWizardRole,
+    releaseChannelGuidedSetupFallbackReady:
+      releaseChannelGuidedSetupFallbackCommand === releaseChannelSetupWizardCommand &&
+      releaseChannelPreflightBlocked.blockedSmokeReady === true,
+    releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence: currentOperatorCommandRowsContainGuidedSetup === false,
+    releaseChannelGuidedSetupFallbackValueRecorded:
+      releaseChannelPreflightBlocked.guidedSetupFallbackValueRecorded === true ? true : false,
+    currentOperatorCommandRowsContainGuidedSetup,
     postEditProofSequenceReceiptReady,
     postEditProofSequenceReceiptRowCount: integerValue(releaseProgress.postEditProofSequenceReceiptRowCount),
     postEditProofSequenceReceiptSummary: textValue(releaseProgress.postEditProofSequenceReceiptSummary, "none"),
@@ -3663,6 +3682,12 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentOperatorBlockerRefreshCommand === "npm run release:current-blocker", "release current blocker current operator sequence should include current-blocker refresh");
   check(report.currentOperatorNextActionsRefreshCommand === "npm run release:next-actions", "release current blocker current operator sequence should include next-actions refresh");
   check(report.currentOperatorValueRecorded === false, "release current blocker current operator sequence should be value-free");
+  check(report.releaseChannelGuidedSetupFallbackCommand === releaseChannelSetupWizardCommand, "release current blocker should expose guided setup fallback command");
+  check(report.releaseChannelGuidedSetupFallbackRole === releaseChannelSetupWizardRole, "release current blocker should expose guided setup fallback role");
+  check(report.releaseChannelGuidedSetupFallbackReady === true, "release current blocker guided setup fallback should be ready");
+  check(report.releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence === true, "release current blocker guided setup fallback should stay outside primary operator sequence");
+  check(report.releaseChannelGuidedSetupFallbackValueRecorded === false, "release current blocker guided setup fallback should be value-free");
+  check(report.currentOperatorCommandRowsContainGuidedSetup === false, "release current blocker current operator rows should not include guided setup fallback");
   check(report.postEditProofSequenceReceiptReady === true, "release current blocker post-edit proof sequence receipt should be ready");
   check(report.postEditProofSequenceReceiptReady === releaseProgress.postEditProofSequenceReceiptReady, "release current blocker should mirror release progress post-edit proof sequence readiness");
   check(report.postEditProofSequenceReceiptRowCount === releaseProgress.postEditProofSequenceReceiptRowCount, "release current blocker should mirror release progress post-edit proof sequence row count");
@@ -4073,6 +4098,9 @@ function buildMarkdown(report) {
     `- Current action handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})`,
     `- Private input template command: ${report.releaseChannelPrivateInputTemplateCommand}`,
     `- Private input template default path: ${report.releaseChannelPrivateInputTemplateDefaultPath}`,
+    `- Guided setup fallback command: \`${report.releaseChannelGuidedSetupFallbackCommand}\``,
+    `- Guided setup fallback ready: ${report.releaseChannelGuidedSetupFallbackReady ? "yes" : "no"}`,
+    `- Guided setup fallback separate from primary sequence: ${report.releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence ? "yes" : "no"}`,
     `- Private edit safety ready: ${report.currentPrivateEditSafetyReady ? "yes" : "no"}`,
     `- Private edit safety rows: ${report.currentPrivateEditSafetyRowCount} (${report.currentPrivateEditSafetySummary})`,
     `- Current input shape checklist ready: ${report.currentInputShapeChecklistReady ? "yes" : "no"}`,
@@ -4373,6 +4401,11 @@ function buildMarkdown(report) {
     `- Preflight command: \`${report.currentOperatorPreflightCommand}\``,
     `- Apply command: \`${report.currentOperatorApplyCommand}\``,
     `- Strict proof command: \`${report.currentOperatorStrictProofCommand}\``,
+    `- Guided setup fallback command: \`${report.releaseChannelGuidedSetupFallbackCommand}\``,
+    `- Guided setup fallback role: ${report.releaseChannelGuidedSetupFallbackRole}`,
+    `- Guided setup fallback ready: ${report.releaseChannelGuidedSetupFallbackReady ? "yes" : "no"}`,
+    `- Guided setup fallback separate from primary sequence: ${report.releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence ? "yes" : "no"}`,
+    `- Primary rows contain guided setup fallback: ${report.currentOperatorCommandRowsContainGuidedSetup ? "yes" : "no"}`,
     `- Current-blocker refresh command: \`${report.currentOperatorBlockerRefreshCommand}\``,
     `- Next-actions refresh command: \`${report.currentOperatorNextActionsRefreshCommand}\``,
     `- Preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`,
@@ -4998,6 +5031,9 @@ console.log(`- Current operator start command role: ${report.currentOperatorStar
 console.log(`- Current operator start command matches first command: ${report.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`);
 console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
+console.log(`- Guided setup fallback command: ${report.releaseChannelGuidedSetupFallbackCommand}`);
+console.log(`- Guided setup fallback ready: ${report.releaseChannelGuidedSetupFallbackReady ? "yes" : "no"}`);
+console.log(`- Guided setup fallback separate from primary sequence: ${report.releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence ? "yes" : "no"}`);
 console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);
 console.log(`- Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})`);
 console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})`);
