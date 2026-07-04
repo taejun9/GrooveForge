@@ -57,6 +57,15 @@ const requiredRefreshCommands = [
   },
   {
     order: 2,
+    command: releaseChannelApplyPrivateEnvPreflightCommand,
+    role: "leave the real operator private-input preflight receipt before completion-summary and external packet mirroring",
+    condition: "always; exit 0 or expected blocked exit 1",
+    allowBlockedExit: true,
+    skipped: false,
+    valueRecorded: false
+  },
+  {
+    order: 3,
     command: "npm run release:completion-summary-smoke",
     role: "emit compact after-work completion summary from the refreshed progress receipt",
     condition: "always",
@@ -64,7 +73,7 @@ const requiredRefreshCommands = [
     valueRecorded: false
   },
   {
-    order: 3,
+    order: 4,
     command: "npm run release:external-completion-run-packet-smoke -- --from-existing-completion-summary",
     role: "refresh the ordered external completion run packet from the just-refreshed completion summary",
     condition: "always",
@@ -72,19 +81,10 @@ const requiredRefreshCommands = [
     valueRecorded: false
   },
   {
-    order: 4,
+    order: 5,
     command: "npm run release:external-completion-resume-packet-smoke -- --from-existing-run-packet",
     role: "refresh the current external completion resume packet from the ordered run packet",
     condition: "always",
-    skipped: false,
-    valueRecorded: false
-  },
-  {
-    order: 5,
-    command: releaseChannelApplyPrivateEnvPreflightCommand,
-    role: "leave the real operator private-input preflight receipt after synthetic resume-packet coverage",
-    condition: "always; exit 0 or expected blocked exit 1",
-    allowBlockedExit: true,
     skipped: false,
     valueRecorded: false
   }

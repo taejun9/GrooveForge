@@ -378,6 +378,106 @@ function buildReport(sourcePacket, preflightBlocked) {
     currentPrivateInputReceiptNextProofCommand: textValue(sourcePacket.currentPrivateInputReceiptNextProofCommand),
     currentPrivateInputReceiptValueRecorded:
       sourcePacket.currentPrivateInputReceiptValueRecorded === true ? true : false,
+    realOperatorPreflightReceiptReady: sourcePacket.realOperatorPreflightReceiptReady === true,
+    realOperatorPreflightCommand: textValue(sourcePacket.realOperatorPreflightCommand),
+    realOperatorPreflightRole: textValue(sourcePacket.realOperatorPreflightRole),
+    realOperatorPreflightExitStatus: integerValue(sourcePacket.realOperatorPreflightExitStatus),
+    realOperatorPreflightPreflightOnly: sourcePacket.realOperatorPreflightPreflightOnly === true,
+    realOperatorPreflightSourcePreflightReady:
+      sourcePacket.realOperatorPreflightSourcePreflightReady === true,
+    realOperatorPreflightSourceApplyReady: sourcePacket.realOperatorPreflightSourceApplyReady === true,
+    realOperatorPreflightLocalEnvFileLoaded:
+      sourcePacket.realOperatorPreflightLocalEnvFileLoaded === true,
+    realOperatorPreflightLocalEnvModified:
+      sourcePacket.realOperatorPreflightLocalEnvModified === true,
+    realOperatorPreflightRealLocalEnvModified:
+      sourcePacket.realOperatorPreflightRealLocalEnvModified === true,
+    realOperatorPreflightCurrentEnvEditTarget: textValue(
+      sourcePacket.realOperatorPreflightCurrentEnvEditTarget,
+      ".env.distribution.local"
+    ),
+    realOperatorPreflightCurrentFirstBlocker: textValue(
+      sourcePacket.realOperatorPreflightCurrentFirstBlocker
+    ),
+    realOperatorPreflightCurrentReadyKeyCount: integerValue(
+      sourcePacket.realOperatorPreflightCurrentReadyKeyCount
+    ),
+    realOperatorPreflightCurrentRequiredKeyCount: integerValue(
+      sourcePacket.realOperatorPreflightCurrentRequiredKeyCount
+    ),
+    realOperatorPreflightPrivateInputFileKey: textValue(
+      sourcePacket.realOperatorPreflightPrivateInputFileKey
+    ),
+    realOperatorPreflightPrivateInputFileDefaultName: textValue(
+      sourcePacket.realOperatorPreflightPrivateInputFileDefaultName
+    ),
+    realOperatorPreflightPrivateInputFilePath: textValue(
+      sourcePacket.realOperatorPreflightPrivateInputFilePath
+    ),
+    realOperatorPreflightPrivateInputFilePresent:
+      sourcePacket.realOperatorPreflightPrivateInputFilePresent === true,
+    realOperatorPreflightPrivateInputFileConfigured:
+      sourcePacket.realOperatorPreflightPrivateInputFileConfigured === true,
+    realOperatorPreflightPrivateInputFileLoadedKeyCount: integerValue(
+      sourcePacket.realOperatorPreflightPrivateInputFileLoadedKeyCount
+    ),
+    realOperatorPreflightPrivateInputFileLoadedKeySummary: textValue(
+      sourcePacket.realOperatorPreflightPrivateInputFileLoadedKeySummary
+    ),
+    realOperatorPreflightPrivateInputFileUnknownKeyCount: integerValue(
+      sourcePacket.realOperatorPreflightPrivateInputFileUnknownKeyCount
+    ),
+    realOperatorPreflightPrivateInputFileMalformedLineCount: integerValue(
+      sourcePacket.realOperatorPreflightPrivateInputFileMalformedLineCount
+    ),
+    realOperatorPreflightPrivateInputFileValueRecorded:
+      sourcePacket.realOperatorPreflightPrivateInputFileValueRecorded === true ? true : false,
+    realOperatorPreflightInputReadyKeyCount: integerValue(
+      sourcePacket.realOperatorPreflightInputReadyKeyCount
+    ),
+    realOperatorPreflightInputMissingKeyCount: integerValue(
+      sourcePacket.realOperatorPreflightInputMissingKeyCount
+    ),
+    realOperatorPreflightInputPlaceholderKeyCount: integerValue(
+      sourcePacket.realOperatorPreflightInputPlaceholderKeyCount
+    ),
+    realOperatorPreflightInputShapeInvalidKeyCount: integerValue(
+      sourcePacket.realOperatorPreflightInputShapeInvalidKeyCount
+    ),
+    realOperatorPreflightProcessEnvInputRowCount: integerValue(
+      sourcePacket.realOperatorPreflightProcessEnvInputRowCount
+    ),
+    realOperatorPreflightProcessEnvInputRowsValueFree:
+      sourcePacket.realOperatorPreflightProcessEnvInputRowsValueFree === true,
+    realOperatorPreflightRemediationRowCount: integerValue(
+      sourcePacket.realOperatorPreflightRemediationRowCount
+    ),
+    realOperatorPreflightRemediationRowsValueFree:
+      sourcePacket.realOperatorPreflightRemediationRowsValueFree === true,
+    realOperatorPreflightOperatorReceiptReady:
+      sourcePacket.realOperatorPreflightOperatorReceiptReady === true,
+    realOperatorPreflightOperatorReceiptRowCount: integerValue(
+      sourcePacket.realOperatorPreflightOperatorReceiptRowCount
+    ),
+    realOperatorPreflightOperatorReceiptRowsValueFree:
+      sourcePacket.realOperatorPreflightOperatorReceiptRowsValueFree === true,
+    realOperatorPreflightNextWriteCommand: textValue(
+      sourcePacket.realOperatorPreflightNextWriteCommand
+    ),
+    realOperatorPreflightGuidedSetupFallbackCommand: textValue(
+      sourcePacket.realOperatorPreflightGuidedSetupFallbackCommand
+    ),
+    realOperatorPreflightRecommendedOperatorProofCommand: textValue(
+      sourcePacket.realOperatorPreflightRecommendedOperatorProofCommand
+    ),
+    realOperatorPreflightHardGateCommand: textValue(
+      sourcePacket.realOperatorPreflightHardGateCommand,
+      "npm run release:external-check"
+    ),
+    realOperatorPreflightPrivateValuesRecorded:
+      sourcePacket.realOperatorPreflightPrivateValuesRecorded === true ? true : false,
+    realOperatorPreflightClaimedExternalDistribution:
+      sourcePacket.realOperatorPreflightClaimedExternalDistribution === true ? true : false,
     currentOperatorCommandSequenceReady: sourcePacket.currentOperatorCommandSequenceReady === true,
     currentOperatorCommandRows,
     currentOperatorCommandRowCount: integerValue(sourcePacket.currentOperatorCommandRowCount),
@@ -602,6 +702,12 @@ function buildMarkdown(report) {
 - Current private input loaded keys: ${report.currentPrivateInputReceiptPrivateInputFileLoadedKeyCount} (${report.currentPrivateInputReceiptPrivateInputFileLoadedKeySummary})
 - Current private input missing/placeholder/invalid rows: ${report.currentPrivateInputReceiptPrivateInputFileMissingKeyCount}/${report.currentPrivateInputReceiptPrivateInputFilePlaceholderKeyCount}/${report.currentPrivateInputReceiptPrivateInputFileInvalidShapeKeyCount}
 - Current private input receipt next operator command: \`${report.currentPrivateInputReceiptNextOperatorCommand}\`
+- Real operator preflight receipt: ${readyLabel(report.realOperatorPreflightReceiptReady)} (exit ${report.realOperatorPreflightExitStatus})
+- Real operator preflight ready: ${readyLabel(report.realOperatorPreflightSourcePreflightReady)}
+- Real operator private input file present: ${readyLabel(report.realOperatorPreflightPrivateInputFilePresent)}
+- Real operator private input loaded keys: ${report.realOperatorPreflightPrivateInputFileLoadedKeyCount} (${report.realOperatorPreflightPrivateInputFileLoadedKeySummary})
+- Real operator input ready/missing/placeholder/invalid rows: ${report.realOperatorPreflightInputReadyKeyCount}/${report.realOperatorPreflightInputMissingKeyCount}/${report.realOperatorPreflightInputPlaceholderKeyCount}/${report.realOperatorPreflightInputShapeInvalidKeyCount}
+- Real operator next write command: \`${report.realOperatorPreflightNextWriteCommand}\`
 - Current operator command sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
@@ -705,6 +811,44 @@ ${formatCurrentPrivateInputPlaceholderLocationRows(report.currentPrivateInputPla
 - Next operator command: \`${report.currentPrivateInputReceiptNextOperatorCommand}\`
 - Next proof command: \`${report.currentPrivateInputReceiptNextProofCommand}\`
 - Value recorded: ${readyLabel(report.currentPrivateInputReceiptValueRecorded)}
+
+## Real Operator Preflight Receipt
+
+- Receipt ready: ${readyLabel(report.realOperatorPreflightReceiptReady)}
+- Command: \`${report.realOperatorPreflightCommand}\`
+- Role: ${report.realOperatorPreflightRole}
+- Exit status: ${report.realOperatorPreflightExitStatus}
+- Preflight only: ${readyLabel(report.realOperatorPreflightPreflightOnly)}
+- Preflight ready: ${readyLabel(report.realOperatorPreflightSourcePreflightReady)}
+- Apply ready: ${readyLabel(report.realOperatorPreflightSourceApplyReady)}
+- Local env loaded: ${readyLabel(report.realOperatorPreflightLocalEnvFileLoaded)}
+- Local env modified: ${readyLabel(report.realOperatorPreflightLocalEnvModified)}
+- Real local env modified: ${readyLabel(report.realOperatorPreflightRealLocalEnvModified)}
+- Env edit target: ${report.realOperatorPreflightCurrentEnvEditTarget}
+- Current blocker: ${report.realOperatorPreflightCurrentFirstBlocker}
+- Current ready keys: ${report.realOperatorPreflightCurrentReadyKeyCount}/${report.realOperatorPreflightCurrentRequiredKeyCount}
+- Private input file key: ${report.realOperatorPreflightPrivateInputFileKey}
+- Private input file default: ${report.realOperatorPreflightPrivateInputFileDefaultName}
+- Private input file path: ${report.realOperatorPreflightPrivateInputFilePath}
+- Private input file present: ${readyLabel(report.realOperatorPreflightPrivateInputFilePresent)}
+- Private input file configured: ${readyLabel(report.realOperatorPreflightPrivateInputFileConfigured)}
+- Private input loaded keys: ${report.realOperatorPreflightPrivateInputFileLoadedKeyCount} (${report.realOperatorPreflightPrivateInputFileLoadedKeySummary})
+- Private input unknown/malformed rows: ${report.realOperatorPreflightPrivateInputFileUnknownKeyCount}/${report.realOperatorPreflightPrivateInputFileMalformedLineCount}
+- Private input file value recorded: ${readyLabel(report.realOperatorPreflightPrivateInputFileValueRecorded)}
+- Input ready/missing/placeholder/invalid rows: ${report.realOperatorPreflightInputReadyKeyCount}/${report.realOperatorPreflightInputMissingKeyCount}/${report.realOperatorPreflightInputPlaceholderKeyCount}/${report.realOperatorPreflightInputShapeInvalidKeyCount}
+- Process env input rows: ${report.realOperatorPreflightProcessEnvInputRowCount}
+- Process env input rows value-free: ${readyLabel(report.realOperatorPreflightProcessEnvInputRowsValueFree)}
+- Remediation rows: ${report.realOperatorPreflightRemediationRowCount}
+- Remediation rows value-free: ${readyLabel(report.realOperatorPreflightRemediationRowsValueFree)}
+- Operator receipt ready: ${readyLabel(report.realOperatorPreflightOperatorReceiptReady)}
+- Operator receipt rows: ${report.realOperatorPreflightOperatorReceiptRowCount}
+- Operator receipt rows value-free: ${readyLabel(report.realOperatorPreflightOperatorReceiptRowsValueFree)}
+- Next write command: \`${report.realOperatorPreflightNextWriteCommand}\`
+- Guided setup fallback command: \`${report.realOperatorPreflightGuidedSetupFallbackCommand}\`
+- Recommended proof command: \`${report.realOperatorPreflightRecommendedOperatorProofCommand}\`
+- Hard gate command: \`${report.realOperatorPreflightHardGateCommand}\`
+- Private values recorded: ${readyLabel(report.realOperatorPreflightPrivateValuesRecorded)}
+- External distribution claimed: ${readyLabel(report.realOperatorPreflightClaimedExternalDistribution)}
 
 ## Private Env Preflight Blocker
 
@@ -963,6 +1107,95 @@ function validateReport(report, markdown) {
     report.currentPrivateInputReceiptNextOperatorCommand !== "none",
     "external completion resume packet should expose current private input receipt next operator command"
   );
+  check(
+    report.realOperatorPreflightReceiptReady === true,
+    "external completion resume packet should expose ready real operator preflight receipt"
+  );
+  check(
+    report.realOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand,
+    "external completion resume packet real operator preflight should cite the preflight command"
+  );
+  check(
+    [0, 1].includes(report.realOperatorPreflightExitStatus),
+    "external completion resume packet real operator preflight should record success or expected blocked exit"
+  );
+  check(
+    (report.realOperatorPreflightSourcePreflightReady === true && report.realOperatorPreflightExitStatus === 0) ||
+      (report.realOperatorPreflightSourcePreflightReady === false && report.realOperatorPreflightExitStatus === 1),
+    "external completion resume packet real operator preflight readiness should match exit status"
+  );
+  check(
+    report.realOperatorPreflightPreflightOnly === true,
+    "external completion resume packet real operator preflight should be preflight-only"
+  );
+  check(
+    report.realOperatorPreflightSourceApplyReady === false,
+    "external completion resume packet real operator preflight should not claim apply completion"
+  );
+  check(
+    report.realOperatorPreflightLocalEnvModified === false &&
+      report.realOperatorPreflightRealLocalEnvModified === false,
+    "external completion resume packet real operator preflight should not modify local env files"
+  );
+  check(
+    report.realOperatorPreflightCurrentRequiredKeyCount === 4,
+    "external completion resume packet real operator preflight should cover four current keys"
+  );
+  check(
+    report.realOperatorPreflightPrivateInputFileKey !== "none" &&
+      report.realOperatorPreflightPrivateInputFileDefaultName === defaultPrivateInputFileName,
+    "external completion resume packet real operator preflight should expose private input file key/default"
+  );
+  check(
+    report.realOperatorPreflightPrivateInputFileLoadedKeyCount <=
+      report.realOperatorPreflightCurrentRequiredKeyCount,
+    "external completion resume packet real operator preflight loaded key count should not exceed required keys"
+  );
+  check(
+    report.realOperatorPreflightPrivateInputFileValueRecorded === false,
+    "external completion resume packet real operator preflight private input file should stay value-free"
+  );
+  check(
+    report.realOperatorPreflightInputReadyKeyCount +
+      report.realOperatorPreflightInputMissingKeyCount +
+      report.realOperatorPreflightInputPlaceholderKeyCount +
+      report.realOperatorPreflightInputShapeInvalidKeyCount ===
+      report.realOperatorPreflightCurrentRequiredKeyCount,
+    "external completion resume packet real operator preflight input counts should cover required keys"
+  );
+  check(
+    report.realOperatorPreflightProcessEnvInputRowCount === 4 &&
+      report.realOperatorPreflightProcessEnvInputRowsValueFree === true,
+    "external completion resume packet real operator preflight process input rows should be value-free"
+  );
+  check(
+    report.realOperatorPreflightRemediationRowCount === 4 &&
+      report.realOperatorPreflightRemediationRowsValueFree === true,
+    "external completion resume packet real operator preflight remediation rows should be value-free"
+  );
+  check(
+    report.realOperatorPreflightOperatorReceiptReady === true &&
+      report.realOperatorPreflightOperatorReceiptRowCount === 6 &&
+      report.realOperatorPreflightOperatorReceiptRowsValueFree === true,
+    "external completion resume packet real operator preflight operator receipt should be ready and value-free"
+  );
+  check(
+    report.realOperatorPreflightNextWriteCommand === releaseChannelApplyPrivateEnvCommand,
+    "external completion resume packet real operator preflight should expose the next write command"
+  );
+  check(
+    report.realOperatorPreflightRecommendedOperatorProofCommand === privateEditStrictProofCommand,
+    "external completion resume packet real operator preflight should expose the recommended proof command"
+  );
+  check(
+    report.realOperatorPreflightHardGateCommand === "npm run release:external-check",
+    "external completion resume packet real operator preflight should expose the hard gate command"
+  );
+  check(
+    report.realOperatorPreflightPrivateValuesRecorded === false &&
+      report.realOperatorPreflightClaimedExternalDistribution === false,
+    "external completion resume packet real operator preflight should not record private values or claim external distribution"
+  );
   check(report.currentOperatorCommandSequenceReady === true, "external completion resume packet current operator command sequence should be ready");
   check(
     report.currentOperatorCommandRowCount === report.currentOperatorCommandRows.length,
@@ -1119,6 +1352,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("Current Private Input Placeholder Locations"), "external completion resume packet Markdown should include current private input placeholder location rows");
   check(markdown.includes("Current private input receipt:"), "external completion resume packet Markdown should include current private input receipt summary");
   check(markdown.includes("Current Private Input Receipt"), "external completion resume packet Markdown should include current private input receipt section");
+  check(markdown.includes("Real operator preflight receipt:"), "external completion resume packet Markdown should include real operator preflight summary");
+  check(markdown.includes("Real Operator Preflight Receipt"), "external completion resume packet Markdown should include real operator preflight section");
   check(markdown.includes("Private input template command:"), "external completion resume packet Markdown should include private input template command");
   check(
     markdown.includes("Private env apply proof runner command:"),
@@ -1171,6 +1406,12 @@ console.log(`- Current private input file present: ${report.currentPrivateInputR
 console.log(`- Current private input loaded keys: ${report.currentPrivateInputReceiptPrivateInputFileLoadedKeyCount} (${report.currentPrivateInputReceiptPrivateInputFileLoadedKeySummary})`);
 console.log(`- Current private input missing/placeholder/invalid rows: ${report.currentPrivateInputReceiptPrivateInputFileMissingKeyCount}/${report.currentPrivateInputReceiptPrivateInputFilePlaceholderKeyCount}/${report.currentPrivateInputReceiptPrivateInputFileInvalidShapeKeyCount}`);
 console.log(`- Current private input receipt next operator command: ${report.currentPrivateInputReceiptNextOperatorCommand}`);
+console.log(`- Real operator preflight receipt: ${report.realOperatorPreflightReceiptReady ? "yes" : "no"} (exit ${report.realOperatorPreflightExitStatus})`);
+console.log(`- Real operator preflight ready: ${report.realOperatorPreflightSourcePreflightReady ? "yes" : "no"}`);
+console.log(`- Real operator private input file present: ${report.realOperatorPreflightPrivateInputFilePresent ? "yes" : "no"}`);
+console.log(`- Real operator private input loaded keys: ${report.realOperatorPreflightPrivateInputFileLoadedKeyCount} (${report.realOperatorPreflightPrivateInputFileLoadedKeySummary})`);
+console.log(`- Real operator input ready/missing/placeholder/invalid rows: ${report.realOperatorPreflightInputReadyKeyCount}/${report.realOperatorPreflightInputMissingKeyCount}/${report.realOperatorPreflightInputPlaceholderKeyCount}/${report.realOperatorPreflightInputShapeInvalidKeyCount}`);
+console.log(`- Real operator next write command: ${report.realOperatorPreflightNextWriteCommand}`);
 console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
