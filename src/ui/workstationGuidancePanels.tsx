@@ -749,22 +749,29 @@ export function AudienceRouteBridge({
   }, [summary.activeLaneId, summary.readinessLane.id, summary.completionLane.id]);
 
   function queueBridgeActionResult(actionResult: AudienceRouteBridgeActionResult, routeAction: () => void): void {
-    window.setTimeout(() => setResult(actionResult), 0);
+    setResult(actionResult);
     window.setTimeout(routeAction, 180);
   }
 
-  function runBridgeReadiness(): void {
-    queueBridgeActionResult(createAudienceRouteBridgeActionResult(summary, "readiness"), () => {
+  function runBridgeReadinessAction(): AudienceRouteBridgeActionResult {
+    const actionResult = createAudienceRouteBridgeActionResult(summary, "readiness");
+    queueBridgeActionResult(actionResult, () => {
       runDualAudienceReadinessLaneAction(summary.readinessLane, {
         onFocusExportPreflight,
         onFocusProductionSnapshot,
         onJumpFirstBeatPath
       });
     });
+    return actionResult;
   }
 
-  function runBridgeCompletion(): void {
-    queueBridgeActionResult(createAudienceRouteBridgeActionResult(summary, "completion"), () => {
+  function runBridgeReadiness(): void {
+    runBridgeReadinessAction();
+  }
+
+  function runBridgeCompletionAction(): AudienceRouteBridgeActionResult {
+    const actionResult = createAudienceRouteBridgeActionResult(summary, "completion");
+    queueBridgeActionResult(actionResult, () => {
       runAudienceCompletionRouteLaneAction(summary.completionLane, {
         onFocusExportPreflight,
         onFocusHandoffPackageCheck,
@@ -772,7 +779,55 @@ export function AudienceRouteBridge({
         onJumpFirstBeatPath
       });
     });
+    return actionResult;
   }
+
+  function runBridgeCompletion(): void {
+    runBridgeCompletionAction();
+  }
+
+  function createBridgeDirectEvidence(actionResult: AudienceRouteBridgeActionResult): GrooveforgeLaunchSmokeBridgeDirectEvidence {
+    return {
+      buttonPresent: true,
+      resultDestination: `${actionResult.destinationLabel} ${actionResult.audienceLabel}`,
+      resultFollowup: `${actionResult.auditionCue} ${actionResult.nextCheckLabel}`,
+      resultMetric: `${actionResult.actionLabel} ${actionResult.metricLabel}`,
+      resultPresent: true,
+      resultTitle: actionResult.title
+    };
+  }
+
+  useEffect(() => {
+    if (window.grooveforge?.launchSmoke !== true) {
+      return undefined;
+    }
+
+    const existing = window.__grooveforgeLaunchSmoke ?? {};
+    const previousCollector = existing.collectAudienceRouteBridgeDirectEvidence;
+    window.__grooveforgeLaunchSmoke = {
+      ...existing,
+      collectAudienceRouteBridgeDirectEvidence: () => {
+        const readiness = createBridgeDirectEvidence(runBridgeReadinessAction());
+        const completion = createBridgeDirectEvidence(runBridgeCompletionAction());
+        return { completion, readiness };
+      }
+    };
+
+    return () => {
+      const current = window.__grooveforgeLaunchSmoke;
+      if (!current) {
+        return;
+      }
+      if (previousCollector) {
+        current.collectAudienceRouteBridgeDirectEvidence = previousCollector;
+      } else {
+        delete current.collectAudienceRouteBridgeDirectEvidence;
+      }
+      if (!current.collectAudienceRouteBridgeDirectEvidence && !current.collectAudienceSessionQuickActionEvidence) {
+        delete window.__grooveforgeLaunchSmoke;
+      }
+    };
+  }, [summary, onFocusExportPreflight, onFocusHandoffPackageCheck, onFocusProductionSnapshot, onJumpFirstBeatPath]);
 
   return (
     <section

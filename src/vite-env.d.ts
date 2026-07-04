@@ -75,6 +75,20 @@ type GrooveforgeLaunchSmokePaletteEvidence = {
   searchPresent: boolean;
 };
 
+type GrooveforgeLaunchSmokeBridgeDirectEvidence = {
+  buttonPresent: boolean;
+  resultDestination: string;
+  resultFollowup: string;
+  resultMetric: string;
+  resultPresent: boolean;
+  resultTitle: string;
+};
+
+type GrooveforgeLaunchSmokeBridgeDirectEvidenceBundle = {
+  completion: GrooveforgeLaunchSmokeBridgeDirectEvidence;
+  readiness: GrooveforgeLaunchSmokeBridgeDirectEvidence;
+};
+
 interface Window {
   grooveforge?: {
     platform: NodeJS.Platform;
@@ -85,7 +99,10 @@ interface Window {
     onMenuCommand?: (callback: (command: NativeMenuCommand) => void) => () => void;
   };
   __grooveforgeLaunchSmoke?: {
-    collectAudienceSessionQuickActionEvidence: () => GrooveforgeLaunchSmokePaletteEvidence | Promise<GrooveforgeLaunchSmokePaletteEvidence>;
+    collectAudienceRouteBridgeDirectEvidence?: () =>
+      | GrooveforgeLaunchSmokeBridgeDirectEvidenceBundle
+      | Promise<GrooveforgeLaunchSmokeBridgeDirectEvidenceBundle>;
+    collectAudienceSessionQuickActionEvidence?: () => GrooveforgeLaunchSmokePaletteEvidence | Promise<GrooveforgeLaunchSmokePaletteEvidence>;
   };
   webkitAudioContext?: typeof AudioContext;
 }

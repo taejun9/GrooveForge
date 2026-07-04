@@ -9613,6 +9613,7 @@ export function App(): ReactElement {
     };
 
     window.__grooveforgeLaunchSmoke = {
+      ...(window.__grooveforgeLaunchSmoke ?? {}),
       collectAudienceSessionQuickActionEvidence: () => {
         const producer = {
           ...routeEvidence("enter studio professional producer", "audience-session-enter-producer"),
@@ -9700,7 +9701,14 @@ export function App(): ReactElement {
     };
 
     return () => {
-      delete window.__grooveforgeLaunchSmoke;
+      const current = window.__grooveforgeLaunchSmoke;
+      if (!current) {
+        return;
+      }
+      delete current.collectAudienceSessionQuickActionEvidence;
+      if (!current.collectAudienceRouteBridgeDirectEvidence) {
+        delete window.__grooveforgeLaunchSmoke;
+      }
     };
   }, [audienceSessionReadoutSummary, quickActions, selectedArrangementIndex]);
   const guidedModeContext = createModeSwitchButtonContext({

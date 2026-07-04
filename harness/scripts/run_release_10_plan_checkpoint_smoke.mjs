@@ -23,8 +23,20 @@ const releasePrepareEnvCommand = "npm run release:prepare-env";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const releasePrivateEditStrictProofCommand = "npm run release:private-edit-strict-proof";
-const expectedSourceRefreshCommandSummary =
-  "npm run release:proof-bundle -> npm run desktop:external-distribution-gate-smoke -> npm run release:update-feed-checkpoint-smoke -> npm run release:progress-smoke -> npm run release:channel-placeholder-input-receipt -> npm run release:current-blocker-smoke -> npm run release:completion-report-packet-smoke -> npm run release:progress-freshness-smoke -> npm run release:operator-completion-brief-smoke";
+const expectedSourceRefreshCommands = [
+  "npm run release:proof-bundle",
+  "npm run desktop:external-distribution-gate-smoke",
+  "npm run desktop:completion-progress-smoke",
+  "npm run release:channel-unblock-smoke",
+  "npm run release:update-feed-checkpoint-smoke",
+  "npm run release:progress-smoke",
+  "npm run release:channel-placeholder-input-receipt",
+  "npm run release:current-blocker-smoke",
+  "npm run release:completion-report-packet-smoke",
+  "npm run release:progress-freshness-smoke",
+  "npm run release:operator-completion-brief-smoke"
+];
+const expectedSourceRefreshCommandSummary = expectedSourceRefreshCommands.join(" -> ");
 const expectedProofGateRefreshCommands = [
   {
     order: 1,
@@ -267,7 +279,7 @@ function buildReport(source, localWindow) {
   const currentOperatorCommandRowsContainGuidedSetup = currentOperatorCommandRows.some((row) => textValue(row.command) === guidedSetupCommand);
   const sourceProofGateRefreshReady =
     source.releaseProgressRefreshReady === true &&
-    integerValue(source.refreshCommandCount) === 9 &&
+    integerValue(source.refreshCommandCount) === expectedSourceRefreshCommands.length &&
     textValue(source.refreshCommandSummary) === expectedSourceRefreshCommandSummary &&
     sourceRefreshCommandsValueFree &&
     sourceProofGateRefreshRows.length === 2 &&
@@ -559,7 +571,10 @@ function validateReport(report, markdown) {
   check(report.sourceReady === true, "release 10-plan checkpoint should require ready progress refresh source");
   check(report.sourceSummaryReady === true, "release 10-plan checkpoint should require ready compact source summary");
   check(report.sourceLabelsMatch === true, "release 10-plan checkpoint should require matched source labels");
-  check(report.sourceRefreshCommandCount === 9, "release 10-plan checkpoint should require the full source refresh command sequence");
+  check(
+    report.sourceRefreshCommandCount === expectedSourceRefreshCommands.length,
+    "release 10-plan checkpoint should require the full source refresh command sequence"
+  );
   check(
     report.sourceRefreshCommandSummary === expectedSourceRefreshCommandSummary,
     "release 10-plan checkpoint should require proof bundle and external gate before progress refresh reads evidence"

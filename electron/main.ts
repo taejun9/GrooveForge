@@ -1012,17 +1012,38 @@ async function clickLaunchSmokeBridgeDirectTarget(
         return readResult(true);
       }
       button.click();
-      await new Promise((resolve) => window.setTimeout(resolve, 40));
+      await Promise.resolve();
+      await Promise.resolve();
       return readResult(true);
     })();
   `);
   return result as LaunchSmokeBridgeDirectEvidence;
 }
 
+async function collectLaunchSmokeBridgeDirectHookEvidence(win: BrowserWindow): Promise<LaunchSmokeBridgeDirectEvidenceBundle | null> {
+  const result = await win.webContents.executeJavaScript(`
+    (async () => {
+      const collector = window.__grooveforgeLaunchSmoke?.collectAudienceRouteBridgeDirectEvidence;
+      if (window.grooveforge?.launchSmoke !== true || typeof collector !== "function") {
+        return { ready: false, evidence: null };
+      }
+      const evidence = await collector();
+      return { ready: true, evidence };
+    })();
+  `);
+  return result && result.ready === true && result.evidence ? (result.evidence as LaunchSmokeBridgeDirectEvidenceBundle) : null;
+}
+
 async function collectLaunchSmokeBridgeDirectEvidence(
   win: BrowserWindow,
   setStep: (step: string) => void = () => undefined
 ): Promise<LaunchSmokeBridgeDirectEvidenceBundle> {
+  setStep("collecting-react-direct-hook");
+  const hookEvidence = await collectLaunchSmokeBridgeDirectHookEvidence(win);
+  if (hookEvidence) {
+    return hookEvidence;
+  }
+
   const readiness = await clickLaunchSmokeBridgeDirectTarget(win, "audience-route-bridge-readiness-action", setStep);
   const completion = await clickLaunchSmokeBridgeDirectTarget(win, "audience-route-bridge-completion-action", setStep);
 
@@ -1038,7 +1059,7 @@ function collectLaunchSmokeBridgeDirectEvidenceWithTimeout(win: BrowserWindow): 
     let step = "starting";
     const timeout = setTimeout(
       () => reject(new Error(`Timed out collecting live Audience Route Bridge direct button evidence at ${step}.`)),
-      30000
+      10000
     );
     void collectLaunchSmokeBridgeDirectEvidence(win, (nextStep) => {
       step = nextStep;
@@ -1270,9 +1291,19 @@ function installLaunchSmoke(win: BrowserWindow): void {
                 });
             })
             .catch((error: unknown) => {
-              fail("Production desktop Audience Route Bridge direct button JavaScript failed.", {
+              if (Date.now() >= deadline) {
+                fail("Production desktop Audience Route Bridge direct button JavaScript failed.", {
+                  error: error instanceof Error ? error.message : String(error)
+                });
+                return;
+              }
+
+              lastProgress = {
+                phase: "bridge-direct-retrying",
+                evidence,
                 error: error instanceof Error ? error.message : String(error)
-              });
+              };
+              setTimeout(() => poll(deadline), 250);
             });
         }
 
