@@ -2917,7 +2917,7 @@ function buildCompletionGapSummary({
     completionGapSummary: `${completionGapStatus}: ${completionGapCurrentProofTarget} is the next proof target before any external distribution completion claim.`,
     completionGapCompletionStage: completionStage,
     completionGapCurrentProofTarget,
-    completionGapNextProofCommand: currentNextCommand,
+    completionGapNextProofCommand: sourceEvidenceReady ? currentNextCommand : prerequisiteCommand,
     completionGapHardGateCommand: hardExternalGateCommand,
     completionGapFirstBlocker: currentFirstBlocker || "none",
     completionGapEvidenceSummary: currentEvidenceLabelSummary,
@@ -3229,6 +3229,89 @@ function formatReleaseChannelFocusRows(rows) {
     .join("\n");
 }
 
+function buildRegenerateLocalReleaseEvidenceAction(artifactRows, firstBlockers, order = 1) {
+  const action = {
+    order,
+    id: "regenerate-local-release-evidence",
+    label: "Regenerate local release evidence",
+    ready: false,
+    requiredKeys: [],
+    placeholderKeys: [],
+    placeholderEditLocations: [],
+    keyGuidance: [],
+    envEditTemplate: [],
+    envEditRows: [],
+    readyCriteria: readyCriteriaForAction({ id: "regenerate-local-release-evidence" }),
+    evidence: buildEvidenceRows(artifactRows),
+    prerequisiteCommands: [],
+    operatorActions: [
+      "Run the full local release gate to regenerate ignored source evidence before external preflight.",
+      "Do not add private release values to committed files while regenerating evidence."
+    ],
+    rerunCommands: ["npm run release:check", "npm run release:next-actions"],
+    nextCommand: "npm run release:check",
+    firstBlocker: firstBlockers[0],
+    blockers: firstBlockers,
+    valueRecorded: false
+  };
+  action.actionChecklist = buildActionChecklist(action);
+  return action;
+}
+
+function buildDoctorBootstrapReleaseChannelAction(releaseDoctor, artifactRows) {
+  if (!releaseDoctor || typeof releaseDoctor !== "object") {
+    return null;
+  }
+  const doctorCurrentActionId = stringField(releaseDoctor, "currentActionId");
+  const doctorReleaseChannelActionIds = new Set(["release-channel-metadata", "replace-release-channel-placeholders"]);
+  if (!doctorReleaseChannelActionIds.has(doctorCurrentActionId)) {
+    return null;
+  }
+
+  const placeholderKeys = arrayField(releaseDoctor, "currentActionPlaceholderKeys");
+  if (placeholderKeys.length === 0) {
+    return null;
+  }
+  const releaseChannelPlaceholderKeys = placeholderKeys.filter((key) => releaseChannelMetadataKeys.includes(key));
+  if (releaseChannelPlaceholderKeys.length === 0) {
+    return null;
+  }
+
+  const requiredKeys = arrayField(releaseDoctor, "currentActionRequiredKeys");
+  const placeholderEditLocations = valueFreeObjectRows(releaseDoctor.currentActionPlaceholderEditLocations);
+  const envEditTemplate = valueFreeObjectRows(releaseDoctor.currentActionEnvEditTemplate);
+  const envEditRows = valueFreeObjectRows(releaseDoctor.currentActionEnvEditRows);
+  const evidence = valueFreeObjectRows(releaseDoctor.currentActionEvidenceRows);
+  const readyCriteria = arrayField(releaseDoctor, "currentActionReadyCriteria");
+  const actionChecklist = arrayField(releaseDoctor, "currentActionChecklist");
+  const rerunCommands = arrayField(releaseDoctor, "currentActionRerunCommands");
+  const operatorAction = stringField(releaseDoctor, "currentActionOperatorAction");
+  const action = {
+    order: 1,
+    id: "release-channel-metadata",
+    label: stringField(releaseDoctor, "currentActionLabel", "Release channel metadata"),
+    ready: false,
+    requiredKeys,
+    placeholderKeys: releaseChannelPlaceholderKeys,
+    placeholderEditLocations,
+    privateInputPlaceholderLocations: [],
+    keyGuidance: guidanceForKeys(requiredKeys),
+    envEditTemplate: envEditTemplate.length > 0 ? envEditTemplate : buildEnvEditTemplate(requiredKeys),
+    envEditRows,
+    readyCriteria: readyCriteria.length > 0 ? readyCriteria : readyCriteriaForAction({ id: "release-channel-metadata" }),
+    evidence: evidence.length > 0 ? evidence : buildEvidenceRows(artifactRows),
+    prerequisiteCommands: ["npm run release:check"],
+    operatorActions: operatorAction === "none" ? [] : [operatorAction],
+    rerunCommands: rerunCommands.length > 0 ? rerunCommands : ["npm run release:current-blocker", "npm run release:doctor", "npm run release:next-actions"],
+    nextCommand: stringField(releaseDoctor, "currentActionNextCommand", "npm run release:doctor"),
+    firstBlocker: stringField(releaseDoctor, "currentActionFirstBlocker", "Current release-channel metadata still contains placeholder keys."),
+    blockers: arrayField(releaseDoctor, "currentActionAcceptanceBlockers"),
+    valueRecorded: false
+  };
+  action.actionChecklist = actionChecklist.length > 0 ? actionChecklist : buildActionChecklist(action, { shouldReplacePlaceholders: true });
+  return action;
+}
+
 function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoctor = null) {
   const missingArtifacts = artifactRows.filter((item) => !item.present);
   const missingLabels = missingArtifacts.map((item) => item.label);
@@ -3237,39 +3320,20 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     "Run npm run release:check before external preflight.",
     "Rerun npm run release:next-actions after evidence is regenerated."
   ]);
-  const priorityActions = [
-    {
-      order: 1,
-      id: "regenerate-local-release-evidence",
-      label: "Regenerate local release evidence",
-      ready: false,
-      requiredKeys: [],
-      placeholderKeys: [],
-      placeholderEditLocations: [],
-      keyGuidance: [],
-      envEditTemplate: [],
-      envEditRows: [],
-      readyCriteria: readyCriteriaForAction({ id: "regenerate-local-release-evidence" }),
-      evidence: buildEvidenceRows(artifactRows),
-      prerequisiteCommands: [],
-      operatorActions: [
-        "Run the full local release gate to regenerate ignored source evidence before external preflight.",
-        "Do not add private release values to committed files while regenerating evidence."
-      ],
-      rerunCommands: ["npm run release:check", "npm run release:next-actions"],
-      nextCommand: "npm run release:check",
-      firstBlocker: firstBlockers[0],
-      blockers: firstBlockers,
-      valueRecorded: false
-    }
-  ];
-  priorityActions[0].actionChecklist = buildActionChecklist(priorityActions[0]);
+  const regenerateAction = buildRegenerateLocalReleaseEvidenceAction(artifactRows, firstBlockers);
+  const doctorReleaseChannelAction = buildDoctorBootstrapReleaseChannelAction(releaseDoctor, artifactRows);
+  const priorityActions = doctorReleaseChannelAction
+    ? [doctorReleaseChannelAction, { ...regenerateAction, order: 2 }]
+    : [regenerateAction];
   const currentActionSummary = buildCurrentActionSummary(priorityActions, {
     id: "regenerate-local-release-evidence",
     label: "Regenerate local release evidence",
     nextCommand: "npm run release:check",
     firstBlocker: firstBlockers[0]
   });
+  const bootstrapCurrentFocus = doctorReleaseChannelAction
+    ? `${doctorReleaseChannelAction.label} (source evidence missing)`
+    : "Regenerate local release evidence";
   const completionGap = buildCompletionGapSummary({
     sourceEvidenceReady: false,
     completionStage: "source evidence missing",
@@ -3390,7 +3454,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     missingSourceArtifacts: missingArtifacts,
     sourceEvidenceReady: false,
     completionStage: "source evidence missing",
-    currentFocus: "Regenerate local release evidence",
+    currentFocus: bootstrapCurrentFocus,
     ...currentActionSummary,
     ...completionGap,
     ...doctorCompletionGap,
@@ -4305,9 +4369,12 @@ check(
   typeof nextActionsReport.completionGapCurrentProofTarget === "string" && nextActionsReport.completionGapCurrentProofTarget.length > 0,
   "external next actions should include the completion gap proof target"
 );
+const expectedCompletionGapNextProofCommand = nextActionsReport.sourceEvidenceReady
+  ? nextActionsReport.currentNextCommand
+  : nextActionsReport.prerequisiteCommand;
 check(
-  nextActionsReport.completionGapNextProofCommand === nextActionsReport.currentNextCommand,
-  "external next actions completion gap should mirror the current next proof command"
+  nextActionsReport.completionGapNextProofCommand === expectedCompletionGapNextProofCommand,
+  "external next actions completion gap should mirror the current proof command or source evidence prerequisite"
 );
 check(
   nextActionsReport.completionGapHardGateCommand === nextActionsReport.hardExternalGateCommand,
@@ -5647,6 +5714,8 @@ check(markdown.includes("## Current Command Sequence"), "external next actions M
 check(markdown.includes("## Current Command Verification"), "external next actions Markdown should include current command verification section");
 if (nextActionsReport.bootstrapMode === true) {
   const releaseDoctorArtifactPresent = nextActionsReport.sourceArtifacts.some((item) => item.label === "Release doctor" && item.present === true);
+  const bootstrapDoctorReleaseChannelActive =
+    releaseDoctorArtifactPresent === true && nextActionsReport.currentActionId === "release-channel-metadata";
   check(nextActionsReport.sourceEvidenceReady === false, "bootstrap external next actions should report missing source evidence");
   check(
     nextActionsReport.doctorCompletionGapSourceReady === releaseDoctorArtifactPresent,
@@ -5654,9 +5723,40 @@ if (nextActionsReport.bootstrapMode === true) {
   );
   check(nextActionsReport.localReleaseReady === false, "bootstrap external next actions should not claim local release readiness");
   check(nextActionsReport.localReleaseReadinessPercent === 0, "bootstrap external next actions should report zero local release readiness");
-  check(nextActionsReport.currentFocus === "Regenerate local release evidence", "bootstrap external next actions should focus on regenerating evidence");
-  check(nextActionsReport.currentNextCommand === "npm run release:check", "bootstrap external next actions should surface release:check as the current next command");
-  check(nextActionsReport.priorityActions[0]?.nextCommand === "npm run release:check", "bootstrap external next actions should make release:check the first command");
+  if (bootstrapDoctorReleaseChannelActive) {
+    check(
+      nextActionsReport.currentFocus === `${nextActionsReport.currentActionLabel} (source evidence missing)`,
+      "bootstrap external next actions should keep doctor release-channel focus while source evidence is missing"
+    );
+    check(
+      nextActionsReport.currentNextCommand === "npm run release:doctor",
+      "bootstrap external next actions should keep release doctor as the current release-channel proof command"
+    );
+    check(
+      nextActionsReport.priorityActions.some((action) => action.id === "regenerate-local-release-evidence"),
+      "bootstrap external next actions should keep source regeneration as a priority action"
+    );
+    check(
+      nextActionsReport.currentPrerequisiteCommands.includes("npm run release:check"),
+      "bootstrap external next actions should keep release:check as the source evidence prerequisite"
+    );
+    check(
+      nextActionsReport.currentOperatorCommandSequenceReady === true,
+      "bootstrap external next actions should keep the doctor-derived operator command sequence ready"
+    );
+    check(
+      nextActionsReport.currentOperatorCommandRows.some((row) => row.command === "npm run release:current-blocker"),
+      "bootstrap external next actions should keep current-blocker refresh in the operator command sequence"
+    );
+    check(
+      nextActionsReport.currentOperatorCommandRows.some((row) => row.command === "npm run release:next-actions"),
+      "bootstrap external next actions should keep next-actions refresh in the operator command sequence"
+    );
+  } else {
+    check(nextActionsReport.currentFocus === "Regenerate local release evidence", "bootstrap external next actions should focus on regenerating evidence");
+    check(nextActionsReport.currentNextCommand === "npm run release:check", "bootstrap external next actions should surface release:check as the current next command");
+    check(nextActionsReport.priorityActions[0]?.nextCommand === "npm run release:check", "bootstrap external next actions should make release:check the first command");
+  }
   check(Array.isArray(nextActionsReport.missingSourceArtifacts) && nextActionsReport.missingSourceArtifacts.length > 0, "bootstrap external next actions should list missing source artifacts");
   check(markdown.includes("Regenerate local release evidence"), "bootstrap external next actions Markdown should include the evidence regeneration focus");
   check(markdown.includes("npm run release:check"), "bootstrap external next actions Markdown should include the source evidence command");

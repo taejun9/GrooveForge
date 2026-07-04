@@ -807,10 +807,20 @@ check(Number.isInteger(summary.currentCommandSequenceCount), "release proof bund
 check(typeof summary.currentCommandSequenceSummary === "string" && summary.currentCommandSequenceSummary.length > 0, "release proof bundle should include current command sequence summary");
 check(Array.isArray(summary.currentCommandVerificationRows), "release proof bundle should include value-free current command verification rows");
 check(summary.currentCommandVerificationRows.every((row) => row.valueRecorded === false), "release proof bundle current command verification rows should not record values");
-check(summary.releaseChannelPostEditOperatorReceiptReady === true, "release proof bundle should include ready release-channel post-edit operator receipt");
+const sourceMissingOperatorSequenceReady =
+  summary.sourceEvidenceReady === false &&
+  summary.currentOperatorCommandSequenceReady === true &&
+  summary.currentPlaceholderKeyCount > 0;
+check(
+  summary.releaseChannelPostEditOperatorReceiptReady === true || sourceMissingOperatorSequenceReady,
+  "release proof bundle should include a ready post-edit operator receipt or source-missing operator command sequence"
+);
 check(summary.releaseChannelPostEditOperatorReceiptRowCount === summary.releaseChannelPostEditOperatorReceiptRows.length, "release proof bundle post-edit operator receipt row count should match rows");
 check(summary.releaseChannelPostEditOperatorReceiptRowCount === 7, "release proof bundle post-edit operator receipt should include seven rows");
-check(summary.releaseChannelPostEditOperatorReceiptRows.every((row) => row.ready === true && row.valueRecorded === false), "release proof bundle post-edit operator receipt rows should be ready and value-free");
+check(
+  summary.releaseChannelPostEditOperatorReceiptRows.every((row) => row.valueRecorded === false && (sourceMissingOperatorSequenceReady || row.ready === true)),
+  "release proof bundle post-edit operator receipt rows should stay value-free and be ready once source evidence exists"
+);
 check(summary.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Edit target"), "release proof bundle post-edit operator receipt should include edit target");
 check(
   summary.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Recommended strict proof chain" && row.command === recommendedPrivateEditOperatorProofCommand),
