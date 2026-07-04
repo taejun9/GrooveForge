@@ -1862,6 +1862,9 @@ function buildReport({
   const progressPlaceholderKeys = stringArrayValue(releaseProgress.externalProofBundleCurrentPlaceholderKeys);
   const doctorPlaceholderLocations = locationKeyRows(releaseDoctor.currentActionPlaceholderEditLocations);
   const proofPlaceholderLocations = locationKeyRows(externalProofBundle.currentPlaceholderEditLocations);
+  const proofPrivateInputPlaceholderLocations = locationKeyRows(
+    externalProofBundle.currentPrivateInputPlaceholderLocations
+  );
   const progressPlaceholderLocations = locationKeyRows(releaseProgress.externalProofBundleCurrentPlaceholderEditLocations);
   const doctorEnvEditRows = valueFreeObjectRows(releaseDoctor.currentActionEnvEditRows);
   const proofEnvEditRows = valueFreeObjectRows(externalProofBundle.currentEnvEditRows);
@@ -1991,6 +1994,10 @@ function buildReport({
   const currentPlaceholderEditLocationSummary = textValue(
     externalProofBundle.currentPlaceholderEditLocationSummary,
     formatLocationSummary(proofPlaceholderLocations)
+  );
+  const currentPrivateInputPlaceholderLocationSummary = textValue(
+    externalProofBundle.currentPrivateInputPlaceholderLocationSummary,
+    formatLocationSummary(proofPrivateInputPlaceholderLocations)
   );
   const acceptanceBlockerRows = currentActionAcceptanceBlockerRows({
     acceptanceRows,
@@ -2655,6 +2662,11 @@ function buildReport({
     currentPlaceholderEditLocationCount: integerValue(externalProofBundle.currentPlaceholderEditLocationCount),
     currentPlaceholderEditLocationSummary,
     currentPlaceholderEditLocations: proofPlaceholderLocations,
+    currentPrivateInputPlaceholderLocationCount: integerValue(
+      externalProofBundle.currentPrivateInputPlaceholderLocationCount
+    ),
+    currentPrivateInputPlaceholderLocationSummary,
+    currentPrivateInputPlaceholderLocations: proofPrivateInputPlaceholderLocations,
     currentEnvEditRowsCount: integerValue(externalProofBundle.currentEnvEditRowsCount),
     currentEnvEditRowsSummary: textValue(externalProofBundle.currentEnvEditRowsSummary, `${proofEnvEditRows.length} value-free edit rows`),
     currentEnvEditRows: proofEnvEditRows,
@@ -3715,11 +3727,20 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentRequiredKeyCount === report.currentRequiredKeys.length, "release current blocker required key count should match keys");
   check(report.currentPlaceholderKeyCount === report.currentPlaceholderKeys.length, "release current blocker placeholder key count should match keys");
   check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderEditLocations.length, "release current blocker placeholder edit location count should match locations");
+  check(
+    report.currentPrivateInputPlaceholderLocationCount === report.currentPrivateInputPlaceholderLocations.length,
+    "release current blocker private input placeholder location count should match locations"
+  );
   check(report.currentEnvEditRowsCount === report.currentEnvEditRows.length, "release current blocker env edit row count should match rows");
   check(report.currentProofChecklistRowCount === report.currentProofChecklistRows.length, "release current blocker proof checklist row count should match rows");
   check(report.currentActionChecklistCount === report.currentActionChecklistRows.length, "release current blocker action checklist count should match rows");
   check(report.currentCommandVerificationRowCount === report.currentCommandVerificationRows.length, "release current blocker command verification row count should match rows");
   check(typeof report.currentPlaceholderEditLocationSummary === "string" && report.currentPlaceholderEditLocationSummary.length > 0, "release current blocker receipt should include current placeholder edit location summary");
+  check(
+    typeof report.currentPrivateInputPlaceholderLocationSummary === "string" &&
+      report.currentPrivateInputPlaceholderLocationSummary.length > 0,
+    "release current blocker receipt should include current private input placeholder location summary"
+  );
   check(typeof report.currentEnvEditRowsSummary === "string" && report.currentEnvEditRowsSummary.length > 0, "release current blocker receipt should include current env edit rows summary");
   check(typeof report.currentProofChecklistRowSummary === "string" && report.currentProofChecklistRowSummary.length > 0, "release current blocker receipt should include current proof checklist row summary");
   check(typeof report.currentActionChecklistSummary === "string" && report.currentActionChecklistSummary.length > 0, "release current blocker receipt should include current action checklist summary");
@@ -3741,6 +3762,7 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
     );
   }
   check(report.currentPlaceholderEditLocations.every((row) => row.valueRecorded === false), "release current blocker placeholder locations should not record values");
+  check(report.currentPrivateInputPlaceholderLocations.every((row) => row.valueRecorded === false), "release current blocker private input placeholder locations should not record values");
   check(report.currentEnvEditRows.every((row) => row.valueRecorded === false), "release current blocker env edit rows should not record values");
   check(report.currentProofChecklistRows.every((row) => row.valueRecorded === false), "release current blocker proof checklist rows should not record values");
   check(report.currentActionChecklistRows.every((row) => row.valueRecorded === false), "release current blocker action checklist rows should not record values");
@@ -4332,6 +4354,7 @@ function buildMarkdown(report) {
     `- Private env apply proof runner after preflight: ${report.releaseChannelPrivateEnvApplyProofAfterPreflight ? "yes" : "no"}`,
     `- Current env edit target: ${report.currentEnvEditTarget}`,
     `- Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})`,
+    `- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})`,
     `- Current action checklist rows: ${report.currentActionChecklistCount} (${report.currentActionChecklistSummary})`,
     `- Current rerun command: \`${report.currentRerunCommand}\``,
     `- Current command sequence: ${report.currentCommandSequenceCount} (${report.currentCommandSequenceSummary})`,
@@ -5377,6 +5400,7 @@ console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);
 console.log(`- Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})`);
 console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})`);
 console.log(`- Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})`);
+console.log(`- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})`);
 console.log(`- Current env edit rows: ${report.currentEnvEditRowsCount} (${report.currentEnvEditRowsSummary})`);
 console.log(`- Current proof checklist rows: ${report.currentProofChecklistRowCount} (${report.currentProofChecklistRowSummary})`);
 console.log(`- Current action checklist rows: ${report.currentActionChecklistCount} (${report.currentActionChecklistSummary})`);

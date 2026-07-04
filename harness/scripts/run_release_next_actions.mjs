@@ -53,6 +53,7 @@ const releaseChannelPrivateInputTemplateRole =
   "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
 const releaseChannelPrivateInputTemplateDefaultPath = ".env.release-channel.local";
 const releaseChannelPrivateInputTemplatePrivateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
+const releaseChannelPrivateInputPlaceholderPattern = /^(|<[^>]+>|CHANGE_ME|REPLACE_ME|TODO|TBD|example|example-.+|your-.+|https:\/\/example\.com.*)$/i;
 const releaseChannelApplyPrivateEnvPreflightBlockedSmokeCommand =
   "npm run release:channel-apply-private-env-preflight-blocked-smoke";
 const sensitivePrivateKeys = [
@@ -201,10 +202,13 @@ function currentLocalEnvEditTarget(evidence = {}) {
 function releaseChannelInputSourceOperatorAction({
   editTarget = distributionLocalEnvDefaults.defaultEnvFileName,
   detail = "the four current release-channel metadata keys",
+  inputLocationSummary = "",
   locationSummary = ""
 } = {}) {
+  const inputLocationClause =
+    inputLocationSummary && inputLocationSummary !== "none" ? ` using ${inputLocationSummary}` : "";
   const locationClause = locationSummary && locationSummary !== "none" ? `: ${locationSummary}` : "";
-  return `Set private release-channel metadata through ${releaseChannelPrivateInputSourceLabel} for ${detail}, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${editTarget}${locationClause}.`;
+  return `Set private release-channel metadata through ${releaseChannelPrivateInputSourceLabel} for ${detail}${inputLocationClause}, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${editTarget}${locationClause}.`;
 }
 
 function localEnvCandidatePaths() {
@@ -213,6 +217,12 @@ function localEnvCandidatePaths() {
     return [path.isAbsolute(configuredPath) ? configuredPath : path.resolve(root, configuredPath)];
   }
   return [path.join(root, distributionLocalEnvDefaults.defaultEnvFileName)];
+}
+
+function privateInputCandidatePath() {
+  const configuredPath = process.env[releaseChannelPrivateInputTemplatePrivateInputFileKey]?.trim();
+  const rawPath = configuredPath || releaseChannelPrivateInputTemplateDefaultPath;
+  return path.isAbsolute(rawPath) ? rawPath : path.resolve(root, rawPath);
 }
 
 function parseEnvLineKey(line) {
@@ -227,6 +237,31 @@ function parseEnvLineKey(line) {
   }
   const key = withoutExport.slice(0, separatorIndex).trim();
   return /^[A-Z0-9_]+$/.test(key) ? key : null;
+}
+
+function parseEnvLineEntry(line) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("#")) {
+    return null;
+  }
+  const withoutExport = trimmed.startsWith("export ") ? trimmed.slice("export ".length).trim() : trimmed;
+  const separatorIndex = withoutExport.indexOf("=");
+  if (separatorIndex <= 0) {
+    return null;
+  }
+  const key = withoutExport.slice(0, separatorIndex).trim();
+  if (!/^[A-Z0-9_]+$/.test(key)) {
+    return null;
+  }
+  let value = withoutExport.slice(separatorIndex + 1).trim();
+  if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) {
+    value = value.slice(1, -1);
+  }
+  return { key, value };
+}
+
+function isReleaseChannelPrivateInputPlaceholder(value) {
+  return releaseChannelPrivateInputPlaceholderPattern.test(String(value ?? "").trim());
 }
 
 async function readLocalEnvKeyLocations(keys) {
@@ -253,6 +288,34 @@ async function readLocalEnvKeyLocations(keys) {
         valueRecorded: false
       });
     }
+  }
+  return locations;
+}
+
+async function readReleaseChannelPrivateInputPlaceholderLocations(keys) {
+  const keySet = new Set(Array.isArray(keys) ? keys : []);
+  if (keySet.size === 0) {
+    return [];
+  }
+  const filePath = privateInputCandidatePath();
+  const relativePath = path.relative(root, filePath);
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath) || !existsSync(filePath)) {
+    return [];
+  }
+  const locations = [];
+  const lines = (await readFile(filePath, "utf8")).split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    const parsed = parseEnvLineEntry(line);
+    if (!parsed || !keySet.has(parsed.key) || !isReleaseChannelPrivateInputPlaceholder(parsed.value)) {
+      continue;
+    }
+    locations.push({
+      key: parsed.key,
+      file: displayLocalEnvTarget(filePath),
+      line: index + 1,
+      placeholder: true,
+      valueRecorded: false
+    });
   }
   return locations;
 }
@@ -2616,8 +2679,13 @@ function buildActionChecklist(action, context = {}) {
   }
   if (context.shouldReplacePlaceholders) {
     const locationSummary = formatEditLocationSummary(action.placeholderEditLocations);
-      return [
-      `Set private release-channel metadata through ${releaseChannelPrivateInputSourceLabel} for current placeholder keys at ${locationSummary}.`,
+    const privateInputLocationSummary = formatEditLocationSummary(action.privateInputPlaceholderLocations);
+    const privateInputLocationClause =
+      privateInputLocationSummary !== "none"
+        ? ` Selected ignored private input file placeholder rows: ${privateInputLocationSummary}.`
+        : "";
+    return [
+      `Set private release-channel metadata through ${releaseChannelPrivateInputSourceLabel} for current placeholder keys at ${locationSummary}.${privateInputLocationClause}`,
       `Run \`${releaseChannelApplyPrivateEnvPreflightCommand}\` to verify the selected private input source before any ignored local env write.`,
       `Run \`${releaseChannelApplyPrivateEnvCommand}\` to apply only the listed current-action placeholders into the ignored local env file after preflight passes.`,
       "Follow the current value-free key guidance for allowed channel and safe HTTPS URL constraints.",
@@ -2643,6 +2711,9 @@ function buildPriorityActions(remediation, context = {}) {
     ? context.localEnvPlaceholderKeyCount
     : localEnvPlaceholderKeys.length;
   const localEnvPlaceholderLocations = Array.isArray(context.localEnvPlaceholderLocations) ? context.localEnvPlaceholderLocations : [];
+  const privateInputPlaceholderLocations = Array.isArray(context.privateInputPlaceholderLocations)
+    ? context.privateInputPlaceholderLocations
+    : [];
   const localEnvEditTarget = context.localEnvEditTarget ?? currentLocalEnvEditTarget();
   return (remediation.remediationGroups ?? [])
     .filter((group) => group.ready !== true)
@@ -2650,6 +2721,12 @@ function buildPriorityActions(remediation, context = {}) {
       const requiredKeys = group.requiredKeys ?? [];
       const placeholderKeys = requiredKeys.filter((key) => localEnvPlaceholderKeySet.has(key));
       const placeholderEditLocations = localEnvPlaceholderLocations.filter((item) => placeholderKeys.includes(item.key));
+      const selectedPrivateInputPlaceholderLocations = privateInputPlaceholderLocations.filter((item) => placeholderKeys.includes(item.key));
+      const selectedPrivateInputPlaceholderLocationSummary = formatEditLocationSummary(selectedPrivateInputPlaceholderLocations);
+      const selectedInputLocationSummary =
+        selectedPrivateInputPlaceholderLocationSummary !== "none"
+          ? `selected ignored private input file placeholder rows at ${selectedPrivateInputPlaceholderLocationSummary}`
+          : "";
       const keyGuidance = guidanceForKeys(requiredKeys);
       const envEditTemplate = buildEnvEditTemplate(requiredKeys);
       const envEditRows = buildEnvEditRows({ envEditTemplate, placeholderEditLocations, placeholderKeys, localEnvEditTarget });
@@ -2668,6 +2745,7 @@ function buildPriorityActions(remediation, context = {}) {
               releaseChannelInputSourceOperatorAction({
                 editTarget: localEnvEditTarget,
                 detail: `the current release-channel keys (${placeholderKeys.length})`,
+                inputLocationSummary: selectedInputLocationSummary,
                 locationSummary: placeholderKeys.join(", ")
               }),
               `The full local env still has ${localEnvPlaceholderKeyCount} placeholder keys across all external distribution groups.`,
@@ -2691,6 +2769,7 @@ function buildPriorityActions(remediation, context = {}) {
         requiredKeys,
         placeholderKeys,
         placeholderEditLocations,
+        privateInputPlaceholderLocations: selectedPrivateInputPlaceholderLocations,
         keyGuidance,
         envEditTemplate,
         envEditRows,
@@ -2718,6 +2797,8 @@ function buildCurrentActionSummary(priorityActions, fallback = {}) {
   const currentRequiredKeys = currentAction?.requiredKeys ?? fallback.requiredKeys ?? [];
   const currentPlaceholderKeys = currentAction?.placeholderKeys ?? fallback.placeholderKeys ?? [];
   const currentPlaceholderEditLocations = currentAction?.placeholderEditLocations ?? fallback.placeholderEditLocations ?? [];
+  const currentPrivateInputPlaceholderLocations =
+    currentAction?.privateInputPlaceholderLocations ?? fallback.privateInputPlaceholderLocations ?? [];
   const currentEnvKeyGuidance = currentAction?.keyGuidance ?? fallback.keyGuidance ?? guidanceForKeys(currentRequiredKeys);
   const currentEnvEditTemplate = currentAction?.envEditTemplate ?? fallback.envEditTemplate ?? buildEnvEditTemplate(currentRequiredKeys);
   const currentEnvEditRows =
@@ -2756,6 +2837,9 @@ function buildCurrentActionSummary(priorityActions, fallback = {}) {
     currentPlaceholderEditLocationCount: currentPlaceholderEditLocations.length,
     currentPlaceholderEditLocationSummary: formatEditLocationSummary(currentPlaceholderEditLocations),
     currentPlaceholderEditLocations,
+    currentPrivateInputPlaceholderLocationCount: currentPrivateInputPlaceholderLocations.length,
+    currentPrivateInputPlaceholderLocationSummary: formatEditLocationSummary(currentPrivateInputPlaceholderLocations),
+    currentPrivateInputPlaceholderLocations,
     currentEnvKeyGuidanceCount: currentEnvKeyGuidance.length,
     currentEnvKeyGuidanceSummary: currentEnvKeyGuidance.length > 0 ? `${currentEnvKeyGuidance.length} keys with value-free guidance` : "none",
     currentEnvKeyGuidance,
@@ -3424,6 +3508,7 @@ function buildMarkdown(report) {
 - Current required keys: ${report.currentRequiredKeyCount} (${report.currentRequiredKeySummary})
 - Current placeholder keys: ${report.currentPlaceholderKeyCount} (${report.currentPlaceholderKeySummary})
 - Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})
+- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})
 - Current env key guidance: ${report.currentEnvKeyGuidanceCount} (${report.currentEnvKeyGuidanceSummary})
 - Current env edit template: ${report.currentEnvEditTemplateCount} (${report.currentEnvEditTemplateSummary})
 - Current env edit rows: ${report.currentEnvEditRowsCount} (${report.currentEnvEditRowsSummary})
@@ -3892,11 +3977,13 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
       : [];
   const localEnvEditTarget = currentLocalEnvEditTarget({ localEnvFilesChecked, localEnvPresentFiles });
   const localEnvPlaceholderLocations = await readLocalEnvKeyLocations(localEnvPlaceholderKeys);
+  const privateInputPlaceholderLocations = await readReleaseChannelPrivateInputPlaceholderLocations(releaseChannelMetadataKeys);
   const priorityActions = buildPriorityActions(externalRemediation, {
     localEnvFileLoaded,
     localEnvPlaceholderKeyCount,
     localEnvPlaceholderKeys,
     localEnvPlaceholderLocations,
+    privateInputPlaceholderLocations,
     localEnvEditTarget
   });
   const firstBlockers = unique([
@@ -4441,6 +4528,15 @@ check(
   typeof nextActionsReport.currentPlaceholderEditLocationSummary === "string" && nextActionsReport.currentPlaceholderEditLocationSummary.length > 0,
   "external next actions should include the current placeholder edit location summary"
 );
+check(
+  Number.isInteger(nextActionsReport.currentPrivateInputPlaceholderLocationCount),
+  "external next actions should include the current private input placeholder location count"
+);
+check(
+  typeof nextActionsReport.currentPrivateInputPlaceholderLocationSummary === "string" &&
+    nextActionsReport.currentPrivateInputPlaceholderLocationSummary.length > 0,
+  "external next actions should include the current private input placeholder location summary"
+);
 check(Number.isInteger(nextActionsReport.currentEnvKeyGuidanceCount), "external next actions should include the current env key guidance count");
 check(typeof nextActionsReport.currentEnvKeyGuidanceSummary === "string" && nextActionsReport.currentEnvKeyGuidanceSummary.length > 0, "external next actions should include the current env key guidance summary");
 check(Number.isInteger(nextActionsReport.currentEnvEditTemplateCount), "external next actions should include the current env edit template count");
@@ -4504,6 +4600,7 @@ check(Array.isArray(nextActionsReport.localEnvPresentFiles), "external next acti
 check(Array.isArray(nextActionsReport.currentRequiredKeys), "external next actions should include current required keys");
 check(Array.isArray(nextActionsReport.currentPlaceholderKeys), "external next actions should include current placeholder keys");
 check(Array.isArray(nextActionsReport.currentPlaceholderEditLocations), "external next actions should include current placeholder edit locations");
+check(Array.isArray(nextActionsReport.currentPrivateInputPlaceholderLocations), "external next actions should include current private input placeholder locations");
 check(Array.isArray(nextActionsReport.currentEnvKeyGuidance), "external next actions should include current env key guidance");
 check(Array.isArray(nextActionsReport.currentEnvEditTemplate), "external next actions should include current env edit template");
 check(Array.isArray(nextActionsReport.currentEnvEditRows), "external next actions should include current env edit rows");
@@ -4529,6 +4626,10 @@ check(
 check(
   nextActionsReport.currentPlaceholderEditLocationCount === nextActionsReport.currentPlaceholderEditLocations.length,
   "external next actions current placeholder edit location count should match listed locations"
+);
+check(
+  nextActionsReport.currentPrivateInputPlaceholderLocationCount === nextActionsReport.currentPrivateInputPlaceholderLocations.length,
+  "external next actions current private input placeholder location count should match listed locations"
 );
 check(
   nextActionsReport.currentEnvKeyGuidanceCount === nextActionsReport.currentEnvKeyGuidance.length,
@@ -6485,6 +6586,34 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   check(nextActionsReport.currentOperatorAction.includes(releaseChannelApplyPrivateEnvPreflightCommand), "release channel metadata should surface private env preflight helper before apply when placeholders remain");
   check(nextActionsReport.currentOperatorAction.includes(nextActionsReport.currentEnvEditTarget), "release channel metadata should include the env edit target when placeholders remain");
   check(nextActionsReport.currentOperatorAction.includes("current release-channel keys (4)"), "release channel metadata should focus placeholder replacement on current action keys");
+  check(
+    nextActionsReport.currentPrivateInputPlaceholderLocations.every(
+      (item) =>
+        nextActionsReport.currentPlaceholderKeys.includes(item.key) &&
+        typeof item.file === "string" &&
+        item.file.length > 0 &&
+        Number.isInteger(item.line) &&
+        item.line > 0 &&
+        item.placeholder === true &&
+        item.valueRecorded === false
+    ),
+    "release channel metadata should surface value-free selected private input placeholder locations when available"
+  );
+  check(
+    nextActionsReport.currentPrivateInputPlaceholderLocationCount === 0 ||
+      nextActionsReport.currentPrivateInputPlaceholderLocationSummary !== "none",
+    "release channel metadata should summarize selected private input placeholder locations when available"
+  );
+  check(
+    nextActionsReport.currentPrivateInputPlaceholderLocationCount === 0 ||
+      nextActionsReport.currentOperatorAction.includes(nextActionsReport.currentPrivateInputPlaceholderLocationSummary),
+    "release channel metadata current operator action should include selected private input placeholder locations when available"
+  );
+  check(
+    nextActionsReport.currentPrivateInputPlaceholderLocationCount === 0 ||
+      nextActionsReport.currentActionChecklist.some((item) => item.includes(nextActionsReport.currentPrivateInputPlaceholderLocationSummary)),
+    "release channel metadata current action checklist should include selected private input placeholder locations when available"
+  );
   check(nextActionsReport.currentActionChecklist.some((item) => item.includes(releaseChannelApplyPrivateEnvPreflightCommand)), "release channel metadata should include the private env preflight helper in the current action checklist");
   check(nextActionsReport.currentActionChecklist.some((item) => item.includes(releaseChannelApplyPrivateEnvCommand)), "release channel metadata should include the private env apply helper in the current action checklist");
   check(
@@ -6537,6 +6666,7 @@ check(markdown.includes("Completion gap claim blockers:"), "external next action
 check(markdown.includes("Current required keys:"), "external next actions Markdown should include current required keys");
 check(markdown.includes("Current placeholder keys:"), "external next actions Markdown should include current placeholder keys");
 check(markdown.includes("Current placeholder edit locations:"), "external next actions Markdown should include current placeholder edit locations");
+check(markdown.includes("Current private input placeholder locations:"), "external next actions Markdown should include current private input placeholder locations");
 check(markdown.includes("Current env key guidance:"), "external next actions Markdown should include current env key guidance");
 check(markdown.includes("Current env edit template:"), "external next actions Markdown should include current env edit template status");
 check(markdown.includes("Current env edit rows:"), "external next actions Markdown should include current env edit rows status");
@@ -6874,6 +7004,9 @@ console.log(`- Doctor post-edit proof matches recommended: ${nextActionsReport.d
 console.log(`- Current required keys: ${nextActionsReport.currentRequiredKeyCount} (${nextActionsReport.currentRequiredKeySummary})`);
 console.log(`- Current placeholder keys: ${nextActionsReport.currentPlaceholderKeyCount} (${nextActionsReport.currentPlaceholderKeySummary})`);
 console.log(`- Current placeholder edit locations: ${nextActionsReport.currentPlaceholderEditLocationCount} (${nextActionsReport.currentPlaceholderEditLocationSummary})`);
+console.log(
+  `- Current private input placeholder locations: ${nextActionsReport.currentPrivateInputPlaceholderLocationCount} (${nextActionsReport.currentPrivateInputPlaceholderLocationSummary})`
+);
 console.log(`- Current env key guidance: ${nextActionsReport.currentEnvKeyGuidanceCount} (${nextActionsReport.currentEnvKeyGuidanceSummary})`);
 console.log(`- Current env edit template: ${nextActionsReport.currentEnvEditTemplateCount} (${nextActionsReport.currentEnvEditTemplateSummary})`);
 console.log(`- Current env edit rows: ${nextActionsReport.currentEnvEditRowsCount} (${nextActionsReport.currentEnvEditRowsSummary})`);

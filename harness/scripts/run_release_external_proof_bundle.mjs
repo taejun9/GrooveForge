@@ -137,6 +137,9 @@ function buildCurrentEnvSummary(externalNextActions) {
   const currentRequiredKeys = stringArrayValue(externalNextActions?.currentRequiredKeys);
   const currentPlaceholderKeys = stringArrayValue(externalNextActions?.currentPlaceholderKeys);
   const currentPlaceholderEditLocations = valueFreeObjectRows(externalNextActions?.currentPlaceholderEditLocations);
+  const currentPrivateInputPlaceholderLocations = valueFreeObjectRows(
+    externalNextActions?.currentPrivateInputPlaceholderLocations
+  );
   const currentEnvEditTemplate = valueFreeObjectRows(externalNextActions?.currentEnvEditTemplate);
   const currentEnvEditRows = valueFreeObjectRows(externalNextActions?.currentEnvEditRows);
   const currentPlaceholderRemediationRows = valueFreeObjectRows(externalNextActions?.currentPlaceholderRemediationRows);
@@ -156,6 +159,13 @@ function buildCurrentEnvSummary(externalNextActions) {
     currentPlaceholderEditLocationCount: integerValue(externalNextActions?.currentPlaceholderEditLocationCount),
     currentPlaceholderEditLocationSummary: textValue(externalNextActions?.currentPlaceholderEditLocationSummary),
     currentPlaceholderEditLocations,
+    currentPrivateInputPlaceholderLocationCount: integerValue(
+      externalNextActions?.currentPrivateInputPlaceholderLocationCount
+    ),
+    currentPrivateInputPlaceholderLocationSummary: textValue(
+      externalNextActions?.currentPrivateInputPlaceholderLocationSummary
+    ),
+    currentPrivateInputPlaceholderLocations,
     currentEnvEditTarget: textValue(externalNextActions?.currentEnvEditTarget, ".env.distribution.local"),
     currentEnvEditTemplateCount: integerValue(externalNextActions?.currentEnvEditTemplateCount),
     currentEnvEditTemplateSummary: textValue(externalNextActions?.currentEnvEditTemplateSummary),
@@ -473,6 +483,7 @@ ${formatGateRequirementRows(summary.gateRequirementRows)}
 - Current required keys: ${summary.currentRequiredKeyCount} (${summary.currentRequiredKeySummary})
 - Current placeholder keys: ${summary.currentPlaceholderKeyCount} (${summary.currentPlaceholderKeySummary})
 - Current placeholder edit locations: ${summary.currentPlaceholderEditLocationCount} (${summary.currentPlaceholderEditLocationSummary})
+- Current private input placeholder locations: ${summary.currentPrivateInputPlaceholderLocationCount} (${summary.currentPrivateInputPlaceholderLocationSummary})
 - Current env edit target: ${summary.currentEnvEditTarget}
 - Current env edit template: ${summary.currentEnvEditTemplateCount} (${summary.currentEnvEditTemplateSummary})
 - Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})
@@ -758,6 +769,17 @@ check(Number.isInteger(summary.currentPlaceholderEditLocationCount), "release pr
 check(typeof summary.currentPlaceholderEditLocationSummary === "string" && summary.currentPlaceholderEditLocationSummary.length > 0, "release proof bundle should include current placeholder edit location summary");
 check(Array.isArray(summary.currentPlaceholderEditLocations), "release proof bundle should include value-free current placeholder edit locations");
 check(summary.currentPlaceholderEditLocations.every((row) => row.valueRecorded === false), "release proof bundle placeholder edit locations should not record values");
+check(Number.isInteger(summary.currentPrivateInputPlaceholderLocationCount), "release proof bundle should include current private input placeholder location count");
+check(
+  typeof summary.currentPrivateInputPlaceholderLocationSummary === "string" &&
+    summary.currentPrivateInputPlaceholderLocationSummary.length > 0,
+  "release proof bundle should include current private input placeholder location summary"
+);
+check(Array.isArray(summary.currentPrivateInputPlaceholderLocations), "release proof bundle should include value-free current private input placeholder locations");
+check(
+  summary.currentPrivateInputPlaceholderLocations.every((row) => row.valueRecorded === false),
+  "release proof bundle private input placeholder locations should not record values"
+);
 check(typeof summary.currentEnvEditTarget === "string" && summary.currentEnvEditTarget.length > 0, "release proof bundle should include current env edit target");
 check(Number.isInteger(summary.currentEnvEditTemplateCount), "release proof bundle should include current env edit template count");
 check(typeof summary.currentEnvEditTemplateSummary === "string" && summary.currentEnvEditTemplateSummary.length > 0, "release proof bundle should include current env edit template summary");
@@ -1000,6 +1022,7 @@ console.log(`- Current first blocker: ${summary.currentFirstBlocker}`);
 console.log(`- Current required keys: ${summary.currentRequiredKeyCount} (${summary.currentRequiredKeySummary})`);
 console.log(`- Current placeholder keys: ${summary.currentPlaceholderKeyCount} (${summary.currentPlaceholderKeySummary})`);
 console.log(`- Current placeholder edit locations: ${summary.currentPlaceholderEditLocationCount} (${summary.currentPlaceholderEditLocationSummary})`);
+console.log(`- Current private input placeholder locations: ${summary.currentPrivateInputPlaceholderLocationCount} (${summary.currentPrivateInputPlaceholderLocationSummary})`);
 console.log(`- Current env edit target: ${summary.currentEnvEditTarget}`);
 console.log(`- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})`);
 console.log(`- Current placeholder remediation rows: ${summary.currentPlaceholderRemediationRowCount} (${summary.currentPlaceholderRemediationRowSummary})`);
