@@ -361,6 +361,9 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     currentBlocker.claimedExternalDistribution === false;
   const currentRequiredKeys = stringArrayValue(currentBlocker.currentRequiredKeys);
   const currentPlaceholderKeys = stringArrayValue(currentBlocker.currentPlaceholderKeys);
+  const currentPrivateInputPlaceholderLocations = objectRows(
+    currentBlocker.currentPrivateInputPlaceholderLocations
+  ).filter((row) => row.valueRecorded === false);
   const releaseChannelFirstProofCommand = textValue(
     currentBlocker.releaseChannelFirstProofCommandAfterPrivateEdits,
     "npm run release:channel-live-check"
@@ -435,6 +438,13 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     currentPlaceholderKeys,
     currentPlaceholderEditLocationCount: integerValue(currentBlocker.currentPlaceholderEditLocationCount),
     currentPlaceholderEditLocationSummary: textValue(currentBlocker.currentPlaceholderEditLocationSummary),
+    currentPrivateInputPlaceholderLocationCount: integerValue(
+      currentBlocker.currentPrivateInputPlaceholderLocationCount
+    ),
+    currentPrivateInputPlaceholderLocationSummary: textValue(
+      currentBlocker.currentPrivateInputPlaceholderLocationSummary
+    ),
+    currentPrivateInputPlaceholderLocations,
     placeholderInputReceiptReady: currentBlocker.placeholderInputReceiptReady === true,
     placeholderInputReceiptMode: textValue(currentBlocker.placeholderInputReceiptMode),
     placeholderInputReceiptPrivateInputFilePresent: currentBlocker.placeholderInputReceiptPrivateInputFilePresent === true,
@@ -645,6 +655,9 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     currentPlaceholderKeys: completionSummary.currentPlaceholderKeys,
     currentPlaceholderEditLocationCount: completionSummary.currentPlaceholderEditLocationCount,
     currentPlaceholderEditLocationSummary: completionSummary.currentPlaceholderEditLocationSummary,
+    currentPrivateInputPlaceholderLocationCount: completionSummary.currentPrivateInputPlaceholderLocationCount,
+    currentPrivateInputPlaceholderLocationSummary: completionSummary.currentPrivateInputPlaceholderLocationSummary,
+    currentPrivateInputPlaceholderLocations: completionSummary.currentPrivateInputPlaceholderLocations,
     placeholderInputReceiptReady: completionSummary.placeholderInputReceiptReady,
     placeholderInputReceiptMode: completionSummary.placeholderInputReceiptMode,
     placeholderInputReceiptPrivateInputFilePresent: completionSummary.placeholderInputReceiptPrivateInputFilePresent,
@@ -807,6 +820,7 @@ function buildMarkdown(report) {
 - Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})
 - Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})
 - Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})
+- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})
 - Current next command: \`${report.currentNextCommand}\`
 - Current first blocker: ${report.currentFirstBlocker}
 - Hard gate ready: ${readyLabel(report.hardGateReady)}
@@ -849,6 +863,7 @@ function buildMarkdown(report) {
 - Current required keys: ${report.completionSummary.currentRequiredKeyCount} (${formatKeyList(report.completionSummary.currentRequiredKeys)})
 - Current placeholder keys: ${report.completionSummary.currentPlaceholderKeyCount} (${formatKeyList(report.completionSummary.currentPlaceholderKeys)})
 - Current placeholder edit locations: ${report.completionSummary.currentPlaceholderEditLocationCount} (${report.completionSummary.currentPlaceholderEditLocationSummary})
+- Current private input placeholder locations: ${report.completionSummary.currentPrivateInputPlaceholderLocationCount} (${report.completionSummary.currentPrivateInputPlaceholderLocationSummary})
 - Placeholder input receipt ready: ${readyLabel(report.completionSummary.placeholderInputReceiptReady)}
 - Placeholder input receipt mode: ${report.completionSummary.placeholderInputReceiptMode}
 - Placeholder private input file present: ${readyLabel(report.completionSummary.placeholderInputReceiptPrivateInputFilePresent)}
@@ -1026,6 +1041,25 @@ function validateReport(report, markdown) {
       (report.currentPlaceholderEditLocationCount === 0 ||
         report.currentPlaceholderEditLocationSummary.includes(report.currentEnvEditTarget)),
     "release progress refresh should expose value-free placeholder edit location summary"
+  );
+  check(
+    report.completionSummary.currentPrivateInputPlaceholderLocationCount ===
+      report.currentPrivateInputPlaceholderLocationCount,
+    "release progress refresh summary should mirror current private input placeholder location count"
+  );
+  check(
+    Array.isArray(report.currentPrivateInputPlaceholderLocations) &&
+      report.currentPrivateInputPlaceholderLocationCount === report.currentPrivateInputPlaceholderLocations.length,
+    "release progress refresh current private input placeholder location count should match locations"
+  );
+  check(
+    report.currentPrivateInputPlaceholderLocations.every((row) => row.valueRecorded === false),
+    "release progress refresh current private input placeholder locations should not record values"
+  );
+  check(
+    report.currentPrivateInputPlaceholderLocationCount === 0 ||
+      report.currentPrivateInputPlaceholderLocationSummary !== "none",
+    "release progress refresh should expose current private input placeholder file/line locations"
   );
   check(report.completionSummary.placeholderInputReceiptReady === report.placeholderInputReceiptReady, "release progress refresh summary should mirror placeholder input receipt readiness");
   check(report.placeholderInputReceiptReady === true, "release progress refresh should expose ready placeholder input receipt evidence");
@@ -1301,6 +1335,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("## Completion Blocker Action Receipt"), "release progress refresh Markdown should include completion blocker action receipt");
   check(markdown.includes("## Completion Blocker Focus Rows"), "release progress refresh Markdown should include completion blocker focus rows");
   check(markdown.includes("Completion blocker action receipt ready: yes"), "release progress refresh Markdown should include blocker action receipt readiness");
+  check(markdown.includes("Current private input placeholder locations:"), "release progress refresh Markdown should include current private input placeholder locations");
   check(markdown.includes("Current operator start command:"), "release progress refresh Markdown should include current operator start command");
   check(markdown.includes("Current operator start command role:"), "release progress refresh Markdown should include current operator start command role");
   check(markdown.includes("Current operator start command matches first command:"), "release progress refresh Markdown should include current operator start command match");
@@ -1381,6 +1416,7 @@ console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);
 console.log(`- Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})`);
 console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})`);
 console.log(`- Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})`);
+console.log(`- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})`);
 console.log(`- Placeholder input receipt ready: ${report.placeholderInputReceiptReady ? "yes" : "no"}`);
 console.log(`- Placeholder input receipt mode: ${report.placeholderInputReceiptMode}`);
 console.log(`- Placeholder private input file present: ${report.placeholderInputReceiptPrivateInputFilePresent ? "yes" : "no"}`);

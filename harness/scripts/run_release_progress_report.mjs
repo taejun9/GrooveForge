@@ -1223,6 +1223,16 @@ function buildExternalProofBundleSummary(externalProofBundle) {
     externalProofBundleCurrentPlaceholderEditLocationCount: integerValue(externalProofBundle.currentPlaceholderEditLocationCount),
     externalProofBundleCurrentPlaceholderEditLocationSummary: textValue(externalProofBundle.currentPlaceholderEditLocationSummary, "none"),
     externalProofBundleCurrentPlaceholderEditLocations: valueFreeObjectRows(externalProofBundle.currentPlaceholderEditLocations),
+    externalProofBundleCurrentPrivateInputPlaceholderLocationCount: integerValue(
+      externalProofBundle.currentPrivateInputPlaceholderLocationCount
+    ),
+    externalProofBundleCurrentPrivateInputPlaceholderLocationSummary: textValue(
+      externalProofBundle.currentPrivateInputPlaceholderLocationSummary,
+      "none"
+    ),
+    externalProofBundleCurrentPrivateInputPlaceholderLocations: valueFreeObjectRows(
+      externalProofBundle.currentPrivateInputPlaceholderLocations
+    ),
     externalProofBundleCurrentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
     externalProofBundleCurrentEnvEditTemplateCount: integerValue(externalProofBundle.currentEnvEditTemplateCount),
     externalProofBundleCurrentEnvEditTemplateSummary: textValue(externalProofBundle.currentEnvEditTemplateSummary, "none"),
@@ -1686,6 +1696,7 @@ function buildMarkdown(report) {
 - External proof current required keys: ${report.externalProofBundleCurrentRequiredKeyCount} (${report.externalProofBundleCurrentRequiredKeySummary})
 - External proof current placeholder keys: ${report.externalProofBundleCurrentPlaceholderKeyCount} (${report.externalProofBundleCurrentPlaceholderKeySummary})
 - External proof current placeholder edit locations: ${report.externalProofBundleCurrentPlaceholderEditLocationCount} (${report.externalProofBundleCurrentPlaceholderEditLocationSummary})
+- External proof current private input placeholder locations: ${report.externalProofBundleCurrentPrivateInputPlaceholderLocationCount} (${report.externalProofBundleCurrentPrivateInputPlaceholderLocationSummary})
 - External proof current env edit target: ${report.externalProofBundleCurrentEnvEditTarget}
 - External proof current env edit template: ${report.externalProofBundleCurrentEnvEditTemplateCount} (${report.externalProofBundleCurrentEnvEditTemplateSummary})
 - External proof current placeholder remediation rows: ${report.externalProofBundleCurrentPlaceholderRemediationRowCount} (${report.externalProofBundleCurrentPlaceholderRemediationRowSummary})
@@ -2063,6 +2074,7 @@ ${formatUpdateFeedCheckpointComparisonRows(report.updateFeedCheckpointComparison
 - Current required keys: ${report.externalProofBundleCurrentRequiredKeyCount} (${report.externalProofBundleCurrentRequiredKeySummary})
 - Current placeholder keys: ${report.externalProofBundleCurrentPlaceholderKeyCount} (${report.externalProofBundleCurrentPlaceholderKeySummary})
 - Current placeholder edit locations: ${report.externalProofBundleCurrentPlaceholderEditLocationCount} (${report.externalProofBundleCurrentPlaceholderEditLocationSummary})
+- Current private input placeholder locations: ${report.externalProofBundleCurrentPrivateInputPlaceholderLocationCount} (${report.externalProofBundleCurrentPrivateInputPlaceholderLocationSummary})
 - Current env edit target: ${report.externalProofBundleCurrentEnvEditTarget}
 - Current env edit rows: ${report.externalProofBundleCurrentEnvEditRowsCount} (${report.externalProofBundleCurrentEnvEditRowsSummary})
 - Current placeholder remediation rows: ${report.externalProofBundleCurrentPlaceholderRemediationRowCount} (${report.externalProofBundleCurrentPlaceholderRemediationRowSummary})
@@ -2902,6 +2914,17 @@ check(Number.isInteger(releaseProgressReport.externalProofBundleCurrentPlacehold
 check(typeof releaseProgressReport.externalProofBundleCurrentPlaceholderEditLocationSummary === "string" && releaseProgressReport.externalProofBundleCurrentPlaceholderEditLocationSummary.length > 0, "release progress report should include external proof current placeholder edit location summary");
 check(Array.isArray(releaseProgressReport.externalProofBundleCurrentPlaceholderEditLocations), "release progress report should include value-free external proof current placeholder edit locations");
 check(releaseProgressReport.externalProofBundleCurrentPlaceholderEditLocations.every((row) => row.valueRecorded === false), "release progress report placeholder edit locations should not record values");
+check(Number.isInteger(releaseProgressReport.externalProofBundleCurrentPrivateInputPlaceholderLocationCount), "release progress report should include external proof current private input placeholder location count");
+check(
+  typeof releaseProgressReport.externalProofBundleCurrentPrivateInputPlaceholderLocationSummary === "string" &&
+    releaseProgressReport.externalProofBundleCurrentPrivateInputPlaceholderLocationSummary.length > 0,
+  "release progress report should include external proof current private input placeholder location summary"
+);
+check(Array.isArray(releaseProgressReport.externalProofBundleCurrentPrivateInputPlaceholderLocations), "release progress report should include value-free external proof current private input placeholder locations");
+check(
+  releaseProgressReport.externalProofBundleCurrentPrivateInputPlaceholderLocations.every((row) => row.valueRecorded === false),
+  "release progress report private input placeholder locations should not record values"
+);
 check(typeof releaseProgressReport.externalProofBundleCurrentEnvEditTarget === "string" && releaseProgressReport.externalProofBundleCurrentEnvEditTarget.length > 0, "release progress report should include external proof current env edit target");
 check(Number.isInteger(releaseProgressReport.externalProofBundleCurrentEnvEditTemplateCount), "release progress report should include external proof current env edit template count");
 check(typeof releaseProgressReport.externalProofBundleCurrentEnvEditTemplateSummary === "string" && releaseProgressReport.externalProofBundleCurrentEnvEditTemplateSummary.length > 0, "release progress report should include external proof current env edit template summary");
@@ -2934,6 +2957,11 @@ check(Array.isArray(releaseProgressReport.externalProofBundleCurrentCommandVerif
 check(releaseProgressReport.externalProofBundleCurrentCommandVerificationRows.every((row) => row.valueRecorded === false), "release progress report command verification rows should not record values");
 check(releaseProgressReport.externalProofBundleCurrentRequiredKeyCount === releaseProgressReport.externalProofBundleCurrentRequiredKeys.length, "release progress report current required key count should match names");
 check(releaseProgressReport.externalProofBundleCurrentPlaceholderKeyCount === releaseProgressReport.externalProofBundleCurrentPlaceholderKeys.length, "release progress report current placeholder key count should match names");
+check(
+  releaseProgressReport.externalProofBundleCurrentPrivateInputPlaceholderLocationCount ===
+    releaseProgressReport.externalProofBundleCurrentPrivateInputPlaceholderLocations.length,
+  "release progress report current private input placeholder location count should match locations"
+);
 check(releaseProgressReport.externalProofBundleCurrentCommandVerificationRowCount >= 0, "release progress report should include external proof command verification row count");
 check(releaseProgressReport.externalProofBundleHardGateCommand === "npm run release:external-check", "release progress report should mirror the external proof bundle hard gate command");
 check(releaseProgressReport.externalProofBundleCurrentEnvSummaryValueRecorded === false, "release progress report should not record external proof current env summary values");
@@ -3030,6 +3058,7 @@ check(markdown.includes("External proof artifacts present:"), "release progress 
 check(markdown.includes("External proof current target:"), "release progress Markdown should include external proof current target");
 check(markdown.includes("External proof current operator action:"), "release progress Markdown should include external proof current operator action");
 check(markdown.includes("External proof current required keys:"), "release progress Markdown should include external proof current required key summary");
+check(markdown.includes("External proof current private input placeholder locations:"), "release progress Markdown should include external proof current private input placeholder locations");
 check(markdown.includes("Next proof target to report:"), "release progress Markdown should include user-facing next proof target");
 check(markdown.includes("Operator action to report:"), "release progress Markdown should include user-facing operator action");
 check(markdown.includes("Current Edit Guidance"), "release progress Markdown should include current edit guidance table");
@@ -3155,6 +3184,7 @@ console.log(`- External proof current operator action: ${releaseProgressReport.e
 console.log(`- External proof current required keys: ${releaseProgressReport.externalProofBundleCurrentRequiredKeyCount} (${releaseProgressReport.externalProofBundleCurrentRequiredKeySummary})`);
 console.log(`- External proof current placeholder keys: ${releaseProgressReport.externalProofBundleCurrentPlaceholderKeyCount} (${releaseProgressReport.externalProofBundleCurrentPlaceholderKeySummary})`);
 console.log(`- External proof current placeholder edit locations: ${releaseProgressReport.externalProofBundleCurrentPlaceholderEditLocationCount} (${releaseProgressReport.externalProofBundleCurrentPlaceholderEditLocationSummary})`);
+console.log(`- External proof current private input placeholder locations: ${releaseProgressReport.externalProofBundleCurrentPrivateInputPlaceholderLocationCount} (${releaseProgressReport.externalProofBundleCurrentPrivateInputPlaceholderLocationSummary})`);
 console.log(`- External proof current env edit target: ${releaseProgressReport.externalProofBundleCurrentEnvEditTarget}`);
 console.log(`- External proof current env edit template: ${releaseProgressReport.externalProofBundleCurrentEnvEditTemplateCount} (${releaseProgressReport.externalProofBundleCurrentEnvEditTemplateSummary})`);
 console.log(`- External proof current env edit rows: ${releaseProgressReport.externalProofBundleCurrentEnvEditRowsCount} (${releaseProgressReport.externalProofBundleCurrentEnvEditRowsSummary})`);
