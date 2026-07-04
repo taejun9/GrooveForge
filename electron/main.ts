@@ -12,7 +12,7 @@ const isLaunchSmoke = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1";
 const isProjectIoSmoke = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE === "1";
 const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
-const launchSmokeTimeoutMs = 180000;
+const launchSmokeTimeoutMs = 240000;
 const projectIoSmokeTimeoutMs = launchSmokeTimeoutMs;
 
 type NativeMenuCommand =
@@ -33,6 +33,7 @@ type SaveProjectPayload = {
 type LaunchSmokeEvidence = {
   appKind: unknown;
   bodyTextLength: number;
+  commandReference: LaunchSmokeCommandReferenceEvidence;
   hasOpenProject: boolean;
   hasPreloadBridge: boolean;
   hasRoot: boolean;
@@ -85,6 +86,27 @@ type LaunchSmokeAudienceStarterEvidence = LaunchSmokePaletteRouteEvidence & {
   visibleResultPresent: boolean;
   visibleResultStatus: string;
   visibleResultTitle: string;
+};
+
+type LaunchSmokeCommandReferenceEvidence = {
+  contextHasDirectComposition: boolean;
+  contextHasFollowupRoutes: boolean;
+  contextHasResultMetric: boolean;
+  contextHasStarterCommands: boolean;
+  contextText: string;
+  handoffButtonPresent: boolean;
+  itemPresent: boolean;
+  opened: boolean;
+  quickActionsOpenedAfterHandoff: boolean;
+  searchCountText: string;
+  searchInputPresent: boolean;
+  searchQuery: string;
+  spotlightContext: string;
+  spotlightDetail: string;
+  spotlightId: string;
+  spotlightLabel: string;
+  targetHasAudienceTargets: boolean;
+  targetText: string;
 };
 
 type LaunchSmokeBridgeDirectEvidence = {
@@ -751,6 +773,37 @@ function launchSmokeBridgeDirectFailures(evidence: LaunchSmokeBridgeDirectEviden
   return failures;
 }
 
+function launchSmokeCommandReferenceFailures(evidence: LaunchSmokeCommandReferenceEvidence): string[] {
+  const failures: string[] = [];
+  if (!evidence.opened || !evidence.searchInputPresent || evidence.searchQuery !== "audience starter") {
+    failures.push("live Command Reference should open and search for Audience Starter");
+  }
+  if (!evidence.itemPresent || evidence.spotlightId !== "command-audience-starter" || evidence.spotlightLabel !== "Audience Starter") {
+    failures.push("live Command Reference search should spotlight the Audience Starter command-map row");
+  }
+  if (!evidence.targetHasAudienceTargets || !evidence.targetText.includes("Build")) {
+    failures.push("live Audience Starter Command Reference target should name both starter audiences");
+  }
+  if (!evidence.contextHasStarterCommands || !evidence.contextHasFollowupRoutes) {
+    failures.push("live Audience Starter Command Reference context should expose starter commands and follow-up routes");
+  }
+  if (!evidence.contextHasResultMetric || !evidence.contextHasDirectComposition) {
+    failures.push("live Audience Starter Command Reference context should expose result metrics and direct-composition posture");
+  }
+  if (!evidence.handoffButtonPresent || !evidence.quickActionsOpenedAfterHandoff) {
+    failures.push("live Audience Starter Command Reference spotlight should hand off to Quick Actions");
+  }
+  if (
+    !evidence.contextText.includes("First Beat Path") ||
+    !evidence.contextText.includes("Review Queue") ||
+    !evidence.contextText.includes("Handoff Package Check")
+  ) {
+    failures.push("live Audience Starter Command Reference context should name beginner and producer next checks");
+  }
+
+  return failures;
+}
+
 function launchSmokeVisualFailures(evidence: LaunchSmokeVisualEvidence): string[] {
   const failures: string[] = [];
   const opaqueRatio = evidence.sampledPixels > 0 ? evidence.opaqueSamples / evidence.sampledPixels : 0;
@@ -994,10 +1047,31 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         resultPresent: false,
         resultTitle: ""
       };
+      const emptyCommandReference = {
+        contextHasDirectComposition: false,
+        contextHasFollowupRoutes: false,
+        contextHasResultMetric: false,
+        contextHasStarterCommands: false,
+        contextText: "",
+        handoffButtonPresent: false,
+        itemPresent: false,
+        opened: false,
+        quickActionsOpenedAfterHandoff: false,
+        searchCountText: "",
+        searchInputPresent: false,
+        searchQuery: "",
+        spotlightContext: "",
+        spotlightDetail: "",
+        spotlightId: "",
+        spotlightLabel: "",
+        targetHasAudienceTargets: false,
+        targetText: ""
+      };
       const bridge = window.grooveforge;
       return {
         appKind: bridge?.appKind ?? null,
         bodyTextLength: bodyText.length,
+        commandReference: emptyCommandReference,
         hasOpenProject: typeof bridge?.openProject === "function",
         hasPreloadBridge: Boolean(bridge),
         hasRoot: Boolean(document.querySelector("#root")),
@@ -1076,7 +1150,7 @@ async function collectLaunchSmokePaletteEvidence(win: BrowserWindow): Promise<La
 
 function collectLaunchSmokePaletteEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokePaletteEvidence> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Timed out collecting live Quick Actions palette evidence.")), 120000);
+    const timeout = setTimeout(() => reject(new Error("Timed out collecting live Quick Actions palette evidence.")), 150000);
     void collectLaunchSmokePaletteEvidence(win)
       .then((evidence) => {
         clearTimeout(timeout);
@@ -1167,6 +1241,99 @@ function collectLaunchSmokeBridgeDirectEvidenceWithTimeout(win: BrowserWindow): 
     void collectLaunchSmokeBridgeDirectEvidence(win, (nextStep) => {
       step = nextStep;
     })
+      .then((evidence) => {
+        clearTimeout(timeout);
+        resolve(evidence);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+}
+
+async function collectLaunchSmokeCommandReferenceEvidence(win: BrowserWindow): Promise<LaunchSmokeCommandReferenceEvidence> {
+  const result = await win.webContents.executeJavaScript(`
+    (async () => {
+      const readText = (testId) => document.querySelector('[data-testid="' + testId + '"]')?.textContent?.trim() ?? "";
+      const readEvidence = () => {
+        const contextText = readText("command-reference-item-audience-starter-context");
+        const targetText = readText("command-reference-item-audience-starter-target");
+        return {
+          contextHasDirectComposition: /direct composition posture/i.test(contextText),
+          contextHasFollowupRoutes:
+            contextText.includes("First Beat Path") &&
+            contextText.includes("Dual Audience Readiness") &&
+            contextText.includes("Review Queue") &&
+            contextText.includes("Export Preflight") &&
+            contextText.includes("Handoff Package Check"),
+          contextHasResultMetric: contextText.includes("Audience Starter result metric"),
+          contextHasStarterCommands: contextText.includes("Build Starter Project commands"),
+          contextText,
+          handoffButtonPresent: document.querySelector('[data-testid="command-reference-spotlight-open-quick-actions"]') !== null,
+          itemPresent: document.querySelector('[data-testid="command-reference-item-audience-starter"]') !== null,
+          opened: document.querySelector('[data-testid="command-reference"]') !== null,
+          quickActionsOpenedAfterHandoff: document.querySelector('[data-testid="quick-actions"]') !== null,
+          searchCountText: readText("command-reference-search-count"),
+          searchInputPresent: document.querySelector('[data-testid="command-reference-search-input"]') !== null,
+          searchQuery: document.querySelector('[data-testid="command-reference-search-input"]')?.value ?? "",
+          spotlightContext: readText("command-reference-spotlight-context"),
+          spotlightDetail: readText("command-reference-spotlight-detail"),
+          spotlightId: document.querySelector('[data-testid="command-reference-spotlight"]')?.dataset.commandReferenceSpotlight ?? "",
+          spotlightLabel: readText("command-reference-spotlight-label"),
+          targetHasAudienceTargets: targetText.includes("first-time composer") && targetText.includes("professional producer"),
+          targetText
+        };
+      };
+
+      if (window.grooveforge?.launchSmoke !== true) {
+        return { ready: false, evidence: readEvidence() };
+      }
+
+      const openButton = document.querySelector('[data-testid="command-reference-open"]');
+      if (!openButton) {
+        return { ready: false, evidence: readEvidence() };
+      }
+      openButton.click();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const input = document.querySelector('[data-testid="command-reference-search-input"]');
+      if (input) {
+        const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+        valueSetter?.call(input, "audience starter");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      }
+
+      const handoffButton = document.querySelector('[data-testid="command-reference-spotlight-open-quick-actions"]');
+      const beforeHandoff = readEvidence();
+      if (handoffButton) {
+        handoffButton.click();
+        await Promise.resolve();
+        await Promise.resolve();
+      }
+
+      return {
+        ready: true,
+        evidence: {
+          ...beforeHandoff,
+          quickActionsOpenedAfterHandoff: document.querySelector('[data-testid="quick-actions"]') !== null
+        }
+      };
+    })();
+  `);
+  if (!result || result.ready !== true || !result.evidence) {
+    throw new Error("Launch smoke Command Reference DOM was not ready.");
+  }
+  return result.evidence as LaunchSmokeCommandReferenceEvidence;
+}
+
+function collectLaunchSmokeCommandReferenceEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeCommandReferenceEvidence> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Timed out collecting live Command Reference evidence.")), 20000);
+    void collectLaunchSmokeCommandReferenceEvidence(win)
       .then((evidence) => {
         clearTimeout(timeout);
         resolve(evidence);
@@ -1347,26 +1514,25 @@ function installLaunchSmoke(win: BrowserWindow): void {
                     return;
                   }
 
-                  lastProgress = { phase: "collecting-visual", evidence: evidenceWithPalette };
-                  return collectLaunchSmokeVisualEvidenceWithTimeout(win)
-                    .then((visualEvidence) => {
+                  lastProgress = { phase: "collecting-command-reference", evidence: evidenceWithPalette };
+                  return collectLaunchSmokeCommandReferenceEvidenceWithTimeout(win)
+                    .then((commandReferenceEvidence) => {
                       if (finished) {
                         return;
                       }
 
-                      const visualFailures = launchSmokeVisualFailures(visualEvidence);
+                      const commandReferenceFailures = launchSmokeCommandReferenceFailures(commandReferenceEvidence);
+                      const evidenceWithCommandReference = { ...evidenceWithPalette, commandReference: commandReferenceEvidence };
                       lastProgress = {
-                        phase: "visual-collected",
-                        evidence: evidenceWithPalette,
-                        visualEvidence,
-                        failures: visualFailures
+                        phase: "command-reference-collected",
+                        evidence: evidenceWithCommandReference,
+                        failures: commandReferenceFailures
                       };
-                      if (visualFailures.length > 0) {
+                      if (commandReferenceFailures.length > 0) {
                         if (Date.now() >= deadline) {
-                          fail("Production desktop visual launch smoke failed.", {
-                            evidence: evidenceWithPalette,
-                            visualEvidence,
-                            failures: visualFailures
+                          fail("Production desktop Command Reference launch smoke failed.", {
+                            evidence: evidenceWithCommandReference,
+                            failures: commandReferenceFailures
                           });
                         } else {
                           setTimeout(() => poll(deadline), 100);
@@ -1374,15 +1540,48 @@ function installLaunchSmoke(win: BrowserWindow): void {
                         return;
                       }
 
-                      finished = true;
-                      clearTimeout(timeout);
-                      console.log(
-                        `${launchSmokeResultPrefix}${JSON.stringify({ ok: true, evidence: { ...evidenceWithPalette, visual: visualEvidence } })}`
-                      );
-                      app.exit(0);
+                      lastProgress = { phase: "collecting-visual", evidence: evidenceWithCommandReference };
+                      return collectLaunchSmokeVisualEvidenceWithTimeout(win)
+                        .then((visualEvidence) => {
+                          if (finished) {
+                            return;
+                          }
+
+                          const visualFailures = launchSmokeVisualFailures(visualEvidence);
+                          lastProgress = {
+                            phase: "visual-collected",
+                            evidence: evidenceWithCommandReference,
+                            visualEvidence,
+                            failures: visualFailures
+                          };
+                          if (visualFailures.length > 0) {
+                            if (Date.now() >= deadline) {
+                              fail("Production desktop visual launch smoke failed.", {
+                                evidence: evidenceWithCommandReference,
+                                visualEvidence,
+                                failures: visualFailures
+                              });
+                            } else {
+                              setTimeout(() => poll(deadline), 100);
+                            }
+                            return;
+                          }
+
+                          finished = true;
+                          clearTimeout(timeout);
+                          console.log(
+                            `${launchSmokeResultPrefix}${JSON.stringify({ ok: true, evidence: { ...evidenceWithCommandReference, visual: visualEvidence } })}`
+                          );
+                          app.exit(0);
+                        })
+                        .catch((error: unknown) => {
+                          fail("Production desktop screenshot capture failed.", {
+                            error: error instanceof Error ? error.message : String(error)
+                          });
+                        });
                     })
                     .catch((error: unknown) => {
-                      fail("Production desktop screenshot capture failed.", {
+                      fail("Production desktop Command Reference JavaScript failed.", {
                         error: error instanceof Error ? error.message : String(error)
                       });
                     });

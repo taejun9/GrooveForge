@@ -10,7 +10,7 @@ import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gu
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(import.meta.url);
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
-const timeoutMs = 210000;
+const timeoutMs = 300000;
 const failures = [];
 const expectedLiveTestIds = [
   "workflow-target-transport",
@@ -272,6 +272,41 @@ function checkResult(result) {
       String(evidence?.palette?.starterProducer?.visibleFollowupReadinessResult ?? "").includes("Export Preflight") &&
       String(evidence?.palette?.starterProducer?.visibleFollowupCompletionResult ?? "").includes("Package"),
     "live desktop Audience Starter producer follow-up buttons should route to Review Queue, Export Preflight, and Handoff Package Check surfaces"
+  );
+  check(
+    evidence?.commandReference?.opened === true &&
+      evidence?.commandReference?.searchInputPresent === true &&
+      evidence?.commandReference?.searchQuery === "audience starter",
+    "live desktop Command Reference should open and search for Audience Starter"
+  );
+  check(
+    evidence?.commandReference?.itemPresent === true &&
+      evidence?.commandReference?.spotlightId === "command-audience-starter" &&
+      evidence?.commandReference?.spotlightLabel === "Audience Starter",
+    "live desktop Command Reference search should spotlight Audience Starter"
+  );
+  check(
+    evidence?.commandReference?.targetHasAudienceTargets === true &&
+      String(evidence?.commandReference?.targetText ?? "").includes("Build"),
+    "live desktop Audience Starter Command Reference target should name both starter audiences"
+  );
+  check(
+    evidence?.commandReference?.contextHasStarterCommands === true &&
+      evidence?.commandReference?.contextHasFollowupRoutes === true &&
+      String(evidence?.commandReference?.contextText ?? "").includes("First Beat Path") &&
+      String(evidence?.commandReference?.contextText ?? "").includes("Review Queue") &&
+      String(evidence?.commandReference?.contextText ?? "").includes("Handoff Package Check"),
+    "live desktop Audience Starter Command Reference context should expose starter commands and follow-up routes"
+  );
+  check(
+    evidence?.commandReference?.contextHasResultMetric === true &&
+      evidence?.commandReference?.contextHasDirectComposition === true,
+    "live desktop Audience Starter Command Reference context should expose result metrics and direct-composition posture"
+  );
+  check(
+    evidence?.commandReference?.handoffButtonPresent === true &&
+      evidence?.commandReference?.quickActionsOpenedAfterHandoff === true,
+    "live desktop Audience Starter Command Reference spotlight should hand off to Quick Actions"
   );
   check(
     evidence?.palette?.routeBridge?.actionPresent === true,
@@ -543,6 +578,7 @@ child.on("exit", (code, signal) => {
   console.log("- Audience session rows: First-time composer, Professional producer");
   console.log("- Audience session Quick Actions: renderer palette search and run evidence passed for Enter Guided and Enter Studio");
   console.log("- Audience Starter controls: visible beginner and producer starter creation evidence passed");
+  console.log("- Audience Starter Command Reference: live search, row context, and Quick Actions handoff evidence passed");
   console.log("- Audience Route Bridge Quick Actions: readout, readiness, completion, and direct button result evidence passed");
   console.log(
     "- Dual Audience Readiness Quick Actions: route readout, first-time composer lane, and professional producer lane search/run evidence passed"

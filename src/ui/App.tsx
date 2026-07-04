@@ -9488,15 +9488,6 @@ export function App(): ReactElement {
       const visibleActionLimit = query.trim().length > 0 ? 80 : 48;
       const visibleActionCount = Math.min(routeActions.length, visibleActionLimit);
 
-      setCommandReferenceOpen(false);
-      setQuickActionQuery(query);
-      setQuickActionSearchHintResult(null);
-      setQuickActionSearchResult(searchResult);
-      setQuickActionSearchRecoveryResult(null);
-      setQuickActionScope(scope);
-      setQuickActionScopeResult(null);
-      setQuickActionsOpen(true);
-
       return {
         actionPresent: action !== null && action.disabled !== true,
         countText: `${visibleActionCount} shown / ${routeActions.length} results / ${matchingCount} matching`,
@@ -9548,9 +9539,6 @@ export function App(): ReactElement {
         handoffExportReceiptRef.current,
         null
       );
-      setQuickActionResult(result);
-      setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
-      setQuickActionsOpen(false);
 
       return {
         resultMetricValue: `${result.metric.before} -> ${result.metric.after}`,
@@ -9584,9 +9572,6 @@ export function App(): ReactElement {
         handoffExportReceiptRef.current,
         null
       );
-      setQuickActionResult(result);
-      setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
-      setQuickActionsOpen(false);
 
       return {
         resultMetricValue: `${result.metric.before} -> ${result.metric.after}`,
@@ -9620,9 +9605,6 @@ export function App(): ReactElement {
         handoffExportReceiptRef.current,
         null
       );
-      setQuickActionResult(result);
-      setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
-      setQuickActionsOpen(false);
 
       return {
         resultMetricValue: `${result.metric.before} -> ${result.metric.after}`,
@@ -9656,9 +9638,6 @@ export function App(): ReactElement {
         handoffExportReceiptRef.current,
         null
       );
-      setQuickActionResult(result);
-      setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
-      setQuickActionsOpen(false);
 
       return {
         resultMetricValue: `${result.metric.before} -> ${result.metric.after}`,
@@ -9740,9 +9719,9 @@ export function App(): ReactElement {
       return readAudienceStarterFollowupRouteResult(starterId, route);
     };
 
-    const runAudienceStarterRoute = async (
+    const runAudienceStarterRoute = (
       starterId: AudienceStarterProjectId
-    ): Promise<GrooveforgeLaunchSmokeAudienceStarterEvidence> => {
+    ): GrooveforgeLaunchSmokeAudienceStarterEvidence => {
       const actionId = `audience-starter-${starterId}`;
       const routeQuery =
         starterId === "producer" ? "build professional producer starter" : "build first time composer starter";
@@ -9772,8 +9751,6 @@ export function App(): ReactElement {
 
       const result = createAudienceStarter(starterId);
       setQuickActionsOpen(false);
-      await Promise.resolve();
-      await Promise.resolve();
       const visibleResult = readAudienceStarterVisibleResult();
       const visibleFollowupPrimaryResult = clickAudienceStarterFollowupRoute(starterId, "primary");
       const visibleFollowupReadinessResult = clickAudienceStarterFollowupRoute(starterId, "readiness");
@@ -9798,7 +9775,7 @@ export function App(): ReactElement {
 
     window.__grooveforgeLaunchSmoke = {
       ...(window.__grooveforgeLaunchSmoke ?? {}),
-      collectAudienceSessionQuickActionEvidence: async () => {
+      collectAudienceSessionQuickActionEvidence: () => {
         const producer = {
           ...routeEvidence("enter studio professional producer", "audience-session-enter-producer"),
           ...runAudienceSessionRoute("audience-session-enter-producer")
@@ -9843,8 +9820,8 @@ export function App(): ReactElement {
           ...routeEvidence("enter guided first time composer", "audience-session-enter-beginner"),
           ...runAudienceSessionRoute("audience-session-enter-beginner")
         };
-        const starterBeginner = await runAudienceStarterRoute("beginner");
-        const starterProducer = await runAudienceStarterRoute("producer");
+        const starterBeginner = runAudienceStarterRoute("beginner");
+        const starterProducer = runAudienceStarterRoute("producer");
         return {
           completionBeginner,
           completionProducer,
