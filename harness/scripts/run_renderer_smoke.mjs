@@ -190,6 +190,18 @@ function createAudienceCompletionSmokeAction({ id, resultTargetId, title }) {
   };
 }
 
+function createAudienceStarterSmokeAction({ id, resultTargetId, title }) {
+  return {
+    id,
+    title,
+    detail: `${title} / Audience Starter / Creates editable drums, 808/bass, melody/chords, arrangement, mix/master, and delivery target`,
+    group: "Create",
+    keywords: "audience starter project build first-time composer professional producer direct beat workstation sample free",
+    resultTargetId,
+    run() {}
+  };
+}
+
 function validateAudienceSessionQuickActionResults(quickActions, workstation) {
   const guidedProject = { ...workstation.starterProject, mode: "guided" };
   const studioProject = { ...workstation.starterProject, mode: "studio" };
@@ -265,6 +277,79 @@ function validateAudienceSessionQuickActionResults(quickActions, workstation) {
     }
     for (const needle of testCase.auditionNeedles) {
       checkIncludes(result.auditionCue, needle, `${testCase.label} audition cue`);
+    }
+    for (const needle of testCase.nextNeedles) {
+      checkIncludes(result.nextCheck, needle, `${testCase.label} next check`);
+    }
+  }
+}
+
+function validateAudienceStarterQuickActionResults(quickActions, workstation) {
+  const cases = [
+    {
+      label: "beginner Audience Starter visible result",
+      action: createAudienceStarterSmokeAction({
+        id: "audience-starter-beginner",
+        resultTargetId: "beginner",
+        title: "Build Starter Project: First-time composer"
+      }),
+      afterProject: workstation.createAudienceStarterProject("beginner"),
+      afterNeedles: [
+        "starter project",
+        "First-time composer first beat",
+        "Guided mode / lofi / A minor / 8 bars / Starter Sketch delivery",
+        "Guided mode",
+        "Lo-fi / A minor / 86 BPM",
+        "8 bars",
+        "editable events",
+        "delivery Starter Sketch"
+      ],
+      beforeNeedles: ["current project", "First-time composer first beat", "Trap", "F minor", "145 BPM", "editable events"],
+      nextNeedles: ["Enter Guided", "First Beat Path", "sample-free composition move"]
+    },
+    {
+      label: "producer Audience Starter visible result",
+      action: createAudienceStarterSmokeAction({
+        id: "audience-starter-producer",
+        resultTargetId: "producer",
+        title: "Build Starter Project: Professional producer"
+      }),
+      afterProject: workstation.createAudienceStarterProject("producer"),
+      afterNeedles: [
+        "starter project",
+        "Professional producer studio pass",
+        "Studio mode / house / C minor / 26 bars / Beat Store delivery",
+        "Studio mode",
+        "House / C minor / 124 BPM",
+        "26 bars",
+        "editable events",
+        "delivery Beat Store"
+      ],
+      beforeNeedles: ["current project", "Professional producer studio pass", "Trap", "F minor", "145 BPM", "editable events"],
+      nextNeedles: ["Enter Studio", "Review Queue", "Export Preflight"]
+    }
+  ];
+
+  for (const testCase of cases) {
+    const result = quickActions.createQuickActionResult(
+      testCase.action,
+      workstation.starterProject,
+      testCase.afterProject,
+      "complete"
+    );
+
+    check(result.actionId === testCase.action.id, `${testCase.label} should return the executed action id`);
+    check(result.status === "Applied", `${testCase.label} should report Applied status`);
+    check(result.tone === "good", `${testCase.label} should report a good tone`);
+    check(result.metric.id === "audience-starter", `${testCase.label} should use the Audience Starter metric id`);
+    check(result.metric.label === "Audience Starter", `${testCase.label} should use the Audience Starter metric label`);
+    check(result.metric.tone === "good", `${testCase.label} metric should report a good tone`);
+
+    for (const needle of testCase.beforeNeedles) {
+      checkIncludes(result.metric.before, needle, `${testCase.label} before metric`);
+    }
+    for (const needle of testCase.afterNeedles) {
+      checkIncludes(result.metric.after, needle, `${testCase.label} after metric`);
     }
     for (const needle of testCase.nextNeedles) {
       checkIncludes(result.nextCheck, needle, `${testCase.label} next check`);
@@ -795,6 +880,10 @@ try {
     await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
     await server.ssrLoadModule("/src/domain/workstation.ts")
   );
+  validateAudienceStarterQuickActionResults(
+    await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
+    await server.ssrLoadModule("/src/domain/workstation.ts")
+  );
   validateDualAudienceQuickActionResults(
     await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
     await server.ssrLoadModule("/src/domain/workstation.ts")
@@ -836,6 +925,7 @@ try {
     );
     console.log("- Audience Session result: Enter Guided and Enter Studio Quick Actions return Entered status, route metrics, and route-specific follow-up");
     console.log("- Audience Session palette: Enter Guided, Enter Studio, and Audience Starter project actions are searchable through Quick Actions query and scope filters");
+    console.log("- Audience Starter visible result: Build Starter Project actions return Applied status, before/after starter metrics, and delivery target context");
     console.log("- Audience Starter Command Reference: Build Starter Project creation row is searchable from the Guide command map");
     console.log("- Dual Audience Readiness palette: route readout plus both audience lanes are searchable and return focused route metrics");
     console.log("- Audience Completion Route palette: route readout plus both audience completion lanes are searchable and return focused route metrics");

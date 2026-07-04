@@ -39,6 +39,8 @@ Audience Starter Projects turn those routes into reusable local project creation
 
 Audience Starter Projects should also be discoverable in Command Reference as a Create-oriented Guide row, so users who learn by searching the command map can find Build Starter Project commands, the two audience targets, and the sample-free direct-composition posture before opening Quick Actions.
 
+Visible Build Starter Project controls should show the same value-free Audience Starter result feedback as Quick Actions: before/after project posture, target audience, mode, style, key, BPM, bar count, editable event count, delivery target, audition cue, and next check.
+
 The first-run Dual Audience Readiness strip should keep that promise visible after mode choice by summarizing the first-time composer next step and the professional producer delivery scan from existing local First Beat Path, Beat Readiness, Session Pass, Production Snapshot, and Export Preflight signals. It is a read-only navigation surface, not a scoring engine, genre lock, style imitation feature, remote service, or export mutation.
 
 Dual Audience Readiness should also be discoverable from Quick Actions and Command Reference: command-palette users get a read-only route readout plus explicit first-time composer and professional producer lane commands that use the same existing First Beat Path, Export Preflight, and Production Snapshot focus routes as the visible strip.

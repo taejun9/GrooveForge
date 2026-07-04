@@ -7066,6 +7066,8 @@ export function App(): ReactElement {
 
   function createAudienceStarter(starterId: AudienceStarterProjectId): void {
     const label = audienceStarterProjectLabel(starterId);
+    const beforeProject = projectRef.current;
+    const resultAction = quickActions.find((action) => action.id === `audience-starter-${starterId}`) ?? null;
     const changed = updateProject(() => createAudienceStarterProject(starterId), `Built ${label} starter project`);
     if (changed) {
       setSelectedNote(null);
@@ -7073,6 +7075,19 @@ export function App(): ReactElement {
       setSelectedChordIndex(0);
       setSelectedArrangementIndex(0);
       selectTransportLoopScope("arrangement", false);
+      if (resultAction) {
+        const result = createQuickActionResult(
+          resultAction,
+          beforeProject,
+          projectRef.current,
+          "complete",
+          0,
+          handoffExportReceiptRef.current,
+          null
+        );
+        setQuickActionResult(result);
+        setQuickActionRecents((recents) => prependQuickActionRecent(recents, resultAction, result));
+      }
       setProjectStatus(`Built ${label} starter project`);
     }
   }
