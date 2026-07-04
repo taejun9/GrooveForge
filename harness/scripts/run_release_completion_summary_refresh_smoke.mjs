@@ -281,6 +281,14 @@ function checkpointRowsValueFree(checkpoint) {
   return Array.isArray(checkpoint.tenPlanWindowRows) && checkpoint.tenPlanWindowRows.every((row) => row.valueRecorded === false);
 }
 
+function checkpointUserReportRowsValueFree(checkpoint) {
+  if (!checkpoint) {
+    return true;
+  }
+  const rows = objectRows(checkpoint.userReportRows);
+  return rows.length === integerValue(checkpoint.userReportRowCount) && rows.every((row) => row.valueRecorded === false);
+}
+
 function checkpointReadyLabel(report) {
   return report.tenPlanCheckpointRequired ? readyLabel(report.tenPlanCheckpointReady) : "not due";
 }
@@ -313,6 +321,9 @@ function checkpointFieldRows(report) {
     ["current operator preflight before apply", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorPreflightBeforeApply) : "not due"],
     ["current operator apply before strict proof", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorApplyBeforeStrictProof) : "not due"],
     ["rows value-free", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointRowsValueFree) : "not due"],
+    ["user report ready", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointUserReportReady) : "not due"],
+    ["user report rows", report.tenPlanCheckpointRequired ? report.checkpointUserReportRowSummary : "not due"],
+    ["user report rows value-free", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointUserReportRowsValueFree) : "not due"],
     ["private values recorded", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointPrivateValuesRecorded) : "not due"],
     ["auto-update claimed", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointClaimedAutoUpdate) : "not due"],
     ["external distribution claimed", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointClaimedExternalDistribution) : "not due"]
@@ -326,6 +337,15 @@ function checkpointFieldRows(report) {
 
 function formatCheckpointRows(rows) {
   return rows.map((row) => `| ${row.order} | ${escapeCell(row.field)} | ${escapeCell(row.value)} | ${row.valueRecorded ? "yes" : "no"} |`).join("\n");
+}
+
+function formatCheckpointUserReportRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.item)} | ${readyLabel(row.ready === true)} | ${escapeCell(row.value)} | ${escapeCell(row.sourceField)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
 }
 
 function gitContextRows(gitContext) {
@@ -881,6 +901,11 @@ function buildReport({ progressRefresh, completionSummary, externalResume, opera
     checkpointCurrentOperatorPreflightBeforeApply: checkpointRequired ? checkpoint?.currentOperatorPreflightBeforeApply === true : false,
     checkpointCurrentOperatorApplyBeforeStrictProof: checkpointRequired ? checkpoint?.currentOperatorApplyBeforeStrictProof === true : false,
     checkpointRowsValueFree: checkpointRequired ? checkpointRowsValueFree(checkpoint) : true,
+    checkpointUserReportReady: checkpointRequired ? checkpoint?.userReportReady === true : false,
+    checkpointUserReportRows: checkpointRequired ? objectRows(checkpoint?.userReportRows) : [],
+    checkpointUserReportRowCount: checkpointRequired ? integerValue(checkpoint?.userReportRowCount) : 0,
+    checkpointUserReportRowSummary: checkpointRequired ? textValue(checkpoint?.userReportRowSummary) : "not due",
+    checkpointUserReportRowsValueFree: checkpointRequired ? checkpointUserReportRowsValueFree(checkpoint) : true,
     checkpointPrivateValuesRecorded: checkpointRequired ? checkpoint?.privateValuesRecorded === true || checkpoint?.valueRecorded === true : false,
     checkpointClaimedAutoUpdate: checkpointRequired ? checkpoint?.claimedAutoUpdate === true : false,
     checkpointClaimedExternalDistribution: checkpointRequired ? checkpoint?.claimedExternalDistribution === true : false,
@@ -1213,6 +1238,9 @@ ${formatCompletionBlockerFocusRows(report.completionBlockerFocusRows)}
 - Checkpoint current operator preflight before apply: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorPreflightBeforeApply) : "not due"}
 - Checkpoint current operator apply before strict proof: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorApplyBeforeStrictProof) : "not due"}
 - Checkpoint rows value-free: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointRowsValueFree) : "not due"}
+- Checkpoint user report ready: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointUserReportReady) : "not due"}
+- Checkpoint user report rows: ${report.tenPlanCheckpointRequired ? report.checkpointUserReportRowCount : "not due"} (${report.checkpointUserReportRowSummary})
+- Checkpoint user report rows value-free: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointUserReportRowsValueFree) : "not due"}
 - Checkpoint private values recorded: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointPrivateValuesRecorded) : "not due"}
 - Checkpoint auto-update claimed: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointClaimedAutoUpdate) : "not due"}
 - Checkpoint external distribution claimed: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointClaimedExternalDistribution) : "not due"}
@@ -1222,6 +1250,12 @@ ${formatCompletionBlockerFocusRows(report.completionBlockerFocusRows)}
 | order | field | value | value recorded |
 |---:|---|---|---:|
 ${formatCheckpointRows(report.tenPlanCheckpointRows)}
+
+## 10-Plan User Report Receipt
+
+| order | item | ready | value | source field | value recorded |
+|---:|---|---:|---|---|---:|
+${formatCheckpointUserReportRows(report.checkpointUserReportRows)}
 
 ## Git Worktree Context
 
@@ -1777,6 +1811,31 @@ function validateReport(report, markdown) {
     check(report.checkpointCurrentOperatorPreflightBeforeApply === true, "release completion summary refresh checkpoint current operator sequence should place preflight before apply");
     check(report.checkpointCurrentOperatorApplyBeforeStrictProof === true, "release completion summary refresh checkpoint current operator sequence should place apply before strict proof");
     check(report.checkpointRowsValueFree === true, "release completion summary refresh checkpoint rows should be value-free");
+    check(report.checkpointUserReportReady === true, "release completion summary refresh checkpoint should expose ready user report rows");
+    check(report.checkpointUserReportRowCount === report.checkpointUserReportRows.length, "release completion summary refresh checkpoint user report count should match rows");
+    check(report.checkpointUserReportRowCount === 10, "release completion summary refresh checkpoint user report should include ten rows");
+    check(report.checkpointUserReportRowSummary === "10 user report rows", "release completion summary refresh checkpoint user report summary should match rows");
+    check(report.checkpointUserReportRowsValueFree === true, "release completion summary refresh checkpoint user report rows should be value-free");
+    check(
+      report.checkpointUserReportRows.every((row) => row.ready === true && row.valueRecorded === false),
+      "release completion summary refresh checkpoint user report rows should be ready and value-free"
+    );
+    check(
+      report.checkpointUserReportRows.some((row) => row.item === "Overall completion" && row.value === report.userFacingCompletionLabel),
+      "release completion summary refresh checkpoint user report should mirror completion label"
+    );
+    check(
+      report.checkpointUserReportRows.some((row) => row.item === "Remaining completion" && row.value === report.userFacingRemainingLabel),
+      "release completion summary refresh checkpoint user report should mirror remaining label"
+    );
+    check(
+      report.checkpointUserReportRows.some((row) => row.item === "Guided setup fallback" && row.value === releaseChannelSetupWizardCommand),
+      "release completion summary refresh checkpoint user report should include guided setup fallback"
+    );
+    check(
+      report.checkpointUserReportRows.some((row) => row.item === "External distribution claimed" && row.value === "no"),
+      "release completion summary refresh checkpoint user report should include external distribution non-claim"
+    );
     check(report.checkpointPrivateValuesRecorded === false, "release completion summary refresh checkpoint should not record private values");
     check(report.checkpointClaimedAutoUpdate === false, "release completion summary refresh checkpoint should not claim auto-update");
     check(report.checkpointClaimedExternalDistribution === false, "release completion summary refresh checkpoint should not claim external distribution");
@@ -1787,6 +1846,8 @@ function validateReport(report, markdown) {
     check(report.tenPlanCheckpointJsonPath === "not due", "release completion summary refresh should not expose a checkpoint artifact path when not due");
     check(report.checkpointLatestPlan === "not due", "release completion summary refresh should mark checkpoint plan not due");
     check(report.checkpointTenPlanProgress === "not due", "release completion summary refresh should mark checkpoint progress not due");
+    check(report.checkpointUserReportReady === false, "release completion summary refresh should not mark checkpoint user report ready when not due");
+    check(report.checkpointUserReportRows.length === 0, "release completion summary refresh should not expose checkpoint user report rows when not due");
   }
 
   check(markdown.includes("## Command Order"), "release completion summary refresh Markdown should include command order");
@@ -1807,6 +1868,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("npm run release:10-plan-checkpoint-smoke"), "release completion summary refresh Markdown should cite checkpoint command");
   check(markdown.includes("## 10-Plan Checkpoint"), "release completion summary refresh Markdown should include checkpoint section");
   check(markdown.includes("## 10-Plan Checkpoint Rows"), "release completion summary refresh Markdown should include checkpoint rows");
+  check(markdown.includes("## 10-Plan User Report Receipt"), "release completion summary refresh Markdown should include checkpoint user report rows");
+  check(markdown.includes("Checkpoint user report ready:"), "release completion summary refresh Markdown should include checkpoint user report readiness");
   check(markdown.includes("Checkpoint proof/gate refresh ready:"), "release completion summary refresh Markdown should include checkpoint proof/gate readiness");
   check(markdown.includes("Checkpoint current operator sequence ready:"), "release completion summary refresh Markdown should include checkpoint current operator readiness");
   check(markdown.includes("## Completion Blocker Action Receipt"), "release completion summary refresh Markdown should include blocker action receipt section");

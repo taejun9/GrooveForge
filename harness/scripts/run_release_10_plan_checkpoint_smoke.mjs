@@ -24,7 +24,7 @@ const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-a
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const releasePrivateEditStrictProofCommand = "npm run release:private-edit-strict-proof";
 const expectedSourceRefreshCommandSummary =
-  "npm run release:proof-bundle -> npm run desktop:external-distribution-gate-smoke -> npm run release:update-feed-checkpoint-smoke -> npm run release:progress-smoke -> npm run release:current-blocker-smoke -> npm run release:completion-report-packet-smoke -> npm run release:progress-freshness-smoke -> npm run release:operator-completion-brief-smoke";
+  "npm run release:proof-bundle -> npm run desktop:external-distribution-gate-smoke -> npm run release:update-feed-checkpoint-smoke -> npm run release:progress-smoke -> npm run release:channel-placeholder-input-receipt -> npm run release:current-blocker-smoke -> npm run release:completion-report-packet-smoke -> npm run release:progress-freshness-smoke -> npm run release:operator-completion-brief-smoke";
 const expectedProofGateRefreshCommands = [
   {
     order: 1,
@@ -108,6 +108,96 @@ function buildProofGateRefreshRows(sourceCommandRows) {
   });
 }
 
+function buildUserReportRows(report) {
+  return [
+    {
+      order: 1,
+      item: "Latest completed plan",
+      value: report.localLatestPlan,
+      ready: report.localLatestPlan !== "none",
+      sourceField: "localLatestPlan",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      item: "10-plan progress",
+      value: report.localTenPlanProgress,
+      ready: report.localTenPlanCompletedCount === 10 && report.localTenPlanTotal === 10,
+      sourceField: "localTenPlanProgress",
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      item: "Overall completion",
+      value: `${report.completionPercent}%`,
+      ready: report.completionPercent === 99.999999,
+      sourceField: "completionPercent",
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      item: "Remaining completion",
+      value: `${report.remainingPercent}%`,
+      ready: report.remainingPercent === 0.000001,
+      sourceField: "remainingPercent",
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      item: "Current first blocker",
+      value: report.firstBlocker,
+      ready: report.firstBlocker !== "none",
+      sourceField: "firstBlocker",
+      valueRecorded: false
+    },
+    {
+      order: 6,
+      item: "Current operator start command",
+      value: report.currentOperatorStartCommand,
+      ready:
+        report.currentOperatorStartCommand === report.currentOperatorFirstCommand &&
+        report.currentOperatorFirstCommandIsGuidedSetup === false &&
+        report.currentOperatorCommandRowsContainGuidedSetup === false,
+      sourceField: "currentOperatorStartCommand",
+      valueRecorded: report.currentOperatorStartCommandValueRecorded
+    },
+    {
+      order: 7,
+      item: "Guided setup fallback",
+      value: report.releaseChannelGuidedSetupFallbackCommand,
+      ready:
+        report.releaseChannelGuidedSetupFallbackReady === true &&
+        report.releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence === true,
+      sourceField: "releaseChannelGuidedSetupFallbackCommand",
+      valueRecorded: report.releaseChannelGuidedSetupFallbackValueRecorded
+    },
+    {
+      order: 8,
+      item: "Operator proof command",
+      value: report.operatorProofCommand,
+      ready: report.operatorProofCommand === releasePrivateEditStrictProofCommand,
+      sourceField: "operatorProofCommand",
+      valueRecorded: false
+    },
+    {
+      order: 9,
+      item: "Current edit target",
+      value: report.currentEnvEditTarget,
+      ready: report.currentEnvEditTarget !== "none",
+      sourceField: "currentEnvEditTarget",
+      valueRecorded: false
+    },
+    {
+      order: 10,
+      item: "External distribution claimed",
+      value: readyLabel(report.claimedExternalDistribution),
+      ready: report.claimedExternalDistribution === false,
+      sourceField: "claimedExternalDistribution",
+      valueRecorded: false
+    }
+  ];
+}
+
 async function deriveCompletedPlanWindow() {
   const entries = await readdir(completedPlansDir, { withFileTypes: true });
   const plans = entries
@@ -177,7 +267,7 @@ function buildReport(source, localWindow) {
   const currentOperatorCommandRowsContainGuidedSetup = currentOperatorCommandRows.some((row) => textValue(row.command) === guidedSetupCommand);
   const sourceProofGateRefreshReady =
     source.releaseProgressRefreshReady === true &&
-    integerValue(source.refreshCommandCount) === 8 &&
+    integerValue(source.refreshCommandCount) === 9 &&
     textValue(source.refreshCommandSummary) === expectedSourceRefreshCommandSummary &&
     sourceRefreshCommandsValueFree &&
     sourceProofGateRefreshRows.length === 2 &&
@@ -239,6 +329,15 @@ function buildReport(source, localWindow) {
     currentOperatorPreflightBeforeApply: summary.currentOperatorPreflightBeforeApply === true,
     currentOperatorApplyBeforeStrictProof: summary.currentOperatorApplyBeforeStrictProof === true,
     currentOperatorValueRecorded: summary.currentOperatorValueRecorded === true ? true : false,
+    releaseChannelGuidedSetupFallbackCommand: textValue(
+      summary.releaseChannelGuidedSetupFallbackCommand,
+      guidedSetupCommand
+    ),
+    releaseChannelGuidedSetupFallbackReady: summary.releaseChannelGuidedSetupFallbackReady === true,
+    releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence:
+      summary.releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence === true,
+    releaseChannelGuidedSetupFallbackValueRecorded:
+      summary.releaseChannelGuidedSetupFallbackValueRecorded === true ? true : false,
     sourceLatestPlanNumber: integerValue(summary.latestPlanNumber),
     sourceLatestPlan: textValue(summary.latestPlan),
     sourceTenPlanProgress: textValue(summary.tenPlanProgress),
@@ -287,6 +386,7 @@ function buildReport(source, localWindow) {
     firstBlocker: textValue(summary.firstBlocker),
     nextCommand: textValue(summary.nextCommand),
     rerunCommand: textValue(summary.rerunCommand),
+    currentEnvEditTarget: textValue(summary.currentEnvEditTarget, ".env.distribution.local"),
     hardGateReady: summary.hardGateReady === true,
     hardGateWouldFail: summary.hardGateWouldFail === true,
     privateValuesRecorded: summary.privateValuesRecorded === true,
@@ -304,7 +404,11 @@ function buildReport(source, localWindow) {
     claimedNotarization: false,
     claimedGatekeeperApproval: false,
     claimedManualQaApproval: false,
-    claimedAppStoreSubmission: false
+    claimedAppStoreSubmission: false,
+    userReportReady: false,
+    userReportRows: [],
+    userReportRowCount: 0,
+    userReportRowSummary: "0 user report rows"
   };
 }
 
@@ -322,6 +426,12 @@ function buildMarkdown(report) {
     .map(
       (row) =>
         `| ${row.order} | \`${escapeCell(row.command)}\` | \`${escapeCell(row.expectedCommand)}\` | ${readyLabel(row.commandMatched)} | ${escapeCell(row.role)} | ${readyLabel(row.roleMatched)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+  const userReportRows = report.userReportRows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.item)} | ${readyLabel(row.ready === true)} | ${escapeCell(row.value)} | ${escapeCell(row.sourceField)} | ${readyLabel(row.valueRecorded)} |`
     )
     .join("\n");
   return `# ${appName} ${report.version} ${report.platform}-${report.arch} Release 10-Plan Checkpoint Smoke
@@ -348,6 +458,9 @@ function buildMarkdown(report) {
 - Source current operator start command matches first command: ${readyLabel(report.currentOperatorStartCommandMatchesFirstCommand)}
 - Source current operator first command is guided setup: ${readyLabel(report.currentOperatorFirstCommandIsGuidedSetup)}
 - Source current operator rows contain guided setup: ${readyLabel(report.currentOperatorCommandRowsContainGuidedSetup)}
+- Guided setup fallback command: \`${report.releaseChannelGuidedSetupFallbackCommand}\`
+- Guided setup fallback ready: ${readyLabel(report.releaseChannelGuidedSetupFallbackReady)}
+- Guided setup fallback separate from primary sequence: ${readyLabel(report.releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence)}
 - Source current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
 - Source current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
 - Latest completed plan: ${report.localLatestPlan}
@@ -376,6 +489,9 @@ function buildMarkdown(report) {
 - Post-clearance next action: ${report.postClearanceNextAction}
 - Post-clearance proof command: \`${report.postClearanceProofCommand}\`
 - Current first blocker: ${report.firstBlocker}
+- Current edit target: ${report.currentEnvEditTarget}
+- User report ready: ${readyLabel(report.userReportReady)}
+- User report rows: ${report.userReportRowCount} (${report.userReportRowSummary})
 - Hard gate ready: ${readyLabel(report.hardGateReady)}
 - Hard gate would fail: ${readyLabel(report.hardGateWouldFail)}
 - Private values recorded: ${readyLabel(report.privateValuesRecorded)}
@@ -417,6 +533,12 @@ ${proofGateRows}
 |---:|---|---:|---|---|---|---|---|---:|
 ${currentOperatorRows}
 
+## User Report Receipt
+
+| order | item | ready | value | source field | value recorded |
+|---:|---|---:|---|---|---:|
+${userReportRows}
+
 ## 10-Plan Window Rows
 
 | plan | path | value-free |
@@ -437,7 +559,7 @@ function validateReport(report, markdown) {
   check(report.sourceReady === true, "release 10-plan checkpoint should require ready progress refresh source");
   check(report.sourceSummaryReady === true, "release 10-plan checkpoint should require ready compact source summary");
   check(report.sourceLabelsMatch === true, "release 10-plan checkpoint should require matched source labels");
-  check(report.sourceRefreshCommandCount === 8, "release 10-plan checkpoint should require the full source refresh command sequence");
+  check(report.sourceRefreshCommandCount === 9, "release 10-plan checkpoint should require the full source refresh command sequence");
   check(
     report.sourceRefreshCommandSummary === expectedSourceRefreshCommandSummary,
     "release 10-plan checkpoint should require proof bundle and external gate before progress refresh reads evidence"
@@ -465,6 +587,16 @@ function validateReport(report, markdown) {
   check(report.currentOperatorFirstCommandAllowed === true, "release 10-plan checkpoint current operator first command should be prepare-env or private-env preflight");
   check(report.currentOperatorFirstCommandIsGuidedSetup === false, "release 10-plan checkpoint current operator first command should not be the guided setup wizard");
   check(report.currentOperatorCommandRowsContainGuidedSetup === false, "release 10-plan checkpoint current operator rows should not include the guided setup wizard");
+  check(report.releaseChannelGuidedSetupFallbackCommand === guidedSetupCommand, "release 10-plan checkpoint should expose the guided setup fallback command");
+  check(report.releaseChannelGuidedSetupFallbackReady === true, "release 10-plan checkpoint should keep guided setup fallback ready");
+  check(
+    report.releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence === true,
+    "release 10-plan checkpoint should keep guided setup fallback separate from the primary sequence"
+  );
+  check(
+    report.releaseChannelGuidedSetupFallbackValueRecorded === false,
+    "release 10-plan checkpoint guided setup fallback should be value-free"
+  );
   check(report.currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release 10-plan checkpoint current operator sequence should expose private env preflight command");
   check(report.currentOperatorApplyCommand === releaseChannelApplyPrivateEnvCommand, "release 10-plan checkpoint current operator sequence should expose private env apply command");
   check(report.currentOperatorStrictProofCommand === releasePrivateEditStrictProofCommand, "release 10-plan checkpoint current operator sequence should expose strict proof command");
@@ -511,6 +643,29 @@ function validateReport(report, markdown) {
   check(report.privateEditBlockedSmokeReady === true, "release 10-plan checkpoint should expose private-edit blocked smoke readiness");
   check(report.privateEditBlockedSmokeCurrentPlaceholderKeyCount === 4, "release 10-plan checkpoint should expose blocked smoke coverage for four placeholders");
   check(report.operatorProofCommand === "npm run release:private-edit-strict-proof", "release 10-plan checkpoint should keep strict proof as operator proof command");
+  check(report.currentEnvEditTarget !== "none", "release 10-plan checkpoint should expose the current edit target");
+  check(report.userReportReady === true, "release 10-plan checkpoint should expose a ready user report receipt");
+  check(report.userReportRowCount === report.userReportRows.length, "release 10-plan checkpoint should count user report rows");
+  check(report.userReportRowCount === 10, "release 10-plan checkpoint user report should include ten rows");
+  check(report.userReportRowSummary === "10 user report rows", "release 10-plan checkpoint should summarize user report rows");
+  check(report.userReportRows.every((row) => row.ready === true), "release 10-plan checkpoint user report rows should be ready");
+  check(report.userReportRows.every((row) => row.valueRecorded === false), "release 10-plan checkpoint user report rows should be value-free");
+  check(
+    report.userReportRows.some((row) => row.item === "Overall completion" && row.value === "99.999999%"),
+    "release 10-plan checkpoint user report should include overall completion"
+  );
+  check(
+    report.userReportRows.some((row) => row.item === "Remaining completion" && row.value === "0.000001%"),
+    "release 10-plan checkpoint user report should include remaining completion"
+  );
+  check(
+    report.userReportRows.some((row) => row.item === "Guided setup fallback" && row.value === guidedSetupCommand),
+    "release 10-plan checkpoint user report should include guided setup fallback"
+  );
+  check(
+    report.userReportRows.some((row) => row.item === "External distribution claimed" && row.value === "no"),
+    "release 10-plan checkpoint user report should include external distribution non-claim posture"
+  );
   check(report.postClearanceNextAction === "auto-update-feed", "release 10-plan checkpoint should keep auto-update-feed as post-clearance next action");
   check(report.postClearanceProofCommand === "npm run desktop:auto-update-readiness-smoke", "release 10-plan checkpoint should keep auto-update readiness as post-clearance proof command");
   check(report.hardGateReady === false, "release 10-plan checkpoint should keep hard gate unready");
@@ -533,6 +688,10 @@ function validateReport(report, markdown) {
   check(markdown.includes("Source Current Operator Command Sequence"), "release 10-plan checkpoint Markdown should include source current operator sequence");
   check(markdown.includes("Source current operator start command:"), "release 10-plan checkpoint Markdown should include source current operator start command");
   check(markdown.includes("First command is guided setup: no"), "release 10-plan checkpoint Markdown should prove guided setup is not first command");
+  check(markdown.includes("## User Report Receipt"), "release 10-plan checkpoint Markdown should include user report receipt");
+  check(markdown.includes("User report ready: yes"), "release 10-plan checkpoint Markdown should summarize user report readiness");
+  check(markdown.includes("| 3 | Overall completion | yes | 99.999999% | completionPercent | no |"), "release 10-plan checkpoint Markdown should include completion user report row");
+  check(markdown.includes("| 7 | Guided setup fallback | yes | npm run release:channel-setup-wizard |"), "release 10-plan checkpoint Markdown should include guided fallback user report row");
   check(markdown.includes(`| ${report.localLatestPlan} |`), "release 10-plan checkpoint Markdown should include the boundary plan row when current window completes");
 
   if (failures.length > 0) {
@@ -560,6 +719,13 @@ report.tenPlanCheckpointReady =
   report.tenPlanBoundaryMatched === true &&
   report.privateValuesRecorded === false &&
   report.claimedExternalDistribution === false;
+report.userReportRows = buildUserReportRows(report);
+report.userReportRowCount = report.userReportRows.length;
+report.userReportRowSummary = `${report.userReportRowCount} user report rows`;
+report.userReportReady =
+  report.tenPlanCheckpointReady === true &&
+  report.userReportRowCount === 10 &&
+  report.userReportRows.every((row) => row.ready === true && row.valueRecorded === false);
 const markdown = buildMarkdown(report);
 validateReport(report, markdown);
 
@@ -583,6 +749,9 @@ console.log(`- Source current operator start command role: ${report.currentOpera
 console.log(`- Source current operator start command matches first command: ${report.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`);
 console.log(`- Source current operator first command is guided setup: ${report.currentOperatorFirstCommandIsGuidedSetup ? "yes" : "no"}`);
 console.log(`- Source current operator rows contain guided setup: ${report.currentOperatorCommandRowsContainGuidedSetup ? "yes" : "no"}`);
+console.log(`- Guided setup fallback command: ${report.releaseChannelGuidedSetupFallbackCommand}`);
+console.log(`- Guided setup fallback ready: ${report.releaseChannelGuidedSetupFallbackReady ? "yes" : "no"}`);
+console.log(`- Guided setup fallback separate from primary sequence: ${report.releaseChannelGuidedSetupFallbackSeparateFromPrimarySequence ? "yes" : "no"}`);
 console.log(`- Source current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Source current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Release-channel metadata needs ignored env: ${report.releaseChannelMetadataNeedsIgnoredEnv ? "yes" : "no"}`);
@@ -595,6 +764,8 @@ console.log(`- Current 10-plan report boundary: ${report.currentTenPlanReportBou
 console.log(`- Post-delivery next 10-plan report: ${report.postDeliveryNextTenPlanProgressReportAt}`);
 console.log(`- User-facing completion: ${report.completionPercent}%`);
 console.log(`- Remaining completion: ${report.remainingPercent}%`);
+console.log(`- User report ready: ${report.userReportReady ? "yes" : "no"}`);
+console.log(`- User report rows: ${report.userReportRowCount} (${report.userReportRowSummary})`);
 console.log(`- Fresh artifacts: ${report.freshArtifactCount}`);
 console.log(`- Stale artifacts: ${report.staleArtifactCount}`);
 console.log(`- Missing artifacts: ${report.missingArtifactCount}`);
