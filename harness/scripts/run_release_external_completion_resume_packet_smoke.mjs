@@ -338,6 +338,46 @@ function buildReport(sourcePacket, preflightBlocked) {
       sourcePacket.currentPrivateInputPlaceholderLocationSummary
     ),
     currentPrivateInputPlaceholderLocations,
+    currentPrivateInputReceiptReady: sourcePacket.currentPrivateInputReceiptReady === true,
+    currentPrivateInputReceiptMode: textValue(sourcePacket.currentPrivateInputReceiptMode),
+    currentPrivateInputReceiptPrivateInputFilePresent:
+      sourcePacket.currentPrivateInputReceiptPrivateInputFilePresent === true,
+    currentPrivateInputReceiptPrivateInputFileLoadedKeyCount: integerValue(
+      sourcePacket.currentPrivateInputReceiptPrivateInputFileLoadedKeyCount
+    ),
+    currentPrivateInputReceiptPrivateInputFileLoadedKeySummary: textValue(
+      sourcePacket.currentPrivateInputReceiptPrivateInputFileLoadedKeySummary
+    ),
+    currentPrivateInputReceiptPrivateInputFileMissingKeyCount: integerValue(
+      sourcePacket.currentPrivateInputReceiptPrivateInputFileMissingKeyCount
+    ),
+    currentPrivateInputReceiptPrivateInputFileMissingKeySummary: textValue(
+      sourcePacket.currentPrivateInputReceiptPrivateInputFileMissingKeySummary
+    ),
+    currentPrivateInputReceiptPrivateInputFilePlaceholderKeyCount: integerValue(
+      sourcePacket.currentPrivateInputReceiptPrivateInputFilePlaceholderKeyCount
+    ),
+    currentPrivateInputReceiptPrivateInputFilePlaceholderKeySummary: textValue(
+      sourcePacket.currentPrivateInputReceiptPrivateInputFilePlaceholderKeySummary
+    ),
+    currentPrivateInputReceiptPrivateInputFileInvalidShapeKeyCount: integerValue(
+      sourcePacket.currentPrivateInputReceiptPrivateInputFileInvalidShapeKeyCount
+    ),
+    currentPrivateInputReceiptPrivateInputFileInvalidShapeKeySummary: textValue(
+      sourcePacket.currentPrivateInputReceiptPrivateInputFileInvalidShapeKeySummary
+    ),
+    currentPrivateInputReceiptPrivateInputFilePlaceholderLocationCount: integerValue(
+      sourcePacket.currentPrivateInputReceiptPrivateInputFilePlaceholderLocationCount
+    ),
+    currentPrivateInputReceiptPrivateInputFilePlaceholderLocationSummary: textValue(
+      sourcePacket.currentPrivateInputReceiptPrivateInputFilePlaceholderLocationSummary
+    ),
+    currentPrivateInputReceiptRowCount: integerValue(sourcePacket.currentPrivateInputReceiptRowCount),
+    currentPrivateInputReceiptCommandRowCount: integerValue(sourcePacket.currentPrivateInputReceiptCommandRowCount),
+    currentPrivateInputReceiptNextOperatorCommand: textValue(sourcePacket.currentPrivateInputReceiptNextOperatorCommand),
+    currentPrivateInputReceiptNextProofCommand: textValue(sourcePacket.currentPrivateInputReceiptNextProofCommand),
+    currentPrivateInputReceiptValueRecorded:
+      sourcePacket.currentPrivateInputReceiptValueRecorded === true ? true : false,
     currentOperatorCommandSequenceReady: sourcePacket.currentOperatorCommandSequenceReady === true,
     currentOperatorCommandRows,
     currentOperatorCommandRowCount: integerValue(sourcePacket.currentOperatorCommandRowCount),
@@ -557,6 +597,11 @@ function buildMarkdown(report) {
 - Current next command: \`${report.currentNextCommand}\`
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})
+- Current private input receipt: ${readyLabel(report.currentPrivateInputReceiptReady)} (${report.currentPrivateInputReceiptMode})
+- Current private input file present: ${readyLabel(report.currentPrivateInputReceiptPrivateInputFilePresent)}
+- Current private input loaded keys: ${report.currentPrivateInputReceiptPrivateInputFileLoadedKeyCount} (${report.currentPrivateInputReceiptPrivateInputFileLoadedKeySummary})
+- Current private input missing/placeholder/invalid rows: ${report.currentPrivateInputReceiptPrivateInputFileMissingKeyCount}/${report.currentPrivateInputReceiptPrivateInputFilePlaceholderKeyCount}/${report.currentPrivateInputReceiptPrivateInputFileInvalidShapeKeyCount}
+- Current private input receipt next operator command: \`${report.currentPrivateInputReceiptNextOperatorCommand}\`
 - Current operator command sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
@@ -644,6 +689,22 @@ ${formatCurrentOperatorCommandRows(report.currentOperatorCommandRows)}
 | key | file | line | location | placeholder | value recorded |
 |---|---|---:|---|---:|---:|
 ${formatCurrentPrivateInputPlaceholderLocationRows(report.currentPrivateInputPlaceholderLocations)}
+
+## Current Private Input Receipt
+
+- Receipt ready: ${readyLabel(report.currentPrivateInputReceiptReady)}
+- Receipt mode: ${report.currentPrivateInputReceiptMode}
+- Private input file present: ${readyLabel(report.currentPrivateInputReceiptPrivateInputFilePresent)}
+- Loaded keys: ${report.currentPrivateInputReceiptPrivateInputFileLoadedKeyCount} (${report.currentPrivateInputReceiptPrivateInputFileLoadedKeySummary})
+- Missing keys: ${report.currentPrivateInputReceiptPrivateInputFileMissingKeyCount} (${report.currentPrivateInputReceiptPrivateInputFileMissingKeySummary})
+- Placeholder keys: ${report.currentPrivateInputReceiptPrivateInputFilePlaceholderKeyCount} (${report.currentPrivateInputReceiptPrivateInputFilePlaceholderKeySummary})
+- Invalid-shape keys: ${report.currentPrivateInputReceiptPrivateInputFileInvalidShapeKeyCount} (${report.currentPrivateInputReceiptPrivateInputFileInvalidShapeKeySummary})
+- Placeholder locations: ${report.currentPrivateInputReceiptPrivateInputFilePlaceholderLocationCount} (${report.currentPrivateInputReceiptPrivateInputFilePlaceholderLocationSummary})
+- Receipt rows: ${report.currentPrivateInputReceiptRowCount}
+- Command rows: ${report.currentPrivateInputReceiptCommandRowCount}
+- Next operator command: \`${report.currentPrivateInputReceiptNextOperatorCommand}\`
+- Next proof command: \`${report.currentPrivateInputReceiptNextProofCommand}\`
+- Value recorded: ${readyLabel(report.currentPrivateInputReceiptValueRecorded)}
 
 ## Private Env Preflight Blocker
 
@@ -873,6 +934,35 @@ function validateReport(report, markdown) {
       report.currentPrivateInputPlaceholderLocationSummary !== "none",
     "external completion resume packet should expose current private input placeholder file/line locations"
   );
+  check(report.currentPrivateInputReceiptReady === true, "external completion resume packet should expose ready current private input receipt");
+  check(
+    [
+      "missing-private-input-file",
+      "incomplete-private-input-file",
+      "placeholder-private-input-file",
+      "invalid-shape-private-input-file",
+      "ready-private-input-file",
+      "review-private-input-file"
+    ].includes(report.currentPrivateInputReceiptMode),
+    "external completion resume packet should expose current private input receipt mode"
+  );
+  check(
+    report.currentPrivateInputReceiptRowCount === 4,
+    "external completion resume packet should expose current private input receipt row count"
+  );
+  check(
+    report.currentPrivateInputReceiptValueRecorded === false,
+    "external completion resume packet current private input receipt should not record values"
+  );
+  check(
+    report.currentPrivateInputReceiptPrivateInputFilePlaceholderLocationCount === 0 ||
+      report.currentPrivateInputReceiptPrivateInputFilePlaceholderLocationSummary !== "none",
+    "external completion resume packet should expose current private input receipt placeholder locations"
+  );
+  check(
+    report.currentPrivateInputReceiptNextOperatorCommand !== "none",
+    "external completion resume packet should expose current private input receipt next operator command"
+  );
   check(report.currentOperatorCommandSequenceReady === true, "external completion resume packet current operator command sequence should be ready");
   check(
     report.currentOperatorCommandRowCount === report.currentOperatorCommandRows.length,
@@ -1027,6 +1117,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("Next resume matches current operator start command:"), "external completion resume packet Markdown should include resume/start-command match");
   check(markdown.includes("Current private input placeholder locations:"), "external completion resume packet Markdown should include current private input placeholder locations");
   check(markdown.includes("Current Private Input Placeholder Locations"), "external completion resume packet Markdown should include current private input placeholder location rows");
+  check(markdown.includes("Current private input receipt:"), "external completion resume packet Markdown should include current private input receipt summary");
+  check(markdown.includes("Current Private Input Receipt"), "external completion resume packet Markdown should include current private input receipt section");
   check(markdown.includes("Private input template command:"), "external completion resume packet Markdown should include private input template command");
   check(
     markdown.includes("Private env apply proof runner command:"),
@@ -1074,6 +1166,11 @@ console.log(`- Remaining completion: ${report.remainingPercent}%`);
 console.log(`- Current first blocker: ${report.currentFirstBlocker}`);
 console.log(`- Current next command: ${report.currentNextCommand}`);
 console.log(`- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})`);
+console.log(`- Current private input receipt: ${report.currentPrivateInputReceiptReady ? "yes" : "no"} (${report.currentPrivateInputReceiptMode})`);
+console.log(`- Current private input file present: ${report.currentPrivateInputReceiptPrivateInputFilePresent ? "yes" : "no"}`);
+console.log(`- Current private input loaded keys: ${report.currentPrivateInputReceiptPrivateInputFileLoadedKeyCount} (${report.currentPrivateInputReceiptPrivateInputFileLoadedKeySummary})`);
+console.log(`- Current private input missing/placeholder/invalid rows: ${report.currentPrivateInputReceiptPrivateInputFileMissingKeyCount}/${report.currentPrivateInputReceiptPrivateInputFilePlaceholderKeyCount}/${report.currentPrivateInputReceiptPrivateInputFileInvalidShapeKeyCount}`);
+console.log(`- Current private input receipt next operator command: ${report.currentPrivateInputReceiptNextOperatorCommand}`);
 console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
