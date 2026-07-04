@@ -19,12 +19,17 @@ const checkpointStem = "release-10-plan-checkpoint-smoke";
 const externalRunPacketStem = "release-external-completion-run-packet-smoke";
 const externalResumePacketStem = "release-external-completion-resume-packet-smoke";
 const operatorPreflightStem = "release-channel-apply-private-env-preflight";
+const realOperatorPreflightSnapshotStem = "release-completion-summary-refresh-real-operator-preflight";
 const progressRefreshJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${progressRefreshStem}.json`);
 const completionSummaryJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${completionSummaryStem}.json`);
 const checkpointJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${checkpointStem}.json`);
 const externalRunPacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${externalRunPacketStem}.json`);
 const externalResumePacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${externalResumePacketStem}.json`);
 const operatorPreflightJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${operatorPreflightStem}.json`);
+const realOperatorPreflightSnapshotJsonPath = path.join(
+  packageRoot,
+  `${appName}-${packageJson.version}-${platformArch}-${realOperatorPreflightSnapshotStem}.json`
+);
 const receiptMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${receiptStem}.md`);
 const receiptJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${receiptStem}.json`);
 const failures = [];
@@ -169,6 +174,126 @@ function objectRows(value) {
 
 function valueFreeRows(rows) {
   return objectRows(rows).every((row) => row.valueRecorded === false);
+}
+
+function realPreflightComparableFields(source) {
+  return {
+    receiptReady: source.realOperatorPreflightReceiptReady === true,
+    command: textValue(source.realOperatorPreflightCommand),
+    role: textValue(source.realOperatorPreflightRole),
+    exitStatus: integerValue(source.realOperatorPreflightExitStatus),
+    preflightOnly: source.realOperatorPreflightPreflightOnly === true,
+    preflightReady: source.realOperatorPreflightSourcePreflightReady === true,
+    applyReady: source.realOperatorPreflightSourceApplyReady === true,
+    localEnvLoaded: source.realOperatorPreflightLocalEnvFileLoaded === true,
+    localEnvModified: source.realOperatorPreflightLocalEnvModified === true,
+    realLocalEnvModified: source.realOperatorPreflightRealLocalEnvModified === true,
+    envEditTarget: textValue(source.realOperatorPreflightCurrentEnvEditTarget),
+    firstBlocker: textValue(source.realOperatorPreflightCurrentFirstBlocker),
+    currentReadyKeyCount: integerValue(source.realOperatorPreflightCurrentReadyKeyCount),
+    currentRequiredKeyCount: integerValue(source.realOperatorPreflightCurrentRequiredKeyCount),
+    privateInputFileKey: textValue(source.realOperatorPreflightPrivateInputFileKey),
+    privateInputFileDefaultName: textValue(source.realOperatorPreflightPrivateInputFileDefaultName),
+    privateInputFilePath: textValue(source.realOperatorPreflightPrivateInputFilePath),
+    privateInputFilePresent: source.realOperatorPreflightPrivateInputFilePresent === true,
+    privateInputFileConfigured: source.realOperatorPreflightPrivateInputFileConfigured === true,
+    privateInputFileLoadedKeyCount: integerValue(source.realOperatorPreflightPrivateInputFileLoadedKeyCount),
+    privateInputFileLoadedKeySummary: textValue(source.realOperatorPreflightPrivateInputFileLoadedKeySummary),
+    privateInputFileUnknownKeyCount: integerValue(source.realOperatorPreflightPrivateInputFileUnknownKeyCount),
+    privateInputFileMalformedLineCount: integerValue(source.realOperatorPreflightPrivateInputFileMalformedLineCount),
+    privateInputFileValueRecorded: source.realOperatorPreflightPrivateInputFileValueRecorded === true,
+    inputReadyKeyCount: integerValue(source.realOperatorPreflightInputReadyKeyCount),
+    inputMissingKeyCount: integerValue(source.realOperatorPreflightInputMissingKeyCount),
+    inputPlaceholderKeyCount: integerValue(source.realOperatorPreflightInputPlaceholderKeyCount),
+    inputShapeInvalidKeyCount: integerValue(source.realOperatorPreflightInputShapeInvalidKeyCount),
+    processEnvInputRowCount: integerValue(source.realOperatorPreflightProcessEnvInputRowCount),
+    processEnvInputRowsValueFree: source.realOperatorPreflightProcessEnvInputRowsValueFree === true,
+    remediationRowCount: integerValue(source.realOperatorPreflightRemediationRowCount),
+    remediationRowsValueFree: source.realOperatorPreflightRemediationRowsValueFree === true,
+    operatorReceiptReady: source.realOperatorPreflightOperatorReceiptReady === true,
+    operatorReceiptRowCount: integerValue(source.realOperatorPreflightOperatorReceiptRowCount),
+    operatorReceiptRowsValueFree: source.realOperatorPreflightOperatorReceiptRowsValueFree === true,
+    nextWriteCommand: textValue(source.realOperatorPreflightNextWriteCommand),
+    guidedSetupFallbackCommand: textValue(source.realOperatorPreflightGuidedSetupFallbackCommand),
+    recommendedOperatorProofCommand: textValue(source.realOperatorPreflightRecommendedOperatorProofCommand),
+    hardGateCommand: textValue(source.realOperatorPreflightHardGateCommand),
+    privateValuesRecorded: source.realOperatorPreflightPrivateValuesRecorded === true,
+    claimedExternalDistribution: source.realOperatorPreflightClaimedExternalDistribution === true
+  };
+}
+
+function realPreflightFieldsMatch(left, right) {
+  return JSON.stringify(realPreflightComparableFields(left)) === JSON.stringify(realPreflightComparableFields(right));
+}
+
+function buildRealOperatorPreflightReportFields({
+  operatorPreflight,
+  operatorPreflightExitStatus,
+  realOperatorPreflightReady,
+  processEnvInputRows,
+  remediationRows,
+  operatorReceiptRows
+}) {
+  return {
+    realOperatorPreflightReceiptReady: realOperatorPreflightReady,
+    realOperatorPreflightCommand: releaseChannelApplyPrivateEnvPreflightCommand,
+    realOperatorPreflightRole: releaseChannelApplyPrivateEnvPreflightRole,
+    realOperatorPreflightExitStatus: operatorPreflightExitStatus,
+    realOperatorPreflightPreflightOnly: operatorPreflight.preflightOnly === true,
+    realOperatorPreflightSourcePreflightReady: operatorPreflight.releaseChannelPrivateEnvApplyPreflightReady === true,
+    realOperatorPreflightSourceApplyReady: operatorPreflight.releaseChannelPrivateEnvApplyReady === true,
+    realOperatorPreflightLocalEnvFileLoaded: operatorPreflight.localEnvFileLoaded === true,
+    realOperatorPreflightLocalEnvModified: operatorPreflight.localEnvModified === true,
+    realOperatorPreflightRealLocalEnvModified: operatorPreflight.realLocalEnvModified === true,
+    realOperatorPreflightCurrentEnvEditTarget: textValue(operatorPreflight.currentEnvEditTarget, ".env.distribution.local"),
+    realOperatorPreflightCurrentFirstBlocker: textValue(operatorPreflight.currentFirstBlocker),
+    realOperatorPreflightCurrentReadyKeyCount: integerValue(operatorPreflight.currentReadyKeyCount),
+    realOperatorPreflightCurrentRequiredKeyCount: integerValue(operatorPreflight.currentRequiredKeyCount),
+    realOperatorPreflightPrivateInputFileKey: textValue(operatorPreflight.privateInputFileKey, privateInputFileKey),
+    realOperatorPreflightPrivateInputFileDefaultName: textValue(
+      operatorPreflight.privateInputFileDefaultName,
+      defaultPrivateInputFileName
+    ),
+    realOperatorPreflightPrivateInputFilePath: textValue(operatorPreflight.privateInputFilePath),
+    realOperatorPreflightPrivateInputFilePresent: operatorPreflight.privateInputFilePresent === true,
+    realOperatorPreflightPrivateInputFileConfigured: operatorPreflight.privateInputFileConfigured === true,
+    realOperatorPreflightPrivateInputFileLoadedKeys: stringArrayValue(operatorPreflight.privateInputFileLoadedKeys),
+    realOperatorPreflightPrivateInputFileLoadedKeyCount: integerValue(operatorPreflight.privateInputFileLoadedKeyCount),
+    realOperatorPreflightPrivateInputFileLoadedKeySummary: textValue(operatorPreflight.privateInputFileLoadedKeySummary),
+    realOperatorPreflightPrivateInputFileUnknownKeyCount: integerValue(operatorPreflight.privateInputFileUnknownKeyCount),
+    realOperatorPreflightPrivateInputFileMalformedLineCount: integerValue(operatorPreflight.privateInputFileMalformedLineCount),
+    realOperatorPreflightPrivateInputFileValueRecorded: operatorPreflight.privateInputFileValueRecorded === true,
+    realOperatorPreflightInputReadyKeyCount: integerValue(operatorPreflight.inputReadyKeyCount),
+    realOperatorPreflightInputMissingKeys: stringArrayValue(operatorPreflight.inputMissingKeys),
+    realOperatorPreflightInputMissingKeyCount: stringArrayValue(operatorPreflight.inputMissingKeys).length,
+    realOperatorPreflightInputPlaceholderKeys: stringArrayValue(operatorPreflight.inputPlaceholderKeys),
+    realOperatorPreflightInputPlaceholderKeyCount: stringArrayValue(operatorPreflight.inputPlaceholderKeys).length,
+    realOperatorPreflightInputShapeInvalidKeys: stringArrayValue(operatorPreflight.inputShapeInvalidKeys),
+    realOperatorPreflightInputShapeInvalidKeyCount: stringArrayValue(operatorPreflight.inputShapeInvalidKeys).length,
+    realOperatorPreflightProcessEnvInputRows: processEnvInputRows,
+    realOperatorPreflightProcessEnvInputRowCount: integerValue(operatorPreflight.processEnvInputChecklistRowCount),
+    realOperatorPreflightProcessEnvInputRowsValueFree: valueFreeRows(processEnvInputRows),
+    realOperatorPreflightRemediationRows: remediationRows,
+    realOperatorPreflightRemediationRowCount: integerValue(operatorPreflight.preflightRemediationRowCount),
+    realOperatorPreflightRemediationRowsValueFree: valueFreeRows(remediationRows),
+    realOperatorPreflightOperatorReceiptReady:
+      operatorPreflight.operatorReceiptReady === true && valueFreeRows(operatorReceiptRows),
+    realOperatorPreflightOperatorReceiptRows: operatorReceiptRows,
+    realOperatorPreflightOperatorReceiptRowCount: integerValue(operatorPreflight.operatorReceiptRowCount),
+    realOperatorPreflightOperatorReceiptRowsValueFree: valueFreeRows(operatorReceiptRows),
+    realOperatorPreflightNextWriteCommand: textValue(operatorPreflight.nextWriteCommand, releaseChannelApplyPrivateEnvCommand),
+    realOperatorPreflightGuidedSetupFallbackCommand: textValue(
+      operatorPreflight.guidedSetupFallbackCommand,
+      releaseChannelSetupWizardCommand
+    ),
+    realOperatorPreflightRecommendedOperatorProofCommand: textValue(
+      operatorPreflight.recommendedOperatorProofCommand,
+      "npm run release:private-edit-strict-proof"
+    ),
+    realOperatorPreflightHardGateCommand: textValue(operatorPreflight.hardGateCommand, "npm run release:external-check"),
+    realOperatorPreflightPrivateValuesRecorded: operatorPreflight.privateValuesRecorded === true,
+    realOperatorPreflightClaimedExternalDistribution: operatorPreflight.releaseGateClaimedExternalDistribution === true
+  };
 }
 
 function formatKeyList(keys) {
@@ -433,7 +558,16 @@ function formatPreflightOperatorReceiptRows(rows) {
     .join("\n");
 }
 
-function buildReport({ progressRefresh, completionSummary, externalResume, operatorPreflight, operatorPreflightExitStatus, checkpoint, gitContext }) {
+function buildReport({
+  progressRefresh,
+  completionSummary,
+  externalRun,
+  externalResume,
+  operatorPreflight,
+  operatorPreflightExitStatus,
+  checkpoint,
+  gitContext
+}) {
   const checkpointRequired = tenPlanCheckpointRequired(completionSummary);
   const checkpointReady = checkpointRequired ? checkpoint?.tenPlanCheckpointReady === true : false;
   const userFacingCompletionPercent = percentNumber(completionSummary.completionPercent);
@@ -471,6 +605,14 @@ function buildReport({ progressRefresh, completionSummary, externalResume, opera
     operatorPreflight.notarySubmissionAttempted === false &&
     operatorPreflight.signingAttempted === false &&
     operatorPreflight.releaseGateClaimedExternalDistribution === false;
+  const realOperatorPreflightReportFields = buildRealOperatorPreflightReportFields({
+    operatorPreflight,
+    operatorPreflightExitStatus,
+    realOperatorPreflightReady,
+    processEnvInputRows: realOperatorPreflightProcessEnvInputRows,
+    remediationRows: realOperatorPreflightRemediationRows,
+    operatorReceiptRows: realOperatorPreflightOperatorReceiptRows
+  });
   const externalResumeReady =
     externalResume.externalCompletionResumePacketReady === true &&
     externalResume.sourcePacketReady === true &&
@@ -506,6 +648,7 @@ function buildReport({ progressRefresh, completionSummary, externalResume, opera
     externalCompletionRunPacketJsonArtifactName: "release-external-completion-run-packet-smoke.json",
     externalCompletionResumePacketJsonArtifactName: "release-external-completion-resume-packet-smoke.json",
     realOperatorPreflightJsonArtifactName: "release-channel-apply-private-env-preflight.json",
+    realOperatorPreflightSnapshotJsonArtifactName: "release-completion-summary-refresh-real-operator-preflight.json",
     tenPlanCheckpointJsonArtifactName: "release-10-plan-checkpoint-smoke.json",
     completionSummaryRefreshMarkdownArtifactName: "release-completion-summary-refresh-smoke.md",
     completionSummaryRefreshJsonArtifactName: "release-completion-summary-refresh-smoke.json",
@@ -514,6 +657,7 @@ function buildReport({ progressRefresh, completionSummary, externalResume, opera
     externalCompletionRunPacketJsonPath: relative(externalRunPacketJsonPath),
     externalCompletionResumePacketJsonPath: relative(externalResumePacketJsonPath),
     realOperatorPreflightJsonPath: relative(operatorPreflightJsonPath),
+    realOperatorPreflightSnapshotJsonPath: relative(realOperatorPreflightSnapshotJsonPath),
     tenPlanCheckpointJsonPath: checkpointRequired ? relative(checkpointJsonPath) : "not due",
     completionSummaryRefreshMarkdownPath: relative(receiptMarkdownPath),
     completionSummaryRefreshJsonPath: relative(receiptJsonPath),
@@ -688,64 +832,25 @@ function buildReport({ progressRefresh, completionSummary, externalResume, opera
     releaseChannelPrivateEnvApplyProofValueRecorded: completionSummary.releaseChannelPrivateEnvApplyProofValueRecorded === true ? true : false,
     releaseChannelFirstProofCommandAfterPrivateEdits: textValue(completionSummary.releaseChannelFirstProofCommandAfterPrivateEdits),
     releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits: textValue(completionSummary.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits),
-    realOperatorPreflightReceiptReady: realOperatorPreflightReady,
-    realOperatorPreflightCommand: releaseChannelApplyPrivateEnvPreflightCommand,
-    realOperatorPreflightRole: releaseChannelApplyPrivateEnvPreflightRole,
-    realOperatorPreflightExitStatus: operatorPreflightExitStatus,
-    realOperatorPreflightPreflightOnly: operatorPreflight.preflightOnly === true,
-    realOperatorPreflightSourcePreflightReady: operatorPreflight.releaseChannelPrivateEnvApplyPreflightReady === true,
-    realOperatorPreflightSourceApplyReady: operatorPreflight.releaseChannelPrivateEnvApplyReady === true,
-    realOperatorPreflightLocalEnvFileLoaded: operatorPreflight.localEnvFileLoaded === true,
-    realOperatorPreflightLocalEnvModified: operatorPreflight.localEnvModified === true,
-    realOperatorPreflightRealLocalEnvModified: operatorPreflight.realLocalEnvModified === true,
-    realOperatorPreflightCurrentEnvEditTarget: textValue(operatorPreflight.currentEnvEditTarget, ".env.distribution.local"),
-    realOperatorPreflightCurrentFirstBlocker: textValue(operatorPreflight.currentFirstBlocker),
-    realOperatorPreflightCurrentReadyKeyCount: integerValue(operatorPreflight.currentReadyKeyCount),
-    realOperatorPreflightCurrentRequiredKeyCount: integerValue(operatorPreflight.currentRequiredKeyCount),
-    realOperatorPreflightPrivateInputFileKey: textValue(operatorPreflight.privateInputFileKey, privateInputFileKey),
-    realOperatorPreflightPrivateInputFileDefaultName: textValue(
-      operatorPreflight.privateInputFileDefaultName,
-      defaultPrivateInputFileName
+    ...realOperatorPreflightReportFields,
+    realOperatorPreflightSnapshotReady: true,
+    realOperatorPreflightSnapshotSourceCommand: releaseChannelApplyPrivateEnvPreflightCommand,
+    realOperatorPreflightSnapshotSourceExitStatus: operatorPreflightExitStatus,
+    realOperatorPreflightSnapshotValueRecorded: false,
+    realOperatorPreflightMatchesCompletionSummary: realPreflightFieldsMatch(
+      realOperatorPreflightReportFields,
+      completionSummary
     ),
-    realOperatorPreflightPrivateInputFilePath: textValue(operatorPreflight.privateInputFilePath),
-    realOperatorPreflightPrivateInputFilePresent: operatorPreflight.privateInputFilePresent === true,
-    realOperatorPreflightPrivateInputFileConfigured: operatorPreflight.privateInputFileConfigured === true,
-    realOperatorPreflightPrivateInputFileLoadedKeys: stringArrayValue(operatorPreflight.privateInputFileLoadedKeys),
-    realOperatorPreflightPrivateInputFileLoadedKeyCount: integerValue(operatorPreflight.privateInputFileLoadedKeyCount),
-    realOperatorPreflightPrivateInputFileLoadedKeySummary: textValue(operatorPreflight.privateInputFileLoadedKeySummary),
-    realOperatorPreflightPrivateInputFileUnknownKeyCount: integerValue(operatorPreflight.privateInputFileUnknownKeyCount),
-    realOperatorPreflightPrivateInputFileMalformedLineCount: integerValue(operatorPreflight.privateInputFileMalformedLineCount),
-    realOperatorPreflightPrivateInputFileValueRecorded: operatorPreflight.privateInputFileValueRecorded === true,
-    realOperatorPreflightInputReadyKeyCount: integerValue(operatorPreflight.inputReadyKeyCount),
-    realOperatorPreflightInputMissingKeys: stringArrayValue(operatorPreflight.inputMissingKeys),
-    realOperatorPreflightInputMissingKeyCount: stringArrayValue(operatorPreflight.inputMissingKeys).length,
-    realOperatorPreflightInputPlaceholderKeys: stringArrayValue(operatorPreflight.inputPlaceholderKeys),
-    realOperatorPreflightInputPlaceholderKeyCount: stringArrayValue(operatorPreflight.inputPlaceholderKeys).length,
-    realOperatorPreflightInputShapeInvalidKeys: stringArrayValue(operatorPreflight.inputShapeInvalidKeys),
-    realOperatorPreflightInputShapeInvalidKeyCount: stringArrayValue(operatorPreflight.inputShapeInvalidKeys).length,
-    realOperatorPreflightProcessEnvInputRows: realOperatorPreflightProcessEnvInputRows,
-    realOperatorPreflightProcessEnvInputRowCount: integerValue(operatorPreflight.processEnvInputChecklistRowCount),
-    realOperatorPreflightProcessEnvInputRowsValueFree: valueFreeRows(realOperatorPreflightProcessEnvInputRows),
-    realOperatorPreflightRemediationRows: realOperatorPreflightRemediationRows,
-    realOperatorPreflightRemediationRowCount: integerValue(operatorPreflight.preflightRemediationRowCount),
-    realOperatorPreflightRemediationRowsValueFree: valueFreeRows(realOperatorPreflightRemediationRows),
-    realOperatorPreflightOperatorReceiptReady:
-      operatorPreflight.operatorReceiptReady === true && valueFreeRows(realOperatorPreflightOperatorReceiptRows),
-    realOperatorPreflightOperatorReceiptRows: realOperatorPreflightOperatorReceiptRows,
-    realOperatorPreflightOperatorReceiptRowCount: integerValue(operatorPreflight.operatorReceiptRowCount),
-    realOperatorPreflightOperatorReceiptRowsValueFree: valueFreeRows(realOperatorPreflightOperatorReceiptRows),
-    realOperatorPreflightNextWriteCommand: textValue(operatorPreflight.nextWriteCommand, releaseChannelApplyPrivateEnvCommand),
-    realOperatorPreflightGuidedSetupFallbackCommand: textValue(
-      operatorPreflight.guidedSetupFallbackCommand,
-      releaseChannelSetupWizardCommand
+    realOperatorPreflightMatchesExternalRunPacket: realPreflightFieldsMatch(
+      realOperatorPreflightReportFields,
+      externalRun
     ),
-    realOperatorPreflightRecommendedOperatorProofCommand: textValue(
-      operatorPreflight.recommendedOperatorProofCommand,
-      "npm run release:private-edit-strict-proof"
+    realOperatorPreflightMatchesExternalResumePacket: realPreflightFieldsMatch(
+      realOperatorPreflightReportFields,
+      externalResume
     ),
-    realOperatorPreflightHardGateCommand: textValue(operatorPreflight.hardGateCommand, "npm run release:external-check"),
-    realOperatorPreflightPrivateValuesRecorded: operatorPreflight.privateValuesRecorded === true,
-    realOperatorPreflightClaimedExternalDistribution: operatorPreflight.releaseGateClaimedExternalDistribution === true,
+    externalCompletionRunPacketReady: externalRun.externalCompletionRunPacketReady === true,
+    externalCompletionRunSourceMode: textValue(externalRun.sourceMode),
     externalCompletionResumePacketReady: externalResumeReady,
     externalCompletionResumeSourceMode: textValue(externalResume.sourceMode),
     externalCompletionResumePrivateInputTemplateCommand: textValue(
@@ -1070,11 +1175,20 @@ ${formatCommandRows(report.refreshCommands)}
 - External completion run packet JSON: ${report.externalCompletionRunPacketJsonPath}
 - External completion resume packet JSON: ${report.externalCompletionResumePacketJsonPath}
 - Real operator preflight JSON: ${report.realOperatorPreflightJsonPath}
+- Real operator preflight snapshot JSON: ${report.realOperatorPreflightSnapshotJsonPath}
 - 10-plan checkpoint JSON: ${report.tenPlanCheckpointJsonPath}
 
 ## Real Operator Preflight Readout
 
 - Receipt ready: ${readyLabel(report.realOperatorPreflightReceiptReady)}
+- Snapshot ready: ${readyLabel(report.realOperatorPreflightSnapshotReady)}
+- Snapshot JSON: ${report.realOperatorPreflightSnapshotJsonPath}
+- Snapshot source command: \`${report.realOperatorPreflightSnapshotSourceCommand}\`
+- Snapshot source exit status: ${report.realOperatorPreflightSnapshotSourceExitStatus}
+- Snapshot value recorded: ${readyLabel(report.realOperatorPreflightSnapshotValueRecorded)}
+- Matches completion summary: ${readyLabel(report.realOperatorPreflightMatchesCompletionSummary)}
+- Matches external run packet: ${readyLabel(report.realOperatorPreflightMatchesExternalRunPacket)}
+- Matches external resume packet: ${readyLabel(report.realOperatorPreflightMatchesExternalResumePacket)}
 - Command: \`${report.realOperatorPreflightCommand}\`
 - Role: ${report.realOperatorPreflightRole}
 - Exit status: ${report.realOperatorPreflightExitStatus}
@@ -1450,6 +1564,43 @@ function validateReport(report, markdown) {
   check(report.releaseChannelFirstProofCommandAfterPrivateEdits === "npm run release:channel-live-check", "release completion summary refresh should expose release-channel first proof command");
   check(report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits === "npm run release:private-edit-strict-proof", "release completion summary refresh should expose recommended private edit proof chain");
   check(report.realOperatorPreflightReceiptReady === true, "release completion summary refresh should leave a ready real operator preflight readout");
+  check(report.realOperatorPreflightSnapshotReady === true, "release completion summary refresh should preserve the real operator preflight snapshot");
+  check(
+    report.realOperatorPreflightSnapshotJsonPath === relative(realOperatorPreflightSnapshotJsonPath),
+    "release completion summary refresh should expose the preserved real operator preflight snapshot path"
+  );
+  check(
+    report.realOperatorPreflightSnapshotSourceCommand === releaseChannelApplyPrivateEnvPreflightCommand,
+    "release completion summary refresh snapshot should cite the real operator preflight command"
+  );
+  check(
+    report.realOperatorPreflightSnapshotSourceExitStatus === report.realOperatorPreflightExitStatus,
+    "release completion summary refresh snapshot exit status should match the real operator preflight readout"
+  );
+  check(
+    report.realOperatorPreflightSnapshotValueRecorded === false,
+    "release completion summary refresh snapshot should be value-free"
+  );
+  check(
+    report.realOperatorPreflightMatchesCompletionSummary === true,
+    "release completion summary refresh real preflight should match the compact completion summary"
+  );
+  check(
+    report.realOperatorPreflightMatchesExternalRunPacket === true,
+    "release completion summary refresh real preflight should match the external run packet"
+  );
+  check(
+    report.realOperatorPreflightMatchesExternalResumePacket === true,
+    "release completion summary refresh real preflight should match the external resume packet"
+  );
+  check(
+    report.externalCompletionRunPacketReady === true,
+    "release completion summary refresh should read a ready external completion run packet"
+  );
+  check(
+    report.externalCompletionRunSourceMode === "existing-completion-summary",
+    "release completion summary refresh should use the non-recursive existing completion summary run-packet mode"
+  );
   check(report.realOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release completion summary refresh real operator preflight should cite the preflight command");
   check(report.realOperatorPreflightRole === releaseChannelApplyPrivateEnvPreflightRole, "release completion summary refresh real operator preflight should describe the preflight role");
   check([0, 1].includes(report.realOperatorPreflightExitStatus), "release completion summary refresh real operator preflight should record success or expected blocked exit");
@@ -1900,6 +2051,9 @@ function validateReport(report, markdown) {
   check(markdown.includes("## Completion Blocker Action Receipt"), "release completion summary refresh Markdown should include blocker action receipt section");
   check(markdown.includes("## Real Operator Preflight Readout"), "release completion summary refresh Markdown should include real operator preflight readout");
   check(markdown.includes("Real operator preflight receipt ready:"), "release completion summary refresh Markdown should summarize real operator preflight readiness");
+  check(markdown.includes("Snapshot JSON:"), "release completion summary refresh Markdown should include real preflight snapshot path");
+  check(markdown.includes("Matches external run packet:"), "release completion summary refresh Markdown should include run packet real-preflight match");
+  check(markdown.includes("Matches external resume packet:"), "release completion summary refresh Markdown should include resume packet real-preflight match");
   check(markdown.includes("Real Operator Process Input Checklist"), "release completion summary refresh Markdown should include real operator process input checklist");
   check(markdown.includes("External resume private input template command:"), "release completion summary refresh Markdown should include external resume private input template command");
   check(markdown.includes("External resume private input file key:"), "release completion summary refresh Markdown should include external resume private input file guidance");
@@ -1917,19 +2071,34 @@ function validateReport(report, markdown) {
 
 async function main() {
   let operatorPreflightExitStatus = 0;
+  let operatorPreflightSnapshot = null;
   for (const step of requiredRefreshCommands) {
     console.log(`Refreshing release completion summary evidence: ${step.command}`);
     const exitStatus = runNpmScript(step.command, { allowBlockedExit: step.allowBlockedExit === true });
     if (step.command === releaseChannelApplyPrivateEnvPreflightCommand) {
       operatorPreflightExitStatus = exitStatus;
+      operatorPreflightSnapshot = await readJsonRequired(
+        operatorPreflightJsonPath,
+        "real release-channel private env apply preflight"
+      );
+      await mkdir(packageRoot, { recursive: true });
+      await writeFile(realOperatorPreflightSnapshotJsonPath, `${JSON.stringify(operatorPreflightSnapshot, null, 2)}\n`, "utf8");
     }
   }
 
-  const [progressRefresh, completionSummary, externalResume, operatorPreflight] = await Promise.all([
+  if (!operatorPreflightSnapshot) {
+    fail(
+      "Real operator preflight snapshot was not captured.",
+      `Expected ${releaseChannelApplyPrivateEnvPreflightCommand} to write ${relative(realOperatorPreflightSnapshotJsonPath)} before external resume evidence.`
+    );
+  }
+
+  const [progressRefresh, completionSummary, externalRun, externalResume, operatorPreflight] = await Promise.all([
     readJsonRequired(progressRefreshJsonPath, "release progress refresh"),
     readJsonRequired(completionSummaryJsonPath, "release completion summary"),
+    readJsonRequired(externalRunPacketJsonPath, "release external completion run packet"),
     readJsonRequired(externalResumePacketJsonPath, "release external completion resume packet"),
-    readJsonRequired(operatorPreflightJsonPath, "release-channel private env apply preflight")
+    readJsonRequired(realOperatorPreflightSnapshotJsonPath, "real release-channel private env apply preflight snapshot")
   ]);
 
   let checkpoint = null;
@@ -1945,6 +2114,7 @@ async function main() {
   const report = buildReport({
     progressRefresh,
     completionSummary,
+    externalRun,
     externalResume,
     operatorPreflight,
     operatorPreflightExitStatus,
@@ -2032,6 +2202,10 @@ async function main() {
   );
   console.log(`- Placeholder input next operator command: ${report.placeholderInputReceiptNextOperatorCommand}`);
   console.log(`- Real operator preflight receipt ready: ${report.realOperatorPreflightReceiptReady ? "yes" : "no"}`);
+  console.log(`- Real operator preflight snapshot: ${report.realOperatorPreflightSnapshotJsonPath}`);
+  console.log(`- Real operator preflight matches completion summary: ${report.realOperatorPreflightMatchesCompletionSummary ? "yes" : "no"}`);
+  console.log(`- Real operator preflight matches external run packet: ${report.realOperatorPreflightMatchesExternalRunPacket ? "yes" : "no"}`);
+  console.log(`- Real operator preflight matches external resume packet: ${report.realOperatorPreflightMatchesExternalResumePacket ? "yes" : "no"}`);
   console.log(`- Real operator preflight exit status: ${report.realOperatorPreflightExitStatus}`);
   console.log(`- Real operator preflight ready: ${report.realOperatorPreflightSourcePreflightReady ? "yes" : "no"}`);
   console.log(`- Real operator local env loaded: ${report.realOperatorPreflightLocalEnvFileLoaded ? "yes" : "no"}`);
