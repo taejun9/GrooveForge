@@ -71,6 +71,14 @@ type LaunchSmokeAudienceStarterEvidence = LaunchSmokePaletteRouteEvidence & {
   buttonPresent: boolean;
   followupPresent: boolean;
   followupText: string;
+  visibleFollowupActionCount: number;
+  visibleFollowupActionLabels: string;
+  visibleFollowupCompletionPresent: boolean;
+  visibleFollowupCompletionResult: string;
+  visibleFollowupPrimaryPresent: boolean;
+  visibleFollowupPrimaryResult: string;
+  visibleFollowupReadinessPresent: boolean;
+  visibleFollowupReadinessResult: string;
   visibleResultAudition: string;
   visibleResultMetricValue: string;
   visibleResultNextCheck: string;
@@ -652,6 +660,61 @@ function launchSmokePaletteFailures(evidence: LaunchSmokePaletteEvidence): strin
   ) {
     failures.push("live Quick Actions Audience Completion producer lane should guide the next producer completion check");
   }
+  if (!evidence.starterBeginner.buttonPresent || !evidence.starterBeginner.followupPresent || !evidence.starterBeginner.actionPresent) {
+    failures.push("live Audience Starter beginner visible button and Quick Action should be available");
+  }
+  if (
+    !evidence.starterBeginner.visibleResultMetricValue.includes("starter project") ||
+    !evidence.starterBeginner.visibleResultMetricValue.includes("First-time composer")
+  ) {
+    failures.push("live Audience Starter beginner visible result should expose starter project metric feedback");
+  }
+  if (
+    evidence.starterBeginner.visibleFollowupActionCount < 2 ||
+    !evidence.starterBeginner.visibleFollowupPrimaryPresent ||
+    !evidence.starterBeginner.visibleFollowupReadinessPresent ||
+    !evidence.starterBeginner.visibleFollowupActionLabels.includes("First Beat Path") ||
+    !evidence.starterBeginner.visibleFollowupActionLabels.includes("Dual Audience Readiness")
+  ) {
+    failures.push("live Audience Starter beginner visible result should expose First Beat Path and Dual Audience Readiness follow-up buttons");
+  }
+  if (
+    !evidence.starterBeginner.visibleFollowupPrimaryResult.includes("First Beat Path") ||
+    !evidence.starterBeginner.visibleFollowupReadinessResult.includes("Dual Audience Readiness")
+  ) {
+    failures.push("live Audience Starter beginner follow-up buttons should route to First Beat Path and Dual Audience Readiness surfaces");
+  }
+  if (!evidence.starterProducer.buttonPresent || !evidence.starterProducer.followupPresent || !evidence.starterProducer.actionPresent) {
+    failures.push("live Audience Starter producer visible button and Quick Action should be available");
+  }
+  if (
+    !evidence.starterProducer.visibleResultPresent ||
+    !evidence.starterProducer.visibleResultStatus.includes("Applied") ||
+    !evidence.starterProducer.visibleResultTitle.includes("Professional producer") ||
+    !evidence.starterProducer.visibleResultMetricValue.includes("starter project") ||
+    !evidence.starterProducer.visibleResultMetricValue.includes("Professional producer") ||
+    !evidence.starterProducer.visibleResultMetricValue.includes("Studio")
+  ) {
+    failures.push("live Audience Starter producer visible result should expose studio starter project metric feedback");
+  }
+  if (
+    evidence.starterProducer.visibleFollowupActionCount < 3 ||
+    !evidence.starterProducer.visibleFollowupPrimaryPresent ||
+    !evidence.starterProducer.visibleFollowupReadinessPresent ||
+    !evidence.starterProducer.visibleFollowupCompletionPresent ||
+    !evidence.starterProducer.visibleFollowupActionLabels.includes("Review Queue") ||
+    !evidence.starterProducer.visibleFollowupActionLabels.includes("Export Preflight") ||
+    !evidence.starterProducer.visibleFollowupActionLabels.includes("Handoff Package Check")
+  ) {
+    failures.push("live Audience Starter producer visible result should expose Review Queue, Export Preflight, and Handoff Package Check follow-up buttons");
+  }
+  if (
+    !evidence.starterProducer.visibleFollowupPrimaryResult.includes("Review Queue") ||
+    !evidence.starterProducer.visibleFollowupReadinessResult.includes("Export Preflight") ||
+    !evidence.starterProducer.visibleFollowupCompletionResult.includes("Package")
+  ) {
+    failures.push("live Audience Starter producer follow-up buttons should route to Review Queue, Export Preflight, and Handoff Package Check surfaces");
+  }
   return failures;
 }
 
@@ -834,6 +897,10 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "audience-completion-route",
         "audience-completion-route-beginner",
         "audience-completion-route-producer",
+        "mode-focus",
+        "mode-focus-mode",
+        "session-pass",
+        "session-pass-mode",
         "mode-guided",
         "mode-studio",
         "quick-actions-open",
@@ -863,8 +930,6 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "Beat Spine",
         "Composer Guide",
         "Workflow Navigator",
-        "Guided Focus",
-        "Guided Session Pass",
         "Studio",
         "Review Queue",
         "Production Snapshot",
@@ -906,6 +971,14 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         buttonPresent: false,
         followupPresent: false,
         followupText: "",
+        visibleFollowupActionCount: 0,
+        visibleFollowupActionLabels: "",
+        visibleFollowupCompletionPresent: false,
+        visibleFollowupCompletionResult: "",
+        visibleFollowupPrimaryPresent: false,
+        visibleFollowupPrimaryResult: "",
+        visibleFollowupReadinessPresent: false,
+        visibleFollowupReadinessResult: "",
         visibleResultAudition: "",
         visibleResultMetricValue: "",
         visibleResultNextCheck: "",
@@ -1003,7 +1076,7 @@ async function collectLaunchSmokePaletteEvidence(win: BrowserWindow): Promise<La
 
 function collectLaunchSmokePaletteEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokePaletteEvidence> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Timed out collecting live Quick Actions palette evidence.")), 60000);
+    const timeout = setTimeout(() => reject(new Error("Timed out collecting live Quick Actions palette evidence.")), 120000);
     void collectLaunchSmokePaletteEvidence(win)
       .then((evidence) => {
         clearTimeout(timeout);

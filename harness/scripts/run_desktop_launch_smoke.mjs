@@ -35,6 +35,10 @@ const expectedLiveTestIds = [
   "audience-completion-route",
   "audience-completion-route-beginner",
   "audience-completion-route-producer",
+  "mode-focus",
+  "mode-focus-mode",
+  "session-pass",
+  "session-pass-mode",
   "mode-guided",
   "mode-studio",
   "quick-actions-open",
@@ -208,6 +212,19 @@ function checkResult(result) {
     "live desktop Audience Starter beginner should expose visible starter result metric feedback"
   );
   check(
+    Number(evidence?.palette?.starterBeginner?.visibleFollowupActionCount ?? 0) >= 2 &&
+      evidence?.palette?.starterBeginner?.visibleFollowupPrimaryPresent === true &&
+      evidence?.palette?.starterBeginner?.visibleFollowupReadinessPresent === true &&
+      String(evidence?.palette?.starterBeginner?.visibleFollowupActionLabels ?? "").includes("First Beat Path") &&
+      String(evidence?.palette?.starterBeginner?.visibleFollowupActionLabels ?? "").includes("Dual Audience Readiness"),
+    "live desktop Audience Starter beginner should expose First Beat Path and Dual Audience Readiness follow-up buttons"
+  );
+  check(
+    String(evidence?.palette?.starterBeginner?.visibleFollowupPrimaryResult ?? "").includes("First Beat Path") &&
+      String(evidence?.palette?.starterBeginner?.visibleFollowupReadinessResult ?? "").includes("Dual Audience Readiness"),
+    "live desktop Audience Starter beginner follow-up buttons should route to First Beat Path and Dual Audience Readiness surfaces"
+  );
+  check(
     evidence?.palette?.starterProducer?.buttonPresent === true &&
       evidence?.palette?.starterProducer?.followupPresent === true &&
       evidence?.palette?.starterProducer?.actionPresent === true,
@@ -239,6 +256,22 @@ function checkResult(result) {
       String(evidence?.palette?.starterProducer?.visibleResultNextCheck ?? "").includes("Review Queue") &&
       String(evidence?.palette?.starterProducer?.visibleResultNextCheck ?? "").includes("Handoff Package Check"),
     "live desktop Audience Starter producer visible result should expose audition and next-check feedback"
+  );
+  check(
+    Number(evidence?.palette?.starterProducer?.visibleFollowupActionCount ?? 0) >= 3 &&
+      evidence?.palette?.starterProducer?.visibleFollowupPrimaryPresent === true &&
+      evidence?.palette?.starterProducer?.visibleFollowupReadinessPresent === true &&
+      evidence?.palette?.starterProducer?.visibleFollowupCompletionPresent === true &&
+      String(evidence?.palette?.starterProducer?.visibleFollowupActionLabels ?? "").includes("Review Queue") &&
+      String(evidence?.palette?.starterProducer?.visibleFollowupActionLabels ?? "").includes("Export Preflight") &&
+      String(evidence?.palette?.starterProducer?.visibleFollowupActionLabels ?? "").includes("Handoff Package Check"),
+    "live desktop Audience Starter producer should expose Review Queue, Export Preflight, and Handoff Package Check follow-up buttons"
+  );
+  check(
+    String(evidence?.palette?.starterProducer?.visibleFollowupPrimaryResult ?? "").includes("Review Queue") &&
+      String(evidence?.palette?.starterProducer?.visibleFollowupReadinessResult ?? "").includes("Export Preflight") &&
+      String(evidence?.palette?.starterProducer?.visibleFollowupCompletionResult ?? "").includes("Package"),
+    "live desktop Audience Starter producer follow-up buttons should route to Review Queue, Export Preflight, and Handoff Package Check surfaces"
   );
   check(
     evidence?.palette?.routeBridge?.actionPresent === true,

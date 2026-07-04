@@ -74,6 +74,74 @@ const audienceStarterFollowupLabels: Record<AudienceStarterProjectId, string> = 
   producer: "Starter follow-up: Review Queue / Export Preflight / Handoff Package Check"
 };
 
+export type AudienceStarterFollowupRoute = "primary" | "readiness" | "completion";
+
+type AudienceStarterResultFollowupAction = {
+  route: AudienceStarterFollowupRoute;
+  label: string;
+  detail: string;
+};
+
+const audienceStarterResultFollowupActions: Record<AudienceStarterProjectId, AudienceStarterResultFollowupAction[]> = {
+  beginner: [
+    {
+      route: "primary",
+      label: "Open First Beat Path",
+      detail: "Continue the guided first-beat workflow"
+    },
+    {
+      route: "readiness",
+      label: "Open Dual Audience Readiness",
+      detail: "Check the beginner and producer readiness lanes"
+    }
+  ],
+  producer: [
+    {
+      route: "primary",
+      label: "Open Review Queue",
+      detail: "Scan producer-level issues before edits"
+    },
+    {
+      route: "readiness",
+      label: "Open Export Preflight",
+      detail: "Check export and delivery blockers"
+    },
+    {
+      route: "completion",
+      label: "Open Handoff Package Check",
+      detail: "Check package files, receipt, and send order"
+    }
+  ]
+};
+
+function audienceStarterResultAudience(result: QuickActionResult | null): AudienceStarterProjectId | null {
+  if (!result) {
+    return null;
+  }
+
+  if (result.actionId === "audience-starter-producer") {
+    return "producer";
+  }
+
+  if (result.actionId === "audience-starter-beginner") {
+    return "beginner";
+  }
+
+  return null;
+}
+
+function AudienceStarterFollowupIcon({ route }: { route: AudienceStarterFollowupRoute }): ReactElement {
+  if (route === "completion") {
+    return <PackageCheck size={13} aria-hidden="true" />;
+  }
+
+  if (route === "readiness") {
+    return <ListChecks size={13} aria-hidden="true" />;
+  }
+
+  return <ArrowRight size={13} aria-hidden="true" />;
+}
+
 type GuideQuickStartDecision = {
   source: "path" | "session" | "workflow";
   statusLabel: string;
@@ -323,14 +391,19 @@ export function AudienceSessionReadout({
   starterResult,
   summary,
   onCreateStarter,
+  onOpenStarterFollowup,
   onSelectAudience
 }: {
   onCreateStarter: (starterId: AudienceStarterProjectId) => void;
+  onOpenStarterFollowup: (starterId: AudienceStarterProjectId, route: AudienceStarterFollowupRoute) => void;
   result: AudienceSessionActionResult | null;
   starterResult: QuickActionResult | null;
   summary: AudienceSessionReadoutSummary;
   onSelectAudience: (row: AudienceSessionReadoutRow) => void;
 }): ReactElement {
+  const starterAudience = audienceStarterResultAudience(starterResult);
+  const starterFollowupActions = starterAudience ? audienceStarterResultFollowupActions[starterAudience] : [];
+
   return (
     <section
       aria-label="Audience session readout"
@@ -430,6 +503,29 @@ export function AudienceSessionReadout({
               <em data-testid="audience-starter-result-next-check">{starterResult.nextCheck}</em>
             </span>
           </div>
+          {starterAudience && (
+            <div
+              className="audience-starter-result-actions"
+              data-audience-starter-result-actions={starterAudience}
+              data-testid="audience-starter-result-actions"
+            >
+              {starterFollowupActions.map((action) => (
+                <button
+                  aria-label={`${action.label} for ${starterAudience === "beginner" ? "first-time composer starter" : "professional producer starter"}; ${action.detail}`}
+                  className="audience-starter-result-action"
+                  data-audience-starter-followup-route={action.route}
+                  data-testid={`audience-starter-result-followup-${action.route}`}
+                  key={action.route}
+                  title={`${action.label}: ${action.detail}`}
+                  type="button"
+                  onClick={() => onOpenStarterFollowup(starterAudience, action.route)}
+                >
+                  <AudienceStarterFollowupIcon route={action.route} />
+                  <span>{action.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {result && (

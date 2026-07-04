@@ -62,6 +62,14 @@ type GrooveforgeLaunchSmokeAudienceStarterEvidence = GrooveforgeLaunchSmokeRoute
   buttonPresent: boolean;
   followupPresent: boolean;
   followupText: string;
+  visibleFollowupActionCount: number;
+  visibleFollowupActionLabels: string;
+  visibleFollowupCompletionPresent: boolean;
+  visibleFollowupCompletionResult: string;
+  visibleFollowupPrimaryPresent: boolean;
+  visibleFollowupPrimaryResult: string;
+  visibleFollowupReadinessPresent: boolean;
+  visibleFollowupReadinessResult: string;
   visibleResultAudition: string;
   visibleResultMetricValue: string;
   visibleResultNextCheck: string;

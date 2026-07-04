@@ -725,7 +725,8 @@ import {
   createModeSwitchResult,
   createWorkflowSpotlightSummary,
   audienceStarterActionTestIds,
-  modeLabel
+  modeLabel,
+  type AudienceStarterFollowupRoute
 } from "./workstationGuidancePanels";
 import {
   LayerStarterResultStrip,
@@ -7123,6 +7124,53 @@ export function App(): ReactElement {
     return null;
   }
 
+  function openAudienceStarterFollowup(starterId: AudienceStarterProjectId, route: AudienceStarterFollowupRoute): void {
+    if (starterId === "beginner") {
+      if (route === "primary") {
+        const nextStep =
+          firstBeatPathSummary.steps.find((step) => step.id === firstBeatPathSummary.nextStepId) ??
+          firstBeatPathSummary.steps.find((step) => step.tone !== "good") ??
+          firstBeatPathSummary.steps[0] ??
+          null;
+
+        if (nextStep) {
+          jumpToFirstBeatPathStep(nextStep);
+          return;
+        }
+
+        setProjectStatus("Audience Starter follow-up: no First Beat Path target available");
+        return;
+      }
+
+      focusDualAudienceReadinessRouteReadout();
+      return;
+    }
+
+    if (route === "primary") {
+      focusReviewQueueRouteReadout();
+      return;
+    }
+
+    if (route === "readiness") {
+      const exportCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
+      if (exportCard) {
+        focusExportPreflightCard(exportCard);
+        return;
+      }
+
+      focusExportPreflightRouteReadout();
+      return;
+    }
+
+    const packageCard = activeHandoffPackageCheckQuickActionCard(handoffPackageCheckSummary);
+    if (packageCard) {
+      focusHandoffPackageCheckCard(packageCard);
+      return;
+    }
+
+    focusHandoffPack();
+  }
+
   function selectDeliveryTarget(targetId: DeliveryTargetId): void {
     const target = deliveryTargetForId(targetId, projectRef.current.customDeliveryTarget);
     updateProject((current) => {
@@ -9620,19 +9668,77 @@ export function App(): ReactElement {
       };
     };
 
-    const readAudienceStarterVisibleResult = () => ({
-      visibleResultAudition:
-        document.querySelector('[data-testid="audience-starter-result-audition"]')?.textContent?.trim() ?? "",
-      visibleResultMetricValue:
-        document.querySelector('[data-testid="audience-starter-result-metric-value"]')?.textContent?.trim() ?? "",
-      visibleResultNextCheck:
-        document.querySelector('[data-testid="audience-starter-result-next-check"]')?.textContent?.trim() ?? "",
-      visibleResultPresent: document.querySelector('[data-testid="audience-starter-result"]') !== null,
-      visibleResultStatus:
-        document.querySelector('[data-testid="audience-starter-result-status"]')?.textContent?.trim() ?? "",
-      visibleResultTitle:
-        document.querySelector('[data-testid="audience-starter-result-title"]')?.textContent?.trim() ?? ""
-    });
+    const readDomText = (selector: string): string =>
+      document.querySelector(selector)?.textContent?.trim() ?? "";
+
+    const readAudienceStarterFollowupRouteResult = (
+      starterId: AudienceStarterProjectId,
+      route: AudienceStarterFollowupRoute
+    ): string => {
+      if (starterId === "beginner" && route === "primary") {
+        return `First Beat Path / ${
+          readDomText('[data-testid="first-beat-path-result-title"]') || readDomText('[data-testid="first-beat-path-headline"]')
+        }`;
+      }
+
+      if (starterId === "beginner") {
+        return `Dual Audience Readiness / ${readDomText('[data-testid="dual-audience-readiness-headline"]')}`;
+      }
+
+      if (route === "primary") {
+        return `Review Queue / ${readDomText('[data-testid="review-queue-result-title"]') || readDomText('[data-testid="review-queue-headline"]')}`;
+      }
+
+      if (route === "readiness") {
+        return `Export Preflight / ${
+          readDomText('[data-testid="export-preflight-result-title"]') || readDomText('[data-testid="export-preflight-headline"]')
+        }`;
+      }
+
+      return `Handoff Package Check / ${
+        readDomText('[data-testid="handoff-package-check-result-title"]') ||
+        readDomText('[data-testid="handoff-package-check-headline"]')
+      }`;
+    };
+
+    const readAudienceStarterVisibleResult = () => {
+      const followupButtons = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('[data-testid^="audience-starter-result-followup-"]')
+      );
+      const followupLabels = followupButtons.map((button) => button.textContent?.trim() ?? "").filter(Boolean);
+      const followupRoutes = new Set(
+        followupButtons
+          .map((button) => button.dataset.audienceStarterFollowupRoute ?? "")
+          .filter((route) => route.length > 0)
+      );
+
+      return {
+        visibleFollowupActionCount: followupButtons.length,
+        visibleFollowupActionLabels: followupLabels.join(" / "),
+        visibleFollowupCompletionPresent: followupRoutes.has("completion"),
+        visibleFollowupPrimaryPresent: followupRoutes.has("primary"),
+        visibleFollowupReadinessPresent: followupRoutes.has("readiness"),
+        visibleResultAudition: readDomText('[data-testid="audience-starter-result-audition"]'),
+        visibleResultMetricValue: readDomText('[data-testid="audience-starter-result-metric-value"]'),
+        visibleResultNextCheck: readDomText('[data-testid="audience-starter-result-next-check"]'),
+        visibleResultPresent: document.querySelector('[data-testid="audience-starter-result"]') !== null,
+        visibleResultStatus: readDomText('[data-testid="audience-starter-result-status"]'),
+        visibleResultTitle: readDomText('[data-testid="audience-starter-result-title"]')
+      };
+    };
+
+    const clickAudienceStarterFollowupRoute = (
+      starterId: AudienceStarterProjectId,
+      route: AudienceStarterFollowupRoute
+    ): string => {
+      const button = document.querySelector<HTMLButtonElement>(`[data-testid="audience-starter-result-followup-${route}"]`);
+      if (!button) {
+        return "";
+      }
+
+      button.click();
+      return readAudienceStarterFollowupRouteResult(starterId, route);
+    };
 
     const runAudienceStarterRoute = async (
       starterId: AudienceStarterProjectId
@@ -9657,7 +9763,10 @@ export function App(): ReactElement {
           resultNextCheck: "Audience Starter visible control and Quick Action must both be available.",
           resultStatus: "Unavailable",
           resultTitle: action?.title ?? actionId,
-          ...readAudienceStarterVisibleResult()
+          ...readAudienceStarterVisibleResult(),
+          visibleFollowupCompletionResult: "",
+          visibleFollowupPrimaryResult: "",
+          visibleFollowupReadinessResult: ""
         };
       }
 
@@ -9665,6 +9774,12 @@ export function App(): ReactElement {
       setQuickActionsOpen(false);
       await Promise.resolve();
       await Promise.resolve();
+      const visibleResult = readAudienceStarterVisibleResult();
+      const visibleFollowupPrimaryResult = clickAudienceStarterFollowupRoute(starterId, "primary");
+      const visibleFollowupReadinessResult = clickAudienceStarterFollowupRoute(starterId, "readiness");
+      const visibleFollowupCompletionResult =
+        starterId === "producer" ? clickAudienceStarterFollowupRoute(starterId, "completion") : "";
+
       return {
         ...baseEvidence,
         buttonPresent: true,
@@ -9674,7 +9789,10 @@ export function App(): ReactElement {
         resultNextCheck: result?.nextCheck ?? followupText,
         resultStatus: result?.status ?? "Unchanged",
         resultTitle: result?.title ?? action.title,
-        ...readAudienceStarterVisibleResult()
+        ...visibleResult,
+        visibleFollowupCompletionResult,
+        visibleFollowupPrimaryResult,
+        visibleFollowupReadinessResult
       };
     };
 
@@ -10157,6 +10275,7 @@ export function App(): ReactElement {
         starterResult={audienceStarterResult}
         summary={audienceSessionReadoutSummary}
         onCreateStarter={createAudienceStarter}
+        onOpenStarterFollowup={openAudienceStarterFollowup}
         onSelectAudience={selectAudienceSessionRow}
       />
 
