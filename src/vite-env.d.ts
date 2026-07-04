@@ -85,7 +85,7 @@ interface Window {
     onMenuCommand?: (callback: (command: NativeMenuCommand) => void) => () => void;
   };
   __grooveforgeLaunchSmoke?: {
-    collectAudienceSessionQuickActionEvidence: () => GrooveforgeLaunchSmokePaletteEvidence;
+    collectAudienceSessionQuickActionEvidence: () => GrooveforgeLaunchSmokePaletteEvidence | Promise<GrooveforgeLaunchSmokePaletteEvidence>;
   };
   webkitAudioContext?: typeof AudioContext;
 }

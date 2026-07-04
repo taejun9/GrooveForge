@@ -172,6 +172,18 @@ export type AudienceRouteBridgeSummary = {
   tone: MixCoachTone;
 };
 
+export type AudienceRouteBridgeActionResult = {
+  actionLabel: string;
+  audienceLabel: string;
+  auditionCue: string;
+  destinationLabel: string;
+  detailLabel: string;
+  metricLabel: string;
+  nextCheckLabel: string;
+  title: string;
+  tone: MixCoachTone;
+};
+
 export function modeLabel(mode: ProjectState["mode"]): string {
   return mode === "guided" ? "Guided" : "Studio";
 }
@@ -721,6 +733,7 @@ export function AudienceRouteBridge({
   onFocusProductionSnapshot: (metric: ProductionSnapshotMetric) => void;
   onJumpFirstBeatPath: (step: FirstBeatPathStep) => void;
 }): ReactElement {
+  const [result, setResult] = useState<AudienceRouteBridgeActionResult | null>(null);
   const summary = createAudienceRouteBridgeSummary({
     audienceSessionSummary,
     beatReadinessChecks,
@@ -730,6 +743,36 @@ export function AudienceRouteBridge({
     productionSnapshotSummary,
     sessionPassSummary
   });
+
+  useEffect(() => {
+    setResult(null);
+  }, [summary.activeLaneId, summary.readinessLane.id, summary.completionLane.id]);
+
+  function queueBridgeActionResult(actionResult: AudienceRouteBridgeActionResult, routeAction: () => void): void {
+    window.setTimeout(() => setResult(actionResult), 0);
+    window.setTimeout(routeAction, 180);
+  }
+
+  function runBridgeReadiness(): void {
+    queueBridgeActionResult(createAudienceRouteBridgeActionResult(summary, "readiness"), () => {
+      runDualAudienceReadinessLaneAction(summary.readinessLane, {
+        onFocusExportPreflight,
+        onFocusProductionSnapshot,
+        onJumpFirstBeatPath
+      });
+    });
+  }
+
+  function runBridgeCompletion(): void {
+    queueBridgeActionResult(createAudienceRouteBridgeActionResult(summary, "completion"), () => {
+      runAudienceCompletionRouteLaneAction(summary.completionLane, {
+        onFocusExportPreflight,
+        onFocusHandoffPackageCheck,
+        onFocusProductionSnapshot,
+        onJumpFirstBeatPath
+      });
+    });
+  }
 
   return (
     <section
@@ -764,13 +807,7 @@ export function AudienceRouteBridge({
             data-testid="audience-route-bridge-readiness-action"
             title={`${summary.readinessLane.actionLabel}: ${summary.readinessLane.nextCheckLabel}`}
             type="button"
-            onClick={() =>
-              runDualAudienceReadinessLaneAction(summary.readinessLane, {
-                onFocusExportPreflight,
-                onFocusProductionSnapshot,
-                onJumpFirstBeatPath
-              })
-            }
+            onClick={runBridgeReadiness}
           >
             <ArrowRight size={13} aria-hidden="true" />
             <span>{summary.readinessLane.actionLabel}</span>
@@ -786,22 +823,94 @@ export function AudienceRouteBridge({
             data-testid="audience-route-bridge-completion-action"
             title={`${summary.completionLane.actionLabel}: ${summary.completionLane.nextCheckLabel}`}
             type="button"
-            onClick={() =>
-              runAudienceCompletionRouteLaneAction(summary.completionLane, {
-                onFocusExportPreflight,
-                onFocusHandoffPackageCheck,
-                onFocusProductionSnapshot,
-                onJumpFirstBeatPath
-              })
-            }
+            onClick={runBridgeCompletion}
           >
             <PackageCheck size={13} aria-hidden="true" />
             <span>{summary.completionLane.actionLabel}</span>
           </button>
         </div>
       </div>
+      {result && <AudienceRouteBridgeActionResultStrip result={result} />}
     </section>
   );
+}
+
+function AudienceRouteBridgeActionResultStrip({ result }: { result: AudienceRouteBridgeActionResult }): ReactElement {
+  return (
+    <div
+      className={`audience-route-bridge-result ${result.tone}`}
+      data-audience-route-bridge-result={result.actionLabel}
+      data-testid="audience-route-bridge-result"
+      title={`${result.title}: ${result.nextCheckLabel}`}
+    >
+      <div className="audience-route-bridge-result-main">
+        <Target size={15} aria-hidden="true" />
+        <span>
+          <strong data-testid="audience-route-bridge-result-title">{result.title}</strong>
+          <small data-testid="audience-route-bridge-result-detail">{result.detailLabel}</small>
+        </span>
+      </div>
+      <div className="audience-route-bridge-result-metric" data-testid="audience-route-bridge-result-metric">
+        <span>{result.actionLabel}</span>
+        <strong>{result.metricLabel}</strong>
+      </div>
+      <div className="audience-route-bridge-result-destination" data-testid="audience-route-bridge-result-destination">
+        <span>{result.destinationLabel}</span>
+        <strong>{result.audienceLabel}</strong>
+      </div>
+      <div className="audience-route-bridge-result-followup" data-testid="audience-route-bridge-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheckLabel}</small>
+      </div>
+    </div>
+  );
+}
+
+export function createAudienceRouteBridgeActionResult(
+  summary: AudienceRouteBridgeSummary,
+  target: "readiness" | "completion"
+): AudienceRouteBridgeActionResult {
+  const row = target === "readiness" ? summary.readinessLane : summary.completionLane;
+  const actionLabel = target === "readiness" ? "Bridge Readiness Result" : "Bridge Completion Result";
+  const destinationLabel = audienceRouteBridgeDestinationLabel(row);
+  const title = `${target === "readiness" ? "Opened readiness" : "Opened completion"}: ${row.laneLabel}`;
+  const detailLabel = `${summary.activeAudienceLabel} / ${row.statusLabel} / ${destinationLabel}`;
+  const auditionCue =
+    target === "readiness"
+      ? "Audition the active audience lane before changing the beat."
+      : "Check the active audience lane before export or handoff.";
+
+  return {
+    actionLabel,
+    audienceLabel: summary.activeAudienceLabel,
+    auditionCue,
+    destinationLabel,
+    detailLabel,
+    metricLabel: row.metricLabel,
+    nextCheckLabel: row.nextCheckLabel,
+    title,
+    tone: row.tone
+  };
+}
+
+function audienceRouteBridgeDestinationLabel(row: DualAudienceReadinessLane | AudienceCompletionRouteLane): string {
+  if (row.firstBeatPathStep) {
+    return "First Beat Path";
+  }
+
+  if (row.productionSnapshotMetric) {
+    return "Production Snapshot";
+  }
+
+  if (row.exportPreflightCard) {
+    return "Export Preflight";
+  }
+
+  if ("handoffPackageCheckCard" in row && row.handoffPackageCheckCard) {
+    return "Handoff Package Check";
+  }
+
+  return "Audience Route Bridge";
 }
 
 export function createAudienceRouteBridgeSummary({

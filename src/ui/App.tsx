@@ -9658,7 +9658,6 @@ export function App(): ReactElement {
           ...routeEvidence("enter guided first time composer", "audience-session-enter-beginner"),
           ...runAudienceSessionRoute("audience-session-enter-beginner")
         };
-
         return {
           completionBeginner,
           completionProducer,

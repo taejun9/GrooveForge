@@ -38,6 +38,7 @@ type LaunchSmokeEvidence = {
   hasRoot: boolean;
   hasSaveProject: boolean;
   location: string;
+  bridgeDirect: LaunchSmokeBridgeDirectEvidenceBundle;
   palette: LaunchSmokePaletteEvidence;
   missingText: string[];
   platform: unknown;
@@ -64,6 +65,20 @@ type LaunchSmokePaletteRouteEvidence = {
   searchNextCheck: string;
   spotlightAction: string;
   spotlightTitle: string;
+};
+
+type LaunchSmokeBridgeDirectEvidence = {
+  buttonPresent: boolean;
+  resultDestination: string;
+  resultFollowup: string;
+  resultMetric: string;
+  resultPresent: boolean;
+  resultTitle: string;
+};
+
+type LaunchSmokeBridgeDirectEvidenceBundle = {
+  completion: LaunchSmokeBridgeDirectEvidence;
+  readiness: LaunchSmokeBridgeDirectEvidence;
 };
 
 type LaunchSmokePaletteEvidence = {
@@ -626,6 +641,39 @@ function launchSmokePaletteFailures(evidence: LaunchSmokePaletteEvidence): strin
   return failures;
 }
 
+function launchSmokeBridgeDirectFailures(evidence: LaunchSmokeBridgeDirectEvidenceBundle): string[] {
+  const failures: string[] = [];
+  if (!evidence.readiness.buttonPresent || !evidence.readiness.resultPresent) {
+    failures.push("live Audience Route Bridge readiness button should show a direct result strip");
+  }
+  if (!evidence.readiness.resultTitle.includes("Opened readiness") || !evidence.readiness.resultMetric.includes("Bridge Readiness Result")) {
+    failures.push("live Audience Route Bridge readiness direct result should name the readiness action");
+  }
+  if (
+    !evidence.readiness.resultDestination.includes("First Beat Path") &&
+    !evidence.readiness.resultDestination.includes("Export Preflight") &&
+    !evidence.readiness.resultDestination.includes("Production Snapshot")
+  ) {
+    failures.push("live Audience Route Bridge readiness direct result should name the active readiness destination");
+  }
+  if (!evidence.completion.buttonPresent || !evidence.completion.resultPresent) {
+    failures.push("live Audience Route Bridge completion button should show a direct result strip");
+  }
+  if (!evidence.completion.resultTitle.includes("Opened completion") || !evidence.completion.resultMetric.includes("Bridge Completion Result")) {
+    failures.push("live Audience Route Bridge completion direct result should name the completion action");
+  }
+  if (
+    !evidence.completion.resultDestination.includes("First Beat Path") &&
+    !evidence.completion.resultDestination.includes("Export Preflight") &&
+    !evidence.completion.resultDestination.includes("Production Snapshot") &&
+    !evidence.completion.resultDestination.includes("Handoff Package Check")
+  ) {
+    failures.push("live Audience Route Bridge completion direct result should name the active completion destination");
+  }
+
+  return failures;
+}
+
 function launchSmokeVisualFailures(evidence: LaunchSmokeVisualEvidence): string[] {
   const failures: string[] = [];
   const opaqueRatio = evidence.sampledPixels > 0 ? evidence.opaqueSamples / evidence.sampledPixels : 0;
@@ -837,6 +885,14 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         spotlightAction: "",
         spotlightTitle: ""
       };
+      const emptyBridgeDirect = {
+        buttonPresent: false,
+        resultDestination: "",
+        resultFollowup: "",
+        resultMetric: "",
+        resultPresent: false,
+        resultTitle: ""
+      };
       const bridge = window.grooveforge;
       return {
         appKind: bridge?.appKind ?? null,
@@ -847,6 +903,10 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         hasSaveProject: typeof bridge?.saveProject === "function",
         location: window.location.href,
         missingText: expectedText.filter((text) => !bodyText.includes(text)),
+        bridgeDirect: {
+          completion: emptyBridgeDirect,
+          readiness: emptyBridgeDirect
+        },
         palette: {
           completionBeginner: emptyRoute,
           completionProducer: emptyRoute,
@@ -896,12 +956,13 @@ function collectLaunchSmokeEvidenceWithTimeout(win: BrowserWindow): Promise<Laun
 
 async function collectLaunchSmokePaletteEvidence(win: BrowserWindow): Promise<LaunchSmokePaletteEvidence> {
   const result = await win.webContents.executeJavaScript(`
-    (() => {
+    (async () => {
       const collector = window.__grooveforgeLaunchSmoke?.collectAudienceSessionQuickActionEvidence;
       if (window.grooveforge?.launchSmoke !== true || typeof collector !== "function") {
         return { ready: false, evidence: null };
       }
-      return { ready: true, evidence: collector() };
+      const evidence = await collector();
+      return { ready: true, evidence };
     })();
   `);
   if (!result || result.ready !== true || !result.evidence) {
@@ -914,6 +975,74 @@ function collectLaunchSmokePaletteEvidenceWithTimeout(win: BrowserWindow): Promi
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("Timed out collecting live Quick Actions palette evidence.")), 60000);
     void collectLaunchSmokePaletteEvidence(win)
+      .then((evidence) => {
+        clearTimeout(timeout);
+        resolve(evidence);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+}
+
+async function clickLaunchSmokeBridgeDirectTarget(
+  win: BrowserWindow,
+  testId: string,
+  setStep: (step: string) => void
+): Promise<LaunchSmokeBridgeDirectEvidence> {
+  setStep(`${testId}:clicking-dom-button`);
+  const result = await win.webContents.executeJavaScript(`
+    (async () => {
+      const text = (textTestId) => document.querySelector('[data-testid="' + textTestId + '"]')?.textContent?.trim() ?? "";
+      const readResult = (buttonPresent) => ({
+        buttonPresent,
+        resultDestination: text("audience-route-bridge-result-destination"),
+        resultFollowup: text("audience-route-bridge-result-followup"),
+        resultMetric: text("audience-route-bridge-result-metric"),
+        resultPresent: document.querySelector('[data-testid="audience-route-bridge-result"]') !== null,
+        resultTitle: text("audience-route-bridge-result-title")
+      });
+      const button = document.querySelector('[data-testid="${testId}"]');
+      if (!button) {
+        return readResult(false);
+      }
+      button.scrollIntoView({ block: "center", inline: "center" });
+      if (button.disabled === true) {
+        return readResult(true);
+      }
+      button.click();
+      await new Promise((resolve) => window.setTimeout(resolve, 40));
+      return readResult(true);
+    })();
+  `);
+  return result as LaunchSmokeBridgeDirectEvidence;
+}
+
+async function collectLaunchSmokeBridgeDirectEvidence(
+  win: BrowserWindow,
+  setStep: (step: string) => void = () => undefined
+): Promise<LaunchSmokeBridgeDirectEvidenceBundle> {
+  const readiness = await clickLaunchSmokeBridgeDirectTarget(win, "audience-route-bridge-readiness-action", setStep);
+  const completion = await clickLaunchSmokeBridgeDirectTarget(win, "audience-route-bridge-completion-action", setStep);
+
+  const result = {
+    completion,
+    readiness
+  };
+  return result as LaunchSmokeBridgeDirectEvidenceBundle;
+}
+
+function collectLaunchSmokeBridgeDirectEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeBridgeDirectEvidenceBundle> {
+  return new Promise((resolve, reject) => {
+    let step = "starting";
+    const timeout = setTimeout(
+      () => reject(new Error(`Timed out collecting live Audience Route Bridge direct button evidence at ${step}.`)),
+      30000
+    );
+    void collectLaunchSmokeBridgeDirectEvidence(win, (nextStep) => {
+      step = nextStep;
+    })
       .then((evidence) => {
         clearTimeout(timeout);
         resolve(evidence);
@@ -1050,21 +1179,21 @@ function installLaunchSmoke(win: BrowserWindow): void {
         const failures = launchSmokeFailures(evidence);
         lastProgress = { phase: "dom-collected", evidence, failures };
         if (failures.length === 0) {
-          lastProgress = { phase: "collecting-palette", evidence };
-          return collectLaunchSmokePaletteEvidenceWithTimeout(win)
-            .then((paletteEvidence) => {
+          lastProgress = { phase: "collecting-bridge-direct", evidence };
+          return collectLaunchSmokeBridgeDirectEvidenceWithTimeout(win)
+            .then((bridgeDirectEvidence) => {
               if (finished) {
                 return;
               }
 
-              const paletteFailures = launchSmokePaletteFailures(paletteEvidence);
-              const evidenceWithPalette = { ...evidence, palette: paletteEvidence };
-              lastProgress = { phase: "palette-collected", evidence: evidenceWithPalette, failures: paletteFailures };
-              if (paletteFailures.length > 0) {
+              const bridgeDirectFailures = launchSmokeBridgeDirectFailures(bridgeDirectEvidence);
+              const evidenceWithBridgeDirect = { ...evidence, bridgeDirect: bridgeDirectEvidence };
+              lastProgress = { phase: "bridge-direct-collected", evidence: evidenceWithBridgeDirect, failures: bridgeDirectFailures };
+              if (bridgeDirectFailures.length > 0) {
                 if (Date.now() >= deadline) {
-                  fail("Production desktop live Quick Actions palette smoke failed.", {
-                    evidence: evidenceWithPalette,
-                    failures: paletteFailures
+                  fail("Production desktop Audience Route Bridge direct button smoke failed.", {
+                    evidence: evidenceWithBridgeDirect,
+                    failures: bridgeDirectFailures
                   });
                 } else {
                   setTimeout(() => poll(deadline), 100);
@@ -1072,26 +1201,21 @@ function installLaunchSmoke(win: BrowserWindow): void {
                 return;
               }
 
-              lastProgress = { phase: "collecting-visual", evidence: evidenceWithPalette };
-              return collectLaunchSmokeVisualEvidenceWithTimeout(win)
-                .then((visualEvidence) => {
+              lastProgress = { phase: "collecting-palette", evidence: evidenceWithBridgeDirect };
+              return collectLaunchSmokePaletteEvidenceWithTimeout(win)
+                .then((paletteEvidence) => {
                   if (finished) {
                     return;
                   }
 
-                  const visualFailures = launchSmokeVisualFailures(visualEvidence);
-                  lastProgress = {
-                    phase: "visual-collected",
-                    evidence: evidenceWithPalette,
-                    visualEvidence,
-                    failures: visualFailures
-                  };
-                  if (visualFailures.length > 0) {
+                  const paletteFailures = launchSmokePaletteFailures(paletteEvidence);
+                  const evidenceWithPalette = { ...evidenceWithBridgeDirect, palette: paletteEvidence };
+                  lastProgress = { phase: "palette-collected", evidence: evidenceWithPalette, failures: paletteFailures };
+                  if (paletteFailures.length > 0) {
                     if (Date.now() >= deadline) {
-                      fail("Production desktop visual launch smoke failed.", {
+                      fail("Production desktop live Quick Actions palette smoke failed.", {
                         evidence: evidenceWithPalette,
-                        visualEvidence,
-                        failures: visualFailures
+                        failures: paletteFailures
                       });
                     } else {
                       setTimeout(() => poll(deadline), 100);
@@ -1099,19 +1223,54 @@ function installLaunchSmoke(win: BrowserWindow): void {
                     return;
                   }
 
-                  finished = true;
-                  clearTimeout(timeout);
-                  console.log(`${launchSmokeResultPrefix}${JSON.stringify({ ok: true, evidence: { ...evidenceWithPalette, visual: visualEvidence } })}`);
-                  app.exit(0);
+                  lastProgress = { phase: "collecting-visual", evidence: evidenceWithPalette };
+                  return collectLaunchSmokeVisualEvidenceWithTimeout(win)
+                    .then((visualEvidence) => {
+                      if (finished) {
+                        return;
+                      }
+
+                      const visualFailures = launchSmokeVisualFailures(visualEvidence);
+                      lastProgress = {
+                        phase: "visual-collected",
+                        evidence: evidenceWithPalette,
+                        visualEvidence,
+                        failures: visualFailures
+                      };
+                      if (visualFailures.length > 0) {
+                        if (Date.now() >= deadline) {
+                          fail("Production desktop visual launch smoke failed.", {
+                            evidence: evidenceWithPalette,
+                            visualEvidence,
+                            failures: visualFailures
+                          });
+                        } else {
+                          setTimeout(() => poll(deadline), 100);
+                        }
+                        return;
+                      }
+
+                      finished = true;
+                      clearTimeout(timeout);
+                      console.log(
+                        `${launchSmokeResultPrefix}${JSON.stringify({ ok: true, evidence: { ...evidenceWithPalette, visual: visualEvidence } })}`
+                      );
+                      app.exit(0);
+                    })
+                    .catch((error: unknown) => {
+                      fail("Production desktop screenshot capture failed.", {
+                        error: error instanceof Error ? error.message : String(error)
+                      });
+                    });
                 })
                 .catch((error: unknown) => {
-                  fail("Production desktop screenshot capture failed.", {
+                  fail("Production desktop live Quick Actions palette JavaScript failed.", {
                     error: error instanceof Error ? error.message : String(error)
                   });
                 });
             })
             .catch((error: unknown) => {
-              fail("Production desktop live Quick Actions palette JavaScript failed.", {
+              fail("Production desktop Audience Route Bridge direct button JavaScript failed.", {
                 error: error instanceof Error ? error.message : String(error)
               });
             });

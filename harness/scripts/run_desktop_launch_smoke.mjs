@@ -199,6 +199,37 @@ function checkResult(result) {
     "live desktop Quick Actions Audience Route Bridge readout result should include the bridge readout"
   );
   check(
+    evidence?.bridgeDirect?.readiness?.buttonPresent === true && evidence?.bridgeDirect?.readiness?.resultPresent === true,
+    "live desktop Audience Route Bridge readiness button should show a direct result strip"
+  );
+  check(
+    String(evidence?.bridgeDirect?.readiness?.resultTitle ?? "").includes("Opened readiness") &&
+      String(evidence?.bridgeDirect?.readiness?.resultMetric ?? "").includes("Bridge Readiness Result"),
+    "live desktop Audience Route Bridge readiness direct result should name the readiness action"
+  );
+  check(
+    String(evidence?.bridgeDirect?.readiness?.resultDestination ?? "").includes("First Beat Path") ||
+      String(evidence?.bridgeDirect?.readiness?.resultDestination ?? "").includes("Export Preflight") ||
+      String(evidence?.bridgeDirect?.readiness?.resultDestination ?? "").includes("Production Snapshot"),
+    "live desktop Audience Route Bridge readiness direct result should name the active readiness destination"
+  );
+  check(
+    evidence?.bridgeDirect?.completion?.buttonPresent === true && evidence?.bridgeDirect?.completion?.resultPresent === true,
+    "live desktop Audience Route Bridge completion button should show a direct result strip"
+  );
+  check(
+    String(evidence?.bridgeDirect?.completion?.resultTitle ?? "").includes("Opened completion") &&
+      String(evidence?.bridgeDirect?.completion?.resultMetric ?? "").includes("Bridge Completion Result"),
+    "live desktop Audience Route Bridge completion direct result should name the completion action"
+  );
+  check(
+    String(evidence?.bridgeDirect?.completion?.resultDestination ?? "").includes("First Beat Path") ||
+      String(evidence?.bridgeDirect?.completion?.resultDestination ?? "").includes("Export Preflight") ||
+      String(evidence?.bridgeDirect?.completion?.resultDestination ?? "").includes("Production Snapshot") ||
+      String(evidence?.bridgeDirect?.completion?.resultDestination ?? "").includes("Handoff Package Check"),
+    "live desktop Audience Route Bridge completion direct result should name the active completion destination"
+  );
+  check(
     evidence?.palette?.routeBridgeReadiness?.actionPresent === true &&
       String(evidence?.palette?.routeBridgeReadiness?.resultMetricValue ?? "").includes("Bridge readiness lane"),
     "live desktop Quick Actions Audience Route Bridge readiness should execute with readiness lane evidence"
@@ -420,7 +451,7 @@ child.on("exit", (code, signal) => {
   );
   console.log("- Audience session rows: First-time composer, Professional producer");
   console.log("- Audience session Quick Actions: renderer palette search and run evidence passed for Enter Guided and Enter Studio");
-  console.log("- Audience Route Bridge Quick Actions: readout, readiness, and completion search/run evidence passed");
+  console.log("- Audience Route Bridge Quick Actions: readout, readiness, completion, and direct button result evidence passed");
   console.log(
     "- Dual Audience Readiness Quick Actions: route readout, first-time composer lane, and professional producer lane search/run evidence passed"
   );
