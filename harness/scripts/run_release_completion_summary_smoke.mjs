@@ -745,6 +745,17 @@ function validateReport(report, markdown) {
       report.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary !== "none",
     "release completion summary should expose private input placeholder file/line locations"
   );
+  if (report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount > 0) {
+    check(
+      report.currentPrivateInputPlaceholderLocationCount ===
+        report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount,
+      "release completion summary should promote private input placeholder locations into current blocker handoff"
+    );
+    check(
+      report.currentPrivateInputPlaceholderLocations.every((row) => textValue(row.file).includes(defaultPrivateInputFileName)),
+      "release completion summary promoted private input placeholder rows should point to the ignored private input file"
+    );
+  }
   check(
     report.placeholderInputReceiptPrivateInputFileMissingLocationCount === 0 ||
       report.placeholderInputReceiptPrivateInputFileMissingLocationSummary !== "none",

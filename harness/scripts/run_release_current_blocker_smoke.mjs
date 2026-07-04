@@ -484,6 +484,21 @@ function placeholderInputReceiptRows(values) {
   }));
 }
 
+function placeholderReceiptRowsToLocations(rows) {
+  return objectRows(rows).map((row) => {
+    const file = displayEvidenceFile(row.privateInputFilePath);
+    const line = Number.isInteger(row.privateInputFileLine) ? row.privateInputFileLine : 0;
+    return {
+      key: textValue(row.key),
+      file,
+      line,
+      location: line > 0 ? `${file}:${line}` : file,
+      placeholder: row.privateInputFilePlaceholder === true,
+      valueRecorded: false
+    };
+  });
+}
+
 function placeholderInputCommandRows(values) {
   return valueFreeObjectRows(values).map((row) => ({
     order: integerValue(row.order),
@@ -1995,9 +2010,10 @@ function buildReport({
     externalProofBundle.currentPlaceholderEditLocationSummary,
     formatLocationSummary(proofPlaceholderLocations)
   );
-  const currentPrivateInputPlaceholderLocationSummary = textValue(
+  let effectivePrivateInputPlaceholderLocations = proofPrivateInputPlaceholderLocations;
+  let currentPrivateInputPlaceholderLocationSummary = textValue(
     externalProofBundle.currentPrivateInputPlaceholderLocationSummary,
-    formatLocationSummary(proofPrivateInputPlaceholderLocations)
+    formatLocationSummary(effectivePrivateInputPlaceholderLocations)
   );
   const acceptanceBlockerRows = currentActionAcceptanceBlockerRows({
     acceptanceRows,
@@ -2163,6 +2179,10 @@ function buildReport({
       row.privateInputFilePlaceholder !== true &&
       row.privateInputFileShapeReady !== true
   );
+  if (effectivePrivateInputPlaceholderLocations.length === 0 && placeholderReceiptPlaceholderLocationRows.length > 0) {
+    effectivePrivateInputPlaceholderLocations = placeholderReceiptRowsToLocations(placeholderReceiptPlaceholderLocationRows);
+    currentPrivateInputPlaceholderLocationSummary = formatLocationSummary(effectivePrivateInputPlaceholderLocations);
+  }
   const placeholderReceiptModes = [
     "missing-private-input-file",
     "incomplete-private-input-file",
@@ -2662,11 +2682,9 @@ function buildReport({
     currentPlaceholderEditLocationCount: integerValue(externalProofBundle.currentPlaceholderEditLocationCount),
     currentPlaceholderEditLocationSummary,
     currentPlaceholderEditLocations: proofPlaceholderLocations,
-    currentPrivateInputPlaceholderLocationCount: integerValue(
-      externalProofBundle.currentPrivateInputPlaceholderLocationCount
-    ),
+    currentPrivateInputPlaceholderLocationCount: effectivePrivateInputPlaceholderLocations.length,
     currentPrivateInputPlaceholderLocationSummary,
-    currentPrivateInputPlaceholderLocations: proofPrivateInputPlaceholderLocations,
+    currentPrivateInputPlaceholderLocations: effectivePrivateInputPlaceholderLocations,
     currentEnvEditRowsCount: integerValue(externalProofBundle.currentEnvEditRowsCount),
     currentEnvEditRowsSummary: textValue(externalProofBundle.currentEnvEditRowsSummary, `${proofEnvEditRows.length} value-free edit rows`),
     currentEnvEditRows: proofEnvEditRows,
@@ -3967,6 +3985,16 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
     check(
       report.placeholderInputReceiptMode === "placeholder-private-input-file",
       "release current blocker placeholder input receipt should use placeholder mode while private input placeholders remain"
+    );
+    check(
+      report.currentPrivateInputPlaceholderLocationCount === report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount,
+      "release current blocker should promote private input placeholder file/line locations into current blocker handoff"
+    );
+    check(
+      report.currentPrivateInputPlaceholderLocations.every((row) =>
+        textValue(row.file).includes(releaseChannelPrivateInputTemplateDefaultPath)
+      ),
+      "release current blocker promoted private input placeholder rows should point to the ignored private input file"
     );
   }
   check(report.preflightProcessEnvChecklistSourceReady === true, "release current blocker should include ready private-env preflight checklist source");

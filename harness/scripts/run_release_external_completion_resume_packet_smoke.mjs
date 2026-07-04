@@ -1103,6 +1103,19 @@ function validateReport(report, markdown) {
       report.currentPrivateInputReceiptPrivateInputFilePlaceholderLocationSummary !== "none",
     "external completion resume packet should expose current private input receipt placeholder locations"
   );
+  if (report.currentPrivateInputReceiptPrivateInputFilePlaceholderLocationCount > 0) {
+    check(
+      report.currentPrivateInputPlaceholderLocationCount ===
+        report.currentPrivateInputReceiptPrivateInputFilePlaceholderLocationCount,
+      "external completion resume packet should promote private input placeholder locations into current blocker handoff"
+    );
+    check(
+      report.currentPrivateInputPlaceholderLocations.every((row) =>
+        textValue(row.file).includes(".env.release-channel.local")
+      ),
+      "external completion resume packet promoted private input placeholder rows should point to the ignored private input file"
+    );
+  }
   check(
     report.currentPrivateInputReceiptNextOperatorCommand !== "none",
     "external completion resume packet should expose current private input receipt next operator command"

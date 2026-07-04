@@ -24,6 +24,10 @@ const completionProgressPath = path.join(packageRoot, `${appName}-${packageJson.
 const externalRemediationPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-remediation.json`);
 const externalGatePath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-distribution-gate.json`);
 const privateInputsPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-private-inputs.json`);
+const placeholderInputReceiptPath = path.join(
+  packageRoot,
+  `${appName}-${packageJson.version}-${platformArch}-release-channel-placeholder-input-receipt.json`
+);
 const distributionChannelQaPath = path.join(desktopRoot, `${appName}-${platformArch}-distribution-channel-qa.json`);
 const manualQaPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-manual-qa.json`);
 const autoUpdateReadinessPath = path.join(desktopRoot, `${appName}-${platformArch}-auto-update-readiness.json`);
@@ -125,6 +129,30 @@ function valueFreeObjectRows(values) {
   return Array.isArray(values) ? values.filter((value) => value && typeof value === "object" && value.valueRecorded === false) : [];
 }
 
+function privateInputPlaceholderLocationRows(receipt) {
+  return valueFreeObjectRows(receipt?.privateInputFileLocationRows)
+    .filter((row) => row.privateInputFilePlaceholder === true)
+    .map((row) => {
+      const file = textValue(row.privateInputFilePath);
+      const line = Number.isInteger(row.privateInputFileLine) ? row.privateInputFileLine : 0;
+      return {
+        key: textValue(row.key),
+        file,
+        line,
+        location: line > 0 ? `${file}:${line}` : file,
+        placeholder: true,
+        valueRecorded: false
+      };
+    });
+}
+
+function formatLocationSummary(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "none";
+  }
+  return rows.map((row) => `${textValue(row.location)} ${textValue(row.key)}`).join(", ");
+}
+
 function actionChecklistRows(values) {
   return stringArrayValue(values).map((step, index) => ({
     order: index + 1,
@@ -133,13 +161,16 @@ function actionChecklistRows(values) {
   }));
 }
 
-function buildCurrentEnvSummary(externalNextActions) {
+function buildCurrentEnvSummary(externalNextActions, placeholderInputReceipt) {
   const currentRequiredKeys = stringArrayValue(externalNextActions?.currentRequiredKeys);
   const currentPlaceholderKeys = stringArrayValue(externalNextActions?.currentPlaceholderKeys);
   const currentPlaceholderEditLocations = valueFreeObjectRows(externalNextActions?.currentPlaceholderEditLocations);
-  const currentPrivateInputPlaceholderLocations = valueFreeObjectRows(
+  let currentPrivateInputPlaceholderLocations = valueFreeObjectRows(
     externalNextActions?.currentPrivateInputPlaceholderLocations
   );
+  if (currentPrivateInputPlaceholderLocations.length === 0) {
+    currentPrivateInputPlaceholderLocations = privateInputPlaceholderLocationRows(placeholderInputReceipt);
+  }
   const currentEnvEditTemplate = valueFreeObjectRows(externalNextActions?.currentEnvEditTemplate);
   const currentEnvEditRows = valueFreeObjectRows(externalNextActions?.currentEnvEditRows);
   const currentPlaceholderRemediationRows = valueFreeObjectRows(externalNextActions?.currentPlaceholderRemediationRows);
@@ -159,12 +190,8 @@ function buildCurrentEnvSummary(externalNextActions) {
     currentPlaceholderEditLocationCount: integerValue(externalNextActions?.currentPlaceholderEditLocationCount),
     currentPlaceholderEditLocationSummary: textValue(externalNextActions?.currentPlaceholderEditLocationSummary),
     currentPlaceholderEditLocations,
-    currentPrivateInputPlaceholderLocationCount: integerValue(
-      externalNextActions?.currentPrivateInputPlaceholderLocationCount
-    ),
-    currentPrivateInputPlaceholderLocationSummary: textValue(
-      externalNextActions?.currentPrivateInputPlaceholderLocationSummary
-    ),
+    currentPrivateInputPlaceholderLocationCount: currentPrivateInputPlaceholderLocations.length,
+    currentPrivateInputPlaceholderLocationSummary: formatLocationSummary(currentPrivateInputPlaceholderLocations),
     currentPrivateInputPlaceholderLocations,
     currentEnvEditTarget: textValue(externalNextActions?.currentEnvEditTarget, ".env.distribution.local"),
     currentEnvEditTemplateCount: integerValue(externalNextActions?.currentEnvEditTemplateCount),
@@ -616,6 +643,7 @@ async function createProofBundleSummary(nextActionsRun) {
   const externalRemediation = await readJsonIfExists(externalRemediationPath);
   const externalGate = await readJsonIfExists(externalGatePath);
   const privateInputs = await readJsonIfExists(privateInputsPath);
+  const placeholderInputReceipt = await readJsonIfExists(placeholderInputReceiptPath);
   const distributionChannelQa = await readJsonIfExists(distributionChannelQaPath);
   const manualQa = await readJsonIfExists(manualQaPath);
   const autoUpdateReadiness = await readJsonIfExists(autoUpdateReadinessPath);
@@ -670,7 +698,7 @@ async function createProofBundleSummary(nextActionsRun) {
   const localReleaseReady = externalNextActions?.localReleaseReady === true || externalPreflight?.localReleaseReady === true || completionStatus?.localReleaseReady === true;
   const externalDistributionGateReady = externalGate?.externalDistributionGateReady === true || externalNextActions?.externalDistributionGateReady === true;
   const hardGateWouldFail = externalNextActions?.hardGateWouldFail === true || externalPreflight?.hardGateWouldFail === true || externalDistributionGateReady !== true;
-  const currentEnvSummary = buildCurrentEnvSummary(externalNextActions);
+  const currentEnvSummary = buildCurrentEnvSummary(externalNextActions, placeholderInputReceipt);
   const doctorPostEditProofMirror = buildDoctorPostEditProofMirror(externalNextActions);
 
   return {
