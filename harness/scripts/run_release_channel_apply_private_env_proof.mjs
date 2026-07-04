@@ -88,6 +88,47 @@ function stringArrayValue(values) {
   return Array.isArray(values) ? values.filter((value) => typeof value === "string" && value.trim().length > 0) : [];
 }
 
+function objectArrayValue(values) {
+  return Array.isArray(values) ? values.filter((value) => value && typeof value === "object" && !Array.isArray(value)) : [];
+}
+
+function privateInputLocationRows(preflightReport) {
+  return objectArrayValue(preflightReport?.privateInputFileLocationRows).map((row, index) => ({
+    order: integerValue(row.order) || index + 1,
+    key: textValue(row.key),
+    privateInputFilePath: textValue(row.privateInputFilePath, textValue(preflightReport?.privateInputFilePath, ".env.release-channel.local")),
+    privateInputFilePresent: row.privateInputFilePresent === true,
+    privateInputFileKeyPresent: row.privateInputFileKeyPresent === true,
+    privateInputFileLine: integerValue(row.privateInputFileLine),
+    inputSource: textValue(row.inputSource, "none"),
+    inputPresent: row.inputPresent === true,
+    inputPlaceholder: row.inputPlaceholder === true,
+    inputShapeReady: row.inputShapeReady === true,
+    privateInputFilePlaceholder: row.privateInputFilePlaceholder === true,
+    privateInputFileShapeReady: row.privateInputFileShapeReady === true,
+    expectedShape: textValue(row.expectedShape),
+    remediation: textValue(row.remediation),
+    valueRecorded: false
+  }));
+}
+
+function preflightRemediationRows(preflightReport) {
+  return objectArrayValue(preflightReport?.preflightRemediationRows).map((row, index) => ({
+    order: integerValue(row.order) || index + 1,
+    key: textValue(row.key),
+    inputPresent: row.inputPresent === true,
+    inputPlaceholder: row.inputPlaceholder === true,
+    inputShapeReady: row.inputShapeReady === true,
+    expectedShape: textValue(row.expectedShape),
+    remediation: textValue(row.remediation),
+    nextCommand: textValue(row.nextCommand, "npm run release:channel-apply-private-env-preflight"),
+    writeCommand: textValue(row.writeCommand, "npm run release:channel-apply-private-env"),
+    guidedSetupFallbackCommand: textValue(row.guidedSetupFallbackCommand, "npm run release:channel-setup-wizard"),
+    proofCommand: textValue(row.proofCommand, "npm run release:private-edit-strict-proof"),
+    valueRecorded: false
+  }));
+}
+
 async function readJsonIfPresent(filePath) {
   if (!existsSync(filePath)) {
     return null;
@@ -208,6 +249,24 @@ function formatSourceRows(rows) {
     .join("\n");
 }
 
+function formatPrivateInputLocationRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.key)} | \`${escapeCell(row.privateInputFilePath)}\` | ${readyLabel(row.privateInputFilePresent)} | ${readyLabel(row.privateInputFileKeyPresent)} | ${escapeCell(row.privateInputFileLine || "none")} | ${escapeCell(row.inputSource)} | ${readyLabel(row.inputPresent)} | ${readyLabel(row.inputPlaceholder)} | ${readyLabel(row.inputShapeReady)} | ${escapeCell(row.expectedShape)} | ${escapeCell(row.remediation)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
+function formatPreflightRemediationRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.key)} | ${readyLabel(row.inputPresent)} | ${readyLabel(row.inputPlaceholder)} | ${readyLabel(row.inputShapeReady)} | ${escapeCell(row.expectedShape)} | ${escapeCell(row.remediation)} | \`${escapeCell(row.nextCommand)}\` | \`${escapeCell(row.writeCommand)}\` | \`${escapeCell(row.proofCommand)}\` | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function formatKeyList(keys) {
   return keys.length > 0 ? keys.join(", ") : "none";
 }
@@ -247,9 +306,10 @@ function buildReport({
     sourceRow("Private edit strict proof", paths.strictProofJsonPath, strictProofReport),
     sourceRow("Completion summary", paths.completionSummaryJsonPath, completionSummaryReport)
   ];
-  const preflightRemediationRows = Array.isArray(preflightReport?.preflightRemediationRows)
-    ? preflightReport.preflightRemediationRows
-    : [];
+  const privateInputRows = privateInputLocationRows(preflightReport);
+  const remediationRows = preflightRemediationRows(preflightReport);
+  const privateInputPlaceholderLocations = stringArrayValue(preflightReport?.privateInputFilePlaceholderLocations);
+  const privateInputShapeInvalidLocations = stringArrayValue(preflightReport?.privateInputFileShapeInvalidLocations);
   const completionPercent = textValue(completionSummaryReport?.completionPercent, textValue(preflightReport?.completionPercent, "99.999999%"));
   const remainingPercent = textValue(completionSummaryReport?.remainingPercent, "0.000001%");
   const currentPlaceholderKeys = stringArrayValue(
@@ -292,7 +352,9 @@ function buildReport({
     applyExitStatus: applyAttempted ? applyResult?.status ?? 1 : null,
     strictProofExitStatus: strictProofAttempted ? strictProofResult?.status ?? 1 : null,
     completionSummaryExitStatus: completionSummaryAttempted ? completionSummaryResult?.status ?? 1 : null,
-    preflightRemediationRowCount: integerValue(preflightReport?.preflightRemediationRowCount) || preflightRemediationRows.length,
+    preflightRemediationRowCount: integerValue(preflightReport?.preflightRemediationRowCount) || remediationRows.length,
+    preflightRemediationRows: remediationRows,
+    preflightRemediationRowsValueFree: remediationRows.every((row) => row.valueRecorded === false),
     preflightMissingInputCount: integerValue(preflightReport?.preflightRemediationMissingInputCount),
     preflightPlaceholderInputCount: integerValue(preflightReport?.preflightRemediationPlaceholderInputCount),
     preflightInvalidShapeCount: integerValue(preflightReport?.preflightRemediationInvalidShapeCount),
@@ -300,7 +362,27 @@ function buildReport({
     privateInputFileLoadedKeyCount: integerValue(preflightReport?.privateInputFileLoadedKeyCount),
     privateInputFileKey: textValue(preflightReport?.privateInputFileKey, "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE"),
     privateInputFileDefault: textValue(preflightReport?.privateInputFileDefault, ".env.release-channel.local"),
+    privateInputFilePath: textValue(preflightReport?.privateInputFilePath, ".env.release-channel.local"),
+    privateInputFileLocationRowCount: integerValue(preflightReport?.privateInputFileLocationRowCount) || privateInputRows.length,
+    privateInputFileLocationRows: privateInputRows,
+    privateInputFileLocationRowsValueFree: privateInputRows.every((row) => row.valueRecorded === false),
+    privateInputFileLocationPresentRowCount: integerValue(preflightReport?.privateInputFileLocationPresentRowCount),
+    privateInputFileLocationPlaceholderCount: integerValue(preflightReport?.privateInputFileLocationPlaceholderCount),
+    privateInputFileLocationMissingKeyCount: integerValue(preflightReport?.privateInputFileLocationMissingKeyCount),
+    privateInputFileLocationInvalidShapeCount: integerValue(preflightReport?.privateInputFileLocationInvalidShapeCount),
+    privateInputFilePlaceholderLocationCount: privateInputPlaceholderLocations.length,
+    privateInputFilePlaceholderLocationSummary: formatKeyList(privateInputPlaceholderLocations),
+    privateInputFilePlaceholderLocations: privateInputPlaceholderLocations,
+    privateInputFileShapeInvalidLocationCount: privateInputShapeInvalidLocations.length,
+    privateInputFileShapeInvalidLocationSummary: formatKeyList(privateInputShapeInvalidLocations),
+    privateInputFileShapeInvalidLocations: privateInputShapeInvalidLocations,
+    privateInputFileUnknownKeyCount: integerValue(preflightReport?.privateInputFileUnknownKeyCount),
+    privateInputFileMalformedLineCount: integerValue(preflightReport?.privateInputFileMalformedLineCount),
     nextWriteCommand: textValue(preflightReport?.nextWriteCommand, "npm run release:channel-apply-private-env"),
+    nextOperatorAction:
+      preflightReady === true
+        ? "run apply only after preflight readiness"
+        : "replace private input placeholders or missing inputs, then rerun preflight",
     strictProofCommand: textValue(preflightReport?.recommendedOperatorProofCommand, "npm run release:private-edit-strict-proof"),
     completionSummaryCommand: "npm run release:completion-summary-smoke",
     appliedKeyCount: integerValue(applyReport?.appliedKeyCount),
@@ -364,8 +446,14 @@ function buildMarkdown(report) {
 - Current first blocker: ${report.currentFirstBlocker}
 - Private input file key: ${report.privateInputFileKey}
 - Private input file default: ${report.privateInputFileDefault}
+- Private input file path: ${report.privateInputFilePath}
 - Private input file present: ${readyLabel(report.privateInputFilePresent)}
 - Private input file loaded keys: ${report.privateInputFileLoadedKeyCount}
+- Private input file location rows: ${report.privateInputFileLocationRowCount}
+- Private input file placeholder locations: ${report.privateInputFilePlaceholderLocationCount} (${report.privateInputFilePlaceholderLocationSummary})
+- Private input file missing/placeholder/invalid rows: ${report.privateInputFileLocationMissingKeyCount}/${report.privateInputFileLocationPlaceholderCount}/${report.privateInputFileLocationInvalidShapeCount}
+- Preflight missing/placeholder/invalid inputs: ${report.preflightMissingInputCount}/${report.preflightPlaceholderInputCount}/${report.preflightInvalidShapeCount}
+- Next operator action: ${report.nextOperatorAction}
 - Next write command: \`${report.nextWriteCommand}\`
 - Strict proof command: \`${report.strictProofCommand}\`
 - Completion summary command: \`${report.completionSummaryCommand}\`
@@ -391,6 +479,18 @@ ${formatCommandRows(report.commandRows)}
 | label | present | path | value recorded |
 |---|---|---|---|
 ${formatSourceRows(report.sourceRows)}
+
+## Private Input Location Rows
+
+| order | key | private input file | file present | key present | line | input source | input present | placeholder | shape ready | expected shape | remediation | value recorded |
+|---:|---|---|---|---|---:|---|---|---|---|---|---|---|
+${formatPrivateInputLocationRows(report.privateInputFileLocationRows)}
+
+## Preflight Remediation Rows
+
+| order | key | input present | placeholder | shape ready | expected shape | remediation | next command | write command | proof command | value recorded |
+|---:|---|---|---|---|---|---|---|---|---|---|
+${formatPreflightRemediationRows(report.preflightRemediationRows)}
 
 ## Current Required Keys
 
@@ -419,6 +519,14 @@ async function writeReport(report) {
   check(report.commandRowsValueFree === true, "release-channel proof runner command rows should be value-free");
   check(report.sourceRowCount === 4, "release-channel proof runner should include four source rows");
   check(report.sourceRowsValueFree === true, "release-channel proof runner source rows should be value-free");
+  check(report.privateInputFileLocationRowCount === report.privateInputFileLocationRows.length, "release-channel proof runner should mirror private input file location row count");
+  check(report.privateInputFileLocationRowsValueFree === true, "release-channel proof runner private input file location rows should be value-free");
+  check(report.preflightRemediationRowCount === report.preflightRemediationRows.length, "release-channel proof runner should mirror preflight remediation row count");
+  check(report.preflightRemediationRowsValueFree === true, "release-channel proof runner preflight remediation rows should be value-free");
+  check(
+    report.privateInputFileLocationMissingKeyCount + report.privateInputFileLocationPlaceholderCount + report.privateInputFileLocationInvalidShapeCount >= 0,
+    "release-channel proof runner should expose private input blocker counts"
+  );
   check(report.preflightExitStatus === 0 || report.applyAttempted === false, "release-channel proof runner should only apply after preflight succeeds");
   check(report.strictProofAttempted === report.applyReady, "release-channel proof runner should only run strict proof after apply is ready");
   check(report.completionSummaryAttempted === report.strictProofReady, "release-channel proof runner should only run completion summary after strict proof is ready");
@@ -441,6 +549,8 @@ async function writeReport(report) {
   check(!/https?:\/\//i.test(markdown), "release-channel proof runner Markdown should not include URL values");
   check(markdown.includes("Command Rows"), "release-channel proof runner Markdown should include command rows");
   check(markdown.includes("Source Artifacts"), "release-channel proof runner Markdown should include source artifacts");
+  check(markdown.includes("Private Input Location Rows"), "release-channel proof runner Markdown should include private input location rows");
+  check(markdown.includes("Preflight Remediation Rows"), "release-channel proof runner Markdown should include preflight remediation rows");
   if (successSmoke) {
     check(report.releaseChannelApplyPrivateEnvProofRunnerReady === true, "release-channel proof runner success smoke should be ready");
     check(report.preflightReady === true, "release-channel proof runner success smoke should pass preflight");
@@ -540,8 +650,18 @@ console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount} ($
 console.log(`- Current first blocker: ${report.currentFirstBlocker}`);
 console.log(`- Private input file key: ${report.privateInputFileKey}`);
 console.log(`- Private input file default: ${report.privateInputFileDefault}`);
+console.log(`- Private input file path: ${report.privateInputFilePath}`);
 console.log(`- Private input file present: ${report.privateInputFilePresent ? "yes" : "no"}`);
 console.log(`- Private input file loaded keys: ${report.privateInputFileLoadedKeyCount}`);
+console.log(`- Private input file location rows: ${report.privateInputFileLocationRowCount}`);
+console.log(
+  `- Private input file placeholder locations: ${report.privateInputFilePlaceholderLocationCount} (${report.privateInputFilePlaceholderLocationSummary})`
+);
+console.log(
+  `- Private input file missing/placeholder/invalid rows: ${report.privateInputFileLocationMissingKeyCount}/${report.privateInputFileLocationPlaceholderCount}/${report.privateInputFileLocationInvalidShapeCount}`
+);
+console.log(`- Preflight missing/placeholder/invalid inputs: ${report.preflightMissingInputCount}/${report.preflightPlaceholderInputCount}/${report.preflightInvalidShapeCount}`);
+console.log(`- Next operator action: ${report.nextOperatorAction}`);
 console.log(`- Next write command: ${report.nextWriteCommand}`);
 console.log(`- Strict proof command: ${report.strictProofCommand}`);
 console.log(`- Completion summary command: ${report.completionSummaryCommand}`);

@@ -75,6 +75,13 @@ if (report) {
   check(report.commandRowsValueFree === true, "proof success command rows should be value-free");
   check(report.sourceRowCount === 4, "proof success report should include four source rows");
   check(report.sourceRowsValueFree === true, "proof success source rows should be value-free");
+  check(report.privateInputFileLocationRowCount === 4, "proof success report should include four private input location rows");
+  check(report.privateInputFileLocationRowsValueFree === true, "proof success private input location rows should be value-free");
+  check(report.privateInputFileLocationPlaceholderCount === 0, "proof success report should not include private input placeholder rows");
+  check(report.privateInputFileLocationInvalidShapeCount === 0, "proof success report should not include private input invalid-shape rows");
+  check(report.preflightRemediationRowCount === 4, "proof success report should include four preflight remediation rows");
+  check(report.preflightRemediationRowsValueFree === true, "proof success preflight remediation rows should be value-free");
+  check(report.nextOperatorAction === "run apply only after preflight readiness", "proof success report should expose the post-preflight next action");
   check(report.appliedKeyCount === 4, "proof success report should apply four keys");
   check(report.currentReadyKeyCount === 4, "proof success report should report four ready keys");
   check(report.currentRequiredKeyCount === 4, "proof success report should track four release-channel keys");
@@ -97,6 +104,8 @@ if (report) {
   check(!hasUrlValue(JSON.stringify(report)), "proof success JSON should not include URL values");
 }
 check(!hasUrlValue(markdown), "proof success Markdown should not include URL values");
+check(markdown.includes("Private Input Location Rows"), "proof success Markdown should include private input location rows");
+check(markdown.includes("Preflight Remediation Rows"), "proof success Markdown should include preflight remediation rows");
 
 if (failures.length > 0) {
   console.error("GrooveForge release-channel apply private env proof smoke failed:");
