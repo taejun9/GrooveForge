@@ -723,6 +723,7 @@ import {
   createModeSwitchQuickActions,
   createModeSwitchResult,
   createWorkflowSpotlightSummary,
+  audienceStarterActionTestIds,
   modeLabel
 } from "./workstationGuidancePanels";
 import {
@@ -7087,7 +7088,7 @@ export function App(): ReactElement {
     focusBeatBlueprintsPanel();
   }
 
-  function createAudienceStarter(starterId: AudienceStarterProjectId): void {
+  function createAudienceStarter(starterId: AudienceStarterProjectId) {
     const label = audienceStarterProjectLabel(starterId);
     const beforeProject = projectRef.current;
     const resultAction = quickActions.find((action) => action.id === `audience-starter-${starterId}`) ?? null;
@@ -7110,9 +7111,12 @@ export function App(): ReactElement {
         );
         setQuickActionResult(result);
         setQuickActionRecents((recents) => prependQuickActionRecent(recents, resultAction, result));
+        setProjectStatus(`Built ${label} starter project`);
+        return result;
       }
       setProjectStatus(`Built ${label} starter project`);
     }
+    return null;
   }
 
   function selectDeliveryTarget(targetId: DeliveryTargetId): void {
@@ -9612,6 +9616,44 @@ export function App(): ReactElement {
       };
     };
 
+    const runAudienceStarterRoute = (starterId: AudienceStarterProjectId): GrooveforgeLaunchSmokeAudienceStarterEvidence => {
+      const actionId = `audience-starter-${starterId}`;
+      const routeQuery =
+        starterId === "producer" ? "build professional producer starter" : "build first time composer starter";
+      const baseEvidence = routeEvidence(routeQuery, actionId);
+      const button = document.querySelector(`[data-testid="${audienceStarterActionTestIds[starterId]}"]`);
+      const followupText =
+        document.querySelector(`[data-testid="audience-starter-followup-${starterId}"]`)?.textContent?.trim() ?? "";
+      const action = quickActions.find((candidate) => candidate.id === actionId);
+
+      if (!action || action.disabled || !button) {
+        setQuickActionsOpen(false);
+        return {
+          ...baseEvidence,
+          buttonPresent: button !== null,
+          followupPresent: followupText.length > 0,
+          followupText,
+          resultMetricValue: "Audience Starter unavailable",
+          resultNextCheck: "Audience Starter visible control and Quick Action must both be available.",
+          resultStatus: "Unavailable",
+          resultTitle: action?.title ?? actionId
+        };
+      }
+
+      const result = createAudienceStarter(starterId);
+      setQuickActionsOpen(false);
+      return {
+        ...baseEvidence,
+        buttonPresent: true,
+        followupPresent: followupText.length > 0,
+        followupText,
+        resultMetricValue: result ? `${result.metric.before} -> ${result.metric.after}` : "Audience Starter unchanged",
+        resultNextCheck: result?.nextCheck ?? followupText,
+        resultStatus: result?.status ?? "Unchanged",
+        resultTitle: result?.title ?? action.title
+      };
+    };
+
     window.__grooveforgeLaunchSmoke = {
       ...(window.__grooveforgeLaunchSmoke ?? {}),
       collectAudienceSessionQuickActionEvidence: () => {
@@ -9659,6 +9701,8 @@ export function App(): ReactElement {
           ...routeEvidence("enter guided first time composer", "audience-session-enter-beginner"),
           ...runAudienceSessionRoute("audience-session-enter-beginner")
         };
+        const starterBeginner = runAudienceStarterRoute("beginner");
+        const starterProducer = runAudienceStarterRoute("producer");
         return {
           completionBeginner,
           completionProducer,
@@ -9672,6 +9716,8 @@ export function App(): ReactElement {
           routeBridge,
           routeBridgeCompletion,
           routeBridgeReadiness,
+          starterBeginner,
+          starterProducer,
           resultPresent:
             guided.resultTitle.length > 0 &&
             producer.resultTitle.length > 0 &&
@@ -9683,7 +9729,9 @@ export function App(): ReactElement {
             dualProducer.resultTitle.length > 0 &&
             completionReadout.resultTitle.length > 0 &&
             completionBeginner.resultTitle.length > 0 &&
-            completionProducer.resultTitle.length > 0,
+            completionProducer.resultTitle.length > 0 &&
+            starterBeginner.resultTitle.length > 0 &&
+            starterProducer.resultTitle.length > 0,
           searchPresent:
             guided.searchMetricValue.length > 0 &&
             producer.searchMetricValue.length > 0 &&
@@ -9695,7 +9743,9 @@ export function App(): ReactElement {
             dualProducer.searchMetricValue.length > 0 &&
             completionReadout.searchMetricValue.length > 0 &&
             completionBeginner.searchMetricValue.length > 0 &&
-            completionProducer.searchMetricValue.length > 0
+            completionProducer.searchMetricValue.length > 0 &&
+            starterBeginner.searchMetricValue.length > 0 &&
+            starterProducer.searchMetricValue.length > 0
         };
       }
     };

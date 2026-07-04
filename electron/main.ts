@@ -67,6 +67,12 @@ type LaunchSmokePaletteRouteEvidence = {
   spotlightTitle: string;
 };
 
+type LaunchSmokeAudienceStarterEvidence = LaunchSmokePaletteRouteEvidence & {
+  buttonPresent: boolean;
+  followupPresent: boolean;
+  followupText: string;
+};
+
 type LaunchSmokeBridgeDirectEvidence = {
   buttonPresent: boolean;
   resultDestination: string;
@@ -94,6 +100,8 @@ type LaunchSmokePaletteEvidence = {
   routeBridge: LaunchSmokePaletteRouteEvidence;
   routeBridgeCompletion: LaunchSmokePaletteRouteEvidence;
   routeBridgeReadiness: LaunchSmokePaletteRouteEvidence;
+  starterBeginner: LaunchSmokeAudienceStarterEvidence;
+  starterProducer: LaunchSmokeAudienceStarterEvidence;
   resultPresent: boolean;
   searchPresent: boolean;
 };
@@ -809,6 +817,8 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "audience-session-readout",
         "audience-session-action-beginner",
         "audience-session-action-producer",
+        "audience-starter-action-beginner",
+        "audience-starter-action-producer",
         "audience-route-bridge",
         "audience-route-bridge-readiness-action",
         "audience-route-bridge-completion-action",
@@ -885,6 +895,12 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         spotlightAction: "",
         spotlightTitle: ""
       };
+      const emptyStarter = {
+        ...emptyRoute,
+        buttonPresent: false,
+        followupPresent: false,
+        followupText: ""
+      };
       const emptyBridgeDirect = {
         buttonPresent: false,
         resultDestination: "",
@@ -920,6 +936,8 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           routeBridge: emptyRoute,
           routeBridgeCompletion: emptyRoute,
           routeBridgeReadiness: emptyRoute,
+          starterBeginner: emptyStarter,
+          starterProducer: emptyStarter,
           resultPresent: false,
           searchPresent: false
         },

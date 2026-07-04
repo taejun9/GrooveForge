@@ -24,6 +24,8 @@ const expectedLiveTestIds = [
   "audience-session-readout",
   "audience-session-action-beginner",
   "audience-session-action-producer",
+  "audience-starter-action-beginner",
+  "audience-starter-action-producer",
   "audience-route-bridge",
   "audience-route-bridge-readiness-action",
   "audience-route-bridge-completion-action",
@@ -181,6 +183,42 @@ function checkResult(result) {
     String(evidence?.palette?.producer?.resultNextCheck ?? "").includes("Review Queue") &&
       String(evidence?.palette?.producer?.resultNextCheck ?? "").includes("Export Preflight"),
     "live desktop Quick Actions producer result should guide the next Review Queue / Export Preflight check"
+  );
+  check(
+    evidence?.palette?.starterBeginner?.buttonPresent === true &&
+      evidence?.palette?.starterBeginner?.followupPresent === true &&
+      evidence?.palette?.starterBeginner?.actionPresent === true,
+    "live desktop Audience Starter beginner visible button and Quick Action should be available"
+  );
+  check(
+    String(evidence?.palette?.starterBeginner?.followupText ?? "").includes("First Beat Path") &&
+      String(evidence?.palette?.starterBeginner?.resultMetricValue ?? "").includes("starter project") &&
+      String(evidence?.palette?.starterBeginner?.resultMetricValue ?? "").includes("First-time composer") &&
+      String(evidence?.palette?.starterBeginner?.resultMetricValue ?? "").includes("Guided"),
+    "live desktop Audience Starter beginner should create a guided first-time composer starter project"
+  );
+  check(
+    String(evidence?.palette?.starterBeginner?.resultNextCheck ?? "").includes("First Beat Path") &&
+      String(evidence?.palette?.starterBeginner?.resultNextCheck ?? "").includes("Audience Completion Route"),
+    "live desktop Audience Starter beginner result should guide First Beat Path and Audience Completion Route follow-up"
+  );
+  check(
+    evidence?.palette?.starterProducer?.buttonPresent === true &&
+      evidence?.palette?.starterProducer?.followupPresent === true &&
+      evidence?.palette?.starterProducer?.actionPresent === true,
+    "live desktop Audience Starter producer visible button and Quick Action should be available"
+  );
+  check(
+    String(evidence?.palette?.starterProducer?.followupText ?? "").includes("Export Preflight") &&
+      String(evidence?.palette?.starterProducer?.resultMetricValue ?? "").includes("starter project") &&
+      String(evidence?.palette?.starterProducer?.resultMetricValue ?? "").includes("Professional producer") &&
+      String(evidence?.palette?.starterProducer?.resultMetricValue ?? "").includes("Studio"),
+    "live desktop Audience Starter producer should create a studio professional producer starter project"
+  );
+  check(
+    String(evidence?.palette?.starterProducer?.resultNextCheck ?? "").includes("Review Queue") &&
+      String(evidence?.palette?.starterProducer?.resultNextCheck ?? "").includes("Handoff Package Check"),
+    "live desktop Audience Starter producer result should guide Review Queue and Handoff Package Check follow-up"
   );
   check(
     evidence?.palette?.routeBridge?.actionPresent === true,
@@ -451,6 +489,7 @@ child.on("exit", (code, signal) => {
   );
   console.log("- Audience session rows: First-time composer, Professional producer");
   console.log("- Audience session Quick Actions: renderer palette search and run evidence passed for Enter Guided and Enter Studio");
+  console.log("- Audience Starter controls: visible beginner and producer starter creation evidence passed");
   console.log("- Audience Route Bridge Quick Actions: readout, readiness, completion, and direct button result evidence passed");
   console.log(
     "- Dual Audience Readiness Quick Actions: route readout, first-time composer lane, and professional producer lane search/run evidence passed"

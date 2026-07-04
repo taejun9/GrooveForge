@@ -58,6 +58,12 @@ type GrooveforgeLaunchSmokeRouteEvidence = {
   spotlightTitle: string;
 };
 
+type GrooveforgeLaunchSmokeAudienceStarterEvidence = GrooveforgeLaunchSmokeRouteEvidence & {
+  buttonPresent: boolean;
+  followupPresent: boolean;
+  followupText: string;
+};
+
 type GrooveforgeLaunchSmokePaletteEvidence = {
   completionBeginner: GrooveforgeLaunchSmokeRouteEvidence;
   completionProducer: GrooveforgeLaunchSmokeRouteEvidence;
@@ -71,6 +77,8 @@ type GrooveforgeLaunchSmokePaletteEvidence = {
   routeBridge: GrooveforgeLaunchSmokeRouteEvidence;
   routeBridgeCompletion: GrooveforgeLaunchSmokeRouteEvidence;
   routeBridgeReadiness: GrooveforgeLaunchSmokeRouteEvidence;
+  starterBeginner: GrooveforgeLaunchSmokeAudienceStarterEvidence;
+  starterProducer: GrooveforgeLaunchSmokeAudienceStarterEvidence;
   resultPresent: boolean;
   searchPresent: boolean;
 };

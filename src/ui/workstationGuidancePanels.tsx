@@ -63,7 +63,7 @@ const audienceSessionActionTestIds: Record<AudienceSessionReadoutRow["id"], stri
   producer: "audience-session-action-producer"
 };
 
-const audienceStarterActionTestIds: Record<AudienceStarterProjectId, string> = {
+export const audienceStarterActionTestIds: Record<AudienceStarterProjectId, string> = {
   beginner: "audience-starter-action-beginner",
   producer: "audience-starter-action-producer"
 };
