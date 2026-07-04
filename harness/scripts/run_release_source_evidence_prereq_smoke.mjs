@@ -279,13 +279,16 @@ function formatCommandRows(rows) {
 function buildReport({ proofBundle, completionSummary }) {
   const numbers = completedPlanNumbers();
   const latestCompletedPlanNumber = numbers.length > 0 ? numbers[numbers.length - 1] : null;
+  const latestCompletedPlan = latestCompletedPlanNumber ? `plan-${latestCompletedPlanNumber}` : "none";
+  const completedPlanTenPlanProgress = tenPlanProgressLabel(numbers);
+  const completionSummaryLatestCompletedPlan = textValue(completionSummary?.latestCompletedPlan);
+  const completionSummaryMatchesCompletedPlan = completionSummaryLatestCompletedPlan === latestCompletedPlan;
   const artifactRows = artifactRowsFromDefinitions(proofBundle);
   const missingArtifactRows = artifactRows.filter((row) => row.present !== true);
   const commandRows = commandRowsFromArtifacts(artifactRows);
-  const tenPlanProgress = textValue(
-    completionSummary?.tenPlanProgress,
-    tenPlanProgressLabel(numbers)
-  );
+  const tenPlanProgress = completionSummaryMatchesCompletedPlan
+    ? textValue(completionSummary?.tenPlanProgress, completedPlanTenPlanProgress)
+    : completedPlanTenPlanProgress;
   return {
     generatedAt: new Date().toISOString(),
     appName,
@@ -297,8 +300,11 @@ function buildReport({ proofBundle, completionSummary }) {
     reportCommand: "npm run release:source-evidence-prereq-smoke",
     reportStem,
     reportArtifactNames,
-    latestCompletedPlan: latestCompletedPlanNumber ? `plan-${latestCompletedPlanNumber}` : "none",
+    latestCompletedPlan,
     tenPlanProgress,
+    completedPlanTenPlanProgress,
+    completionSummaryLatestCompletedPlan,
+    completionSummaryMatchesCompletedPlan,
     proofBundlePresent: proofBundle !== null,
     proofBundleSourceEvidenceReady: proofBundle?.sourceEvidenceReady === true,
     proofBundleReady: proofBundle?.proofBundleReady === true,
@@ -346,6 +352,8 @@ function buildMarkdown(report) {
 - Report ready: yes
 - Latest completed plan: ${report.latestCompletedPlan}
 - 10-plan progress: ${report.tenPlanProgress}
+- Completed-plan 10-plan progress: ${report.completedPlanTenPlanProgress}
+- Completion summary latest plan matches completed plans: ${readyLabel(report.completionSummaryMatchesCompletedPlan)}
 - Proof bundle present: ${readyLabel(report.proofBundlePresent)}
 - Proof bundle source evidence ready: ${readyLabel(report.proofBundleSourceEvidenceReady)}
 - Proof bundle ready: ${readyLabel(report.proofBundleReady)}
@@ -387,6 +395,7 @@ function validateReport(report, markdown) {
   check(report.commandRows.every((row) => row.valueRecorded === false), "source evidence command rows should be value-free");
   check(report.commandRows.every((row) => row.command.startsWith("npm run ")), "source evidence command rows should include npm run commands");
   check(report.sourceArtifactMissingCount === report.commandRowCount, "missing source artifact count should match command rows");
+  check(report.tenPlanProgress === report.completedPlanTenPlanProgress, "source evidence prereq 10-plan progress should match current completed plan files");
   check(report.privateValuesRecorded === false, "source evidence prereq should not record private values");
   check(report.localEnvValueRecorded === false, "source evidence prereq should not record local env values");
   check(report.releaseUrlValueRecorded === false, "source evidence prereq should not record release URL values");

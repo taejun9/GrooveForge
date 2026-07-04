@@ -180,8 +180,7 @@ const refreshCommands = [
     sourceArtifact: "Completion audit prerequisite",
     cleanupAfter: [
       path.join(packageRoot, "install-smoke"),
-      path.join(packageRoot, "install-smoke-mount"),
-      dmgPath
+      path.join(packageRoot, "install-smoke-mount")
     ]
   },
   {
@@ -405,6 +404,7 @@ function buildMarkdown(report) {
 - Cleanup row count: ${report.cleanupRowCount}
 - Source artifacts present after refresh: ${report.sourceArtifactPresentCount}/${report.sourceArtifactTotal}
 - Missing source artifacts after refresh: ${report.sourceArtifactMissingCount} (${report.sourceArtifactMissingSummary})
+- Release manifest DMG retained for follow-up update metadata checks: ${readyLabel(report.releaseManifestDmgRetained)}
 - Current first blocker: ${report.currentFirstBlocker}
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
 - Operator proof command: \`${report.operatorProofCommand}\`
@@ -445,6 +445,7 @@ function validateReport(report, markdown) {
   check(report.sourceArtifactTotal === 21, "source evidence refresh should validate the 21 source artifact prerequisite set");
   check(report.sourceArtifactPresentCount === report.sourceArtifactTotal, "source evidence refresh should leave all source artifacts present");
   check(report.sourceArtifactMissingCount === 0, "source evidence refresh should leave no missing source artifacts");
+  check(report.releaseManifestDmgRetained === true, "source evidence refresh should retain the release manifest DMG for follow-up update metadata checks");
   check(report.privateValuesRecorded === false, "source evidence refresh should not record private values");
   check(report.localEnvValueRecorded === false, "source evidence refresh should not record local env values");
   check(report.releaseUrlValueRecorded === false, "source evidence refresh should not record release URL values");
@@ -511,6 +512,8 @@ try {
     sourceArtifactPresentCount: sourcePrereq?.sourceArtifactPresentCount ?? 0,
     sourceArtifactMissingCount: sourcePrereq?.sourceArtifactMissingCount ?? 0,
     sourceArtifactMissingSummary: textValue(sourcePrereq?.sourceArtifactMissingSummary),
+    releaseManifestDmgPath: relative(dmgPath),
+    releaseManifestDmgRetained: existsSync(dmgPath),
     currentFirstBlocker: textValue(sourcePrereq?.proofBundleCurrentFirstBlocker),
     currentOperatorFirstCommand: textValue(sourcePrereq?.currentOperatorFirstCommand),
     operatorProofCommand: textValue(sourcePrereq?.operatorProofCommand),
@@ -556,6 +559,7 @@ try {
   console.log(`- Commands: ${report.commandCount}`);
   console.log(`- Source artifacts present: ${report.sourceArtifactPresentCount}/${report.sourceArtifactTotal}`);
   console.log(`- Missing source artifacts: ${report.sourceArtifactMissingCount} (${report.sourceArtifactMissingSummary})`);
+  console.log(`- Release manifest DMG retained: ${readyLabel(report.releaseManifestDmgRetained)}`);
   console.log(`- Current first blocker: ${report.currentFirstBlocker}`);
   console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
   console.log(`- Operator proof command: ${report.operatorProofCommand}`);
