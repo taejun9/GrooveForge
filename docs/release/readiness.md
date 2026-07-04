@@ -32,6 +32,14 @@ npm run release:progress-refresh-smoke
 
 That source refresh runs the proof bundle, external distribution gate, completion progress, release-channel unblock rehearsal, update-feed checkpoint, existing-evidence progress report, placeholder input receipt, current blocker, completion packet, freshness check, and operator brief in that order. If ignored source evidence is missing, the refresh may still pass as a source-missing reporting context only when it preserves `sourceMissingReleaseProgressContext`, keeps missing source artifacts visible, keeps PKG payload project IO and hard-gate readiness false, and keeps the next proof target on `npm run release:check` instead of claiming external distribution readiness.
 
+Run the source evidence prerequisite smoke when the operator needs a value-free map of missing external proof artifacts before rerunning heavier source evidence:
+
+```sh
+npm run release:source-evidence-prereq-smoke
+```
+
+That packet reads the external proof bundle and completion summary when they exist, otherwise falls back to the expected 21 source artifacts. It writes ignored Markdown/JSON with present/missing artifact rows, refresh command rows, prerequisite notes, current operator first command, strict proof command, current private input placeholder locations, and non-claiming posture without running packaging, signing, notarization, uploads, feed publishing, channel probes, hard gates, or ignored env writes.
+
 Run the 10-plan checkpoint smoke directly only when manually rerunning the checkpoint from already refreshed source evidence:
 
 ```sh
