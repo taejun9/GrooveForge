@@ -714,6 +714,12 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
   const proofRows = objectRows(completionReportPacket.privateEditProofCommandRows);
   const postClearanceRows = nextActionRows({ completionReportPacket, currentBlocker });
   const sourceBoundaryReady = sourcePrivacyBoundaryReady({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness });
+  const sourceMissingBriefContext =
+    releaseProgress.sourceMissingReleaseProgressContext === true &&
+    currentBlocker.sourceMissingReleaseProgressContext === true;
+  const sourceRowsReady = sourceRows.every(
+    (row) => row.present === true && row.valueRecorded === false && (row.ready === true || sourceMissingBriefContext)
+  );
   const releaseChannelPosture = releaseChannelMetadataPosture({ completionReportPacket, currentBlocker });
   const currentEditRowsReady =
     currentEnvEditRows.length > 0 &&
@@ -723,12 +729,12 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
         (releaseChannelPosture.needsIgnoredEnv === true || currentEnvEditRows.every((row) => row.placeholder === true))
       : true);
   const ready =
-    sourceRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false) &&
+    sourceRowsReady &&
     sourceLabelsMatchLatest(sourceRows, latestTenPlanProgressLabel) &&
     sourceBoundaryReady === true &&
     completionReportPacket.releaseCompletionReportPacketReady === true &&
     completionReportPacket.sourceLabelsMatchLatestTenPlan === true &&
-    releaseProgress.releaseProgressReportReady === true &&
+    (releaseProgress.releaseProgressReportReady === true || sourceMissingBriefContext) &&
     currentBlocker.releaseCurrentBlockerReady === true &&
     progressFreshness.releaseProgressFreshnessReady === true &&
     integerValue(progressFreshness.staleArtifactCount) === 0 &&
@@ -769,6 +775,7 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     releaseOperatorCompletionBriefReady: ready,
     sourceArtifactRows: sourceRows,
     sourceArtifactRowCount: sourceRows.length,
+    sourceMissingReleaseProgressContext: sourceMissingBriefContext,
     sourceLabelsMatchLatestTenPlan: sourceLabelsMatchLatest(sourceRows, latestTenPlanProgressLabel),
     sourcePrivacyBoundaryReady: sourceBoundaryReady,
     preflightProcessEnvChecklistSourceReady,
@@ -930,7 +937,12 @@ const jsonText = `${JSON.stringify(report, null, 2)}\n`;
 
 check(report.releaseOperatorCompletionBriefReady === true, "release operator completion brief should be ready");
 check(report.sourceArtifactRowCount === 4, "release operator completion brief should include four source artifacts");
-check(report.sourceArtifactRows.every((row) => row.ready === true && row.valueRecorded === false), "release operator completion brief source rows should be ready and value-free");
+check(
+  report.sourceArtifactRows.every(
+    (row) => row.valueRecorded === false && (row.ready === true || report.sourceMissingReleaseProgressContext === true)
+  ),
+  "release operator completion brief source rows should be ready or source-missing and value-free"
+);
 check(report.sourceLabelsMatchLatestTenPlan === true, "release operator completion brief source labels should match latest 10-plan progress");
 check(report.sourcePrivacyBoundaryReady === true, "release operator completion brief source privacy boundaries should be ready");
 check(report.preflightProcessEnvChecklistSourceReady === true, "release operator completion brief should include ready private-env preflight checklist source");

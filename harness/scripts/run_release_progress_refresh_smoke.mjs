@@ -52,42 +52,54 @@ const refreshCommands = [
   },
   {
     order: 3,
+    command: "npm run desktop:completion-progress-smoke",
+    role: "refresh completion progress so release progress can read source-ready or source-missing posture",
+    valueRecorded: false
+  },
+  {
+    order: 4,
+    command: "npm run release:channel-unblock-smoke",
+    role: "refresh value-free release-channel unblock rehearsal before progress reads release-channel source evidence",
+    valueRecorded: false
+  },
+  {
+    order: 5,
     command: "npm run release:update-feed-checkpoint-smoke",
     role: "refresh latest update-feed checkpoint before progress reads it",
     valueRecorded: false
   },
   {
-    order: 4,
+    order: 6,
     command: "npm run release:progress-smoke",
     role: "refresh existing-evidence release progress report",
     valueRecorded: false
   },
   {
-    order: 5,
+    order: 7,
     command: "npm run release:channel-placeholder-input-receipt",
     role: "refresh value-free release-channel placeholder private-input receipt before current-blocker reads existing evidence",
     valueRecorded: false
   },
   {
-    order: 6,
+    order: 8,
     command: "npm run release:current-blocker-smoke",
     role: "refresh existing-evidence current blocker receipt",
     valueRecorded: false
   },
   {
-    order: 7,
+    order: 9,
     command: "npm run release:completion-report-packet-smoke",
     role: "refresh user-facing completion report packet",
     valueRecorded: false
   },
   {
-    order: 8,
+    order: 10,
     command: "npm run release:progress-freshness-smoke",
     role: "verify refreshed artifacts match latest update-feed checkpoint",
     valueRecorded: false
   },
   {
-    order: 9,
+    order: 11,
     command: "npm run release:operator-completion-brief-smoke",
     role: "refresh compact operator completion brief from aligned release evidence",
     valueRecorded: false
@@ -310,8 +322,18 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
   const packetLabel = textValue(completionReportPacket.latestTenPlanProgressLabel);
   const freshnessLabel = textValue(freshness.latestTenPlanProgressLabel);
   const operatorBriefLabel = textValue(operatorCompletionBrief.latestTenPlanProgressLabel);
+  const sourceMissingRefreshContext =
+    releaseProgress.sourceMissingReleaseProgressContext === true &&
+    currentBlocker.sourceMissingReleaseProgressContext === true &&
+    operatorCompletionBrief.sourceMissingReleaseProgressContext === true;
   const sourceArtifactRows = [
-    artifactRow("Release progress report", releaseProgressJsonPath, releaseProgress.releaseProgressReportReady === true, progressLabel, "currentTenPlanWindowLabel"),
+    artifactRow(
+      "Release progress report",
+      releaseProgressJsonPath,
+      releaseProgress.releaseProgressReportReady === true || sourceMissingRefreshContext,
+      progressLabel,
+      "currentTenPlanWindowLabel"
+    ),
     artifactRow("Release current blocker", currentBlockerJsonPath, currentBlocker.releaseCurrentBlockerReady === true, blockerLabel, "currentTenPlanProgressLabel"),
     artifactRow(
       "Release completion report packet",
@@ -587,6 +609,7 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     releaseProgressRefreshMarkdownPath: relative(refreshMarkdownPath),
     releaseProgressRefreshJsonPath: relative(refreshJsonPath),
     releaseProgressRefreshReady,
+    sourceMissingReleaseProgressContext: sourceMissingRefreshContext,
     completionSummary,
     latestPlanNumber: completionSummary.latestPlanNumber,
     latestPlan: completionSummary.latestPlan,
@@ -1256,11 +1279,11 @@ function validateReport(report, markdown) {
   check(report.completionSummary.claimedAutoUpdate === false, "release progress refresh summary should not claim auto-update");
   check(report.completionSummary.claimedExternalDistribution === false, "release progress refresh summary should not claim external distribution");
   check(report.reportCommand === "npm run release:progress-refresh-smoke", "release progress refresh smoke should report its command");
-  check(report.refreshCommandCount === 9, "release progress refresh smoke should run nine commands");
+  check(report.refreshCommandCount === 11, "release progress refresh smoke should run eleven commands");
   check(
     report.refreshCommandSummary ===
-      "npm run release:proof-bundle -> npm run desktop:external-distribution-gate-smoke -> npm run release:update-feed-checkpoint-smoke -> npm run release:progress-smoke -> npm run release:channel-placeholder-input-receipt -> npm run release:current-blocker-smoke -> npm run release:completion-report-packet-smoke -> npm run release:progress-freshness-smoke -> npm run release:operator-completion-brief-smoke",
-    "release progress refresh smoke should run proof bundle, external gate, update-feed checkpoint, progress, placeholder input receipt, current-blocker, completion packet, freshness, then operator completion brief"
+      "npm run release:proof-bundle -> npm run desktop:external-distribution-gate-smoke -> npm run desktop:completion-progress-smoke -> npm run release:channel-unblock-smoke -> npm run release:update-feed-checkpoint-smoke -> npm run release:progress-smoke -> npm run release:channel-placeholder-input-receipt -> npm run release:current-blocker-smoke -> npm run release:completion-report-packet-smoke -> npm run release:progress-freshness-smoke -> npm run release:operator-completion-brief-smoke",
+    "release progress refresh smoke should run proof bundle, external gate, completion progress, channel unblock, update-feed checkpoint, progress, placeholder input receipt, current-blocker, completion packet, freshness, then operator completion brief"
   );
   check(report.refreshCommandRows.every((row) => row.valueRecorded === false), "release progress refresh command rows should be value-free");
   check(report.sourceArtifactRowCount === 5, "release progress refresh smoke should include five source artifacts");

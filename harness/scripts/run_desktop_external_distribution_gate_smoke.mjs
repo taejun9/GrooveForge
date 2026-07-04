@@ -217,6 +217,7 @@ function buildCurrentProofSummary(externalProofBundle) {
     currentCommandVerificationRowCount: integerValue(externalProofBundle?.currentCommandVerificationRowCount),
     currentCommandVerificationRowSummary: textValue(externalProofBundle?.currentCommandVerificationRowSummary),
     currentCommandVerificationRows,
+    currentProofBundleSourceEvidenceReady: externalProofBundle?.sourceEvidenceReady === true,
     currentProofValueRecorded: false
   };
 }
@@ -234,6 +235,7 @@ function buildMarkdown(summary) {
 - Release upload attempted: no
 - Notary submission attempted by this gate: no
 - Current proof bundle source ready: ${summary.currentProofBundleSourceReady ? "yes" : "no"}
+- Current proof bundle source evidence ready: ${summary.currentProofBundleSourceEvidenceReady ? "yes" : "no"}
 - Current next command: \`${summary.currentNextCommand}\`
 - Current first blocker: ${summary.currentFirstBlocker}
 - Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})
@@ -395,9 +397,17 @@ check(summary.appName === appName, "external distribution gate should identify G
 check(summary.bundleId === bundleId, `external distribution gate should identify ${bundleId}`);
 check(summary.version === packageJson.version, "external distribution gate should match package version");
 check(Array.isArray(summary.requirements) && summary.requirements.length >= 10, "external distribution gate should include requirement rows");
+const pkgPayloadProjectIoRequirement = summary.requirements.find((item) => item.label === "PKG payload project IO evidence ready");
+const sourceMissingProofBundleGateContext =
+  summary.dryRun === true &&
+  summary.currentProofBundleSourceReady === true &&
+  summary.currentProofBundleSourceEvidenceReady === false;
 check(
-  summary.requirements.some((item) => item.label === "PKG payload project IO evidence ready" && item.ready === true),
-  "external distribution gate should require ready PKG payload project IO evidence"
+  pkgPayloadProjectIoRequirement?.ready === true ||
+    (sourceMissingProofBundleGateContext &&
+      pkgPayloadProjectIoRequirement?.ready === false &&
+      summary.externalDistributionGateBlockers.includes("PKG payload project IO evidence is not ready.")),
+  "external distribution gate should require ready PKG payload project IO evidence or keep it blocked in source-missing dry-run"
 );
 check(Array.isArray(summary.externalDistributionGateBlockers), "external distribution gate should include blockers");
 check(summary.currentProofValueRecorded === false, "external distribution gate current proof summary should not record values");
@@ -467,6 +477,7 @@ console.log(`- Dry run: ${summary.dryRun ? "yes" : "no"}`);
 console.log(`- External distribution gate ready: ${summary.externalDistributionGateReady ? "yes" : "no"}`);
 console.log(`- Hard gate would fail: ${summary.hardGateWouldFail ? "yes" : "no"}`);
 console.log(`- Current proof bundle source ready: ${summary.currentProofBundleSourceReady ? "yes" : "no"}`);
+console.log(`- Current proof bundle source evidence ready: ${summary.currentProofBundleSourceEvidenceReady ? "yes" : "no"}`);
 console.log(`- Current next command: ${summary.currentNextCommand}`);
 console.log(`- Current first blocker: ${summary.currentFirstBlocker}`);
 console.log(`- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})`);

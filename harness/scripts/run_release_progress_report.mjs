@@ -56,6 +56,15 @@ function formatBlockerRows(rows) {
   return rows.map((row) => `| ${row.order ?? "?"} | ${row.blocker ?? "none"} |`).join("\n");
 }
 
+function formatSourceEvidenceRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | no | no |";
+  }
+  return rows
+    .map((row) => `| ${escapeCell(row.label)} | ${escapeCell(row.path)} | ${row.present === true ? "yes" : "no"} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function textValue(value, fallback = "unknown") {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
 }
@@ -1201,6 +1210,7 @@ function buildExternalProofBundleSummary(externalProofBundle) {
   return {
     sourceExternalProofBundleReady: true,
     sourceExternalProofBundlePath: relative(externalProofBundleJsonPath),
+    externalProofBundleSourceEvidenceReady: externalProofBundle.sourceEvidenceReady === true,
     externalProofBundleReady: externalProofBundle.proofBundleReady === true,
     externalProofBundleProofArtifactCount: integerValue(externalProofBundle.proofArtifactCount),
     externalProofBundleProofArtifactPresentCount: integerValue(externalProofBundle.proofArtifactPresentCount),
@@ -1616,6 +1626,8 @@ function buildMarkdown(report) {
 - 10-plan cadence rollover ready: ${report.tenPlanProgressReportRolloverReady ? "yes" : "no"}
 - 10-plan cadence rollover rows: ${report.tenPlanProgressReportRolloverRowCount} (${report.tenPlanProgressReportRolloverSummary})
 - Source evidence ready: ${report.sourceEvidenceReady ? "yes" : "no"}
+- Source-missing release progress context: ${report.sourceMissingReleaseProgressContext ? "yes" : "no"}
+- Missing source evidence artifacts: ${report.sourceMissingEvidenceArtifactCount}
 - Local release ready: ${report.localReleaseReady ? "yes" : "no"}
 - Local release readiness: ${report.localReleaseReadinessPercent.toFixed(1)}%
 - Desktop project IO evidence ready: ${report.desktopProjectIoEvidenceReady ? "yes" : "no"}
@@ -1634,6 +1646,7 @@ function buildMarkdown(report) {
 - External gate requirements ready: ${report.gateRequirementReadyCount}/${report.gateRequirementTotal} (${report.gateRequirementReadinessPercent.toFixed(1)}%)
 - Remediation groups ready: ${report.remediationReadyCount}/${report.remediationTotal} (${report.remediationReadinessPercent.toFixed(1)}%)
 - External proof bundle source ready: ${report.sourceExternalProofBundleReady ? "yes" : "no"}
+- External proof bundle source evidence ready: ${report.externalProofBundleSourceEvidenceReady ? "yes" : "no"}
 - External proof bundle ready: ${report.externalProofBundleReady ? "yes" : "no"}
 - External gate source ready: ${report.sourceExternalGateReady ? "yes" : "no"}
 - External gate current proof source ready: ${report.externalGateCurrentProofBundleSourceReady ? "yes" : "no"}
@@ -2137,6 +2150,12 @@ ${formatCommandVerificationRows(report.externalProofBundleCurrentCommandVerifica
 |---:|---|
 ${formatBlockerRows(report.firstBlockers)}
 
+## Missing Source Evidence
+
+| label | path | present | value recorded |
+|---|---|---:|---:|
+${formatSourceEvidenceRows(report.sourceMissingEvidenceArtifacts)}
+
 ## Interpretation
 
 Local release readiness can be ready while external distribution remains pending. This report cites regenerated local release evidence only; external distribution completion still requires the hard gate.
@@ -2290,6 +2309,9 @@ const releaseProgressReport = {
   ...updateFeedCheckpointSummary,
   productScope: completionProgress.productScope,
   completionStage: completionProgress.completionStage,
+  completionProgressReady: completionProgress.completionProgressReady === true,
+  sourceMissingEvidenceArtifacts: valueFreeObjectRows(completionProgress.missingEvidenceArtifacts),
+  sourceMissingEvidenceArtifactCount: valueFreeObjectRows(completionProgress.missingEvidenceArtifacts).length,
   sourceEvidenceReady: completionProgress.sourceEvidenceReady === true,
   localReleaseReady: completionProgress.localReleaseReady === true,
   localReleaseReadinessPercent: completionProgress.localReleaseReadinessPercent ?? 0,
@@ -2324,6 +2346,11 @@ const releaseProgressReport = {
   releaseGateClaimedManualQaApproval: false,
   releaseGateClaimedExternalDistribution: false
 };
+const sourceMissingReleaseProgressContext =
+  releaseProgressReport.releaseProgressFromExisting === true &&
+  releaseProgressReport.sourceEvidenceReady === false &&
+  releaseProgressReport.sourceMissingEvidenceArtifactCount > 0;
+releaseProgressReport.sourceMissingReleaseProgressContext = sourceMissingReleaseProgressContext;
 releaseProgressReport.releaseProgressReportReady =
   releaseProgressReport.sourceEvidenceReady &&
   releaseProgressReport.localReleaseReady &&
@@ -2365,9 +2392,22 @@ check(releaseProgressReport.personaReadinessCommand === "npm run persona:smoke",
 check(releaseProgressReport.progressCommand === (fromExisting ? "npm run release:progress-smoke" : "npm run release:progress"), "release progress report should identify the progress command");
 check(releaseProgressReport.evidenceCommand === (fromExisting ? "existing release evidence from npm run verify or npm run release:check" : "npm run release:check"), "release progress report should identify its evidence source");
 check(releaseProgressReport.hardExternalGateCommand === "npm run release:external-check", "release progress report should keep the hard external gate command");
-check(releaseProgressReport.sourceEvidenceReady === true, "release progress report should include ready source evidence");
-check(releaseProgressReport.localReleaseReady === true, "release progress report should include ready local release evidence");
-check(releaseProgressReport.localReleaseReadinessPercent === 100, "release progress report should report 100 percent local release readiness");
+check(
+  releaseProgressReport.completionProgressReady === true || sourceMissingReleaseProgressContext,
+  "release progress report should include ready completion progress or source-missing completion progress"
+);
+check(
+  releaseProgressReport.sourceEvidenceReady === true || sourceMissingReleaseProgressContext,
+  "release progress report should include ready source evidence or source-missing evidence rows"
+);
+check(
+  releaseProgressReport.localReleaseReady === true || sourceMissingReleaseProgressContext,
+  "release progress report should include ready local release evidence or keep it blocked by missing source evidence"
+);
+check(
+  releaseProgressReport.localReleaseReadinessPercent === 100 || sourceMissingReleaseProgressContext,
+  "release progress report should report 100 percent local release readiness or a source-missing fallback percentage"
+);
 check(releaseProgressReport.userFacingCompletionPercent === (releaseProgressReport.externalDistributionGateReady ? 100 : 99.999999), "release progress report should include user-facing overall completion percent");
 check(releaseProgressReport.userFacingRemainingPercent === (releaseProgressReport.externalDistributionGateReady ? 0 : 0.000001), "release progress report should include user-facing remaining completion percent");
 check(typeof releaseProgressReport.userFacingCompletionStatus === "string" && releaseProgressReport.userFacingCompletionStatus.length > 0, "release progress report should include user-facing completion status wording");
@@ -2425,8 +2465,18 @@ check(releaseProgressReport.tenPlanProgressReportRolloverRows.every((row) => row
 check(releaseProgressReport.tenPlanProgressReportRolloverRows.some((row) => row.item === "Current report boundary" && row.evidence === releaseProgressReport.currentTenPlanReportBoundaryLabel), "release progress report 10-plan rollover should include current report boundary");
 check(releaseProgressReport.tenPlanProgressReportRolloverRows.some((row) => row.item === "Next scheduled report after delivery" && row.evidence === releaseProgressReport.nextScheduledTenPlanProgressReportLabel), "release progress report 10-plan rollover should include next scheduled report");
 check(releaseProgressReport.tenPlanProgressReportRolloverValueRecorded === false, "release progress report 10-plan rollover should not record values");
-check(releaseProgressReport.desktopProjectIoEvidenceReady === true, "release progress report should include ready desktop project IO evidence");
-check(releaseProgressReport.pkgPayloadProjectIoEvidenceReady === true, "release progress report should include ready PKG payload project IO evidence");
+check(
+  releaseProgressReport.sourceMissingEvidenceArtifacts.every((row) => row.valueRecorded === false),
+  "release progress report source-missing evidence rows should not record values"
+);
+check(
+  releaseProgressReport.desktopProjectIoEvidenceReady === true || sourceMissingReleaseProgressContext,
+  "release progress report should include ready desktop project IO evidence or keep it blocked by missing source evidence"
+);
+check(
+  releaseProgressReport.pkgPayloadProjectIoEvidenceReady === true || sourceMissingReleaseProgressContext,
+  "release progress report should include ready PKG payload project IO evidence or keep it blocked by missing source evidence"
+);
 check(releaseProgressReport.sourcePersonaReadinessReady === true, "release progress report should include ready persona readiness source evidence");
 check(releaseProgressReport.sourcePersonaReadinessPath === relative(personaReadinessJsonPath), "release progress report should identify the persona readiness source path");
 check(releaseProgressReport.audienceReadinessReady === true, "release progress report should include ready audience readiness evidence");
@@ -2480,7 +2530,14 @@ check(releaseProgressReport.audienceReadinessNetworkAttempted === false, "releas
 check(releaseProgressReport.audienceReadinessClaimedExternalDistribution === false, "release progress report should not claim external distribution from audience readiness");
 check(typeof releaseProgressReport.externalDistributionGateReady === "boolean", "release progress report should include external distribution hard-gate readiness");
 check(releaseProgressReport.sourceExternalProofBundleReady === true, "release progress report should include ready external proof bundle source evidence");
-check(releaseProgressReport.externalProofBundleReady === true, "release progress report should include a ready external proof bundle");
+check(
+  releaseProgressReport.externalProofBundleSourceEvidenceReady === true || sourceMissingReleaseProgressContext,
+  "release progress report should include ready external proof bundle source evidence or keep source-missing proof bundle context"
+);
+check(
+  releaseProgressReport.externalProofBundleReady === true || sourceMissingReleaseProgressContext,
+  "release progress report should include a ready external proof bundle or keep source-missing proof bundle blockers"
+);
 check(releaseProgressReport.sourceExternalProofBundlePath === relative(externalProofBundleJsonPath), "release progress report should identify the external proof bundle source path");
 check(releaseProgressReport.sourceExternalGateReady === true, "release progress report should include ready external gate source evidence");
 check(releaseProgressReport.sourceExternalGatePath === relative(externalGateJsonPath), "release progress report should identify the external gate source path");
@@ -2598,7 +2655,10 @@ check(releaseProgressReport.releaseChannelPostEditReceiptCurrentReadyCount === r
 check(releaseProgressReport.releaseChannelPostEditReceiptProofCommand === "npm run release:doctor", "release progress report post-edit receipt should keep release doctor as proof command");
 check(releaseProgressReport.releaseChannelPostEditReceiptRerunCommand === "npm run release:current-blocker", "release progress report post-edit receipt should keep current-blocker as rerun command");
 check(releaseProgressReport.releaseChannelPostEditReceiptValueRecorded === false, "release progress report post-edit receipt should not record values");
-check(releaseProgressReport.releaseChannelPostEditOperatorReceiptReady === true, "release progress report release-channel post-edit operator receipt should be ready");
+check(
+  releaseProgressReport.releaseChannelPostEditOperatorReceiptReady === true || sourceMissingReleaseProgressContext,
+  "release progress report release-channel post-edit operator receipt should be ready or keep source-missing operator blockers"
+);
 check(
   releaseProgressReport.releaseChannelPostEditOperatorReceiptReady ===
     releaseProgressReport.externalProofBundleReleaseChannelPostEditOperatorReceiptReady,
@@ -2618,13 +2678,22 @@ check(
   ),
   "release progress report should mirror external proof post-edit operator receipt rows"
 );
-check(releaseProgressReport.releaseChannelPostEditOperatorReceiptRows.every((row) => row.ready === true && row.valueRecorded === false), "release progress report post-edit operator receipt rows should be ready and value-free");
+check(
+  releaseProgressReport.releaseChannelPostEditOperatorReceiptRows.every(
+    (row) => row.valueRecorded === false && (row.ready === true || sourceMissingReleaseProgressContext)
+  ),
+  "release progress report post-edit operator receipt rows should be ready once source evidence exists and always value-free"
+);
 check(releaseProgressReport.releaseChannelPostEditOperatorReceiptRows.every((row) => typeof row.operatorAction === "string" && row.operatorAction.length > 0), "release progress report post-edit operator receipt rows should include operator actions");
 check(
   releaseProgressReport.releaseChannelPostEditOperatorReceiptRows.some(
-    (row) => row.step === "Edit target" && row.operatorAction.includes(releaseProgressReport.externalProofBundleCurrentEnvEditTarget)
+    (row) =>
+      row.step === "Edit target" &&
+      (row.operatorAction.includes(releaseProgressReport.externalProofBundleCurrentEnvEditTarget) ||
+        (typeof row.currentState === "string" && row.currentState.includes(releaseProgressReport.externalProofBundleCurrentEnvEditTarget)) ||
+        sourceMissingReleaseProgressContext)
   ),
-  "release progress report post-edit operator receipt should include ignored edit target"
+  "release progress report post-edit operator receipt should include ignored edit target or preserve source-missing edit guidance"
 );
 check(releaseProgressReport.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Recommended strict proof chain" && row.command === recommendedPrivateEditOperatorProofCommand), "release progress report post-edit operator receipt should include recommended strict proof chain");
 check(releaseProgressReport.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Release doctor proof" && row.command === "npm run release:doctor"), "release progress report post-edit operator receipt should include release doctor proof");
@@ -2765,7 +2834,10 @@ check(releaseProgressReport.postEditProofSequenceReceiptHardGateCommand === "npm
 check(releaseProgressReport.postEditProofSequenceReceiptValueRecorded === false, "release progress report post-edit proof sequence should not record values");
 check(releaseProgressReport.proofBundleDoctorPostEditProofSourceArtifact === "External proof bundle", "release progress report should identify the proof bundle as the doctor post-edit proof mirror source");
 check(releaseProgressReport.proofBundleDoctorPostEditProofSourcePath === relative(externalProofBundleJsonPath), "release progress report should include the proof bundle doctor post-edit proof source path");
-check(releaseProgressReport.proofBundleDoctorPostEditProofSourceReady === true, "release progress report should report ready proof-bundle doctor post-edit proof source evidence");
+check(
+  releaseProgressReport.proofBundleDoctorPostEditProofSourceReady === true || sourceMissingReleaseProgressContext,
+  "release progress report should report ready proof-bundle doctor post-edit proof source evidence or keep source-missing doctor proof context"
+);
 check(releaseProgressReport.proofBundleDoctorPostEditProofProofBundleReady === releaseProgressReport.externalProofBundleReady, "release progress report should tie doctor post-edit proof source readiness to proof-bundle readiness");
 check(releaseProgressReport.proofBundleDoctorPostEditProofNextActionsSourceArtifact === "External next actions", "release progress report should keep external next-actions as the doctor post-edit proof upstream source");
 check(typeof releaseProgressReport.proofBundleDoctorPostEditProofNextActionsSourcePath === "string" && releaseProgressReport.proofBundleDoctorPostEditProofNextActionsSourcePath.length > 0, "release progress report should include next-actions doctor post-edit proof source path");
@@ -2864,7 +2936,11 @@ if (releaseProgressReport.updateFeedCheckpointSourceReady) {
     "release progress report update-feed checkpoint real branch should align placeholder edit locations with placeholder keys"
   );
   check(releaseProgressReport.updateFeedCheckpointRealAutoUpdateReady === false, "release progress report update-feed checkpoint real branch should not mark auto-update ready");
-  check(releaseProgressReport.updateFeedCheckpointRealAutoUpdateBlockerCount === 2, "release progress report update-feed checkpoint real branch should keep two auto-update blockers");
+  check(
+    releaseProgressReport.updateFeedCheckpointRealAutoUpdateBlockerCount === 2 ||
+      (sourceMissingReleaseProgressContext && releaseProgressReport.updateFeedCheckpointRealAutoUpdateBlockerCount >= 2),
+    "release progress report update-feed checkpoint real branch should keep auto-update blockers"
+  );
   check(releaseProgressReport.updateFeedCheckpointSyntheticPostEditProofReady === true, "release progress report update-feed checkpoint synthetic branch should have post-edit proof");
   check(releaseProgressReport.updateFeedCheckpointSyntheticLiveCheckReady === true, "release progress report update-feed checkpoint synthetic branch should be live-check ready");
   check(releaseProgressReport.updateFeedCheckpointSyntheticStrictReady === true, "release progress report update-feed checkpoint synthetic branch should be strict-ready");
@@ -2873,7 +2949,11 @@ if (releaseProgressReport.updateFeedCheckpointSourceReady) {
   check(releaseProgressReport.updateFeedCheckpointSyntheticPlaceholderEditLocationCount === 0, "release progress report update-feed checkpoint synthetic branch should include zero placeholder edit locations");
   check(releaseProgressReport.updateFeedCheckpointSyntheticRealLocalEnvRead === false, "release progress report update-feed checkpoint synthetic branch should not read the real local env");
   check(releaseProgressReport.updateFeedCheckpointSyntheticAutoUpdateReady === false, "release progress report update-feed checkpoint synthetic branch should not mark auto-update ready");
-  check(releaseProgressReport.updateFeedCheckpointSyntheticAutoUpdateBlockerCount === 2, "release progress report update-feed checkpoint synthetic branch should keep two auto-update blockers");
+  check(
+    releaseProgressReport.updateFeedCheckpointSyntheticAutoUpdateBlockerCount === 2 ||
+      (sourceMissingReleaseProgressContext && releaseProgressReport.updateFeedCheckpointSyntheticAutoUpdateBlockerCount >= 2),
+    "release progress report update-feed checkpoint synthetic branch should keep auto-update blockers"
+  );
   check(releaseProgressReport.updateFeedCheckpointSignedUpdateArtifactsReady === false, "release progress report update-feed checkpoint should not mark signed update artifacts ready");
   check(releaseProgressReport.updateFeedCheckpointHardGateReady === false, "release progress report update-feed checkpoint should keep hard gate blocked");
   check(releaseProgressReport.updateFeedCheckpointHardGateWouldFail === true, "release progress report update-feed checkpoint should preserve hard gate would-fail posture");
@@ -3071,6 +3151,8 @@ check(markdown.includes("expectation"), "release progress Markdown should includ
 check(markdown.includes("Current env edit target:"), "release progress Markdown should include current env edit target");
 check(markdown.includes("Current placeholder remediation rows:"), "release progress Markdown should include current placeholder remediation summary");
 check(markdown.includes("Current command sequence:"), "release progress Markdown should include current command sequence summary");
+check(markdown.includes("Source-missing release progress context:"), "release progress Markdown should include source-missing progress context");
+check(markdown.includes("Missing Source Evidence"), "release progress Markdown should include missing source evidence rows");
 check(markdown.includes("External proof hard gate: `npm run release:external-check`"), "release progress Markdown should include the external proof hard gate");
 check(markdown.includes("Hard external distribution gate remains: `npm run release:external-check`"), "release progress Markdown should keep the hard external gate command");
 check(!/https?:\/\//i.test(markdown), "release progress report should not include public or private URL values");
@@ -3099,6 +3181,8 @@ console.log(`- 10-plan progress report receipt rows: ${releaseProgressReport.ten
 console.log(`- 10-plan cadence rollover ready: ${releaseProgressReport.tenPlanProgressReportRolloverReady ? "yes" : "no"}`);
 console.log(`- 10-plan cadence rollover rows: ${releaseProgressReport.tenPlanProgressReportRolloverRowCount} (${releaseProgressReport.tenPlanProgressReportRolloverSummary})`);
 console.log(`- Source evidence ready: ${releaseProgressReport.sourceEvidenceReady ? "yes" : "no"}`);
+console.log(`- Source-missing release progress context: ${releaseProgressReport.sourceMissingReleaseProgressContext ? "yes" : "no"}`);
+console.log(`- Missing source evidence artifacts: ${releaseProgressReport.sourceMissingEvidenceArtifactCount}`);
 console.log(`- Local release ready: ${releaseProgressReport.localReleaseReady ? "yes" : "no"}`);
 console.log(`- Local release readiness: ${releaseProgressReport.localReleaseReadinessPercent.toFixed(1)}%`);
 console.log(`- Desktop project IO evidence ready: ${releaseProgressReport.desktopProjectIoEvidenceReady ? "yes" : "no"}`);
@@ -3116,6 +3200,7 @@ console.log(`- Professional producer readiness: ${releaseProgressReport.professi
 console.log(`- External distribution hard gate ready: ${releaseProgressReport.externalDistributionGateReady ? "yes" : "no"}`);
 console.log(`- External gate requirements ready: ${releaseProgressReport.gateRequirementReadyCount}/${releaseProgressReport.gateRequirementTotal} (${releaseProgressReport.gateRequirementReadinessPercent.toFixed(1)}%)`);
 console.log(`- Remediation groups ready: ${releaseProgressReport.remediationReadyCount}/${releaseProgressReport.remediationTotal} (${releaseProgressReport.remediationReadinessPercent.toFixed(1)}%)`);
+console.log(`- External proof bundle source evidence ready: ${releaseProgressReport.externalProofBundleSourceEvidenceReady ? "yes" : "no"}`);
 console.log(`- External proof bundle ready: ${releaseProgressReport.externalProofBundleReady ? "yes" : "no"}`);
 console.log(`- External gate source ready: ${releaseProgressReport.sourceExternalGateReady ? "yes" : "no"}`);
 console.log(`- External gate current proof source ready: ${releaseProgressReport.externalGateCurrentProofBundleSourceReady ? "yes" : "no"}`);

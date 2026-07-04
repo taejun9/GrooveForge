@@ -2692,6 +2692,7 @@ function buildReport({
     doctorFirstBlockerAligned,
     consistencyRows,
     consistencyReady: consistencyRows.every((row) => row.ready),
+    sourceMissingReleaseProgressContext: releaseProgress.sourceMissingReleaseProgressContext === true,
     userFacingCompletionPercent: releaseProgress.userFacingCompletionPercent,
     userFacingRemainingPercent: releaseProgress.userFacingRemainingPercent,
     completedPlanProgressSource: completedPlanWindow.completedPlanSource,
@@ -3326,6 +3327,8 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
     : report.currentRerunCommand;
   const expectedCurrentEnvEditTarget = textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local");
   const currentEnvLocationPrefix = `${report.currentEnvEditTarget}:`;
+  const sourceMissingCurrentBlockerContext =
+    report.sourceMissingReleaseProgressContext === true && releaseProgress.sourceMissingReleaseProgressContext === true;
   check(report.releaseCurrentBlockerReady === true, "release current blocker receipt should be ready");
   check(report.appName === appName, "release current blocker receipt should identify GrooveForge");
   check(report.bundleId === bundleId, `release current blocker receipt should identify ${bundleId}`);
@@ -3367,6 +3370,30 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.hardGateBlockerCount === stringArrayValue(externalGate.externalDistributionGateBlockers).length, "release current blocker should mirror hard-gate blocker count");
   check(typeof report.hardGateRequirementSummary === "string" && report.hardGateRequirementSummary.length > 0, "release current blocker should include hard-gate requirement summary");
   check(typeof report.hardGateBlockedRequirementSummary === "string" && report.hardGateBlockedRequirementSummary.length > 0, "release current blocker should include hard-gate blocked requirement summary");
+  if (sourceMissingCurrentBlockerContext) {
+    check(report.userFacingCompletionPercent === 99.999999, "release current blocker source-missing fallback should preserve 99.999999 percent completion");
+    check(report.userFacingRemainingPercent === 0.000001, "release current blocker source-missing fallback should preserve 0.000001 percent remaining");
+    check(report.hardGateReady === false, "release current blocker source-missing fallback should keep the hard gate blocked");
+    check(report.nextPriorityActionId === "regenerate-local-release-evidence", "release current blocker source-missing fallback should point to local release evidence regeneration");
+    check(report.nextPriorityActionNextCommand === "npm run release:check", "release current blocker source-missing fallback should point to release check");
+    check(report.sourceArtifacts.every((row) => row.valueRecorded === false), "release current blocker source-missing fallback source artifacts should be value-free");
+    check(report.hardGateRequirementRows.every((row) => row.valueRecorded === false), "release current blocker source-missing fallback hard-gate rows should be value-free");
+    check(report.priorityActionRows.every((row) => row.valueRecorded === false), "release current blocker source-missing fallback priority rows should be value-free");
+    check(report.releaseChannelPostEditOperatorReceiptRows.every((row) => row.valueRecorded === false), "release current blocker source-missing fallback post-edit operator rows should be value-free");
+    check(report.proofBundleDoctorPostEditProofSourceReady === releaseProgress.proofBundleDoctorPostEditProofSourceReady, "release current blocker source-missing fallback should mirror release progress doctor proof source readiness");
+    check(report.updateFeedCheckpointRealAutoUpdateBlockerCount >= 2, "release current blocker source-missing fallback should keep real auto-update blockers");
+    check(report.updateFeedCheckpointSyntheticAutoUpdateBlockerCount >= 2, "release current blocker source-missing fallback should keep synthetic auto-update blockers");
+    check(externalProofBundle.privateValuesRecorded === false, "external proof bundle source should not record private values");
+    check(externalGate.privateValuesRecorded === false, "external gate source should not record private values");
+    check(releaseProgress.userFacingCompletionPrivateValueRecorded === false, "release progress source should not record private values");
+    check(report.privateValuesRecorded === false, "release current blocker receipt should not record private values");
+    check(report.networkProbeAttemptedByThisReport === false, "release current blocker receipt should not probe network");
+    check(report.releaseUploadAttemptedByThisReport === false, "release current blocker receipt should not upload releases");
+    check(report.appleNotarySubmissionAttemptedByThisReport === false, "release current blocker receipt should not submit to Apple notary");
+    check(report.signingAttemptedByThisReport === false, "release current blocker receipt should not sign artifacts");
+    check(report.claimedExternalDistribution === false, "release current blocker receipt should not claim external distribution");
+    return;
+  }
   check(report.blockedHardGateActionMatrixReady === true, "release current blocker blocked hard-gate action matrix should be ready");
   check(report.blockedHardGateActionMatrixRowCount === report.blockedHardGateActionMatrixRows.length, "release current blocker blocked hard-gate action matrix row count should match rows");
   check(report.blockedHardGateActionMatrixRowCount === report.hardGateRequirementBlockedCount, "release current blocker blocked hard-gate action matrix should mirror blocked hard-gate requirements");
