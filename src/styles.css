@@ -1114,12 +1114,107 @@ h2 {
   font-style: normal;
 }
 
+.audience-next-step-rail {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.audience-next-step-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.36fr) minmax(122px, 0.34fr) minmax(0, 0.8fr) minmax(0, 1fr) minmax(76px, auto);
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 7px;
+}
+
+.audience-next-step-row.good {
+  border-color: rgba(120, 240, 200, 0.24);
+}
+
+.audience-next-step-row.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+}
+
+.audience-next-step-row.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+}
+
+.audience-next-step-row span,
+.audience-next-step-row strong,
+.audience-next-step-row small,
+.audience-next-step-row em,
+.audience-next-step-action span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audience-next-step-row > span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.audience-next-step-row > strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.audience-next-step-row > small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 10px;
+}
+
+.audience-next-step-row > em {
+  color: rgba(120, 240, 200, 0.72);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.audience-next-step-action {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  border: 1px solid rgba(120, 240, 200, 0.2);
+  border-radius: 6px;
+  background: rgba(120, 240, 200, 0.08);
+  color: #f4efe7;
+  padding: 5px 7px;
+}
+
+.audience-next-step-action:hover {
+  border-color: rgba(120, 240, 200, 0.36);
+  background: rgba(120, 240, 200, 0.13);
+}
+
+.audience-next-step-action svg {
+  flex: 0 0 auto;
+  color: currentColor;
+}
+
 .audience-session-card .audience-starter-followup {
   display: block;
   white-space: normal;
 }
 
 .audience-session-grid {
+  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
@@ -29076,6 +29171,11 @@ input[type="range"] {
   }
 
   .audience-session-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .audience-next-step-rail,
+  .audience-next-step-row {
     grid-template-columns: 1fr;
   }
 

@@ -24,6 +24,9 @@ const expectedLiveTestIds = [
   "audience-session-readout",
   "audience-session-action-beginner",
   "audience-session-action-producer",
+  "audience-next-step-rail",
+  "audience-next-step-beginner",
+  "audience-next-step-producer",
   "audience-starter-action-beginner",
   "audience-starter-action-producer",
   "audience-route-bridge",
@@ -187,6 +190,27 @@ function checkResult(result) {
     String(evidence?.palette?.producer?.resultNextCheck ?? "").includes("Review Queue") &&
       String(evidence?.palette?.producer?.resultNextCheck ?? "").includes("Export Preflight"),
     "live desktop Quick Actions producer result should guide the next Review Queue / Export Preflight check"
+  );
+  check(
+    evidence?.palette?.nextStepRail?.present === true &&
+      evidence?.palette?.nextStepRail?.rowCount === 2 &&
+      evidence?.palette?.nextStepRail?.beginnerButtonPresent === true &&
+      evidence?.palette?.nextStepRail?.producerButtonPresent === true,
+    "live desktop Audience Next Step rail should render two actionable audience rows"
+  );
+  check(
+    String(evidence?.palette?.nextStepRail?.beginnerRoute ?? "").includes("First-time composer") &&
+      String(evidence?.palette?.nextStepRail?.beginnerAction ?? "").includes("Guided") &&
+      String(evidence?.palette?.nextStepRail?.beginnerFollowup ?? "").includes("First Beat Path") &&
+      String(evidence?.palette?.nextStepRail?.beginnerFollowup ?? "").includes("Dual Audience Readiness"),
+    "live desktop Audience Next Step rail should show the beginner guided route and follow-up"
+  );
+  check(
+    String(evidence?.palette?.nextStepRail?.producerRoute ?? "").includes("Professional producer") &&
+      String(evidence?.palette?.nextStepRail?.producerAction ?? "").includes("Studio") &&
+      String(evidence?.palette?.nextStepRail?.producerFollowup ?? "").includes("Review Queue") &&
+      String(evidence?.palette?.nextStepRail?.producerFollowup ?? "").includes("Handoff Package Check"),
+    "live desktop Audience Next Step rail should show the professional producer studio route and follow-up"
   );
   check(
     evidence?.palette?.starterBeginner?.buttonPresent === true &&
@@ -576,6 +600,7 @@ child.on("exit", (code, signal) => {
     `- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors, ${result.evidence.visual.nonBackgroundSamples}/${result.evidence.visual.sampledPixels} non-background samples`
   );
   console.log("- Audience session rows: First-time composer, Professional producer");
+  console.log("- Audience next-step rail: visible beginner and professional producer action rows passed");
   console.log("- Audience session Quick Actions: renderer palette search and run evidence passed for Enter Guided and Enter Studio");
   console.log("- Audience Starter controls: visible beginner and producer starter creation evidence passed");
   console.log("- Audience Starter Command Reference: live search, row context, and Quick Actions handoff evidence passed");

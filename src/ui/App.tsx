@@ -9650,6 +9650,29 @@ export function App(): ReactElement {
     const readDomText = (selector: string): string =>
       document.querySelector(selector)?.textContent?.trim() ?? "";
 
+    const readAudienceNextStepRailEvidence = (): GrooveforgeLaunchSmokeAudienceNextStepRailEvidence => {
+      const rowElements = Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="audience-next-step-"]')).filter(
+        (element) => element.dataset.audienceNextStepRow
+      );
+
+      return {
+        activeAudience:
+          document.querySelector<HTMLElement>('[data-testid="audience-next-step-rail"]')?.dataset.audienceNextStepActive ?? "",
+        beginnerAction: readDomText('[data-testid="audience-next-step-beginner-action"]'),
+        beginnerButtonPresent: document.querySelector('[data-testid="audience-next-step-beginner-action-button"]') !== null,
+        beginnerFollowup: readDomText('[data-testid="audience-next-step-beginner-followup"]'),
+        beginnerReadiness: readDomText('[data-testid="audience-next-step-beginner-readiness"]'),
+        beginnerRoute: readDomText('[data-testid="audience-next-step-beginner-route"]'),
+        present: document.querySelector('[data-testid="audience-next-step-rail"]') !== null,
+        producerAction: readDomText('[data-testid="audience-next-step-producer-action"]'),
+        producerButtonPresent: document.querySelector('[data-testid="audience-next-step-producer-action-button"]') !== null,
+        producerFollowup: readDomText('[data-testid="audience-next-step-producer-followup"]'),
+        producerReadiness: readDomText('[data-testid="audience-next-step-producer-readiness"]'),
+        producerRoute: readDomText('[data-testid="audience-next-step-producer-route"]'),
+        rowCount: rowElements.length
+      };
+    };
+
     const readAudienceStarterFollowupRouteResult = (
       starterId: AudienceStarterProjectId,
       route: AudienceStarterFollowupRoute
@@ -9830,6 +9853,7 @@ export function App(): ReactElement {
           dualProducer,
           dualReadout,
           guided,
+          nextStepRail: readAudienceNextStepRailEvidence(),
           opened: true,
           producer,
           routeBridge,

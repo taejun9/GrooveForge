@@ -142,6 +142,51 @@ function AudienceStarterFollowupIcon({ route }: { route: AudienceStarterFollowup
   return <ArrowRight size={13} aria-hidden="true" />;
 }
 
+function AudienceNextStepRail({
+  onSelectAudience,
+  rows,
+  summary
+}: {
+  onSelectAudience: (row: AudienceSessionReadoutRow) => void;
+  rows: AudienceSessionReadoutRow[];
+  summary: AudienceSessionReadoutSummary;
+}): ReactElement {
+  return (
+    <div
+      className="audience-next-step-rail"
+      data-audience-next-step-active={summary.activeAudience}
+      data-testid="audience-next-step-rail"
+      title={`${summary.activeAudienceLabel}: ${summary.nextCheck}`}
+    >
+      {rows.map((row) => (
+        <div
+          className={`audience-next-step-row ${row.tone}`}
+          data-audience-next-step-row={row.id}
+          data-testid={`audience-next-step-${row.id}`}
+          key={row.id}
+          title={`${row.label}: ${row.actionLabel} / ${row.status} / ${row.nextCheck} / ${audienceStarterFollowupLabels[row.id]}`}
+        >
+          <span data-testid={`audience-next-step-${row.id}-route`}>{row.label}</span>
+          <strong data-testid={`audience-next-step-${row.id}-action`}>{row.actionLabel}</strong>
+          <small data-testid={`audience-next-step-${row.id}-readiness`}>{`${row.status}: ${row.value}`}</small>
+          <em data-testid={`audience-next-step-${row.id}-followup`}>{audienceStarterFollowupLabels[row.id]}</em>
+          <button
+            aria-label={`${row.actionLabel} for ${row.label}; ${row.nextCheck}`}
+            className="audience-next-step-action"
+            data-testid={`audience-next-step-${row.id}-action-button`}
+            title={`${row.actionLabel}: ${row.nextCheck}`}
+            type="button"
+            onClick={() => onSelectAudience(row)}
+          >
+            <ArrowRight size={13} aria-hidden="true" />
+            <span>Open</span>
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type GuideQuickStartDecision = {
   source: "path" | "session" | "workflow";
   statusLabel: string;
@@ -426,6 +471,7 @@ export function AudienceSessionReadout({
         <small data-testid="audience-session-readiness">{summary.readinessLabel}</small>
         <em data-testid="audience-session-next-check">{summary.nextCheck}</em>
       </div>
+      <AudienceNextStepRail rows={summary.rows} summary={summary} onSelectAudience={onSelectAudience} />
       <div className="audience-session-grid" data-testid="audience-session-grid">
         {summary.rows.map((row) => (
           <div

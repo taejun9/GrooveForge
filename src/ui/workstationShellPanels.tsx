@@ -315,7 +315,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions",
         target: "Enter Guided / Enter Studio",
         context:
-          "Audience Session Readout rows, Enter Guided first-time composer route, Enter Studio professional producer route, active lane, readiness posture, direct visible readout action, audition cue, and next check before Audience Session commands switch workflow mode."
+          "Audience Session Readout rows, Audience Next Step rail, Enter Guided first-time composer route, Enter Studio professional producer route, active lane, readiness posture, direct visible readout action, audition cue, and next check before Audience Session commands switch workflow mode."
       },
       {
         id: "audience-starter",
