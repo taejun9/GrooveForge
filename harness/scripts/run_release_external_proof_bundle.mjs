@@ -150,7 +150,14 @@ function formatLocationSummary(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "none";
   }
-  return rows.map((row) => `${textValue(row.location)} ${textValue(row.key)}`).join(", ");
+  return rows
+    .map((row) => {
+      const file = textValue(row.file);
+      const line = Number.isInteger(row.line) ? row.line : 0;
+      const location = textValue(row.location, line > 0 && file !== "none" ? `${file}:${line}` : file);
+      return `${location} ${textValue(row.key)}`;
+    })
+    .join(", ");
 }
 
 function actionChecklistRows(values) {
@@ -808,6 +815,12 @@ check(
   summary.currentPrivateInputPlaceholderLocations.every((row) => row.valueRecorded === false),
   "release proof bundle private input placeholder locations should not record values"
 );
+if (summary.currentPrivateInputPlaceholderLocationCount > 0) {
+  check(
+    summary.currentPrivateInputPlaceholderLocationSummary.includes(".env.release-channel.local"),
+    "release proof bundle current private input placeholder summary should include ignored private input file locations"
+  );
+}
 check(typeof summary.currentEnvEditTarget === "string" && summary.currentEnvEditTarget.length > 0, "release proof bundle should include current env edit target");
 check(Number.isInteger(summary.currentEnvEditTemplateCount), "release proof bundle should include current env edit template count");
 check(typeof summary.currentEnvEditTemplateSummary === "string" && summary.currentEnvEditTemplateSummary.length > 0, "release proof bundle should include current env edit template summary");

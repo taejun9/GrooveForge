@@ -1253,86 +1253,212 @@ function collectLaunchSmokeBridgeDirectEvidenceWithTimeout(win: BrowserWindow): 
 }
 
 async function collectLaunchSmokeCommandReferenceEvidence(win: BrowserWindow): Promise<LaunchSmokeCommandReferenceEvidence> {
-  const result = await win.webContents.executeJavaScript(`
-    (async () => {
+  const readEvidenceScript = `
+    (() => {
       const readText = (testId) => document.querySelector('[data-testid="' + testId + '"]')?.textContent?.trim() ?? "";
-      const readEvidence = () => {
-        const contextText = readText("command-reference-item-audience-starter-context");
-        const targetText = readText("command-reference-item-audience-starter-target");
-        return {
-          contextHasDirectComposition: /direct composition posture/i.test(contextText),
-          contextHasFollowupRoutes:
-            contextText.includes("First Beat Path") &&
-            contextText.includes("Dual Audience Readiness") &&
-            contextText.includes("Review Queue") &&
-            contextText.includes("Export Preflight") &&
-            contextText.includes("Handoff Package Check"),
-          contextHasResultMetric: contextText.includes("Audience Starter result metric"),
-          contextHasStarterCommands: contextText.includes("Build Starter Project commands"),
-          contextText,
-          handoffButtonPresent: document.querySelector('[data-testid="command-reference-spotlight-open-quick-actions"]') !== null,
-          itemPresent: document.querySelector('[data-testid="command-reference-item-audience-starter"]') !== null,
-          opened: document.querySelector('[data-testid="command-reference"]') !== null,
-          quickActionsOpenedAfterHandoff: document.querySelector('[data-testid="quick-actions"]') !== null,
-          searchCountText: readText("command-reference-search-count"),
-          searchInputPresent: document.querySelector('[data-testid="command-reference-search-input"]') !== null,
-          searchQuery: document.querySelector('[data-testid="command-reference-search-input"]')?.value ?? "",
-          spotlightContext: readText("command-reference-spotlight-context"),
-          spotlightDetail: readText("command-reference-spotlight-detail"),
-          spotlightId: document.querySelector('[data-testid="command-reference-spotlight"]')?.dataset.commandReferenceSpotlight ?? "",
-          spotlightLabel: readText("command-reference-spotlight-label"),
-          targetHasAudienceTargets: targetText.includes("first-time composer") && targetText.includes("professional producer"),
-          targetText
-        };
+      const contextText = readText("command-reference-item-audience-starter-context");
+      const targetText = readText("command-reference-item-audience-starter-target");
+      return {
+        contextHasDirectComposition: /direct composition posture/i.test(contextText),
+        contextHasFollowupRoutes:
+          contextText.includes("First Beat Path") &&
+          contextText.includes("Dual Audience Readiness") &&
+          contextText.includes("Review Queue") &&
+          contextText.includes("Export Preflight") &&
+          contextText.includes("Handoff Package Check"),
+        contextHasResultMetric: contextText.includes("Audience Starter result metric"),
+        contextHasStarterCommands: contextText.includes("Build Starter Project commands"),
+        contextText,
+        handoffButtonPresent: document.querySelector('[data-testid="command-reference-spotlight-open-quick-actions"]') !== null,
+        itemPresent: document.querySelector('[data-testid="command-reference-item-audience-starter"]') !== null,
+        opened: document.querySelector('[data-testid="command-reference"]') !== null,
+        quickActionsOpenedAfterHandoff: document.querySelector('[data-testid="quick-actions"]') !== null,
+        searchCountText: readText("command-reference-search-count"),
+        searchInputPresent: document.querySelector('[data-testid="command-reference-search-input"]') !== null,
+        searchQuery: document.querySelector('[data-testid="command-reference-search-input"]')?.value ?? "",
+        spotlightContext: readText("command-reference-spotlight-context"),
+        spotlightDetail: readText("command-reference-spotlight-detail"),
+        spotlightId: document.querySelector('[data-testid="command-reference-spotlight"]')?.dataset.commandReferenceSpotlight ?? "",
+        spotlightLabel: readText("command-reference-spotlight-label"),
+        targetHasAudienceTargets: targetText.includes("first-time composer") && targetText.includes("professional producer"),
+        targetText
       };
+    })();
+  `;
 
-      if (window.grooveforge?.launchSmoke !== true) {
-        return { ready: false, evidence: readEvidence() };
-      }
+  const runCommandReferenceStep = async <T,>(step: string, script: string, timeoutMs: number): Promise<T> =>
+    new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error(`Timed out during Command Reference ${step}.`)), timeoutMs);
+      void win.webContents
+        .executeJavaScript(script)
+        .then((result) => {
+          clearTimeout(timeout);
+          resolve(result as T);
+        })
+        .catch((error: unknown) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
+    });
 
-      const openButton = document.querySelector('[data-testid="command-reference-open"]');
-      if (!openButton) {
-        return { ready: false, evidence: readEvidence() };
-      }
-      openButton.click();
-      await Promise.resolve();
-      await Promise.resolve();
+  const initial = await runCommandReferenceStep<{ launchSmokeReady: boolean; openButtonPresent: boolean }>(
+    "readiness check",
+    `
+      (() => ({
+        launchSmokeReady: window.grooveforge?.launchSmoke === true,
+        openButtonPresent: document.querySelector('[data-testid="command-reference-open"]') !== null
+      }))();
+    `,
+    10000
+  );
+  if (!initial.launchSmokeReady || !initial.openButtonPresent) {
+    throw new Error("Launch smoke Command Reference DOM was not ready.");
+  }
 
-      const input = document.querySelector('[data-testid="command-reference-search-input"]');
-      if (input) {
+  const opened = await runCommandReferenceStep<boolean>(
+    "open button click",
+    `
+      (() => {
+        const openButton = document.querySelector('[data-testid="command-reference-open"]');
+        if (!openButton) {
+          return false;
+        }
+        openButton.click();
+        return true;
+      })();
+    `,
+    45000
+  );
+  if (!opened) {
+    throw new Error("Launch smoke Command Reference open button was missing.");
+  }
+
+  const inputReady = await runCommandReferenceStep<{ ready: boolean; evidence: LaunchSmokeCommandReferenceEvidence }>(
+    "search input readiness",
+    `
+      new Promise((resolve) => {
+        const started = Date.now();
+        const readEvidence = () => ${readEvidenceScript};
+        const tick = () => {
+          const evidence = readEvidence();
+          if (evidence.opened === true && evidence.searchInputPresent === true) {
+            resolve({ ready: true, evidence });
+            return;
+          }
+          if (Date.now() - started > 15000) {
+            resolve({ ready: false, evidence });
+            return;
+          }
+          requestAnimationFrame(tick);
+        };
+        tick();
+      });
+    `,
+    20000
+  );
+  if (!inputReady.ready) {
+    throw new Error("Launch smoke Command Reference search input was not ready.");
+  }
+
+  const searched = await runCommandReferenceStep<boolean>(
+    "search query entry",
+    `
+      (() => {
+        const input = document.querySelector('[data-testid="command-reference-search-input"]');
+        if (!input) {
+          return false;
+        }
         const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
         valueSetter?.call(input, "audience starter");
         input.dispatchEvent(new Event("input", { bubbles: true }));
-        await Promise.resolve();
-        await Promise.resolve();
-      }
-
-      const handoffButton = document.querySelector('[data-testid="command-reference-spotlight-open-quick-actions"]');
-      const beforeHandoff = readEvidence();
-      if (handoffButton) {
-        handoffButton.click();
-        await Promise.resolve();
-        await Promise.resolve();
-      }
-
-      return {
-        ready: true,
-        evidence: {
-          ...beforeHandoff,
-          quickActionsOpenedAfterHandoff: document.querySelector('[data-testid="quick-actions"]') !== null
-        }
-      };
-    })();
-  `);
-  if (!result || result.ready !== true || !result.evidence) {
-    throw new Error("Launch smoke Command Reference DOM was not ready.");
+        return true;
+      })();
+    `,
+    10000
+  );
+  if (!searched) {
+    throw new Error("Launch smoke Command Reference search input disappeared.");
   }
-  return result.evidence as LaunchSmokeCommandReferenceEvidence;
+
+  const searchReady = await runCommandReferenceStep<{ ready: boolean; evidence: LaunchSmokeCommandReferenceEvidence }>(
+    "Audience Starter search result readiness",
+    `
+      new Promise((resolve) => {
+        const started = Date.now();
+        const readEvidence = () => ${readEvidenceScript};
+        const tick = () => {
+          const evidence = readEvidence();
+          if (
+            evidence.searchQuery === "audience starter" &&
+            evidence.itemPresent === true &&
+            evidence.spotlightId === "command-audience-starter"
+          ) {
+            resolve({ ready: true, evidence });
+            return;
+          }
+          if (Date.now() - started > 20000) {
+            resolve({ ready: false, evidence });
+            return;
+          }
+          requestAnimationFrame(tick);
+        };
+        tick();
+      });
+    `,
+    25000
+  );
+  if (!searchReady.ready) {
+    throw new Error("Launch smoke Command Reference Audience Starter result was not ready.");
+  }
+
+  await runCommandReferenceStep<boolean>(
+    "Quick Actions handoff",
+    `
+      (() => {
+        const handoffButton = document.querySelector('[data-testid="command-reference-spotlight-open-quick-actions"]');
+        if (!handoffButton) {
+          return false;
+        }
+        handoffButton.click();
+        return true;
+      })();
+    `,
+    10000
+  );
+
+  const handoffReady = await runCommandReferenceStep<{ ready: boolean; evidence: LaunchSmokeCommandReferenceEvidence }>(
+    "Quick Actions handoff readiness",
+    `
+      new Promise((resolve) => {
+        const started = Date.now();
+        const readEvidence = () => ${readEvidenceScript};
+        const tick = () => {
+          const evidence = readEvidence();
+          if (evidence.quickActionsOpenedAfterHandoff === true) {
+            resolve({ ready: true, evidence });
+            return;
+          }
+          if (Date.now() - started > 10000) {
+            resolve({ ready: false, evidence });
+            return;
+          }
+          requestAnimationFrame(tick);
+        };
+        tick();
+      });
+    `,
+    15000
+  );
+
+  return {
+    ...searchReady.evidence,
+    quickActionsOpenedAfterHandoff: handoffReady.evidence.quickActionsOpenedAfterHandoff
+  } as LaunchSmokeCommandReferenceEvidence;
 }
 
 function collectLaunchSmokeCommandReferenceEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeCommandReferenceEvidence> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Timed out collecting live Command Reference evidence.")), 20000);
+    const timeout = setTimeout(() => reject(new Error("Timed out collecting live Command Reference evidence.")), 90000);
     void collectLaunchSmokeCommandReferenceEvidence(win)
       .then((evidence) => {
         clearTimeout(timeout);

@@ -314,6 +314,7 @@ function buildReport({ proofBundle, completionSummary }) {
     userFacingRemaining: textValue(completionSummary?.userFacingRemainingLabel, "unknown"),
     currentOperatorFirstCommand: textValue(completionSummary?.currentOperatorFirstCommand, "npm run release:channel-apply-private-env-preflight"),
     operatorProofCommand: textValue(completionSummary?.operatorProofCommand, "npm run release:private-edit-strict-proof"),
+    currentPrivateInputPlaceholderLocationCount: completionSummary?.currentPrivateInputPlaceholderLocationCount ?? 0,
     currentPrivateInputPlaceholderLocationSummary: textValue(completionSummary?.currentPrivateInputPlaceholderLocationSummary),
     artifactRows,
     sourceArtifactTotal: artifactRows.length,
@@ -362,7 +363,7 @@ function buildMarkdown(report) {
 - User-facing remaining: ${report.userFacingRemaining}
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
 - Operator proof command: \`${report.operatorProofCommand}\`
-- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationSummary}
+- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})
 - Source artifacts present: ${report.sourceArtifactPresentCount}/${report.sourceArtifactTotal}
 - Missing source artifacts: ${report.sourceArtifactMissingCount} (${report.sourceArtifactMissingSummary})
 - Private values recorded: ${readyLabel(report.privateValuesRecorded)}
@@ -396,6 +397,11 @@ function validateReport(report, markdown) {
   check(report.commandRows.every((row) => row.command.startsWith("npm run ")), "source evidence command rows should include npm run commands");
   check(report.sourceArtifactMissingCount === report.commandRowCount, "missing source artifact count should match command rows");
   check(report.tenPlanProgress === report.completedPlanTenPlanProgress, "source evidence prereq 10-plan progress should match current completed plan files");
+  check(
+    report.currentPrivateInputPlaceholderLocationCount === 0 ||
+      report.currentPrivateInputPlaceholderLocationSummary.includes(".env.release-channel.local"),
+    "source evidence prereq should expose ignored private input placeholder file/line locations when present"
+  );
   check(report.privateValuesRecorded === false, "source evidence prereq should not record private values");
   check(report.localEnvValueRecorded === false, "source evidence prereq should not record local env values");
   check(report.releaseUrlValueRecorded === false, "source evidence prereq should not record release URL values");
@@ -452,6 +458,7 @@ try {
   console.log(`- Current first blocker: ${report.proofBundleCurrentFirstBlocker}`);
   console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
   console.log(`- Operator proof command: ${report.operatorProofCommand}`);
+  console.log(`- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})`);
   console.log("- Private values recorded: no");
   console.log("- Network: no distribution channel probe, release upload, update feed publish, Apple notary submission, or signing attempted");
   console.log("- Not claimed: auto-update, Developer ID signing, notarization, Gatekeeper approval, manual QA approval, app-store submission, or external distribution completion");

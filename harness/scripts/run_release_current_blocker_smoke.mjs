@@ -223,7 +223,14 @@ function formatLocationSummary(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "none";
   }
-  return rows.map((row) => `${textValue(row.location)} ${textValue(row.key)}`).join(", ");
+  return rows
+    .map((row) => {
+      const file = textValue(row.file);
+      const line = Number.isInteger(row.line) ? row.line : 0;
+      const location = textValue(row.location, line > 0 && file !== "none" ? `${file}:${line}` : file);
+      return `${location} ${textValue(row.key)}`;
+    })
+    .join(", ");
 }
 
 function commandSequenceFromRows(rows) {
@@ -2181,6 +2188,8 @@ function buildReport({
   );
   if (effectivePrivateInputPlaceholderLocations.length === 0 && placeholderReceiptPlaceholderLocationRows.length > 0) {
     effectivePrivateInputPlaceholderLocations = placeholderReceiptRowsToLocations(placeholderReceiptPlaceholderLocationRows);
+  }
+  if (effectivePrivateInputPlaceholderLocations.length > 0) {
     currentPrivateInputPlaceholderLocationSummary = formatLocationSummary(effectivePrivateInputPlaceholderLocations);
   }
   const placeholderReceiptModes = [
@@ -3989,6 +3998,10 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
     check(
       report.currentPrivateInputPlaceholderLocationCount === report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount,
       "release current blocker should promote private input placeholder file/line locations into current blocker handoff"
+    );
+    check(
+      report.currentPrivateInputPlaceholderLocationSummary.includes(releaseChannelPrivateInputTemplateDefaultPath),
+      "release current blocker private input placeholder summary should include ignored private input file locations"
     );
     check(
       report.currentPrivateInputPlaceholderLocations.every((row) =>

@@ -159,6 +159,10 @@ type CommandReferenceSection = {
   items: CommandReferenceItem[];
 };
 
+type VisibleCommandReferenceSection = CommandReferenceSection & {
+  matchedItemCount: number;
+};
+
 type CommandReferenceFilterId =
   | "all"
   | "desktop-shortcuts"
@@ -202,6 +206,8 @@ type CommandReferenceSectionRecovery = {
   metricValue: string;
   nextCheck: string;
 };
+
+const commandReferenceAllPreviewItemLimit = 8;
 
 const commandReferenceSections: CommandReferenceSection[] = [
   {
@@ -3591,16 +3597,22 @@ export function CommandReferenceDialog({
     selectedFilterId === "all"
       ? commandReferenceSections
       : commandReferenceSections.filter((section) => section.id === selectedFilterId);
-  const visibleSections = filteredSections
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => commandReferenceItemMatchesQuery(section, item, normalizedSearchQuery))
-    }))
+  const previewingAllSections = selectedFilterId === "all" && normalizedSearchQuery.length === 0;
+  const visibleSections: VisibleCommandReferenceSection[] = filteredSections
+    .map((section) => {
+      const matchingItems = section.items.filter((item) => commandReferenceItemMatchesQuery(section, item, normalizedSearchQuery));
+      return {
+        ...section,
+        items: previewingAllSections ? matchingItems.slice(0, commandReferenceAllPreviewItemLimit) : matchingItems,
+        matchedItemCount: matchingItems.length
+      };
+    })
     .filter((section) => section.items.length > 0);
   const showBeatTerms = selectedFilterId === "all" || selectedFilterId === "beat-terms";
-  const visibleBeatTerms = showBeatTerms
+  const matchingBeatTerms = showBeatTerms
     ? beatTermItems.filter((item) => beatTermMatchesQuery(item, normalizedSearchQuery))
     : [];
+  const visibleBeatTerms = previewingAllSections ? matchingBeatTerms.slice(0, commandReferenceAllPreviewItemLimit) : matchingBeatTerms;
   const visibleCommandCount = visibleSections.reduce((total, section) => total + section.items.length, 0);
   const visibleResultCount = visibleCommandCount + visibleBeatTerms.length;
   const hasVisibleResults = visibleResultCount > 0;
@@ -3746,7 +3758,7 @@ export function CommandReferenceDialog({
               >
                 <div className="command-reference-section-title">
                   <span>{section.title}</span>
-                  <strong>{section.items.length}</strong>
+                  <strong>{previewingAllSections ? `${section.items.length}/${section.matchedItemCount}` : section.items.length}</strong>
                 </div>
                 <div className="command-reference-items" role="list">
                   {section.items.map((item) => {
@@ -3784,7 +3796,7 @@ export function CommandReferenceDialog({
             <div className="command-reference-terms" data-testid="command-reference-terms" aria-label="Beat terms">
               <div className="command-reference-section-title">
                 <span>Beat Terms</span>
-                <strong>{visibleBeatTerms.length}</strong>
+                <strong>{previewingAllSections ? `${visibleBeatTerms.length}/${matchingBeatTerms.length}` : visibleBeatTerms.length}</strong>
               </div>
               <div className="command-reference-terms-grid">
                 {visibleBeatTerms.map((item) => (

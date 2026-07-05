@@ -755,6 +755,10 @@ function validateReport(report, markdown) {
       report.currentPrivateInputPlaceholderLocations.every((row) => textValue(row.file).includes(defaultPrivateInputFileName)),
       "release completion summary promoted private input placeholder rows should point to the ignored private input file"
     );
+    check(
+      report.currentPrivateInputPlaceholderLocationSummary.includes(defaultPrivateInputFileName),
+      "release completion summary promoted private input placeholder summary should include ignored private input file locations"
+    );
   }
   check(
     report.placeholderInputReceiptPrivateInputFileMissingLocationCount === 0 ||
