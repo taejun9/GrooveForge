@@ -9673,6 +9673,32 @@ export function App(): ReactElement {
       };
     };
 
+    const readAudienceCompletionCheckpointEvidence = (): GrooveforgeLaunchSmokeAudienceCompletionCheckpointEvidence => {
+      const rowElements = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-testid^="audience-completion-checkpoint-"]')
+      ).filter((element) => element.dataset.audienceCompletionCheckpointRow);
+
+      return {
+        activeAudience:
+          document.querySelector<HTMLElement>('[data-testid="audience-completion-checkpoints"]')?.dataset
+            .audienceCompletionCheckpointsActive ?? "",
+        beginnerDelivery: readDomText('[data-testid="audience-completion-checkpoint-beginner-delivery"]'),
+        beginnerLane: readDomText('[data-testid="audience-completion-checkpoint-beginner-lane"]'),
+        beginnerMode: readDomText('[data-testid="audience-completion-checkpoint-beginner-mode"]'),
+        beginnerNext: readDomText('[data-testid="audience-completion-checkpoint-beginner-next"]'),
+        beginnerReadiness: readDomText('[data-testid="audience-completion-checkpoint-beginner-readiness"]'),
+        beginnerStarter: readDomText('[data-testid="audience-completion-checkpoint-beginner-starter"]'),
+        present: document.querySelector('[data-testid="audience-completion-checkpoints"]') !== null,
+        producerDelivery: readDomText('[data-testid="audience-completion-checkpoint-producer-delivery"]'),
+        producerLane: readDomText('[data-testid="audience-completion-checkpoint-producer-lane"]'),
+        producerMode: readDomText('[data-testid="audience-completion-checkpoint-producer-mode"]'),
+        producerNext: readDomText('[data-testid="audience-completion-checkpoint-producer-next"]'),
+        producerReadiness: readDomText('[data-testid="audience-completion-checkpoint-producer-readiness"]'),
+        producerStarter: readDomText('[data-testid="audience-completion-checkpoint-producer-starter"]'),
+        rowCount: rowElements.length
+      };
+    };
+
     const readAudienceStarterFollowupRouteResult = (
       starterId: AudienceStarterProjectId,
       route: AudienceStarterFollowupRoute
@@ -9846,6 +9872,7 @@ export function App(): ReactElement {
         const starterBeginner = runAudienceStarterRoute("beginner");
         const starterProducer = runAudienceStarterRoute("producer");
         return {
+          completionCheckpoints: readAudienceCompletionCheckpointEvidence(),
           completionBeginner,
           completionProducer,
           completionReadout,

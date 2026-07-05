@@ -187,6 +187,56 @@ function AudienceNextStepRail({
   );
 }
 
+const audienceCompletionCheckpointModes: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Guided first-beat mode",
+  producer: "Studio producer scan"
+};
+
+const audienceCompletionCheckpointDelivery: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Completion: First Beat Path -> Export Preflight -> Handoff Package Check",
+  producer: "Completion: Production Snapshot -> Export Preflight -> Handoff Package Check"
+};
+
+function AudienceCompletionCheckpoints({
+  rows,
+  summary
+}: {
+  rows: AudienceSessionReadoutRow[];
+  summary: AudienceSessionReadoutSummary;
+}): ReactElement {
+  return (
+    <div
+      className="audience-completion-checkpoints"
+      data-audience-completion-checkpoints-active={summary.activeAudience}
+      data-testid="audience-completion-checkpoints"
+      title={`${summary.activeAudienceLabel}: ${summary.readinessLabel} / ${summary.nextCheck}`}
+    >
+      {rows.map((row) => (
+        <div
+          className={`audience-completion-checkpoint-row ${row.tone}`}
+          data-audience-completion-checkpoint-row={row.id}
+          data-testid={`audience-completion-checkpoint-${row.id}`}
+          key={row.id}
+          title={`${row.label}: ${audienceCompletionCheckpointModes[row.id]} / ${row.nextCheck} / ${audienceStarterFollowupLabels[row.id]} / ${audienceCompletionCheckpointDelivery[row.id]}`}
+        >
+          <span data-testid={`audience-completion-checkpoint-${row.id}-lane`}>{row.label}</span>
+          <strong data-testid={`audience-completion-checkpoint-${row.id}-mode`}>
+            {audienceCompletionCheckpointModes[row.id]}
+          </strong>
+          <small data-testid={`audience-completion-checkpoint-${row.id}-next`}>{row.nextCheck}</small>
+          <em data-testid={`audience-completion-checkpoint-${row.id}-starter`}>
+            {audienceStarterFollowupLabels[row.id]}
+          </em>
+          <small data-testid={`audience-completion-checkpoint-${row.id}-readiness`}>{`${row.status}: ${row.value}`}</small>
+          <em data-testid={`audience-completion-checkpoint-${row.id}-delivery`}>
+            {audienceCompletionCheckpointDelivery[row.id]}
+          </em>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type GuideQuickStartDecision = {
   source: "path" | "session" | "workflow";
   statusLabel: string;
@@ -472,6 +522,7 @@ export function AudienceSessionReadout({
         <em data-testid="audience-session-next-check">{summary.nextCheck}</em>
       </div>
       <AudienceNextStepRail rows={summary.rows} summary={summary} onSelectAudience={onSelectAudience} />
+      <AudienceCompletionCheckpoints rows={summary.rows} summary={summary} />
       <div className="audience-session-grid" data-testid="audience-session-grid">
         {summary.rows.map((row) => (
           <div

@@ -27,6 +27,9 @@ const expectedLiveTestIds = [
   "audience-next-step-rail",
   "audience-next-step-beginner",
   "audience-next-step-producer",
+  "audience-completion-checkpoints",
+  "audience-completion-checkpoint-beginner",
+  "audience-completion-checkpoint-producer",
   "audience-starter-action-beginner",
   "audience-starter-action-producer",
   "audience-route-bridge",
@@ -211,6 +214,26 @@ function checkResult(result) {
       String(evidence?.palette?.nextStepRail?.producerFollowup ?? "").includes("Review Queue") &&
       String(evidence?.palette?.nextStepRail?.producerFollowup ?? "").includes("Handoff Package Check"),
     "live desktop Audience Next Step rail should show the professional producer studio route and follow-up"
+  );
+  check(
+    evidence?.palette?.completionCheckpoints?.present === true &&
+      evidence?.palette?.completionCheckpoints?.rowCount === 2,
+    "live desktop Audience Completion Checkpoints should render two audience lanes"
+  );
+  check(
+    String(evidence?.palette?.completionCheckpoints?.beginnerLane ?? "").includes("First-time composer") &&
+      String(evidence?.palette?.completionCheckpoints?.beginnerMode ?? "").includes("Guided") &&
+      String(evidence?.palette?.completionCheckpoints?.beginnerStarter ?? "").includes("First Beat Path") &&
+      String(evidence?.palette?.completionCheckpoints?.beginnerDelivery ?? "").includes("Handoff Package Check"),
+    "live desktop Audience Completion Checkpoints should show the beginner guided completion path"
+  );
+  check(
+    String(evidence?.palette?.completionCheckpoints?.producerLane ?? "").includes("Professional producer") &&
+      String(evidence?.palette?.completionCheckpoints?.producerMode ?? "").includes("Studio") &&
+      String(evidence?.palette?.completionCheckpoints?.producerStarter ?? "").includes("Review Queue") &&
+      String(evidence?.palette?.completionCheckpoints?.producerDelivery ?? "").includes("Production Snapshot") &&
+      String(evidence?.palette?.completionCheckpoints?.producerDelivery ?? "").includes("Export Preflight"),
+    "live desktop Audience Completion Checkpoints should show the professional producer delivery path"
   );
   check(
     evidence?.palette?.starterBeginner?.buttonPresent === true &&
@@ -601,6 +624,7 @@ child.on("exit", (code, signal) => {
   );
   console.log("- Audience session rows: First-time composer, Professional producer");
   console.log("- Audience next-step rail: visible beginner and professional producer action rows passed");
+  console.log("- Audience completion checkpoints: visible beginner and professional producer completion paths passed");
   console.log("- Audience session Quick Actions: renderer palette search and run evidence passed for Enter Guided and Enter Studio");
   console.log("- Audience Starter controls: visible beginner and producer starter creation evidence passed");
   console.log("- Audience Starter Command Reference: live search, row context, and Quick Actions handoff evidence passed");
