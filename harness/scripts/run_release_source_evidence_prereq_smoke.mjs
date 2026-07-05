@@ -298,6 +298,19 @@ function buildReport({ proofBundle, completionSummary }) {
     proofBundle?.currentNextCommand,
     textValue(completionSummary?.currentNextCommand, commandRows[0]?.command ?? "npm run release:progress-refresh-smoke")
   );
+  const proofBundleOperatorRows = Array.isArray(proofBundle?.currentOperatorCommandRows)
+    ? proofBundle.currentOperatorCommandRows
+    : [];
+  const currentOperatorFirstCommand = textValue(
+    proofBundle?.currentOperatorFirstCommand,
+    textValue(
+      proofBundle?.currentOperatorStartCommand,
+      textValue(
+        proofBundleOperatorRows[0]?.command,
+        textValue(completionSummary?.currentOperatorFirstCommand, "npm run release:channel-apply-private-env-preflight")
+      )
+    )
+  );
   const tenPlanProgress = completionSummaryMatchesCompletedPlan
     ? textValue(completionSummary?.tenPlanProgress, completedPlanTenPlanProgress)
     : completedPlanTenPlanProgress;
@@ -326,7 +339,7 @@ function buildReport({ proofBundle, completionSummary }) {
     userFacingRemaining: textValue(completionSummary?.userFacingRemainingLabel, "unknown"),
     currentFirstBlocker,
     currentNextCommand,
-    currentOperatorFirstCommand: textValue(completionSummary?.currentOperatorFirstCommand, "npm run release:channel-apply-private-env-preflight"),
+    currentOperatorFirstCommand,
     operatorProofCommand: textValue(completionSummary?.operatorProofCommand, "npm run release:private-edit-strict-proof"),
     currentPrivateInputPlaceholderLocationCount: completionSummary?.currentPrivateInputPlaceholderLocationCount ?? 0,
     currentPrivateInputPlaceholderLocationSummary: textValue(completionSummary?.currentPrivateInputPlaceholderLocationSummary),
