@@ -26,6 +26,11 @@ const releaseChannelMetadataKeys = [
 const privateEditStrictProofCommand = "npm run release:private-edit-strict-proof";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const releaseChannelApplyPrivateEnvProofCommand = "npm run release:channel-apply-private-env-proof";
+const releaseChannelPrivateInputTemplateCommand = "npm run release:channel-private-input-template";
+const releaseChannelPrivateInputTemplateRole = "ignored-private-input-template-helper";
+const releaseChannelPrivateInputTemplateDefaultPath = ".env.release-channel.local";
+const releaseChannelPrivateInputTemplatePrivateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
 const releaseChannelPrivateInputSourceLabel = "process env values or ignored private input file rows";
 const releaseChannelEnvKeyGuidance = {
   GROOVEFORGE_DISTRIBUTION_CHANNEL: "Use one of direct-download, private-beta, or managed-release.",
@@ -357,6 +362,89 @@ async function readLocalEnvKeyLocations(keys) {
     }
   }
   return locations;
+}
+
+function privateInputCandidatePath() {
+  const configuredPath = process.env[releaseChannelPrivateInputTemplatePrivateInputFileKey]?.trim();
+  const candidate = configuredPath || releaseChannelPrivateInputTemplateDefaultPath;
+  return path.isAbsolute(candidate) ? candidate : path.resolve(root, candidate);
+}
+
+function placeholderLikeValue(rawValue) {
+  const normalized = String(rawValue ?? "").trim().replace(/^['"]|['"]$/g, "").trim();
+  if (normalized.length === 0) {
+    return true;
+  }
+  return normalized.startsWith("<") || normalized.endsWith(">") || normalized.includes("PLACEHOLDER");
+}
+
+function parseEnvLineAssignment(line) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("#")) {
+    return null;
+  }
+  const withoutExport = trimmed.startsWith("export ") ? trimmed.slice("export ".length).trim() : trimmed;
+  const separatorIndex = withoutExport.indexOf("=");
+  if (separatorIndex <= 0) {
+    return null;
+  }
+  const key = withoutExport.slice(0, separatorIndex).trim();
+  if (!/^[A-Z0-9_]+$/.test(key)) {
+    return null;
+  }
+  return {
+    key,
+    rawValue: withoutExport.slice(separatorIndex + 1)
+  };
+}
+
+async function readPrivateInputFileHandoff(keys) {
+  const keySet = new Set(Array.isArray(keys) ? keys : []);
+  const filePath = privateInputCandidatePath();
+  const displayPath = displayLocalEnvTarget(filePath);
+  if (!existsSync(filePath) || keySet.size === 0) {
+    return {
+      currentPrivateInputFilePath: displayPath,
+      currentPrivateInputFilePresent: false,
+      currentPrivateInputLoadedKeyCount: 0,
+      currentPrivateInputLoadedKeySummary: "none",
+      currentPrivateInputLoadedKeys: [],
+      currentPrivateInputPlaceholderLocationCount: 0,
+      currentPrivateInputPlaceholderLocationSummary: "none",
+      currentPrivateInputPlaceholderLocations: []
+    };
+  }
+
+  const loadedKeySet = new Set();
+  const placeholderLocations = [];
+  const lines = (await readFile(filePath, "utf8")).split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    const parsed = parseEnvLineAssignment(line);
+    if (!parsed || !keySet.has(parsed.key)) {
+      continue;
+    }
+    loadedKeySet.add(parsed.key);
+    if (placeholderLikeValue(parsed.rawValue)) {
+      placeholderLocations.push({
+        key: parsed.key,
+        file: displayPath,
+        line: index + 1,
+        placeholder: true,
+        valueRecorded: false
+      });
+    }
+  }
+  const loadedKeys = [...loadedKeySet];
+  return {
+    currentPrivateInputFilePath: displayPath,
+    currentPrivateInputFilePresent: true,
+    currentPrivateInputLoadedKeyCount: loadedKeys.length,
+    currentPrivateInputLoadedKeySummary: formatSummary(loadedKeys),
+    currentPrivateInputLoadedKeys: loadedKeys,
+    currentPrivateInputPlaceholderLocationCount: placeholderLocations.length,
+    currentPrivateInputPlaceholderLocationSummary: formatLocationSummary(placeholderLocations),
+    currentPrivateInputPlaceholderLocations: placeholderLocations
+  };
 }
 
 function envTemplatePlaceholderForKey(key) {
@@ -789,6 +877,13 @@ function buildMarkdown(report) {
 - Current action post-edit proof role: ${report.currentActionPostEditProofRole}
 - Current first blocker: ${report.currentActionFirstBlocker}
 - Current env edit target: ${report.currentEnvEditTarget}
+- Private input template command: \`${report.releaseChannelPrivateInputTemplateCommand}\`
+- Private input file default path: ${report.releaseChannelPrivateInputTemplateDefaultPath}
+- Current private input file path: ${report.currentPrivateInputFilePath}
+- Current private input file present: ${readyLabel(report.currentPrivateInputFilePresent)}
+- Current private input loaded keys: ${report.currentPrivateInputLoadedKeyCount} (${report.currentPrivateInputLoadedKeySummary})
+- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})
+- Current private input preflight/apply/proof: \`${report.currentPrivateInputPreflightCommand}\` -> \`${report.currentPrivateInputApplyCommand}\` -> \`${report.currentPrivateInputStrictProofCommand}\`
 - Current action required keys: ${report.currentActionRequiredKeyCount} (${report.currentActionRequiredKeySummary})
 - Current action placeholder keys: ${report.currentActionPlaceholderKeyCount} (${report.currentActionPlaceholderKeySummary})
 - Current action placeholder edit locations: ${report.currentActionPlaceholderEditLocationCount} (${report.currentActionPlaceholderEditLocationSummary})
@@ -876,6 +971,18 @@ ${formatChecklistList(report.completionGapClaimBlockers)}
 - First blocker: ${report.currentActionFirstBlocker}
 - Env edit target: ${report.currentEnvEditTarget}
 - Operator action: ${report.currentActionOperatorAction}
+- Private input file key: ${report.releaseChannelPrivateInputTemplatePrivateInputFileKey}
+- Private input template command: \`${report.releaseChannelPrivateInputTemplateCommand}\`
+- Private input default path: ${report.releaseChannelPrivateInputTemplateDefaultPath}
+- Private input current file path: ${report.currentPrivateInputFilePath}
+- Private input file present: ${readyLabel(report.currentPrivateInputFilePresent)}
+- Private input loaded keys: ${report.currentPrivateInputLoadedKeyCount} (${report.currentPrivateInputLoadedKeySummary})
+- Private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})
+- Private input preflight command: \`${report.currentPrivateInputPreflightCommand}\`
+- Private input apply command: \`${report.currentPrivateInputApplyCommand}\`
+- Private input proof runner command: \`${report.currentPrivateInputProofRunnerCommand}\`
+- Private input strict proof command: \`${report.currentPrivateInputStrictProofCommand}\`
+- Private input handoff value recorded: ${readyLabel(report.currentPrivateInputHandoffValueRecorded)}
 - Required keys: ${report.currentActionRequiredKeyCount} (${report.currentActionRequiredKeySummary})
 - Placeholder keys: ${report.currentActionPlaceholderKeyCount} (${report.currentActionPlaceholderKeySummary})
 - Placeholder edit locations: ${report.currentActionPlaceholderEditLocationCount} (${report.currentActionPlaceholderEditLocationSummary})
@@ -892,6 +999,28 @@ ${formatChecklistList(report.completionGapClaimBlockers)}
 - Value recorded: ${readyLabel(report.currentActionValueRecorded)}
 
 ${formatChecklistList(report.currentActionChecklist)}
+
+## Private Input Handoff
+
+- Handoff ready: ${readyLabel(report.currentPrivateInputHandoffReady)}
+- Template command: \`${report.releaseChannelPrivateInputTemplateCommand}\`
+- Template role: ${report.releaseChannelPrivateInputTemplateRole}
+- Template default path: ${report.releaseChannelPrivateInputTemplateDefaultPath}
+- Private input file key: ${report.releaseChannelPrivateInputTemplatePrivateInputFileKey}
+- Template before preflight: ${readyLabel(report.releaseChannelPrivateInputTemplateBeforePreflight)}
+- Current private input file path: ${report.currentPrivateInputFilePath}
+- Current private input file present: ${readyLabel(report.currentPrivateInputFilePresent)}
+- Current private input loaded keys: ${report.currentPrivateInputLoadedKeyCount} (${report.currentPrivateInputLoadedKeySummary})
+- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})
+- Preflight command: \`${report.currentPrivateInputPreflightCommand}\`
+- Apply command: \`${report.currentPrivateInputApplyCommand}\`
+- Proof runner command: \`${report.currentPrivateInputProofRunnerCommand}\`
+- Strict proof command: \`${report.currentPrivateInputStrictProofCommand}\`
+- Value recorded: ${readyLabel(report.currentPrivateInputHandoffValueRecorded)}
+
+| file | line | key | value recorded |
+|---|---:|---|---:|
+${formatLocationRows(report.currentPrivateInputPlaceholderLocations)}
 
 ## Current Action Command Sequence
 
@@ -1020,6 +1149,7 @@ const externalDistributionReady =
   developerIdReadiness.externalDistributionReady === true;
 const currentEnvEditTarget = currentLocalEnvEditTarget(localEnvPresentFiles);
 const currentActionEditLocations = await readLocalEnvKeyLocations(releaseChannelMetadataKeys);
+const currentPrivateInputHandoff = await readPrivateInputFileHandoff(releaseChannelMetadataKeys);
 const currentAction = enrichCurrentAction(
   buildCurrentAction({
     localEnvFileLoaded,
@@ -1119,6 +1249,19 @@ const releaseDoctorReport = {
   localEnvReady: distributionEnvTemplate.localEnvReady === true,
   currentEnvEditTarget,
   currentEnvConfiguredFileKey: distributionLocalEnvDefaults.configuredFileKey,
+  releaseChannelPrivateInputTemplateCommand,
+  releaseChannelPrivateInputTemplateRole,
+  releaseChannelPrivateInputTemplateDefaultPath,
+  releaseChannelPrivateInputTemplatePrivateInputFileKey,
+  releaseChannelPrivateInputTemplateBeforePreflight: true,
+  releaseChannelPrivateInputTemplateValueRecorded: false,
+  currentPrivateInputPreflightCommand: releaseChannelApplyPrivateEnvPreflightCommand,
+  currentPrivateInputApplyCommand: releaseChannelApplyPrivateEnvCommand,
+  currentPrivateInputProofRunnerCommand: releaseChannelApplyPrivateEnvProofCommand,
+  currentPrivateInputStrictProofCommand: privateEditStrictProofCommand,
+  currentPrivateInputHandoffReady: true,
+  currentPrivateInputHandoffValueRecorded: false,
+  ...currentPrivateInputHandoff,
   ...currentAction,
   ...completionGap,
   updateFeedCurrentEnvironmentReady: updateFeedConfig.currentEnvironmentReady === true,
@@ -1401,6 +1544,87 @@ check(releaseDoctorReport.currentActionPostEditProofValueRecorded === false, "re
 check(typeof releaseDoctorReport.currentActionFirstBlocker === "string" && releaseDoctorReport.currentActionFirstBlocker.length > 0, "release doctor should include the current first blocker");
 check(typeof releaseDoctorReport.currentEnvEditTarget === "string" && releaseDoctorReport.currentEnvEditTarget.length > 0, "release doctor should include the current env edit target");
 check(releaseDoctorReport.currentEnvConfiguredFileKey === "GROOVEFORGE_DISTRIBUTION_ENV_FILE", "release doctor should include the env file override key name");
+check(
+  releaseDoctorReport.releaseChannelPrivateInputTemplateCommand === releaseChannelPrivateInputTemplateCommand,
+  "release doctor should include the release-channel private input template command"
+);
+check(
+  releaseDoctorReport.releaseChannelPrivateInputTemplateRole === releaseChannelPrivateInputTemplateRole,
+  "release doctor should include the release-channel private input template role"
+);
+check(
+  releaseDoctorReport.releaseChannelPrivateInputTemplateDefaultPath === releaseChannelPrivateInputTemplateDefaultPath,
+  "release doctor should include the release-channel private input template default path"
+);
+check(
+  releaseDoctorReport.releaseChannelPrivateInputTemplatePrivateInputFileKey === releaseChannelPrivateInputTemplatePrivateInputFileKey,
+  "release doctor should include the release-channel private input file key"
+);
+check(
+  releaseDoctorReport.releaseChannelPrivateInputTemplateBeforePreflight === true,
+  "release doctor should place the private input template before preflight"
+);
+check(
+  releaseDoctorReport.releaseChannelPrivateInputTemplateValueRecorded === false,
+  "release doctor private input template handoff should be value-free"
+);
+check(
+  releaseDoctorReport.currentPrivateInputPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand,
+  "release doctor should include the private input preflight command"
+);
+check(
+  releaseDoctorReport.currentPrivateInputApplyCommand === releaseChannelApplyPrivateEnvCommand,
+  "release doctor should include the private input apply command"
+);
+check(
+  releaseDoctorReport.currentPrivateInputProofRunnerCommand === releaseChannelApplyPrivateEnvProofCommand,
+  "release doctor should include the private input proof runner command"
+);
+check(
+  releaseDoctorReport.currentPrivateInputStrictProofCommand === privateEditStrictProofCommand,
+  "release doctor should include the strict private-edit proof command"
+);
+check(typeof releaseDoctorReport.currentPrivateInputFilePath === "string" && releaseDoctorReport.currentPrivateInputFilePath.length > 0, "release doctor should include the current private input file path");
+check(typeof releaseDoctorReport.currentPrivateInputFilePresent === "boolean", "release doctor should include current private input file presence");
+check(Number.isInteger(releaseDoctorReport.currentPrivateInputLoadedKeyCount), "release doctor should include current private input loaded-key count");
+check(typeof releaseDoctorReport.currentPrivateInputLoadedKeySummary === "string", "release doctor should include current private input loaded-key summary");
+check(Array.isArray(releaseDoctorReport.currentPrivateInputLoadedKeys), "release doctor should include current private input loaded keys");
+check(
+  releaseDoctorReport.currentPrivateInputLoadedKeyCount === releaseDoctorReport.currentPrivateInputLoadedKeys.length,
+  "release doctor current private input loaded-key count should match listed keys"
+);
+check(
+  releaseDoctorReport.currentPrivateInputLoadedKeys.every((key) => releaseChannelMetadataKeys.includes(key)),
+  "release doctor current private input loaded keys should be limited to release-channel metadata keys"
+);
+check(Number.isInteger(releaseDoctorReport.currentPrivateInputPlaceholderLocationCount), "release doctor should include current private input placeholder location count");
+check(typeof releaseDoctorReport.currentPrivateInputPlaceholderLocationSummary === "string", "release doctor should include current private input placeholder location summary");
+check(Array.isArray(releaseDoctorReport.currentPrivateInputPlaceholderLocations), "release doctor should include current private input placeholder locations");
+check(
+  releaseDoctorReport.currentPrivateInputPlaceholderLocationCount === releaseDoctorReport.currentPrivateInputPlaceholderLocations.length,
+  "release doctor current private input placeholder location count should match listed locations"
+);
+check(
+  releaseDoctorReport.currentPrivateInputPlaceholderLocations.every(
+    (item) =>
+      releaseChannelMetadataKeys.includes(item.key) &&
+      typeof item.file === "string" &&
+      item.file.length > 0 &&
+      Number.isInteger(item.line) &&
+      item.line > 0 &&
+      item.placeholder === true &&
+      item.valueRecorded === false
+  ),
+  "release doctor current private input placeholder locations should include only value-free file, line, key, and placeholder rows"
+);
+check(
+  releaseDoctorReport.currentPrivateInputHandoffReady === true,
+  "release doctor private input handoff should be ready"
+);
+check(
+  releaseDoctorReport.currentPrivateInputHandoffValueRecorded === false,
+  "release doctor private input handoff should not record values"
+);
 check(Number.isInteger(releaseDoctorReport.currentActionRequiredKeyCount), "release doctor should include the current required key count");
 check(typeof releaseDoctorReport.currentActionRequiredKeySummary === "string", "release doctor should include the current required key summary");
 check(Array.isArray(releaseDoctorReport.currentActionRequiredKeys), "release doctor should include current required keys");
@@ -1717,6 +1941,12 @@ check(markdown.includes("Current action post-edit proof command:"), "release doc
 check(markdown.includes("Current action post-edit proof role:"), "release doctor Markdown should include current action post-edit proof role");
 check(markdown.includes("Current first blocker:"), "release doctor Markdown should include current first blocker");
 check(markdown.includes("Current env edit target:"), "release doctor Markdown should include current env edit target");
+check(markdown.includes("Private input template command:"), "release doctor Markdown should include private input template command");
+check(markdown.includes("Current private input file path:"), "release doctor Markdown should include current private input file path");
+check(markdown.includes("Current private input placeholder locations:"), "release doctor Markdown should include current private input placeholder locations");
+check(markdown.includes("Private Input Handoff"), "release doctor Markdown should include private input handoff section");
+check(markdown.includes("Template before preflight:"), "release doctor Markdown should include private input template ordering");
+check(markdown.includes("Proof runner command:"), "release doctor Markdown should include private input proof runner command");
 check(markdown.includes("Current action required keys:"), "release doctor Markdown should include current action required keys");
 check(markdown.includes("Current action placeholder keys:"), "release doctor Markdown should include current action placeholder keys");
 check(markdown.includes("Current action placeholder edit locations:"), "release doctor Markdown should include current action placeholder edit locations");
@@ -1789,6 +2019,19 @@ console.log(`- Current action post-edit proof command: ${releaseDoctorReport.cur
 console.log(`- Current action post-edit proof role: ${releaseDoctorReport.currentActionPostEditProofRole}`);
 console.log(`- Current first blocker: ${releaseDoctorReport.currentActionFirstBlocker}`);
 console.log(`- Current env edit target: ${releaseDoctorReport.currentEnvEditTarget}`);
+console.log(`- Private input template command: ${releaseDoctorReport.releaseChannelPrivateInputTemplateCommand}`);
+console.log(`- Private input file key: ${releaseDoctorReport.releaseChannelPrivateInputTemplatePrivateInputFileKey}`);
+console.log(`- Private input default path: ${releaseDoctorReport.releaseChannelPrivateInputTemplateDefaultPath}`);
+console.log(`- Current private input file path: ${releaseDoctorReport.currentPrivateInputFilePath}`);
+console.log(`- Current private input file present: ${releaseDoctorReport.currentPrivateInputFilePresent ? "yes" : "no"}`);
+console.log(`- Current private input loaded keys: ${releaseDoctorReport.currentPrivateInputLoadedKeyCount} (${releaseDoctorReport.currentPrivateInputLoadedKeySummary})`);
+console.log(
+  `- Current private input placeholder locations: ${releaseDoctorReport.currentPrivateInputPlaceholderLocationCount} (${releaseDoctorReport.currentPrivateInputPlaceholderLocationSummary})`
+);
+console.log(`- Private input preflight command: ${releaseDoctorReport.currentPrivateInputPreflightCommand}`);
+console.log(`- Private input apply command: ${releaseDoctorReport.currentPrivateInputApplyCommand}`);
+console.log(`- Private input proof runner command: ${releaseDoctorReport.currentPrivateInputProofRunnerCommand}`);
+console.log(`- Private input strict proof command: ${releaseDoctorReport.currentPrivateInputStrictProofCommand}`);
 console.log(`- Current action required keys: ${releaseDoctorReport.currentActionRequiredKeyCount} (${releaseDoctorReport.currentActionRequiredKeySummary})`);
 console.log(`- Current action placeholder keys: ${releaseDoctorReport.currentActionPlaceholderKeyCount} (${releaseDoctorReport.currentActionPlaceholderKeySummary})`);
 console.log(`- Current action placeholder edit locations: ${releaseDoctorReport.currentActionPlaceholderEditLocationCount} (${releaseDoctorReport.currentActionPlaceholderEditLocationSummary})`);
