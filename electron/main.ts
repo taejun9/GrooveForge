@@ -948,6 +948,9 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "audience-delivery-snapshot",
         "audience-delivery-snapshot-beginner",
         "audience-delivery-snapshot-producer",
+        "audience-delivery-proof-bridge",
+        "audience-delivery-proof-bridge-beginner",
+        "audience-delivery-proof-bridge-producer",
         "audience-starter-action-beginner",
         "audience-starter-action-producer",
         "audience-route-bridge",
@@ -982,6 +985,7 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "Audience session",
         "Audience Route Bridge",
         "Dual Audience Readiness",
+        "Audience Delivery Proof Bridge",
         "First-time composer",
         "First-time composer lane",
         "Professional producer",
@@ -1159,7 +1163,12 @@ async function collectLaunchSmokePaletteEvidence(win: BrowserWindow): Promise<La
 
 function collectLaunchSmokePaletteEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokePaletteEvidence> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Timed out collecting live Quick Actions palette evidence.")), 150000);
+    const timeout = setTimeout(() => {
+      void win.webContents
+        .executeJavaScript(`window.__grooveforgeLaunchSmokePaletteStep ?? "unknown"`)
+        .then((step: unknown) => reject(new Error(`Timed out collecting live Quick Actions palette evidence at ${String(step)}.`)))
+        .catch(() => reject(new Error("Timed out collecting live Quick Actions palette evidence.")));
+    }, 150000);
     void collectLaunchSmokePaletteEvidence(win)
       .then((evidence) => {
         clearTimeout(timeout);

@@ -838,6 +838,7 @@ import {
   createGuideQuickStartCompletionBottleneckLabel,
   createGuideQuickStartCompletionBreakdownItems,
   createGuideQuickStartCompletionScore,
+  createAudienceDeliveryProofBridgeQuickActions,
   createAudienceRouteBridgeQuickActions,
   createAudienceRouteBridgeSummary,
   createAudienceCompletionRouteQuickActions,
@@ -1499,6 +1500,7 @@ export function createQuickActions({
   onSelectPattern,
   onSelectStyle,
   onSelectAudienceSessionRow,
+  onFocusAudienceDeliveryProofBridgeReadout,
   onFocusAudienceRouteBridgeReadout,
   onFocusAudienceCompletionRouteReadout,
   onFocusDualAudienceReadinessRouteReadout,
@@ -1890,6 +1892,7 @@ export function createQuickActions({
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
   onSelectAudienceSessionRow: (row: AudienceSessionReadoutRow) => void;
   onCreateAudienceStarter: (starterId: AudienceStarterProjectId) => void;
+  onFocusAudienceDeliveryProofBridgeReadout: () => void;
   onFocusAudienceRouteBridgeReadout: () => void;
   onFocusAudienceCompletionRouteReadout: () => void;
   onFocusDualAudienceReadinessRouteReadout: () => void;
@@ -3014,6 +3017,14 @@ export function createQuickActions({
     onCreateStarter: onCreateAudienceStarter,
     onSelectAudience: onSelectAudienceSessionRow,
     summary: audienceSessionReadoutSummary
+  });
+  const audienceDeliveryProofBridgeActions = createAudienceDeliveryProofBridgeQuickActions({
+    exportPreflightSummary,
+    handoffPackageCheckSummary,
+    onFocusExportPreflight,
+    onFocusHandoffPackageCheck,
+    onFocusRouteReadout: onFocusAudienceDeliveryProofBridgeReadout,
+    rows: audienceSessionReadoutSummary.rows
   });
   const audienceRouteBridgeSummary = createAudienceRouteBridgeSummary({
     audienceSessionSummary: audienceSessionReadoutSummary,
@@ -5680,6 +5691,7 @@ export function createQuickActions({
     },
     ...sessionPassActions,
     ...audienceCompletionRouteActions,
+    ...audienceDeliveryProofBridgeActions,
     ...dualAudienceReadinessActions,
     ...audienceSessionActions,
     ...audienceRouteBridgeActions,
@@ -7568,6 +7580,7 @@ export function createQuickActionResult(
     action.id === "stem-audition-readout-action" ||
     action.id === "stem-audition-route-readout-action" ||
     action.id === "timbre-check" ||
+    action.id.startsWith("audience-delivery-proof-bridge-") ||
     action.id.startsWith("audience-route-bridge-") ||
     action.id.startsWith("audience-completion-route-") ||
     action.id.startsWith("dual-audience-readiness-") ||
@@ -9085,6 +9098,74 @@ export function audienceRouteBridgeQuickActionLane(action: QuickAction): {
   }
 
   return null;
+}
+
+export function audienceDeliveryProofBridgeQuickActionLane(action: QuickAction): {
+  laneLabel: string;
+  nextCheck: string;
+  routeLabel: string;
+} | null {
+  if (!action.id.startsWith("audience-delivery-proof-bridge-")) {
+    return null;
+  }
+
+  if (action.id === "audience-delivery-proof-bridge-readout-action") {
+    return {
+      laneLabel: "Audience Delivery Proof Bridge",
+      nextCheck: "Choose the first-time composer or professional producer proof lane before sending files.",
+      routeLabel: "Audience Delivery Proof Bridge Readout"
+    };
+  }
+
+  if (action.id === "audience-delivery-proof-bridge-beginner-action" || action.resultTargetId === "beginner") {
+    return {
+      laneLabel: "First-time composer delivery proof",
+      nextCheck: "Open Export Preflight deliverables and confirm WAV, stems, MIDI, and Handoff Sheet proof.",
+      routeLabel: "Open first-time composer delivery proof"
+    };
+  }
+
+  if (action.id === "audience-delivery-proof-bridge-producer-action" || action.resultTargetId === "producer") {
+    return {
+      laneLabel: "Professional producer delivery proof",
+      nextCheck: "Open Handoff Package Check receipt and confirm package reopen plus send order proof.",
+      routeLabel: "Open professional producer delivery proof"
+    };
+  }
+
+  return null;
+}
+
+export function quickActionAudienceDeliveryProofBridgeMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const lane = audienceDeliveryProofBridgeQuickActionLane(action);
+  if (!lane) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+
+  return {
+    id: "audience-delivery-proof-bridge",
+    label: "Audience Delivery Proof Bridge",
+    value: [
+      lane.routeLabel,
+      lane.laneLabel,
+      action.detail,
+      `${modeLabel(project.mode)} mode`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} selected-pattern events`,
+      `${projectEventTotal(project)} editable project events`,
+      `${arrangementTotalBars(project)} bars`,
+      "local delivery proof bridge",
+      "project data unchanged",
+      "playback unchanged",
+      "export unchanged",
+      lane.nextCheck
+    ].join(" / ")
+  };
 }
 
 export function quickActionAudienceRouteBridgeMetricSnapshot(
@@ -16807,6 +16888,16 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("audience-delivery-proof-bridge-")) {
+    return (
+      quickActionAudienceDeliveryProofBridgeMetricSnapshot(project, action) ?? {
+        id: "audience-delivery-proof-bridge",
+        label: "Audience Delivery Proof Bridge",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id.startsWith("audience-route-bridge-")) {
     return (
       quickActionAudienceRouteBridgeMetricSnapshot(project, action) ?? {
@@ -21822,6 +21913,32 @@ export function quickActionResultFollowup(
       auditionCue: "Keep the beat playing only if you are comparing the same music against the new session goal.",
       nextCheck: "Run Delivery Target Align only when arrangement length, master, mix posture, and stem expectation should change."
     };
+  }
+
+  const audienceDeliveryProofBridgeLane = audienceDeliveryProofBridgeQuickActionLane(action);
+  if (audienceDeliveryProofBridgeLane) {
+    if (action.id === "audience-delivery-proof-bridge-readout-action") {
+      return {
+        auditionCue:
+          "Read the Audience Delivery Proof Bridge before choosing the beginner package proof or producer handoff proof lane.",
+        nextCheck:
+          "Open first-time composer delivery proof for Export Preflight deliverables, or professional producer delivery proof for Handoff Package Check receipt."
+      };
+    }
+
+    return audienceDeliveryProofBridgeLane.laneLabel === "First-time composer delivery proof"
+      ? {
+          auditionCue:
+            "Use the first-time composer delivery proof lane to confirm the local package can be reopened before sending files.",
+          nextCheck:
+            "Confirm the result names Export Preflight deliverables, WAV, stems, MIDI, and Handoff Sheet proof."
+        }
+      : {
+          auditionCue:
+            "Use the professional producer delivery proof lane to confirm the studio handoff package receipt before delivery.",
+          nextCheck:
+            "Confirm the result names Handoff Package Check receipt, package reopen, send order, and stem handoff proof."
+        };
   }
 
   const audienceRouteBridgeLane = audienceRouteBridgeQuickActionLane(action);

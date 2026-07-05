@@ -128,11 +128,31 @@ type GrooveforgeLaunchSmokeAudienceDeliverySnapshotEvidence = {
   rowCount: number;
 };
 
+type GrooveforgeLaunchSmokeAudienceDeliveryProofBridgeEvidence = {
+  activeAudience: string;
+  beginnerLane: string;
+  beginnerNext: string;
+  beginnerPackage: string;
+  beginnerRoute: string;
+  beginnerStatus: string;
+  present: boolean;
+  producerLane: string;
+  producerNext: string;
+  producerPackage: string;
+  producerRoute: string;
+  producerStatus: string;
+  rowCount: number;
+};
+
 type GrooveforgeLaunchSmokePaletteEvidence = {
   completionCheckpoints: GrooveforgeLaunchSmokeAudienceCompletionCheckpointEvidence;
   completionBeginner: GrooveforgeLaunchSmokeRouteEvidence;
   completionProducer: GrooveforgeLaunchSmokeRouteEvidence;
   completionReadout: GrooveforgeLaunchSmokeRouteEvidence;
+  deliveryProofBeginner: GrooveforgeLaunchSmokeRouteEvidence;
+  deliveryProofBridge: GrooveforgeLaunchSmokeAudienceDeliveryProofBridgeEvidence;
+  deliveryProofProducer: GrooveforgeLaunchSmokeRouteEvidence;
+  deliveryProofReadout: GrooveforgeLaunchSmokeRouteEvidence;
   deliverySnapshot: GrooveforgeLaunchSmokeAudienceDeliverySnapshotEvidence;
   dualBeginner: GrooveforgeLaunchSmokeRouteEvidence;
   dualProducer: GrooveforgeLaunchSmokeRouteEvidence;
@@ -179,6 +199,7 @@ interface Window {
       | Promise<GrooveforgeLaunchSmokeBridgeDirectEvidenceBundle>;
     collectAudienceSessionQuickActionEvidence?: () => GrooveforgeLaunchSmokePaletteEvidence | Promise<GrooveforgeLaunchSmokePaletteEvidence>;
   };
+  __grooveforgeLaunchSmokePaletteStep?: string;
   webkitAudioContext?: typeof AudioContext;
 }
 

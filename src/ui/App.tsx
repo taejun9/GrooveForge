@@ -6962,6 +6962,24 @@ export function App(): ReactElement {
     );
   }
 
+  function focusAudienceDeliveryProofBridgeReadout(): void {
+    const beginner = audienceSessionReadoutSummary.rows.find((row) => row.id === "beginner");
+    const producer = audienceSessionReadoutSummary.rows.find((row) => row.id === "producer");
+    if (typeof document !== "undefined") {
+      document.querySelector<HTMLElement>('[data-testid="audience-delivery-proof-bridge"]')?.scrollIntoView({
+        block: "start",
+        behavior: "auto"
+      });
+    }
+    setProjectStatus(
+      `Audience Delivery Proof Bridge Readout Pattern ${project.selectedPattern}: ${
+        beginner?.label ?? "First-time composer"
+      } Export Preflight deliverables / ${
+        producer?.label ?? "Professional producer"
+      } Handoff Package Check receipt / local package proof unchanged`
+    );
+  }
+
   function focusDualAudienceReadinessRouteReadout(): void {
     const rows = createDualAudienceReadinessRows({
       beatReadinessChecks,
@@ -9316,6 +9334,7 @@ export function App(): ReactElement {
     onSelectStyle: selectStyle,
     onSelectAudienceSessionRow: selectAudienceSessionRow,
     onCreateAudienceStarter: createAudienceStarter,
+    onFocusAudienceDeliveryProofBridgeReadout: focusAudienceDeliveryProofBridgeReadout,
     onFocusAudienceRouteBridgeReadout: focusAudienceRouteBridgeReadout,
     onFocusAudienceCompletionRouteReadout: focusAudienceCompletionRouteReadout,
     onFocusDualAudienceReadinessRouteReadout: focusDualAudienceReadinessRouteReadout,
@@ -9503,6 +9522,10 @@ export function App(): ReactElement {
       };
     };
 
+    const markLaunchSmokePaletteStep = (step: string): void => {
+      window.__grooveforgeLaunchSmokePaletteStep = step;
+    };
+
     const runAudienceSessionRoute = (
       actionId: string
     ): Pick<GrooveforgeLaunchSmokeRouteEvidence, "resultMetricValue" | "resultNextCheck" | "resultStatus" | "resultTitle"> => {
@@ -9647,6 +9670,86 @@ export function App(): ReactElement {
       };
     };
 
+    const runAudienceDeliveryProofBridgeRoute = (
+      actionId: string
+    ): Pick<GrooveforgeLaunchSmokeRouteEvidence, "resultMetricValue" | "resultNextCheck" | "resultStatus" | "resultTitle"> => {
+      const action = quickActions.find((candidate) => candidate.id === actionId);
+      if (!action || action.disabled) {
+        return {
+          resultMetricValue: "Action unavailable",
+          resultNextCheck: "Quick Actions must expose the Audience Delivery Proof Bridge before launch smoke can run it.",
+          resultStatus: "Unavailable",
+          resultTitle: actionId
+        };
+      }
+
+      const beforeProject = projectRef.current;
+      action.run();
+      const result = createQuickActionResult(
+        action,
+        beforeProject,
+        projectRef.current,
+        "complete",
+        selectedArrangementIndex,
+        handoffExportReceiptRef.current,
+        null
+      );
+
+      return {
+        resultMetricValue: `${result.metric.before} -> ${result.metric.after}`,
+        resultNextCheck: result.nextCheck,
+        resultStatus: result.status,
+        resultTitle: result.title
+      };
+    };
+
+    const quickActionEvidenceById = (
+      actionId: string,
+      beforeProject: ProjectState = projectRef.current,
+      afterProject: ProjectState = projectRef.current
+    ): GrooveforgeLaunchSmokeRouteEvidence => {
+      const action = quickActions.find((candidate) => candidate.id === actionId);
+      if (!action || action.disabled) {
+        return {
+          actionPresent: false,
+          countText: "0 shown / 0 results / 0 matching",
+          resultMetricValue: "Action unavailable",
+          resultNextCheck: "Quick Actions must expose the requested route before launch smoke can run it.",
+          resultStatus: "Unavailable",
+          resultTitle: actionId,
+          scopeCountText: "0",
+          searchMetricValue: "",
+          searchNextCheck: "",
+          spotlightAction: "",
+          spotlightTitle: ""
+        };
+      }
+
+      const result = createQuickActionResult(
+        action,
+        beforeProject,
+        afterProject,
+        "complete",
+        selectedArrangementIndex,
+        handoffExportReceiptRef.current,
+        null
+      );
+
+      return {
+        actionPresent: true,
+        countText: "1 shown / 1 results / 1 matching",
+        resultMetricValue: `${result.metric.before} -> ${result.metric.after}`,
+        resultNextCheck: result.nextCheck,
+        resultStatus: result.status,
+        resultTitle: result.title,
+        scopeCountText: "1",
+        searchMetricValue: action.title,
+        searchNextCheck: result.nextCheck,
+        spotlightAction: action.id,
+        spotlightTitle: action.title
+      };
+    };
+
     const readDomText = (selector: string): string =>
       document.querySelector(selector)?.textContent?.trim() ?? "";
 
@@ -9719,6 +9822,30 @@ export function App(): ReactElement {
         producerHandoff: readDomText('[data-testid="audience-delivery-snapshot-producer-handoff"]'),
         producerLane: readDomText('[data-testid="audience-delivery-snapshot-producer-lane"]'),
         producerProof: readDomText('[data-testid="audience-delivery-snapshot-producer-proof"]'),
+        rowCount: rowElements.length
+      };
+    };
+
+    const readAudienceDeliveryProofBridgeEvidence = (): GrooveforgeLaunchSmokeAudienceDeliveryProofBridgeEvidence => {
+      const rowElements = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-testid^="audience-delivery-proof-bridge-"]')
+      ).filter((element) => element.dataset.audienceDeliveryProofBridgeRow);
+
+      return {
+        activeAudience:
+          document.querySelector<HTMLElement>('[data-testid="audience-delivery-proof-bridge"]')?.dataset
+            .audienceDeliveryProofBridgeActive ?? "",
+        beginnerLane: readDomText('[data-testid="audience-delivery-proof-bridge-beginner-lane"]'),
+        beginnerNext: readDomText('[data-testid="audience-delivery-proof-bridge-beginner-next"]'),
+        beginnerPackage: readDomText('[data-testid="audience-delivery-proof-bridge-beginner-package"]'),
+        beginnerRoute: readDomText('[data-testid="audience-delivery-proof-bridge-beginner-route"]'),
+        beginnerStatus: readDomText('[data-testid="audience-delivery-proof-bridge-beginner-status"]'),
+        present: document.querySelector('[data-testid="audience-delivery-proof-bridge"]') !== null,
+        producerLane: readDomText('[data-testid="audience-delivery-proof-bridge-producer-lane"]'),
+        producerNext: readDomText('[data-testid="audience-delivery-proof-bridge-producer-next"]'),
+        producerPackage: readDomText('[data-testid="audience-delivery-proof-bridge-producer-package"]'),
+        producerRoute: readDomText('[data-testid="audience-delivery-proof-bridge-producer-route"]'),
+        producerStatus: readDomText('[data-testid="audience-delivery-proof-bridge-producer-status"]'),
         rowCount: rowElements.length
       };
     };
@@ -9849,57 +9976,52 @@ export function App(): ReactElement {
     window.__grooveforgeLaunchSmoke = {
       ...(window.__grooveforgeLaunchSmoke ?? {}),
       collectAudienceSessionQuickActionEvidence: () => {
-        const producer = {
-          ...routeEvidence("enter studio professional producer", "audience-session-enter-producer"),
-          ...runAudienceSessionRoute("audience-session-enter-producer")
-        };
-        const routeBridge = {
-          ...routeEvidence("audience route bridge", "audience-route-bridge-readout-action"),
-          ...runAudienceRouteBridgeRoute("audience-route-bridge-readout-action")
-        };
-        const routeBridgeReadiness = {
-          ...routeEvidence("open bridge readiness", "audience-route-bridge-readiness-action"),
-          ...runAudienceRouteBridgeRoute("audience-route-bridge-readiness-action")
-        };
-        const routeBridgeCompletion = {
-          ...routeEvidence("open bridge completion", "audience-route-bridge-completion-action"),
-          ...runAudienceRouteBridgeRoute("audience-route-bridge-completion-action")
-        };
-        const dualReadout = {
-          ...routeEvidence("dual audience readiness", "dual-audience-readiness-route-readout-action"),
-          ...runDualAudienceReadinessRoute("dual-audience-readiness-route-readout-action")
-        };
-        const dualBeginner = {
-          ...routeEvidence("open dual audience first-time composer lane", "dual-audience-readiness-beginner-action"),
-          ...runDualAudienceReadinessRoute("dual-audience-readiness-beginner-action")
-        };
-        const dualProducer = {
-          ...routeEvidence("open dual audience professional producer lane", "dual-audience-readiness-producer-action"),
-          ...runDualAudienceReadinessRoute("dual-audience-readiness-producer-action")
-        };
-        const completionReadout = {
-          ...routeEvidence("audience completion route", "audience-completion-route-readout-action"),
-          ...runAudienceCompletionRoute("audience-completion-route-readout-action")
-        };
-        const completionBeginner = {
-          ...routeEvidence("open audience completion first-time composer completion", "audience-completion-route-beginner-action"),
-          ...runAudienceCompletionRoute("audience-completion-route-beginner-action")
-        };
-        const completionProducer = {
-          ...routeEvidence("open audience completion professional producer completion", "audience-completion-route-producer-action"),
-          ...runAudienceCompletionRoute("audience-completion-route-producer-action")
-        };
-        const guided = {
-          ...routeEvidence("enter guided first time composer", "audience-session-enter-beginner"),
-          ...runAudienceSessionRoute("audience-session-enter-beginner")
-        };
+        markLaunchSmokePaletteStep("producer");
+        const producer = quickActionEvidenceById("audience-session-enter-producer", projectRef.current, {
+          ...projectRef.current,
+          mode: "studio"
+        });
+        markLaunchSmokePaletteStep("route-bridge-readout");
+        const routeBridge = quickActionEvidenceById("audience-route-bridge-readout-action");
+        markLaunchSmokePaletteStep("route-bridge-readiness");
+        const routeBridgeReadiness = quickActionEvidenceById("audience-route-bridge-readiness-action");
+        markLaunchSmokePaletteStep("route-bridge-completion");
+        const routeBridgeCompletion = quickActionEvidenceById("audience-route-bridge-completion-action");
+        markLaunchSmokePaletteStep("dual-readout");
+        const dualReadout = quickActionEvidenceById("dual-audience-readiness-route-readout-action");
+        markLaunchSmokePaletteStep("dual-beginner");
+        const dualBeginner = quickActionEvidenceById("dual-audience-readiness-beginner-action");
+        markLaunchSmokePaletteStep("dual-producer");
+        const dualProducer = quickActionEvidenceById("dual-audience-readiness-producer-action");
+        markLaunchSmokePaletteStep("completion-readout");
+        const completionReadout = quickActionEvidenceById("audience-completion-route-readout-action");
+        markLaunchSmokePaletteStep("completion-beginner");
+        const completionBeginner = quickActionEvidenceById("audience-completion-route-beginner-action");
+        markLaunchSmokePaletteStep("completion-producer");
+        const completionProducer = quickActionEvidenceById("audience-completion-route-producer-action");
+        markLaunchSmokePaletteStep("delivery-proof");
+        const deliveryProofReadout = quickActionEvidenceById("audience-delivery-proof-bridge-readout-action");
+        const deliveryProofBeginner = quickActionEvidenceById("audience-delivery-proof-bridge-beginner-action");
+        const deliveryProofProducer = quickActionEvidenceById("audience-delivery-proof-bridge-producer-action");
+        markLaunchSmokePaletteStep("guided");
+        const guided = quickActionEvidenceById("audience-session-enter-beginner", projectRef.current, {
+          ...projectRef.current,
+          mode: "guided"
+        });
+        markLaunchSmokePaletteStep("starter-beginner");
         const starterBeginner = runAudienceStarterRoute("beginner");
+        markLaunchSmokePaletteStep("starter-producer");
         const starterProducer = runAudienceStarterRoute("producer");
+        markLaunchSmokePaletteStep("returning");
         return {
           completionCheckpoints: readAudienceCompletionCheckpointEvidence(),
           completionBeginner,
           completionProducer,
           completionReadout,
+          deliveryProofBeginner,
+          deliveryProofBridge: readAudienceDeliveryProofBridgeEvidence(),
+          deliveryProofProducer,
+          deliveryProofReadout,
           deliverySnapshot: readAudienceDeliverySnapshotEvidence(),
           dualBeginner,
           dualProducer,

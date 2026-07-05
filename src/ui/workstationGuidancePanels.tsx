@@ -158,6 +158,12 @@ function AudienceNextStepRail({
       data-testid="audience-next-step-rail"
       title={`${summary.activeAudienceLabel}: ${summary.nextCheck}`}
     >
+      <strong
+        className="audience-delivery-proof-bridge-title"
+        data-testid="audience-delivery-proof-bridge-headline"
+      >
+        Audience Delivery Proof Bridge
+      </strong>
       {rows.map((row) => (
         <div
           className={`audience-next-step-row ${row.tone}`}
@@ -257,6 +263,26 @@ const audienceDeliverySnapshotProof: Record<AudienceSessionReadoutRow["id"], str
   producer: "Proof: persona delivery package + package reopen"
 };
 
+const audienceDeliveryProofBridgeStatus: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Beginner delivery proof",
+  producer: "Producer delivery proof"
+};
+
+const audienceDeliveryProofBridgeRoute: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Route: Export Preflight deliverables",
+  producer: "Route: Handoff Package Check receipt"
+};
+
+const audienceDeliveryProofBridgePackage: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Package proof: local delivery package reopen",
+  producer: "Package proof: persona delivery package reopen"
+};
+
+const audienceDeliveryProofBridgeNext: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Next check: confirm WAV, stems, MIDI, and Handoff Sheet before sending",
+  producer: "Next check: confirm receipt, send order, and stem handoff before delivery"
+};
+
 function AudienceDeliverySnapshot({
   rows,
   summary
@@ -291,6 +317,48 @@ function AudienceDeliverySnapshot({
           </em>
           <em data-testid={`audience-delivery-snapshot-${row.id}-proof`}>
             {audienceDeliverySnapshotProof[row.id]}
+          </em>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AudienceDeliveryProofBridge({
+  rows,
+  summary
+}: {
+  rows: AudienceSessionReadoutRow[];
+  summary: AudienceSessionReadoutSummary;
+}): ReactElement {
+  return (
+    <div
+      aria-label="Audience Delivery Proof Bridge"
+      className="audience-delivery-proof-bridge"
+      data-audience-delivery-proof-bridge-active={summary.activeAudience}
+      data-testid="audience-delivery-proof-bridge"
+      title={`${summary.activeAudienceLabel}: delivery proof bridge for local package and handoff verification`}
+    >
+      {rows.map((row) => (
+        <div
+          className={`audience-delivery-proof-bridge-row ${row.tone}`}
+          data-audience-delivery-proof-bridge-row={row.id}
+          data-testid={`audience-delivery-proof-bridge-${row.id}`}
+          key={row.id}
+          title={`${row.label}: ${audienceDeliveryProofBridgeStatus[row.id]} / ${audienceDeliveryProofBridgeRoute[row.id]} / ${audienceDeliveryProofBridgePackage[row.id]} / ${audienceDeliveryProofBridgeNext[row.id]}`}
+        >
+          <span data-testid={`audience-delivery-proof-bridge-${row.id}-lane`}>{row.label}</span>
+          <strong data-testid={`audience-delivery-proof-bridge-${row.id}-status`}>
+            {audienceDeliveryProofBridgeStatus[row.id]}
+          </strong>
+          <small data-testid={`audience-delivery-proof-bridge-${row.id}-route`}>
+            {audienceDeliveryProofBridgeRoute[row.id]}
+          </small>
+          <em data-testid={`audience-delivery-proof-bridge-${row.id}-package`}>
+            {audienceDeliveryProofBridgePackage[row.id]}
+          </em>
+          <em data-testid={`audience-delivery-proof-bridge-${row.id}-next`}>
+            {audienceDeliveryProofBridgeNext[row.id]}
           </em>
         </div>
       ))}
@@ -585,6 +653,7 @@ export function AudienceSessionReadout({
       <AudienceNextStepRail rows={summary.rows} summary={summary} onSelectAudience={onSelectAudience} />
       <AudienceCompletionCheckpoints rows={summary.rows} summary={summary} />
       <AudienceDeliverySnapshot rows={summary.rows} summary={summary} />
+      <AudienceDeliveryProofBridge rows={summary.rows} summary={summary} />
       <div className="audience-session-grid" data-testid="audience-session-grid">
         {summary.rows.map((row) => (
           <div
@@ -1735,6 +1804,74 @@ export function createAudienceCompletionRouteQuickActions({
   }));
 
   return [routeAction, ...laneActions];
+}
+
+export function createAudienceDeliveryProofBridgeQuickActions({
+  exportPreflightSummary,
+  handoffPackageCheckSummary,
+  onFocusExportPreflight,
+  onFocusHandoffPackageCheck,
+  onFocusRouteReadout,
+  rows
+}: {
+  exportPreflightSummary: ExportPreflightSummary;
+  handoffPackageCheckSummary: HandoffPackageCheckSummary;
+  onFocusExportPreflight: (card: ExportPreflightCard) => void;
+  onFocusHandoffPackageCheck: (card: HandoffPackageCheckCard) => void;
+  onFocusRouteReadout: () => void;
+  rows: AudienceSessionReadoutRow[];
+}): QuickAction[] {
+  const beginner = rows.find((row) => row.id === "beginner") ?? rows[0];
+  const producer = rows.find((row) => row.id === "producer") ?? rows[1] ?? rows[0];
+  const beginnerCard = exportPreflightSummary.cards.find((card) => card.id === "deliverables") ?? exportPreflightSummary.cards[0];
+  const producerCard = handoffPackageCheckSummary.cards.find((card) => card.id === "receipt") ?? handoffPackageCheckSummary.cards[0];
+  const routeDetail = [
+    `${beginner?.label ?? "First-time composer"}: ${audienceDeliveryProofBridgeRoute.beginner}`,
+    `${producer?.label ?? "Professional producer"}: ${audienceDeliveryProofBridgeRoute.producer}`,
+    audienceDeliveryProofBridgePackage.beginner,
+    audienceDeliveryProofBridgePackage.producer,
+    "Visible Audience Delivery Proof Bridge rows unchanged"
+  ].join(" / ");
+
+  return [
+    {
+      id: "audience-delivery-proof-bridge-readout-action",
+      title: "Review Audience Delivery Proof Bridge",
+      detail: routeDetail,
+      group: "Project",
+      keywords: `audience delivery proof bridge readout first-time composer professional producer local delivery package reopen persona package handoff receipt export preflight stems midi wav ${routeDetail}`,
+      resultTargetId: "route",
+      run: onFocusRouteReadout
+    },
+    {
+      id: "audience-delivery-proof-bridge-beginner-action",
+      title: "Open Delivery Proof First-time composer",
+      detail: [
+        audienceDeliveryProofBridgeStatus.beginner,
+        audienceDeliveryProofBridgeRoute.beginner,
+        audienceDeliveryProofBridgePackage.beginner,
+        audienceDeliveryProofBridgeNext.beginner
+      ].join(" / "),
+      group: "Project",
+      keywords: `audience delivery proof bridge beginner first-time composer export preflight deliverables wav stems midi handoff local delivery package reopen ${beginner?.detail ?? ""}`,
+      resultTargetId: "beginner",
+      run: () => onFocusExportPreflight(beginnerCard)
+    },
+    {
+      id: "audience-delivery-proof-bridge-producer-action",
+      title: "Open Delivery Proof Professional producer",
+      detail: [
+        audienceDeliveryProofBridgeStatus.producer,
+        audienceDeliveryProofBridgeRoute.producer,
+        audienceDeliveryProofBridgePackage.producer,
+        audienceDeliveryProofBridgeNext.producer
+      ].join(" / "),
+      group: "Project",
+      keywords: `audience delivery proof bridge producer professional producer handoff package check receipt send order stems midi wav persona package reopen ${producer?.detail ?? ""}`,
+      resultTargetId: "producer",
+      run: () => onFocusHandoffPackageCheck(producerCard)
+    }
+  ];
 }
 
 export function createAudienceRouteBridgeQuickActions({

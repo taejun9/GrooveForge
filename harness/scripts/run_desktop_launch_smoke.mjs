@@ -33,6 +33,9 @@ const expectedLiveTestIds = [
   "audience-delivery-snapshot",
   "audience-delivery-snapshot-beginner",
   "audience-delivery-snapshot-producer",
+  "audience-delivery-proof-bridge",
+  "audience-delivery-proof-bridge-beginner",
+  "audience-delivery-proof-bridge-producer",
   "audience-starter-action-beginner",
   "audience-starter-action-producer",
   "audience-route-bridge",
@@ -257,6 +260,26 @@ function checkResult(result) {
       String(evidence?.palette?.deliverySnapshot?.producerHandoff ?? "").includes("Export Preflight") &&
       String(evidence?.palette?.deliverySnapshot?.producerProof ?? "").includes("persona delivery package"),
     "live desktop Audience Delivery Snapshot should show the professional producer handoff proof path"
+  );
+  check(
+    evidence?.palette?.deliveryProofBridge?.present === true && evidence?.palette?.deliveryProofBridge?.rowCount === 2,
+    "live desktop Audience Delivery Proof Bridge should render two audience proof rows"
+  );
+  check(
+    String(evidence?.palette?.deliveryProofBridge?.beginnerLane ?? "").includes("First-time composer") &&
+      String(evidence?.palette?.deliveryProofBridge?.beginnerStatus ?? "").includes("Beginner delivery proof") &&
+      String(evidence?.palette?.deliveryProofBridge?.beginnerRoute ?? "").includes("Export Preflight") &&
+      String(evidence?.palette?.deliveryProofBridge?.beginnerPackage ?? "").includes("local delivery package") &&
+      String(evidence?.palette?.deliveryProofBridge?.beginnerNext ?? "").includes("WAV"),
+    "live desktop Audience Delivery Proof Bridge should show the beginner package proof route"
+  );
+  check(
+    String(evidence?.palette?.deliveryProofBridge?.producerLane ?? "").includes("Professional producer") &&
+      String(evidence?.palette?.deliveryProofBridge?.producerStatus ?? "").includes("Producer delivery proof") &&
+      String(evidence?.palette?.deliveryProofBridge?.producerRoute ?? "").includes("Handoff Package Check") &&
+      String(evidence?.palette?.deliveryProofBridge?.producerPackage ?? "").includes("persona delivery package") &&
+      String(evidence?.palette?.deliveryProofBridge?.producerNext ?? "").includes("send order"),
+    "live desktop Audience Delivery Proof Bridge should show the professional producer receipt proof route"
   );
   check(
     evidence?.palette?.starterBeginner?.buttonPresent === true &&
@@ -521,6 +544,28 @@ function checkResult(result) {
       String(evidence?.palette?.completionProducer?.resultNextCheck ?? "").includes("Handoff Package Check"),
     "live desktop Quick Actions Audience Completion producer lane should guide the next producer completion check"
   );
+  check(
+    evidence?.palette?.deliveryProofReadout?.actionPresent === true &&
+      evidence?.palette?.deliveryProofReadout?.spotlightAction === "audience-delivery-proof-bridge-readout-action" &&
+      String(evidence?.palette?.deliveryProofReadout?.spotlightTitle ?? "").includes("Review Audience Delivery Proof Bridge"),
+    "live desktop Quick Actions palette should show Audience Delivery Proof Bridge Readout"
+  );
+  check(
+    String(evidence?.palette?.deliveryProofReadout?.resultMetricValue ?? "").includes("Audience Delivery Proof Bridge Readout"),
+    "live desktop Quick Actions Audience Delivery Proof Bridge readout result should include the bridge readout"
+  );
+  check(
+    evidence?.palette?.deliveryProofBeginner?.actionPresent === true &&
+      String(evidence?.palette?.deliveryProofBeginner?.resultMetricValue ?? "").includes("First-time composer delivery proof") &&
+      String(evidence?.palette?.deliveryProofBeginner?.resultNextCheck ?? "").includes("Export Preflight"),
+    "live desktop Quick Actions Audience Delivery Proof Bridge beginner lane should execute with Export Preflight evidence"
+  );
+  check(
+    evidence?.palette?.deliveryProofProducer?.actionPresent === true &&
+      String(evidence?.palette?.deliveryProofProducer?.resultMetricValue ?? "").includes("Professional producer delivery proof") &&
+      String(evidence?.palette?.deliveryProofProducer?.resultNextCheck ?? "").includes("Handoff Package Check"),
+    "live desktop Quick Actions Audience Delivery Proof Bridge producer lane should execute with Handoff Package Check evidence"
+  );
 
   const visual = evidence?.visual;
   check(visual && typeof visual === "object", "live desktop launch smoke should include screenshot visual evidence");
@@ -660,10 +705,13 @@ child.on("exit", (code, signal) => {
     "- Audience Completion Route Quick Actions: route readout, first-time composer completion, and professional producer completion search/run evidence passed"
   );
   console.log(
-    "- Beginner path: Audience Session Readout, Audience Route Bridge, Dual Audience Readiness, Audience Completion Route, Enter Guided, Guide Quick Start, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
+    "- Audience Delivery Proof Bridge: visible beginner/professional producer proof rows plus Quick Actions route and lane evidence passed"
   );
   console.log(
-    "- Producer path: Audience Session Readout, Audience Route Bridge, Dual Audience Readiness, Audience Completion Route, Enter Studio, Studio mode, Review Queue, Production Snapshot, Mix Coach, Handoff Pack, Quick Actions, Command Reference"
+    "- Beginner path: Audience Session Readout, Audience Route Bridge, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, Enter Guided, Guide Quick Start, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
+  );
+  console.log(
+    "- Producer path: Audience Session Readout, Audience Route Bridge, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, Enter Studio, Studio mode, Review Queue, Production Snapshot, Mix Coach, Handoff Pack, Quick Actions, Command Reference"
   );
   console.log("- Workstation path: transport, compose, sound, arrange, mix, master, export controls, Handoff Pack");
 });
