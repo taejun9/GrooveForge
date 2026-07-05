@@ -656,6 +656,18 @@ function formatSetupWizardHandoffRows(rows) {
     .join("\n");
 }
 
+function formatSourcePrereqPrivateInputPlaceholderLocationRows(rows) {
+  if (rows.length === 0) {
+    return "| none | none | none | none | none | none | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.key)} | ${escapeCell(row.file)} | ${integerValue(row.line)} | ${escapeCell(row.location)} | ${escapeCell(row.source)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function buildReport({
   progressRefresh,
   completionSummary,
@@ -734,6 +746,9 @@ function buildReport({
   const realSetupWizardMatchesExternalResume = setupWizardFieldsMatch(externalRun, externalResume);
   const sourcePrereqArtifactRows = objectRows(sourcePrereq.artifactRows);
   const sourcePrereqCommandRows = objectRows(sourcePrereq.commandRows);
+  const sourcePrereqCurrentPrivateInputPlaceholderLocations = objectRows(
+    sourcePrereq.currentPrivateInputPlaceholderLocations
+  ).filter((row) => row.valueRecorded === false);
   const report = {
     appName,
     bundleId,
@@ -788,6 +803,13 @@ function buildReport({
     ),
     sourcePrereqCurrentPrivateInputPlaceholderLocationSummary: textValue(
       sourcePrereq.currentPrivateInputPlaceholderLocationSummary
+    ),
+    sourcePrereqCurrentPrivateInputPlaceholderLocationSource: textValue(
+      sourcePrereq.currentPrivateInputPlaceholderLocationSource
+    ),
+    sourcePrereqCurrentPrivateInputPlaceholderLocations,
+    sourcePrereqCurrentPrivateInputPlaceholderLocationRowsValueFree: valueFreeRows(
+      sourcePrereqCurrentPrivateInputPlaceholderLocations
     ),
     sourcePrereqArtifactRowsValueFree: valueFreeRows(sourcePrereqArtifactRows),
     sourcePrereqCommandRowsValueFree: valueFreeRows(sourcePrereqCommandRows),
@@ -1261,6 +1283,7 @@ function buildMarkdown(report) {
 - Source prereq current first blocker alias: ${report.sourcePrereqCurrentFirstBlocker}
 - Source prereq current next command alias: \`${report.sourcePrereqCurrentNextCommand}\`
 - Source prereq artifacts present: ${report.sourcePrereqSourceArtifactPresentCount}/${report.sourcePrereqSourceArtifactTotal}
+- Source prereq private input placeholder location source: ${report.sourcePrereqCurrentPrivateInputPlaceholderLocationSource}
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})
 - Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})
@@ -1368,11 +1391,19 @@ ${formatCommandRows(report.refreshCommands)}
 - Source prereq current operator first command: \`${report.sourcePrereqCurrentOperatorFirstCommand}\`
 - Source prereq operator proof command: \`${report.sourcePrereqOperatorProofCommand}\`
 - Source prereq private input placeholder locations: ${report.sourcePrereqCurrentPrivateInputPlaceholderLocationCount} (${report.sourcePrereqCurrentPrivateInputPlaceholderLocationSummary})
+- Source prereq private input placeholder location source: ${report.sourcePrereqCurrentPrivateInputPlaceholderLocationSource}
+- Source prereq private input placeholder rows value-free: ${readyLabel(report.sourcePrereqCurrentPrivateInputPlaceholderLocationRowsValueFree)}
 - Source prereq artifact rows value-free: ${readyLabel(report.sourcePrereqArtifactRowsValueFree)}
 - Source prereq command rows value-free: ${readyLabel(report.sourcePrereqCommandRowsValueFree)}
 - Source prereq private values recorded: ${readyLabel(report.sourcePrereqPrivateValuesRecorded)}
 - Source prereq network attempted: ${readyLabel(report.sourcePrereqNetworkProbeAttempted)}
 - Source prereq external distribution claimed: ${readyLabel(report.sourcePrereqClaimedExternalDistribution)}
+
+### Source Prereq Private Input Placeholder Location Rows
+
+| order | key | file | line | location | source | value recorded |
+|---:|---|---|---:|---|---|---|
+${formatSourcePrereqPrivateInputPlaceholderLocationRows(report.sourcePrereqCurrentPrivateInputPlaceholderLocations)}
 
 ## Source Artifacts
 
@@ -1671,6 +1702,28 @@ function validateReport(report, markdown) {
   check(
     report.sourcePrereqOperatorProofCommand === report.operatorProofCommand,
     "release completion summary refresh source prereq operator proof command should align"
+  );
+  check(
+    Array.isArray(report.sourcePrereqCurrentPrivateInputPlaceholderLocations),
+    "release completion summary refresh should mirror source prereq private input placeholder rows"
+  );
+  check(
+    report.sourcePrereqCurrentPrivateInputPlaceholderLocationRowsValueFree === true,
+    "release completion summary refresh source prereq private input placeholder rows should be value-free"
+  );
+  check(
+    report.sourcePrereqCurrentPrivateInputPlaceholderLocationCount ===
+      report.sourcePrereqCurrentPrivateInputPlaceholderLocations.length,
+    "release completion summary refresh source prereq private input placeholder count should match rows"
+  );
+  check(
+    report.sourcePrereqCurrentPrivateInputPlaceholderLocationCount === 0 ||
+      report.sourcePrereqCurrentPrivateInputPlaceholderLocationSource !== "none",
+    "release completion summary refresh source prereq private input placeholder rows should carry a source label"
+  );
+  check(
+    report.sourcePrereqCurrentPrivateInputPlaceholderLocations.every((row) => textValue(row.source) !== "none"),
+    "release completion summary refresh source prereq private input placeholder rows should preserve per-row source labels"
   );
   check(report.sourcePrereqArtifactRowsValueFree === true, "release completion summary refresh source prereq artifact rows should be value-free");
   check(report.sourcePrereqCommandRowsValueFree === true, "release completion summary refresh source prereq command rows should be value-free");
@@ -2535,6 +2588,10 @@ async function main() {
   );
   console.log(`- Source prereq current first blocker alias: ${report.sourcePrereqCurrentFirstBlocker}`);
   console.log(`- Source prereq current next command alias: ${report.sourcePrereqCurrentNextCommand}`);
+  console.log(
+    `- Source prereq private input placeholder locations: ${report.sourcePrereqCurrentPrivateInputPlaceholderLocationCount} (${report.sourcePrereqCurrentPrivateInputPlaceholderLocationSummary})`
+  );
+  console.log(`- Source prereq private input placeholder location source: ${report.sourcePrereqCurrentPrivateInputPlaceholderLocationSource}`);
   console.log(`- Operator proof command: ${report.operatorProofCommand}`);
   console.log(`- Release-channel metadata needs ignored env: ${report.releaseChannelMetadataNeedsIgnoredEnv ? "yes" : "no"}`);
   console.log(`- Strict proof handoff ready: ${report.strictProofHandoffReceiptReady ? "yes" : "no"}`);
