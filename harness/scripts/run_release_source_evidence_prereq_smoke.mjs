@@ -286,6 +286,18 @@ function buildReport({ proofBundle, completionSummary }) {
   const artifactRows = artifactRowsFromDefinitions(proofBundle);
   const missingArtifactRows = artifactRows.filter((row) => row.present !== true);
   const commandRows = commandRowsFromArtifacts(artifactRows);
+  const sourceMissingBlocker =
+    missingArtifactRows.length > 0
+      ? `Source release evidence is missing: ${missingArtifactRows.map((row) => row.label).join(", ")}.`
+      : "Current blocker evidence is unavailable in prerequisite sources; rerun npm run release:progress-refresh-smoke.";
+  const currentFirstBlocker = textValue(
+    proofBundle?.currentFirstBlocker,
+    textValue(completionSummary?.currentFirstBlocker, sourceMissingBlocker)
+  );
+  const currentNextCommand = textValue(
+    proofBundle?.currentNextCommand,
+    textValue(completionSummary?.currentNextCommand, commandRows[0]?.command ?? "npm run release:progress-refresh-smoke")
+  );
   const tenPlanProgress = completionSummaryMatchesCompletedPlan
     ? textValue(completionSummary?.tenPlanProgress, completedPlanTenPlanProgress)
     : completedPlanTenPlanProgress;
@@ -308,10 +320,12 @@ function buildReport({ proofBundle, completionSummary }) {
     proofBundlePresent: proofBundle !== null,
     proofBundleSourceEvidenceReady: proofBundle?.sourceEvidenceReady === true,
     proofBundleReady: proofBundle?.proofBundleReady === true,
-    proofBundleCurrentFirstBlocker: textValue(proofBundle?.currentFirstBlocker, completionSummary?.currentFirstBlocker),
+    proofBundleCurrentFirstBlocker: currentFirstBlocker,
     completionSummaryPresent: completionSummary !== null,
     userFacingCompletion: textValue(completionSummary?.userFacingCompletionLabel, "unknown"),
     userFacingRemaining: textValue(completionSummary?.userFacingRemainingLabel, "unknown"),
+    currentFirstBlocker,
+    currentNextCommand,
     currentOperatorFirstCommand: textValue(completionSummary?.currentOperatorFirstCommand, "npm run release:channel-apply-private-env-preflight"),
     operatorProofCommand: textValue(completionSummary?.operatorProofCommand, "npm run release:private-edit-strict-proof"),
     currentPrivateInputPlaceholderLocationCount: completionSummary?.currentPrivateInputPlaceholderLocationCount ?? 0,
@@ -359,6 +373,8 @@ function buildMarkdown(report) {
 - Proof bundle source evidence ready: ${readyLabel(report.proofBundleSourceEvidenceReady)}
 - Proof bundle ready: ${readyLabel(report.proofBundleReady)}
 - Current first blocker: ${report.proofBundleCurrentFirstBlocker}
+- Current first blocker alias: ${report.currentFirstBlocker}
+- Current next command alias: \`${report.currentNextCommand}\`
 - User-facing completion: ${report.userFacingCompletion}
 - User-facing remaining: ${report.userFacingRemaining}
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
@@ -397,6 +413,9 @@ function validateReport(report, markdown) {
   check(report.commandRows.every((row) => row.command.startsWith("npm run ")), "source evidence command rows should include npm run commands");
   check(report.sourceArtifactMissingCount === report.commandRowCount, "missing source artifact count should match command rows");
   check(report.tenPlanProgress === report.completedPlanTenPlanProgress, "source evidence prereq 10-plan progress should match current completed plan files");
+  check(report.currentFirstBlocker === report.proofBundleCurrentFirstBlocker, "source evidence prereq current first blocker alias should mirror first blocker");
+  check(report.currentFirstBlocker !== "none", "source evidence prereq current first blocker alias should be populated");
+  check(report.currentNextCommand.startsWith("npm run "), "source evidence prereq current next command alias should expose an npm run command");
   check(
     report.currentPrivateInputPlaceholderLocationCount === 0 ||
       report.currentPrivateInputPlaceholderLocationSummary.includes(".env.release-channel.local"),
@@ -456,6 +475,8 @@ try {
   console.log(`- Source artifacts present: ${report.sourceArtifactPresentCount}/${report.sourceArtifactTotal}`);
   console.log(`- Missing source artifacts: ${report.sourceArtifactMissingCount} (${report.sourceArtifactMissingSummary})`);
   console.log(`- Current first blocker: ${report.proofBundleCurrentFirstBlocker}`);
+  console.log(`- Current first blocker alias: ${report.currentFirstBlocker}`);
+  console.log(`- Current next command alias: ${report.currentNextCommand}`);
   console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
   console.log(`- Operator proof command: ${report.operatorProofCommand}`);
   console.log(`- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})`);
