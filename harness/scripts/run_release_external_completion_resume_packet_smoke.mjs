@@ -110,6 +110,93 @@ function copyCurrentPrivateInputPlaceholderLocationRow(row) {
   };
 }
 
+function copySetupWizardHandoffRow(row) {
+  return {
+    order: integerValue(row.order),
+    action: textValue(row.action),
+    command: textValue(row.command),
+    target: textValue(row.target),
+    ready: row.ready === true,
+    expected: textValue(row.expected),
+    valueRecorded: false
+  };
+}
+
+function setupWizardHandoffRowsReady(rows) {
+  const commands = rows.map((row) => row.command);
+  return (
+    rows.length === 6 &&
+    rows.every((row) => row.valueRecorded === false) &&
+    commands.includes("edit ignored private input file") &&
+    commands.includes(releaseChannelApplyPrivateEnvPreflightCommand) &&
+    commands.includes(releaseChannelApplyPrivateEnvCommand) &&
+    commands.includes("npm run release:channel-live-check-strict") &&
+    commands.includes(privateEditStrictProofCommand) &&
+    commands.includes("npm run release:current-blocker")
+  );
+}
+
+function buildSetupWizardSourceFields(sourcePacket) {
+  const handoffRows = objectRows(sourcePacket.realSetupWizardOperatorHandoffRows).map(copySetupWizardHandoffRow);
+  return {
+    realSetupWizardReceiptReady: sourcePacket.realSetupWizardReceiptReady === true,
+    realSetupWizardCommand: textValue(sourcePacket.realSetupWizardCommand, releaseChannelSetupWizardCommand),
+    realSetupWizardInputReady: sourcePacket.realSetupWizardInputReady === true,
+    realSetupWizardLocalEnvFileLoaded: sourcePacket.realSetupWizardLocalEnvFileLoaded === true,
+    realSetupWizardPrivateInputFilePresent: sourcePacket.realSetupWizardPrivateInputFilePresent === true,
+    realSetupWizardPrivateInputFileLoadedKeyCount: integerValue(
+      sourcePacket.realSetupWizardPrivateInputFileLoadedKeyCount
+    ),
+    realSetupWizardPrivateInputFileLoadedKeySummary: textValue(
+      sourcePacket.realSetupWizardPrivateInputFileLoadedKeySummary
+    ),
+    realSetupWizardPrivateInputFileLocationRowCount: integerValue(
+      sourcePacket.realSetupWizardPrivateInputFileLocationRowCount
+    ),
+    realSetupWizardPrivateInputFilePlaceholderLocationSummary: textValue(
+      sourcePacket.realSetupWizardPrivateInputFilePlaceholderLocationSummary
+    ),
+    realSetupWizardPrivateInputFileInvalidShapeLocationSummary: textValue(
+      sourcePacket.realSetupWizardPrivateInputFileInvalidShapeLocationSummary
+    ),
+    realSetupWizardPrivateInputFileMissingKeyLocationSummary: textValue(
+      sourcePacket.realSetupWizardPrivateInputFileMissingKeyLocationSummary
+    ),
+    realSetupWizardOperatorHandoffReady:
+      sourcePacket.realSetupWizardOperatorHandoffReady === true && setupWizardHandoffRowsReady(handoffRows),
+    realSetupWizardOperatorHandoffRows: handoffRows,
+    realSetupWizardOperatorHandoffRowCount: integerValue(sourcePacket.realSetupWizardOperatorHandoffRowCount),
+    realSetupWizardOperatorHandoffSummary: textValue(sourcePacket.realSetupWizardOperatorHandoffSummary),
+    realSetupWizardNextPrivateInputEditTargetSummary: textValue(
+      sourcePacket.realSetupWizardNextPrivateInputEditTargetSummary
+    ),
+    realSetupWizardNextPrivateInputEditExpectedShapeSummary: textValue(
+      sourcePacket.realSetupWizardNextPrivateInputEditExpectedShapeSummary
+    ),
+    realSetupWizardNextOperatorCommandAfterPrivateInputEdit: textValue(
+      sourcePacket.realSetupWizardNextOperatorCommandAfterPrivateInputEdit
+    ),
+    realSetupWizardPreflightReady: sourcePacket.realSetupWizardPreflightReady === true,
+    realSetupWizardApplyReady: sourcePacket.realSetupWizardApplyReady === true,
+    realSetupWizardStrictLiveCheckReady: sourcePacket.realSetupWizardStrictLiveCheckReady === true,
+    realSetupWizardCurrentReadyKeyCount: integerValue(sourcePacket.realSetupWizardCurrentReadyKeyCount),
+    realSetupWizardCurrentRequiredKeyCount: integerValue(sourcePacket.realSetupWizardCurrentRequiredKeyCount),
+    realSetupWizardRealLocalEnvRead: sourcePacket.realSetupWizardRealLocalEnvRead === true,
+    realSetupWizardRealLocalEnvModified: sourcePacket.realSetupWizardRealLocalEnvModified === true,
+    realSetupWizardRecommendedOperatorProofCommand: textValue(
+      sourcePacket.realSetupWizardRecommendedOperatorProofCommand,
+      privateEditStrictProofCommand
+    ),
+    realSetupWizardPrivateValuesRecorded: sourcePacket.realSetupWizardPrivateValuesRecorded === true,
+    realSetupWizardValueRecorded: sourcePacket.realSetupWizardValueRecorded === true,
+    realSetupWizardNetworkProbeAttempted: sourcePacket.realSetupWizardNetworkProbeAttempted === true,
+    realSetupWizardReleaseUploadAttempted: sourcePacket.realSetupWizardReleaseUploadAttempted === true,
+    realSetupWizardNotarySubmissionAttempted: sourcePacket.realSetupWizardNotarySubmissionAttempted === true,
+    realSetupWizardSigningAttempted: sourcePacket.realSetupWizardSigningAttempted === true,
+    realSetupWizardClaimedExternalDistribution: sourcePacket.realSetupWizardClaimedExternalDistribution === true
+  };
+}
+
 function commandOrder(rows, command) {
   const row = objectRows(rows).find((item) => item.command === command);
   return integerValue(row?.order);
@@ -478,6 +565,7 @@ function buildReport(sourcePacket, preflightBlocked) {
       sourcePacket.realOperatorPreflightPrivateValuesRecorded === true ? true : false,
     realOperatorPreflightClaimedExternalDistribution:
       sourcePacket.realOperatorPreflightClaimedExternalDistribution === true ? true : false,
+    ...buildSetupWizardSourceFields(sourcePacket),
     currentOperatorCommandSequenceReady: sourcePacket.currentOperatorCommandSequenceReady === true,
     currentOperatorCommandRows,
     currentOperatorCommandRowCount: integerValue(sourcePacket.currentOperatorCommandRowCount),
@@ -626,6 +714,15 @@ function formatCurrentPrivateInputPlaceholderLocationRows(rows) {
     .join("\n");
 }
 
+function formatSetupWizardHandoffRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.action)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.target)} | ${readyLabel(row.ready)} | ${escapeCell(row.expected)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function formatProcessEnvInputRows(rows) {
   return rows
     .map(
@@ -708,6 +805,10 @@ function buildMarkdown(report) {
 - Real operator private input loaded keys: ${report.realOperatorPreflightPrivateInputFileLoadedKeyCount} (${report.realOperatorPreflightPrivateInputFileLoadedKeySummary})
 - Real operator input ready/missing/placeholder/invalid rows: ${report.realOperatorPreflightInputReadyKeyCount}/${report.realOperatorPreflightInputMissingKeyCount}/${report.realOperatorPreflightInputPlaceholderKeyCount}/${report.realOperatorPreflightInputShapeInvalidKeyCount}
 - Real operator next write command: \`${report.realOperatorPreflightNextWriteCommand}\`
+- Real setup wizard receipt: ${readyLabel(report.realSetupWizardReceiptReady)}
+- Real setup wizard handoff rows: ${report.realSetupWizardOperatorHandoffRowCount} (${report.realSetupWizardOperatorHandoffSummary})
+- Real setup wizard next private input edit target: ${report.realSetupWizardNextPrivateInputEditTargetSummary}
+- Real setup wizard next operator command: \`${report.realSetupWizardNextOperatorCommandAfterPrivateInputEdit}\`
 - Current operator command sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
@@ -849,6 +950,34 @@ ${formatCurrentPrivateInputPlaceholderLocationRows(report.currentPrivateInputPla
 - Hard gate command: \`${report.realOperatorPreflightHardGateCommand}\`
 - Private values recorded: ${readyLabel(report.realOperatorPreflightPrivateValuesRecorded)}
 - External distribution claimed: ${readyLabel(report.realOperatorPreflightClaimedExternalDistribution)}
+
+## Real Setup Wizard Handoff
+
+- Receipt ready: ${readyLabel(report.realSetupWizardReceiptReady)}
+- Command: \`${report.realSetupWizardCommand}\`
+- Input ready: ${readyLabel(report.realSetupWizardInputReady)}
+- Local env loaded: ${readyLabel(report.realSetupWizardLocalEnvFileLoaded)}
+- Private input file present: ${readyLabel(report.realSetupWizardPrivateInputFilePresent)}
+- Private input file loaded keys: ${report.realSetupWizardPrivateInputFileLoadedKeyCount} (${report.realSetupWizardPrivateInputFileLoadedKeySummary})
+- Private input file location rows: ${report.realSetupWizardPrivateInputFileLocationRowCount}
+- Private input placeholder locations: ${report.realSetupWizardPrivateInputFilePlaceholderLocationSummary}
+- Private input missing key locations: ${report.realSetupWizardPrivateInputFileMissingKeyLocationSummary}
+- Private input invalid-shape locations: ${report.realSetupWizardPrivateInputFileInvalidShapeLocationSummary}
+- Operator handoff ready: ${readyLabel(report.realSetupWizardOperatorHandoffReady)}
+- Operator handoff rows: ${report.realSetupWizardOperatorHandoffRowCount} (${report.realSetupWizardOperatorHandoffSummary})
+- Next private input edit target: ${report.realSetupWizardNextPrivateInputEditTargetSummary}
+- Next private input expected shape: ${report.realSetupWizardNextPrivateInputEditExpectedShapeSummary}
+- Next operator command after private input edit: \`${report.realSetupWizardNextOperatorCommandAfterPrivateInputEdit}\`
+- Preflight/apply/strict ready: ${readyLabel(report.realSetupWizardPreflightReady)}/${readyLabel(report.realSetupWizardApplyReady)}/${readyLabel(report.realSetupWizardStrictLiveCheckReady)}
+- Current ready rows: ${report.realSetupWizardCurrentReadyKeyCount}/${report.realSetupWizardCurrentRequiredKeyCount}
+- Recommended proof command: \`${report.realSetupWizardRecommendedOperatorProofCommand}\`
+- Real local env read/modified: ${readyLabel(report.realSetupWizardRealLocalEnvRead)}/${readyLabel(report.realSetupWizardRealLocalEnvModified)}
+- Private values recorded: ${readyLabel(report.realSetupWizardPrivateValuesRecorded)}
+- External distribution claimed: ${readyLabel(report.realSetupWizardClaimedExternalDistribution)}
+
+| order | action | command | target | ready | expected | value recorded |
+|---:|---|---|---|---:|---|---:|
+${formatSetupWizardHandoffRows(report.realSetupWizardOperatorHandoffRows)}
 
 ## Private Env Preflight Blocker
 
@@ -1209,6 +1338,59 @@ function validateReport(report, markdown) {
       report.realOperatorPreflightClaimedExternalDistribution === false,
     "external completion resume packet real operator preflight should not record private values or claim external distribution"
   );
+  check(report.realSetupWizardReceiptReady === true, "external completion resume packet should expose ready real setup wizard evidence");
+  check(report.realSetupWizardCommand === releaseChannelSetupWizardCommand, "external completion resume packet setup wizard should cite its command");
+  check(
+    report.realSetupWizardPrivateInputFileLocationRowCount === 4,
+    "external completion resume packet setup wizard should expose four private input file location rows"
+  );
+  check(
+    report.realSetupWizardOperatorHandoffReady === true,
+    "external completion resume packet setup wizard operator handoff should be ready"
+  );
+  check(
+    report.realSetupWizardOperatorHandoffRowCount === report.realSetupWizardOperatorHandoffRows.length &&
+      report.realSetupWizardOperatorHandoffRowCount === 6,
+    "external completion resume packet setup wizard should expose six operator handoff rows"
+  );
+  check(
+    setupWizardHandoffRowsReady(report.realSetupWizardOperatorHandoffRows),
+    "external completion resume packet setup wizard handoff rows should cover edit, preflight, apply, strict proof, full proof, and blocker refresh"
+  );
+  check(
+    report.realSetupWizardNextPrivateInputEditTargetSummary !== "none",
+    "external completion resume packet setup wizard should expose the next private input edit targets"
+  );
+  check(
+    report.realSetupWizardNextPrivateInputEditExpectedShapeSummary.includes("GROOVEFORGE_DISTRIBUTION_CHANNEL"),
+    "external completion resume packet setup wizard should expose expected private input shapes"
+  );
+  check(
+    report.realSetupWizardNextOperatorCommandAfterPrivateInputEdit === releaseChannelApplyPrivateEnvPreflightCommand,
+    "external completion resume packet setup wizard should point the next operator command at preflight"
+  );
+  check(
+    report.realSetupWizardRecommendedOperatorProofCommand === privateEditStrictProofCommand,
+    "external completion resume packet setup wizard should expose the strict proof command"
+  );
+  check(
+    report.realSetupWizardCurrentRequiredKeyCount === 4,
+    "external completion resume packet setup wizard should cover four current release-channel keys"
+  );
+  check(
+    report.realSetupWizardRealLocalEnvModified === false,
+    "external completion resume packet setup wizard should not modify the real local env"
+  );
+  check(
+    report.realSetupWizardPrivateValuesRecorded === false &&
+      report.realSetupWizardValueRecorded === false &&
+      report.realSetupWizardNetworkProbeAttempted === false &&
+      report.realSetupWizardReleaseUploadAttempted === false &&
+      report.realSetupWizardNotarySubmissionAttempted === false &&
+      report.realSetupWizardSigningAttempted === false &&
+      report.realSetupWizardClaimedExternalDistribution === false,
+    "external completion resume packet setup wizard should stay value-free and non-claiming"
+  );
   check(report.currentOperatorCommandSequenceReady === true, "external completion resume packet current operator command sequence should be ready");
   check(
     report.currentOperatorCommandRowCount === report.currentOperatorCommandRows.length,
@@ -1367,6 +1549,9 @@ function validateReport(report, markdown) {
   check(markdown.includes("Current Private Input Receipt"), "external completion resume packet Markdown should include current private input receipt section");
   check(markdown.includes("Real operator preflight receipt:"), "external completion resume packet Markdown should include real operator preflight summary");
   check(markdown.includes("Real Operator Preflight Receipt"), "external completion resume packet Markdown should include real operator preflight section");
+  check(markdown.includes("Real setup wizard receipt:"), "external completion resume packet Markdown should include setup wizard summary");
+  check(markdown.includes("Real Setup Wizard Handoff"), "external completion resume packet Markdown should include setup wizard handoff section");
+  check(markdown.includes("Next private input edit target:"), "external completion resume packet Markdown should include setup wizard edit target");
   check(markdown.includes("Private input template command:"), "external completion resume packet Markdown should include private input template command");
   check(
     markdown.includes("Private env apply proof runner command:"),
@@ -1425,6 +1610,10 @@ console.log(`- Real operator private input file present: ${report.realOperatorPr
 console.log(`- Real operator private input loaded keys: ${report.realOperatorPreflightPrivateInputFileLoadedKeyCount} (${report.realOperatorPreflightPrivateInputFileLoadedKeySummary})`);
 console.log(`- Real operator input ready/missing/placeholder/invalid rows: ${report.realOperatorPreflightInputReadyKeyCount}/${report.realOperatorPreflightInputMissingKeyCount}/${report.realOperatorPreflightInputPlaceholderKeyCount}/${report.realOperatorPreflightInputShapeInvalidKeyCount}`);
 console.log(`- Real operator next write command: ${report.realOperatorPreflightNextWriteCommand}`);
+console.log(`- Real setup wizard receipt ready: ${report.realSetupWizardReceiptReady ? "yes" : "no"}`);
+console.log(`- Real setup wizard handoff rows: ${report.realSetupWizardOperatorHandoffRowCount} (${report.realSetupWizardOperatorHandoffSummary})`);
+console.log(`- Real setup wizard next private input edit target: ${report.realSetupWizardNextPrivateInputEditTargetSummary}`);
+console.log(`- Real setup wizard next operator command: ${report.realSetupWizardNextOperatorCommandAfterPrivateInputEdit}`);
 console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);

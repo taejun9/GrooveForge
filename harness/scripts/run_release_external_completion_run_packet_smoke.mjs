@@ -17,6 +17,7 @@ const packetMarkdownArtifactName = "release-external-completion-run-packet-smoke
 const packetJsonArtifactName = "release-external-completion-run-packet-smoke.json";
 const completionSummaryRefreshStem = "release-completion-summary-refresh-smoke";
 const completionSummaryStem = "release-completion-summary-smoke";
+const setupWizardStem = "release-channel-setup-wizard";
 const updateFeedPacketStem = "release-update-feed-edit-packet-smoke";
 const updateMetadataPacketStem = "release-update-metadata-publish-packet-smoke";
 const developerIdPacketStem = "release-developer-id-operator-packet-smoke";
@@ -27,6 +28,7 @@ const completionSummaryRefreshJsonPath = path.join(
   `${appName}-${packageJson.version}-${platformArch}-${completionSummaryRefreshStem}.json`
 );
 const completionSummaryJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${completionSummaryStem}.json`);
+const setupWizardJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${setupWizardStem}.json`);
 const updateFeedPacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${updateFeedPacketStem}.json`);
 const updateMetadataPacketJsonPath = path.join(
   packageRoot,
@@ -42,6 +44,7 @@ const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-priv
 const releaseChannelApplyPrivateEnvProofCommand = "npm run release:channel-apply-private-env-proof";
 const releaseChannelApplyPrivateEnvProofRole =
   "run private env preflight, apply only after preflight readiness, strict proof, and completion readout as one value-free operator proof runner";
+const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
 const privateEditStrictProofCommand = "npm run release:private-edit-strict-proof";
 
 const refreshCommands = [
@@ -53,18 +56,25 @@ const refreshCommands = [
   },
   {
     order: 2,
+    command: releaseChannelSetupWizardCommand,
+    role: "refresh the value-free setup wizard Operator Handoff for the current private release-channel metadata blocker",
+    allowBlockedExit: true,
+    valueRecorded: false
+  },
+  {
+    order: 3,
     command: "npm run release:update-feed-edit-packet-smoke",
     role: "refresh the value-free update feed/channel edit packet for the post-clearance auto-update step",
     valueRecorded: false
   },
   {
-    order: 3,
+    order: 4,
     command: "npm run release:update-metadata-publish-packet-smoke",
     role: "refresh the value-free update metadata publish packet and signed metadata blockers",
     valueRecorded: false
   },
   {
-    order: 4,
+    order: 5,
     command: "npm run release:developer-id-operator-packet-smoke",
     role: "refresh the value-free Developer ID, notarization, Gatekeeper, manual QA, and channel QA packet",
     valueRecorded: false
@@ -127,12 +137,101 @@ function copyCurrentPrivateInputPlaceholderLocationRow(row) {
   };
 }
 
+function copySetupWizardHandoffRow(row) {
+  return {
+    order: integerValue(row.order),
+    action: textValue(row.action),
+    command: textValue(row.command),
+    target: textValue(row.target),
+    ready: row.ready === true,
+    expected: textValue(row.expected),
+    valueRecorded: false
+  };
+}
+
+function setupWizardHandoffRowsReady(rows) {
+  const commands = rows.map((row) => row.command);
+  return (
+    rows.length === 6 &&
+    rows.every((row) => row.valueRecorded === false) &&
+    commands.includes("edit ignored private input file") &&
+    commands.includes(releaseChannelApplyPrivateEnvPreflightCommand) &&
+    commands.includes(releaseChannelApplyPrivateEnvCommand) &&
+    commands.includes("npm run release:channel-live-check-strict") &&
+    commands.includes(privateEditStrictProofCommand) &&
+    commands.includes("npm run release:current-blocker")
+  );
+}
+
+function buildSetupWizardMirrorFields(setupWizard) {
+  const handoffRows = objectRows(setupWizard.operatorHandoffRows).map(copySetupWizardHandoffRow);
+  const handoffRowsReady = setupWizardHandoffRowsReady(handoffRows);
+  return {
+    realSetupWizardReceiptReady:
+      setupWizard.reportCommand === releaseChannelSetupWizardCommand &&
+      setupWizard.operatorHandoffReady === true &&
+      handoffRowsReady &&
+      setupWizard.privateValuesRecorded === false &&
+      setupWizard.valueRecorded === false &&
+      setupWizard.networkProbeAttempted === false &&
+      setupWizard.releaseUploadAttempted === false &&
+      setupWizard.notarySubmissionAttempted === false &&
+      setupWizard.signingAttempted === false &&
+      setupWizard.releaseGateClaimedExternalDistribution === false,
+    realSetupWizardCommand: releaseChannelSetupWizardCommand,
+    realSetupWizardInputReady: setupWizard.inputReady === true,
+    realSetupWizardLocalEnvFileLoaded: setupWizard.localEnvFileLoaded === true,
+    realSetupWizardPrivateInputFilePresent: setupWizard.privateInputFilePresent === true,
+    realSetupWizardPrivateInputFileLoadedKeyCount: integerValue(setupWizard.privateInputFileLoadedKeyCount),
+    realSetupWizardPrivateInputFileLoadedKeySummary: textValue(setupWizard.privateInputFileLoadedKeySummary),
+    realSetupWizardPrivateInputFileLocationRowCount: integerValue(setupWizard.privateInputFileLocationRowCount),
+    realSetupWizardPrivateInputFilePlaceholderLocationSummary: textValue(
+      setupWizard.privateInputFilePlaceholderLocationSummary
+    ),
+    realSetupWizardPrivateInputFileInvalidShapeLocationSummary: textValue(
+      setupWizard.privateInputFileInvalidShapeLocationSummary
+    ),
+    realSetupWizardPrivateInputFileMissingKeyLocationSummary: textValue(
+      setupWizard.privateInputFileMissingKeyLocationSummary
+    ),
+    realSetupWizardOperatorHandoffReady: setupWizard.operatorHandoffReady === true && handoffRowsReady,
+    realSetupWizardOperatorHandoffRows: handoffRows,
+    realSetupWizardOperatorHandoffRowCount: integerValue(setupWizard.operatorHandoffRowCount),
+    realSetupWizardOperatorHandoffSummary: textValue(setupWizard.operatorHandoffSummary),
+    realSetupWizardNextPrivateInputEditTargetSummary: textValue(setupWizard.nextPrivateInputEditTargetSummary),
+    realSetupWizardNextPrivateInputEditExpectedShapeSummary: textValue(
+      setupWizard.nextPrivateInputEditExpectedShapeSummary
+    ),
+    realSetupWizardNextOperatorCommandAfterPrivateInputEdit: textValue(
+      setupWizard.nextOperatorCommandAfterPrivateInputEdit
+    ),
+    realSetupWizardPreflightReady: setupWizard.preflightReady === true,
+    realSetupWizardApplyReady: setupWizard.applyReady === true,
+    realSetupWizardStrictLiveCheckReady: setupWizard.strictLiveCheckReady === true,
+    realSetupWizardCurrentReadyKeyCount: integerValue(setupWizard.currentReadyKeyCount),
+    realSetupWizardCurrentRequiredKeyCount: integerValue(setupWizard.currentRequiredKeyCount),
+    realSetupWizardRealLocalEnvRead: setupWizard.realLocalEnvRead === true,
+    realSetupWizardRealLocalEnvModified: setupWizard.realLocalEnvModified === true,
+    realSetupWizardRecommendedOperatorProofCommand: textValue(
+      setupWizard.recommendedOperatorProofCommand,
+      privateEditStrictProofCommand
+    ),
+    realSetupWizardPrivateValuesRecorded: setupWizard.privateValuesRecorded === true,
+    realSetupWizardValueRecorded: setupWizard.valueRecorded === true,
+    realSetupWizardNetworkProbeAttempted: setupWizard.networkProbeAttempted === true,
+    realSetupWizardReleaseUploadAttempted: setupWizard.releaseUploadAttempted === true,
+    realSetupWizardNotarySubmissionAttempted: setupWizard.notarySubmissionAttempted === true,
+    realSetupWizardSigningAttempted: setupWizard.signingAttempted === true,
+    realSetupWizardClaimedExternalDistribution: setupWizard.releaseGateClaimedExternalDistribution === true
+  };
+}
+
 function commandOrder(rows, command) {
   const row = objectRows(rows).find((item) => item.command === command);
   return integerValue(row?.order);
 }
 
-function runNpmScript(command) {
+function runNpmScript(command, { allowBlockedExit = false } = {}) {
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
   const [, , scriptName] = command.trim().split(/\s+/);
   const result = spawnSync(npmCommand, ["run", scriptName], {
@@ -143,7 +242,7 @@ function runNpmScript(command) {
   if (result.error) {
     fail(`Could not run ${command}.`, result.error.message);
   }
-  if (result.status !== 0) {
+  if (result.status !== 0 && !(allowBlockedExit === true && result.status === 1)) {
     fail(`${command} exited with status ${result.status}.`, "Refresh the release evidence, then rerun this packet smoke.");
   }
 }
@@ -329,7 +428,7 @@ function buildRunRows({ completionSummary, updateFeedPacket, updateMetadataPacke
   return sequenceRunRows(rows);
 }
 
-function buildSourceRows({ completionSummaryRefresh, completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket }) {
+function buildSourceRows({ completionSummaryRefresh, completionSummary, setupWizard, updateFeedPacket, updateMetadataPacket, developerIdPacket }) {
   const rows = [
     sourceRow(
       "completion-summary",
@@ -338,6 +437,12 @@ function buildSourceRows({ completionSummaryRefresh, completionSummary, updateFe
         completionSummary.privateValuesRecorded === false &&
         completionSummary.claimedExternalDistribution === false,
       "npm run release:completion-summary-smoke"
+    ),
+    sourceRow(
+      "release-channel-setup-wizard",
+      setupWizardJsonPath,
+      buildSetupWizardMirrorFields(setupWizard).realSetupWizardReceiptReady === true,
+      releaseChannelSetupWizardCommand
     ),
     sourceRow(
       "update-feed-edit-packet",
@@ -379,7 +484,7 @@ function buildSourceRows({ completionSummaryRefresh, completionSummary, updateFe
   return rows;
 }
 
-function buildReport({ completionSummaryRefresh, completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket }) {
+function buildReport({ completionSummaryRefresh, completionSummary, setupWizard, updateFeedPacket, updateMetadataPacket, developerIdPacket }) {
   const currentOperatorCommandRows = objectRows(completionSummary.currentOperatorCommandRows);
   const currentOperatorPreflightCommand = textValue(
     completionSummary.currentOperatorPreflightCommand,
@@ -400,7 +505,7 @@ function buildReport({ completionSummaryRefresh, completionSummary, updateFeedPa
     currentOperatorCommandRows[0]?.role ?? "none"
   );
   const runRows = buildRunRows({ completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket });
-  const sourceRows = buildSourceRows({ completionSummaryRefresh, completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket });
+  const sourceRows = buildSourceRows({ completionSummaryRefresh, completionSummary, setupWizard, updateFeedPacket, updateMetadataPacket, developerIdPacket });
   const blockedRows = runRows.filter((row) => row.readiness !== "ready");
   const currentBlockedRows = runRows.filter((row) => row.sequenceStatus === "current-blocker");
   const waitingRows = runRows.filter((row) => row.sequenceStatus === "waiting-for-prerequisite");
@@ -588,6 +693,7 @@ function buildReport({ completionSummaryRefresh, completionSummary, updateFeedPa
       completionSummary.realOperatorPreflightPrivateValuesRecorded === true ? true : false,
     realOperatorPreflightClaimedExternalDistribution:
       completionSummary.realOperatorPreflightClaimedExternalDistribution === true ? true : false,
+    ...buildSetupWizardMirrorFields(setupWizard),
     currentOperatorCommandSequenceReady: completionSummary.currentOperatorCommandSequenceReady === true,
     currentOperatorCommandRows,
     currentOperatorCommandRowCount: integerValue(completionSummary.currentOperatorCommandRowCount),
@@ -743,6 +849,15 @@ function formatCurrentPrivateInputPlaceholderLocationRows(rows) {
     .join("\n");
 }
 
+function formatSetupWizardHandoffRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.action)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.target)} | ${readyLabel(row.ready)} | ${escapeCell(row.expected)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function formatCompletionActionRows(rows) {
   return rows
     .map(
@@ -786,6 +901,11 @@ function buildMarkdown(report) {
 - Real operator private input loaded keys: ${report.realOperatorPreflightPrivateInputFileLoadedKeyCount} (${report.realOperatorPreflightPrivateInputFileLoadedKeySummary})
 - Real operator input ready/missing/placeholder/invalid rows: ${report.realOperatorPreflightInputReadyKeyCount}/${report.realOperatorPreflightInputMissingKeyCount}/${report.realOperatorPreflightInputPlaceholderKeyCount}/${report.realOperatorPreflightInputShapeInvalidKeyCount}
 - Real operator next write command: \`${report.realOperatorPreflightNextWriteCommand}\`
+- Real setup wizard receipt ready: ${readyLabel(report.realSetupWizardReceiptReady)}
+- Real setup wizard handoff ready: ${readyLabel(report.realSetupWizardOperatorHandoffReady)}
+- Real setup wizard handoff rows: ${report.realSetupWizardOperatorHandoffRowCount} (${report.realSetupWizardOperatorHandoffSummary})
+- Real setup wizard next private input edit target: ${report.realSetupWizardNextPrivateInputEditTargetSummary}
+- Real setup wizard next operator command: \`${report.realSetupWizardNextOperatorCommandAfterPrivateInputEdit}\`
 - Current operator command sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
@@ -931,6 +1051,34 @@ ${formatCurrentPrivateInputPlaceholderLocationRows(report.currentPrivateInputPla
 - Private values recorded: ${readyLabel(report.realOperatorPreflightPrivateValuesRecorded)}
 - External distribution claimed: ${readyLabel(report.realOperatorPreflightClaimedExternalDistribution)}
 
+## Real Setup Wizard Handoff
+
+- Receipt ready: ${readyLabel(report.realSetupWizardReceiptReady)}
+- Command: \`${report.realSetupWizardCommand}\`
+- Input ready: ${readyLabel(report.realSetupWizardInputReady)}
+- Local env loaded: ${readyLabel(report.realSetupWizardLocalEnvFileLoaded)}
+- Private input file present: ${readyLabel(report.realSetupWizardPrivateInputFilePresent)}
+- Private input file loaded keys: ${report.realSetupWizardPrivateInputFileLoadedKeyCount} (${report.realSetupWizardPrivateInputFileLoadedKeySummary})
+- Private input file location rows: ${report.realSetupWizardPrivateInputFileLocationRowCount}
+- Private input placeholder locations: ${report.realSetupWizardPrivateInputFilePlaceholderLocationSummary}
+- Private input missing key locations: ${report.realSetupWizardPrivateInputFileMissingKeyLocationSummary}
+- Private input invalid-shape locations: ${report.realSetupWizardPrivateInputFileInvalidShapeLocationSummary}
+- Operator handoff ready: ${readyLabel(report.realSetupWizardOperatorHandoffReady)}
+- Operator handoff rows: ${report.realSetupWizardOperatorHandoffRowCount} (${report.realSetupWizardOperatorHandoffSummary})
+- Next private input edit target: ${report.realSetupWizardNextPrivateInputEditTargetSummary}
+- Next private input expected shape: ${report.realSetupWizardNextPrivateInputEditExpectedShapeSummary}
+- Next operator command after private input edit: \`${report.realSetupWizardNextOperatorCommandAfterPrivateInputEdit}\`
+- Preflight/apply/strict ready: ${readyLabel(report.realSetupWizardPreflightReady)}/${readyLabel(report.realSetupWizardApplyReady)}/${readyLabel(report.realSetupWizardStrictLiveCheckReady)}
+- Current ready rows: ${report.realSetupWizardCurrentReadyKeyCount}/${report.realSetupWizardCurrentRequiredKeyCount}
+- Recommended proof command: \`${report.realSetupWizardRecommendedOperatorProofCommand}\`
+- Real local env read/modified: ${readyLabel(report.realSetupWizardRealLocalEnvRead)}/${readyLabel(report.realSetupWizardRealLocalEnvModified)}
+- Private values recorded: ${readyLabel(report.realSetupWizardPrivateValuesRecorded)}
+- External distribution claimed: ${readyLabel(report.realSetupWizardClaimedExternalDistribution)}
+
+| order | action | command | target | ready | expected | value recorded |
+|---:|---|---|---|---:|---|---:|
+${formatSetupWizardHandoffRows(report.realSetupWizardOperatorHandoffRows)}
+
 ## Current Completion Blocker Actions
 
 | order | item | ready | current state | operator action | evidence | proof command | source field | value recorded |
@@ -956,22 +1104,22 @@ function validateReport(report, markdown) {
   check(report.reportCommand === "npm run release:external-completion-run-packet-smoke", "external completion run packet should report its command");
   if (fromExistingCompletionSummary) {
     check(report.sourceMode === "existing-completion-summary", "external completion run packet should report existing completion summary mode");
-    check(report.refreshCommandCount === 3, "external completion run packet existing-summary mode should refresh three downstream packets");
+    check(report.refreshCommandCount === 4, "external completion run packet existing-summary mode should refresh setup wizard plus three downstream packets");
     check(
       report.refreshCommands.map((row) => row.command).join(" -> ") ===
-        "npm run release:update-feed-edit-packet-smoke -> npm run release:update-metadata-publish-packet-smoke -> npm run release:developer-id-operator-packet-smoke",
+        "npm run release:channel-setup-wizard -> npm run release:update-feed-edit-packet-smoke -> npm run release:update-metadata-publish-packet-smoke -> npm run release:developer-id-operator-packet-smoke",
       "external completion run packet existing-summary mode should keep downstream refresh order"
     );
-    check(report.sourceRowCount === 4, "external completion run packet existing-summary mode should include four source rows");
+    check(report.sourceRowCount === 5, "external completion run packet existing-summary mode should include five source rows");
   } else {
     check(report.sourceMode === "refreshed-completion-summary", "external completion run packet should report refreshed completion summary mode");
-    check(report.refreshCommandCount === 4, "external completion run packet should refresh four source packets");
+    check(report.refreshCommandCount === 5, "external completion run packet should refresh five source packets");
     check(
       report.refreshCommands.map((row) => row.command).join(" -> ") ===
-        "npm run release:completion-summary-refresh-smoke -> npm run release:update-feed-edit-packet-smoke -> npm run release:update-metadata-publish-packet-smoke -> npm run release:developer-id-operator-packet-smoke",
+        "npm run release:completion-summary-refresh-smoke -> npm run release:channel-setup-wizard -> npm run release:update-feed-edit-packet-smoke -> npm run release:update-metadata-publish-packet-smoke -> npm run release:developer-id-operator-packet-smoke",
       "external completion run packet should keep source refresh order"
     );
-    check(report.sourceRowCount === 5, "external completion run packet should include five source rows");
+    check(report.sourceRowCount === 6, "external completion run packet should include six source rows");
   }
   check(report.sourceRows.every((row) => row.present === true && row.ready === true), "external completion run packet source rows should be present and ready");
   check(report.sourceRowsValueFree === true, "external completion run packet source rows should be value-free");
@@ -1123,6 +1271,59 @@ function validateReport(report, markdown) {
     report.realOperatorPreflightPrivateValuesRecorded === false &&
       report.realOperatorPreflightClaimedExternalDistribution === false,
     "external completion run packet real operator preflight should not record private values or claim external distribution"
+  );
+  check(report.realSetupWizardReceiptReady === true, "external completion run packet should expose ready real setup wizard evidence");
+  check(report.realSetupWizardCommand === releaseChannelSetupWizardCommand, "external completion run packet setup wizard should cite its command");
+  check(
+    report.realSetupWizardPrivateInputFileLocationRowCount === 4,
+    "external completion run packet setup wizard should expose four private input file location rows"
+  );
+  check(
+    report.realSetupWizardOperatorHandoffReady === true,
+    "external completion run packet setup wizard operator handoff should be ready"
+  );
+  check(
+    report.realSetupWizardOperatorHandoffRowCount === report.realSetupWizardOperatorHandoffRows.length &&
+      report.realSetupWizardOperatorHandoffRowCount === 6,
+    "external completion run packet setup wizard should expose six operator handoff rows"
+  );
+  check(
+    setupWizardHandoffRowsReady(report.realSetupWizardOperatorHandoffRows),
+    "external completion run packet setup wizard handoff rows should cover edit, preflight, apply, strict proof, full proof, and blocker refresh"
+  );
+  check(
+    report.realSetupWizardNextPrivateInputEditTargetSummary !== "none",
+    "external completion run packet setup wizard should expose the next private input edit targets"
+  );
+  check(
+    report.realSetupWizardNextPrivateInputEditExpectedShapeSummary.includes("GROOVEFORGE_DISTRIBUTION_CHANNEL"),
+    "external completion run packet setup wizard should expose expected private input shapes"
+  );
+  check(
+    report.realSetupWizardNextOperatorCommandAfterPrivateInputEdit === releaseChannelApplyPrivateEnvPreflightCommand,
+    "external completion run packet setup wizard should point the next operator command at preflight"
+  );
+  check(
+    report.realSetupWizardRecommendedOperatorProofCommand === privateEditStrictProofCommand,
+    "external completion run packet setup wizard should expose the strict proof command"
+  );
+  check(
+    report.realSetupWizardCurrentRequiredKeyCount === 4,
+    "external completion run packet setup wizard should cover four current release-channel keys"
+  );
+  check(
+    report.realSetupWizardRealLocalEnvModified === false,
+    "external completion run packet setup wizard should not modify the real local env"
+  );
+  check(
+    report.realSetupWizardPrivateValuesRecorded === false &&
+      report.realSetupWizardValueRecorded === false &&
+      report.realSetupWizardNetworkProbeAttempted === false &&
+      report.realSetupWizardReleaseUploadAttempted === false &&
+      report.realSetupWizardNotarySubmissionAttempted === false &&
+      report.realSetupWizardSigningAttempted === false &&
+      report.realSetupWizardClaimedExternalDistribution === false,
+    "external completion run packet setup wizard should stay value-free and non-claiming"
   );
   check(report.currentOperatorCommandSequenceReady === true, "external completion run packet current operator command sequence should be ready");
   check(
@@ -1279,6 +1480,9 @@ function validateReport(report, markdown) {
   check(markdown.includes("Current Private Input Receipt"), "external completion run packet Markdown should include current private input receipt section");
   check(markdown.includes("Real operator preflight receipt:"), "external completion run packet Markdown should include real operator preflight summary");
   check(markdown.includes("Real Operator Preflight Receipt"), "external completion run packet Markdown should include real operator preflight section");
+  check(markdown.includes("Real setup wizard receipt ready:"), "external completion run packet Markdown should include setup wizard summary");
+  check(markdown.includes("Real Setup Wizard Handoff"), "external completion run packet Markdown should include setup wizard handoff section");
+  check(markdown.includes("Next private input edit target:"), "external completion run packet Markdown should include setup wizard edit target");
   check(markdown.includes("Current blocker run rows"), "external completion run packet Markdown should include current blocker row summary");
   check(markdown.includes("External distribution claimed: no"), "external completion run packet Markdown should keep external distribution unclaimed");
 
@@ -1289,18 +1493,19 @@ function validateReport(report, markdown) {
 
 for (const step of activeRefreshCommands) {
   console.log(`Refreshing release external completion run packet evidence: ${step.command}`);
-  runNpmScript(step.command);
+  runNpmScript(step.command, { allowBlockedExit: step.allowBlockedExit === true });
 }
 
-const [completionSummaryRefresh, completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket] = await Promise.all([
+const [completionSummaryRefresh, completionSummary, setupWizard, updateFeedPacket, updateMetadataPacket, developerIdPacket] = await Promise.all([
   fromExistingCompletionSummary ? Promise.resolve(null) : readJsonRequired(completionSummaryRefreshJsonPath, "release completion summary refresh"),
   readJsonRequired(completionSummaryJsonPath, "release completion summary"),
+  readJsonRequired(setupWizardJsonPath, "release-channel setup wizard"),
   readJsonRequired(updateFeedPacketJsonPath, "release update feed edit packet"),
   readJsonRequired(updateMetadataPacketJsonPath, "release update metadata publish packet"),
   readJsonRequired(developerIdPacketJsonPath, "release Developer ID operator packet")
 ]);
 
-const report = buildReport({ completionSummaryRefresh, completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket });
+const report = buildReport({ completionSummaryRefresh, completionSummary, setupWizard, updateFeedPacket, updateMetadataPacket, developerIdPacket });
 report.externalCompletionRunPacketReady = true;
 const markdown = buildMarkdown(report);
 validateReport(report, markdown);
@@ -1331,6 +1536,10 @@ console.log(`- Real operator private input file present: ${report.realOperatorPr
 console.log(`- Real operator private input loaded keys: ${report.realOperatorPreflightPrivateInputFileLoadedKeyCount} (${report.realOperatorPreflightPrivateInputFileLoadedKeySummary})`);
 console.log(`- Real operator input ready/missing/placeholder/invalid rows: ${report.realOperatorPreflightInputReadyKeyCount}/${report.realOperatorPreflightInputMissingKeyCount}/${report.realOperatorPreflightInputPlaceholderKeyCount}/${report.realOperatorPreflightInputShapeInvalidKeyCount}`);
 console.log(`- Real operator next write command: ${report.realOperatorPreflightNextWriteCommand}`);
+console.log(`- Real setup wizard receipt ready: ${report.realSetupWizardReceiptReady ? "yes" : "no"}`);
+console.log(`- Real setup wizard handoff rows: ${report.realSetupWizardOperatorHandoffRowCount} (${report.realSetupWizardOperatorHandoffSummary})`);
+console.log(`- Real setup wizard next private input edit target: ${report.realSetupWizardNextPrivateInputEditTargetSummary}`);
+console.log(`- Real setup wizard next operator command: ${report.realSetupWizardNextOperatorCommandAfterPrivateInputEdit}`);
 console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);

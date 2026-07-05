@@ -176,6 +176,85 @@ function valueFreeRows(rows) {
   return objectRows(rows).every((row) => row.valueRecorded === false);
 }
 
+function copySetupWizardHandoffRow(row) {
+  return {
+    order: integerValue(row.order),
+    action: textValue(row.action),
+    command: textValue(row.command),
+    target: textValue(row.target),
+    ready: row.ready === true,
+    expected: textValue(row.expected),
+    valueRecorded: false
+  };
+}
+
+function setupWizardHandoffRowsReady(rows) {
+  const commands = rows.map((row) => row.command);
+  return (
+    rows.length === 6 &&
+    rows.every((row) => row.valueRecorded === false) &&
+    commands.includes("edit ignored private input file") &&
+    commands.includes(releaseChannelApplyPrivateEnvPreflightCommand) &&
+    commands.includes(releaseChannelApplyPrivateEnvCommand) &&
+    commands.includes("npm run release:channel-live-check-strict") &&
+    commands.includes("npm run release:private-edit-strict-proof") &&
+    commands.includes("npm run release:current-blocker")
+  );
+}
+
+function setupWizardComparableFields(source) {
+  const handoffRows = objectRows(source.realSetupWizardOperatorHandoffRows).map(copySetupWizardHandoffRow);
+  return {
+    receiptReady: source.realSetupWizardReceiptReady === true,
+    command: textValue(source.realSetupWizardCommand),
+    inputReady: source.realSetupWizardInputReady === true,
+    localEnvFileLoaded: source.realSetupWizardLocalEnvFileLoaded === true,
+    privateInputFilePresent: source.realSetupWizardPrivateInputFilePresent === true,
+    privateInputFileLoadedKeyCount: integerValue(source.realSetupWizardPrivateInputFileLoadedKeyCount),
+    privateInputFileLoadedKeySummary: textValue(source.realSetupWizardPrivateInputFileLoadedKeySummary),
+    privateInputFileLocationRowCount: integerValue(source.realSetupWizardPrivateInputFileLocationRowCount),
+    privateInputFilePlaceholderLocationSummary: textValue(
+      source.realSetupWizardPrivateInputFilePlaceholderLocationSummary
+    ),
+    privateInputFileInvalidShapeLocationSummary: textValue(
+      source.realSetupWizardPrivateInputFileInvalidShapeLocationSummary
+    ),
+    privateInputFileMissingKeyLocationSummary: textValue(
+      source.realSetupWizardPrivateInputFileMissingKeyLocationSummary
+    ),
+    operatorHandoffReady: source.realSetupWizardOperatorHandoffReady === true && setupWizardHandoffRowsReady(handoffRows),
+    operatorHandoffRowCount: integerValue(source.realSetupWizardOperatorHandoffRowCount),
+    operatorHandoffSummary: textValue(source.realSetupWizardOperatorHandoffSummary),
+    operatorHandoffRows: handoffRows,
+    nextPrivateInputEditTargetSummary: textValue(source.realSetupWizardNextPrivateInputEditTargetSummary),
+    nextPrivateInputEditExpectedShapeSummary: textValue(
+      source.realSetupWizardNextPrivateInputEditExpectedShapeSummary
+    ),
+    nextOperatorCommandAfterPrivateInputEdit: textValue(
+      source.realSetupWizardNextOperatorCommandAfterPrivateInputEdit
+    ),
+    preflightReady: source.realSetupWizardPreflightReady === true,
+    applyReady: source.realSetupWizardApplyReady === true,
+    strictLiveCheckReady: source.realSetupWizardStrictLiveCheckReady === true,
+    currentReadyKeyCount: integerValue(source.realSetupWizardCurrentReadyKeyCount),
+    currentRequiredKeyCount: integerValue(source.realSetupWizardCurrentRequiredKeyCount),
+    realLocalEnvRead: source.realSetupWizardRealLocalEnvRead === true,
+    realLocalEnvModified: source.realSetupWizardRealLocalEnvModified === true,
+    recommendedOperatorProofCommand: textValue(source.realSetupWizardRecommendedOperatorProofCommand),
+    privateValuesRecorded: source.realSetupWizardPrivateValuesRecorded === true,
+    valueRecorded: source.realSetupWizardValueRecorded === true,
+    networkProbeAttempted: source.realSetupWizardNetworkProbeAttempted === true,
+    releaseUploadAttempted: source.realSetupWizardReleaseUploadAttempted === true,
+    notarySubmissionAttempted: source.realSetupWizardNotarySubmissionAttempted === true,
+    signingAttempted: source.realSetupWizardSigningAttempted === true,
+    claimedExternalDistribution: source.realSetupWizardClaimedExternalDistribution === true
+  };
+}
+
+function setupWizardFieldsMatch(left, right) {
+  return JSON.stringify(setupWizardComparableFields(left)) === JSON.stringify(setupWizardComparableFields(right));
+}
+
 function realPreflightComparableFields(source) {
   return {
     receiptReady: source.realOperatorPreflightReceiptReady === true,
@@ -558,6 +637,15 @@ function formatPreflightOperatorReceiptRows(rows) {
     .join("\n");
 }
 
+function formatSetupWizardHandoffRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.action)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.target)} | ${readyLabel(row.ready)} | ${escapeCell(row.expected)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function buildReport({
   progressRefresh,
   completionSummary,
@@ -631,6 +719,8 @@ function buildReport({
     externalResume.privateValuesRecorded === false &&
     externalResume.claimedExternalDistribution === false &&
     externalResume.valueRecorded === false;
+  const realSetupWizardFields = setupWizardComparableFields(externalRun);
+  const realSetupWizardMatchesExternalResume = setupWizardFieldsMatch(externalRun, externalResume);
   const report = {
     appName,
     bundleId,
@@ -849,6 +939,47 @@ function buildReport({
       realOperatorPreflightReportFields,
       externalResume
     ),
+    realSetupWizardReceiptReady: realSetupWizardFields.receiptReady,
+    realSetupWizardCommand: realSetupWizardFields.command,
+    realSetupWizardInputReady: realSetupWizardFields.inputReady,
+    realSetupWizardLocalEnvFileLoaded: realSetupWizardFields.localEnvFileLoaded,
+    realSetupWizardPrivateInputFilePresent: realSetupWizardFields.privateInputFilePresent,
+    realSetupWizardPrivateInputFileLoadedKeyCount: realSetupWizardFields.privateInputFileLoadedKeyCount,
+    realSetupWizardPrivateInputFileLoadedKeySummary: realSetupWizardFields.privateInputFileLoadedKeySummary,
+    realSetupWizardPrivateInputFileLocationRowCount: realSetupWizardFields.privateInputFileLocationRowCount,
+    realSetupWizardPrivateInputFilePlaceholderLocationSummary:
+      realSetupWizardFields.privateInputFilePlaceholderLocationSummary,
+    realSetupWizardPrivateInputFileInvalidShapeLocationSummary:
+      realSetupWizardFields.privateInputFileInvalidShapeLocationSummary,
+    realSetupWizardPrivateInputFileMissingKeyLocationSummary:
+      realSetupWizardFields.privateInputFileMissingKeyLocationSummary,
+    realSetupWizardOperatorHandoffReady: realSetupWizardFields.operatorHandoffReady,
+    realSetupWizardOperatorHandoffRows: realSetupWizardFields.operatorHandoffRows,
+    realSetupWizardOperatorHandoffRowCount: realSetupWizardFields.operatorHandoffRowCount,
+    realSetupWizardOperatorHandoffSummary: realSetupWizardFields.operatorHandoffSummary,
+    realSetupWizardNextPrivateInputEditTargetSummary:
+      realSetupWizardFields.nextPrivateInputEditTargetSummary,
+    realSetupWizardNextPrivateInputEditExpectedShapeSummary:
+      realSetupWizardFields.nextPrivateInputEditExpectedShapeSummary,
+    realSetupWizardNextOperatorCommandAfterPrivateInputEdit:
+      realSetupWizardFields.nextOperatorCommandAfterPrivateInputEdit,
+    realSetupWizardPreflightReady: realSetupWizardFields.preflightReady,
+    realSetupWizardApplyReady: realSetupWizardFields.applyReady,
+    realSetupWizardStrictLiveCheckReady: realSetupWizardFields.strictLiveCheckReady,
+    realSetupWizardCurrentReadyKeyCount: realSetupWizardFields.currentReadyKeyCount,
+    realSetupWizardCurrentRequiredKeyCount: realSetupWizardFields.currentRequiredKeyCount,
+    realSetupWizardRealLocalEnvRead: realSetupWizardFields.realLocalEnvRead,
+    realSetupWizardRealLocalEnvModified: realSetupWizardFields.realLocalEnvModified,
+    realSetupWizardRecommendedOperatorProofCommand:
+      realSetupWizardFields.recommendedOperatorProofCommand,
+    realSetupWizardPrivateValuesRecorded: realSetupWizardFields.privateValuesRecorded,
+    realSetupWizardValueRecorded: realSetupWizardFields.valueRecorded,
+    realSetupWizardNetworkProbeAttempted: realSetupWizardFields.networkProbeAttempted,
+    realSetupWizardReleaseUploadAttempted: realSetupWizardFields.releaseUploadAttempted,
+    realSetupWizardNotarySubmissionAttempted: realSetupWizardFields.notarySubmissionAttempted,
+    realSetupWizardSigningAttempted: realSetupWizardFields.signingAttempted,
+    realSetupWizardClaimedExternalDistribution: realSetupWizardFields.claimedExternalDistribution,
+    realSetupWizardMatchesExternalResumePacket: realSetupWizardMatchesExternalResume,
     externalCompletionRunPacketReady: externalRun.externalCompletionRunPacketReady === true,
     externalCompletionRunSourceMode: textValue(externalRun.sourceMode),
     externalCompletionResumePacketReady: externalResumeReady,
@@ -1132,6 +1263,12 @@ function buildMarkdown(report) {
 - Real operator next write command: \`${report.realOperatorPreflightNextWriteCommand}\`
 - Real operator guided setup fallback: \`${report.realOperatorPreflightGuidedSetupFallbackCommand}\`
 - Real operator next proof command: \`${report.realOperatorPreflightRecommendedOperatorProofCommand}\`
+- Real setup wizard receipt ready: ${readyLabel(report.realSetupWizardReceiptReady)}
+- Real setup wizard handoff ready: ${readyLabel(report.realSetupWizardOperatorHandoffReady)}
+- Real setup wizard handoff rows: ${report.realSetupWizardOperatorHandoffRowCount} (${report.realSetupWizardOperatorHandoffSummary})
+- Real setup wizard next private input edit target: ${report.realSetupWizardNextPrivateInputEditTargetSummary}
+- Real setup wizard next operator command: \`${report.realSetupWizardNextOperatorCommandAfterPrivateInputEdit}\`
+- Real setup wizard matches external resume packet: ${readyLabel(report.realSetupWizardMatchesExternalResumePacket)}
 - External resume packet ready: ${readyLabel(report.externalCompletionResumePacketReady)}
 - External resume source mode: ${report.externalCompletionResumeSourceMode}
 - External resume private input template command: \`${report.externalCompletionResumePrivateInputTemplateCommand}\`
@@ -1239,6 +1376,35 @@ ${formatPreflightRemediationRows(report.realOperatorPreflightRemediationRows)}
 | order | step | status | command | target | expected evidence | operator action | value recorded |
 |---:|---|---|---|---|---|---|---:|
 ${formatPreflightOperatorReceiptRows(report.realOperatorPreflightOperatorReceiptRows)}
+
+## Real Setup Wizard Handoff
+
+- Receipt ready: ${readyLabel(report.realSetupWizardReceiptReady)}
+- Command: \`${report.realSetupWizardCommand}\`
+- Input ready: ${readyLabel(report.realSetupWizardInputReady)}
+- Local env loaded: ${readyLabel(report.realSetupWizardLocalEnvFileLoaded)}
+- Private input file present: ${readyLabel(report.realSetupWizardPrivateInputFilePresent)}
+- Private input file loaded keys: ${report.realSetupWizardPrivateInputFileLoadedKeyCount} (${report.realSetupWizardPrivateInputFileLoadedKeySummary})
+- Private input file location rows: ${report.realSetupWizardPrivateInputFileLocationRowCount}
+- Private input placeholder locations: ${report.realSetupWizardPrivateInputFilePlaceholderLocationSummary}
+- Private input missing key locations: ${report.realSetupWizardPrivateInputFileMissingKeyLocationSummary}
+- Private input invalid-shape locations: ${report.realSetupWizardPrivateInputFileInvalidShapeLocationSummary}
+- Operator handoff ready: ${readyLabel(report.realSetupWizardOperatorHandoffReady)}
+- Operator handoff rows: ${report.realSetupWizardOperatorHandoffRowCount} (${report.realSetupWizardOperatorHandoffSummary})
+- Next private input edit target: ${report.realSetupWizardNextPrivateInputEditTargetSummary}
+- Next private input expected shape: ${report.realSetupWizardNextPrivateInputEditExpectedShapeSummary}
+- Next operator command after private input edit: \`${report.realSetupWizardNextOperatorCommandAfterPrivateInputEdit}\`
+- Preflight/apply/strict ready: ${readyLabel(report.realSetupWizardPreflightReady)}/${readyLabel(report.realSetupWizardApplyReady)}/${readyLabel(report.realSetupWizardStrictLiveCheckReady)}
+- Current ready rows: ${report.realSetupWizardCurrentReadyKeyCount}/${report.realSetupWizardCurrentRequiredKeyCount}
+- Recommended proof command: \`${report.realSetupWizardRecommendedOperatorProofCommand}\`
+- Real local env read/modified: ${readyLabel(report.realSetupWizardRealLocalEnvRead)}/${readyLabel(report.realSetupWizardRealLocalEnvModified)}
+- Matches external resume packet: ${readyLabel(report.realSetupWizardMatchesExternalResumePacket)}
+- Private values recorded: ${readyLabel(report.realSetupWizardPrivateValuesRecorded)}
+- External distribution claimed: ${readyLabel(report.realSetupWizardClaimedExternalDistribution)}
+
+| order | action | command | target | ready | expected | value recorded |
+|---:|---|---|---|---:|---|---:|
+${formatSetupWizardHandoffRows(report.realSetupWizardOperatorHandoffRows)}
 
 ## External Completion Resume Packet
 
@@ -1695,6 +1861,63 @@ function validateReport(report, markdown) {
     report.realOperatorPreflightClaimedExternalDistribution === false,
     "release completion summary refresh real operator preflight should not claim external distribution"
   );
+  check(report.realSetupWizardReceiptReady === true, "release completion summary refresh should expose ready real setup wizard evidence");
+  check(report.realSetupWizardCommand === releaseChannelSetupWizardCommand, "release completion summary refresh setup wizard should cite its command");
+  check(
+    report.realSetupWizardPrivateInputFileLocationRowCount === 4,
+    "release completion summary refresh setup wizard should expose four private input file location rows"
+  );
+  check(
+    report.realSetupWizardOperatorHandoffReady === true,
+    "release completion summary refresh setup wizard operator handoff should be ready"
+  );
+  check(
+    report.realSetupWizardOperatorHandoffRowCount === report.realSetupWizardOperatorHandoffRows.length &&
+      report.realSetupWizardOperatorHandoffRowCount === 6,
+    "release completion summary refresh setup wizard should expose six operator handoff rows"
+  );
+  check(
+    setupWizardHandoffRowsReady(report.realSetupWizardOperatorHandoffRows),
+    "release completion summary refresh setup wizard handoff rows should cover edit, preflight, apply, strict proof, full proof, and blocker refresh"
+  );
+  check(
+    report.realSetupWizardNextPrivateInputEditTargetSummary !== "none",
+    "release completion summary refresh setup wizard should expose the next private input edit targets"
+  );
+  check(
+    report.realSetupWizardNextPrivateInputEditExpectedShapeSummary.includes("GROOVEFORGE_DISTRIBUTION_CHANNEL"),
+    "release completion summary refresh setup wizard should expose expected private input shapes"
+  );
+  check(
+    report.realSetupWizardNextOperatorCommandAfterPrivateInputEdit === releaseChannelApplyPrivateEnvPreflightCommand,
+    "release completion summary refresh setup wizard should point the next operator command at preflight"
+  );
+  check(
+    report.realSetupWizardRecommendedOperatorProofCommand === "npm run release:private-edit-strict-proof",
+    "release completion summary refresh setup wizard should expose the strict proof command"
+  );
+  check(
+    report.realSetupWizardCurrentRequiredKeyCount === 4,
+    "release completion summary refresh setup wizard should cover four current release-channel keys"
+  );
+  check(
+    report.realSetupWizardRealLocalEnvModified === false,
+    "release completion summary refresh setup wizard should not modify the real local env"
+  );
+  check(
+    report.realSetupWizardPrivateValuesRecorded === false &&
+      report.realSetupWizardValueRecorded === false &&
+      report.realSetupWizardNetworkProbeAttempted === false &&
+      report.realSetupWizardReleaseUploadAttempted === false &&
+      report.realSetupWizardNotarySubmissionAttempted === false &&
+      report.realSetupWizardSigningAttempted === false &&
+      report.realSetupWizardClaimedExternalDistribution === false,
+    "release completion summary refresh setup wizard should stay value-free and non-claiming"
+  );
+  check(
+    report.realSetupWizardMatchesExternalResumePacket === true,
+    "release completion summary refresh setup wizard should match the external resume packet mirror"
+  );
   check(report.externalCompletionResumePacketReady === true, "release completion summary refresh should refresh a ready external completion resume packet");
   check(report.externalCompletionResumeSourceMode === "existing-run-packet", "release completion summary refresh should use the non-recursive existing run packet resume mode");
   check(report.externalCompletionResumeSourcePacketReady === true, "release completion summary refresh should require a ready external completion run packet source");
@@ -2068,6 +2291,10 @@ function validateReport(report, markdown) {
   check(markdown.includes("Matches external run packet:"), "release completion summary refresh Markdown should include run packet real-preflight match");
   check(markdown.includes("Matches external resume packet:"), "release completion summary refresh Markdown should include resume packet real-preflight match");
   check(markdown.includes("Real Operator Process Input Checklist"), "release completion summary refresh Markdown should include real operator process input checklist");
+  check(markdown.includes("Real setup wizard receipt ready:"), "release completion summary refresh Markdown should include setup wizard summary");
+  check(markdown.includes("Real Setup Wizard Handoff"), "release completion summary refresh Markdown should include setup wizard handoff section");
+  check(markdown.includes("Next private input edit target:"), "release completion summary refresh Markdown should include setup wizard edit target");
+  check(markdown.includes("Matches external resume packet:"), "release completion summary refresh Markdown should include setup wizard resume match");
   check(markdown.includes("External resume private input template command:"), "release completion summary refresh Markdown should include external resume private input template command");
   check(markdown.includes("External resume private input file key:"), "release completion summary refresh Markdown should include external resume private input file guidance");
   check(
@@ -2229,6 +2456,11 @@ async function main() {
   );
   console.log(`- Real operator next write command: ${report.realOperatorPreflightNextWriteCommand}`);
   console.log(`- Real operator guided setup fallback: ${report.realOperatorPreflightGuidedSetupFallbackCommand}`);
+  console.log(`- Real setup wizard receipt ready: ${report.realSetupWizardReceiptReady ? "yes" : "no"}`);
+  console.log(`- Real setup wizard handoff rows: ${report.realSetupWizardOperatorHandoffRowCount} (${report.realSetupWizardOperatorHandoffSummary})`);
+  console.log(`- Real setup wizard next private input edit target: ${report.realSetupWizardNextPrivateInputEditTargetSummary}`);
+  console.log(`- Real setup wizard next operator command: ${report.realSetupWizardNextOperatorCommandAfterPrivateInputEdit}`);
+  console.log(`- Real setup wizard matches external resume packet: ${report.realSetupWizardMatchesExternalResumePacket ? "yes" : "no"}`);
   console.log(`- Private env apply preflight command: ${report.releaseChannelPrivateEnvApplyPreflightCommand}`);
   console.log(`- Private env apply preflight before apply: ${report.releaseChannelPrivateEnvApplyPreflightBeforeApply ? "yes" : "no"}`);
   console.log(`- Private env apply command: ${report.releaseChannelPrivateEnvApplyCommand}`);
