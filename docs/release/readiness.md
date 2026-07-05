@@ -46,7 +46,7 @@ Run the source evidence refresh smoke when those prerequisite rows need to be re
 npm run release:source-evidence-refresh-smoke
 ```
 
-That refresh builds the app, regenerates local package/project-IO/release manifest/support/update/signing-readiness/completion/external runbook/proof-bundle evidence in dependency order, then reruns `npm run release:source-evidence-prereq-smoke` and fails unless all 21 source artifacts are present. It forces `GROOVEFORGE_NOTARY_SUBMIT=0`, stores only command status/duration rows plus generated-intermediate cleanup rows, retains the release manifest DMG for follow-up update metadata checks, and does not upload releases, publish update feeds, probe distribution channels, submit to Apple, write ignored private env files, record private values, or claim external distribution completion.
+That refresh builds the app, regenerates local package/project-IO/release manifest/support/update/signing-readiness/completion/external runbook/proof-bundle evidence in dependency order, then reruns `npm run release:source-evidence-prereq-smoke` and fails unless all 21 source artifacts are present. It forces `GROOVEFORGE_NOTARY_SUBMIT=0`, stores only command status/duration rows, generated-intermediate cleanup rows, and value-free restore rows for the packaged app restored from the verified PKG payload before DMG evidence, retains the release manifest DMG for follow-up update metadata checks, and does not upload releases, publish update feeds, probe distribution channels, submit to Apple, write ignored private env files, record private values, or claim external distribution completion.
 
 Run the 10-plan checkpoint smoke directly only when manually rerunning the checkpoint from already refreshed source evidence:
 
