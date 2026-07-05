@@ -1275,6 +1275,85 @@ h2 {
   font-style: normal;
 }
 
+.audience-session-acceptance {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.audience-session-acceptance-title {
+  grid-column: 1 / -1;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.audience-session-acceptance-row {
+  display: grid;
+  grid-template-columns: minmax(116px, 0.34fr) minmax(150px, 0.48fr) minmax(0, 1fr);
+  gap: 6px 8px;
+  align-items: center;
+  min-width: 0;
+  min-height: 50px;
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.04);
+  padding: 7px;
+}
+
+.audience-session-acceptance-row.good {
+  border-color: rgba(120, 240, 200, 0.22);
+}
+
+.audience-session-acceptance-row.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+}
+
+.audience-session-acceptance-row.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+}
+
+.audience-session-acceptance-row span,
+.audience-session-acceptance-row strong,
+.audience-session-acceptance-row small,
+.audience-session-acceptance-row em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audience-session-acceptance-row span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.audience-session-acceptance-row strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.audience-session-acceptance-row small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 10px;
+}
+
+.audience-session-acceptance-row em {
+  color: rgba(120, 240, 200, 0.72);
+  font-size: 10px;
+  font-style: normal;
+}
+
 .audience-session-proof-handoff {
   grid-column: 1 / -1;
   display: grid;
@@ -29444,6 +29523,8 @@ input[type="range"] {
   .audience-next-step-row,
   .audience-completion-checkpoints,
   .audience-completion-checkpoint-row,
+  .audience-session-acceptance,
+  .audience-session-acceptance-row,
   .audience-session-proof-handoff,
   .audience-session-proof-handoff-row,
   .audience-delivery-snapshot,

@@ -128,6 +128,22 @@ type GrooveforgeLaunchSmokeAudienceSessionProofHandoffEvidence = {
   rowCount: number;
 };
 
+type GrooveforgeLaunchSmokeAudienceSessionAcceptanceEvidence = {
+  activeAudience: string;
+  beginnerEvidence: string;
+  beginnerLane: string;
+  beginnerNext: string;
+  beginnerProof: string;
+  beginnerTarget: string;
+  present: boolean;
+  producerEvidence: string;
+  producerLane: string;
+  producerNext: string;
+  producerProof: string;
+  producerTarget: string;
+  rowCount: number;
+};
+
 type GrooveforgeLaunchSmokeAudienceDeliverySnapshotEvidence = {
   activeAudience: string;
   beginnerDeliverables: string;
@@ -180,6 +196,10 @@ type GrooveforgeLaunchSmokePaletteEvidence = {
   routeBridge: GrooveforgeLaunchSmokeRouteEvidence;
   routeBridgeCompletion: GrooveforgeLaunchSmokeRouteEvidence;
   routeBridgeReadiness: GrooveforgeLaunchSmokeRouteEvidence;
+  sessionAcceptanceBeginner: GrooveforgeLaunchSmokeRouteEvidence;
+  sessionAcceptance: GrooveforgeLaunchSmokeAudienceSessionAcceptanceEvidence;
+  sessionAcceptanceProducer: GrooveforgeLaunchSmokeRouteEvidence;
+  sessionAcceptanceReadout: GrooveforgeLaunchSmokeRouteEvidence;
   sessionProofBeginner: GrooveforgeLaunchSmokeRouteEvidence;
   sessionProofHandoff: GrooveforgeLaunchSmokeAudienceSessionProofHandoffEvidence;
   sessionProofProducer: GrooveforgeLaunchSmokeRouteEvidence;

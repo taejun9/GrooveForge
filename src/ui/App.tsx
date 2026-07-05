@@ -6980,6 +6980,24 @@ export function App(): ReactElement {
     );
   }
 
+  function focusAudienceSessionAcceptanceReadout(): void {
+    const beginner = audienceSessionReadoutSummary.rows.find((row) => row.id === "beginner");
+    const producer = audienceSessionReadoutSummary.rows.find((row) => row.id === "producer");
+    if (typeof document !== "undefined") {
+      document.querySelector<HTMLElement>('[data-testid="audience-session-acceptance"]')?.scrollIntoView({
+        block: "start",
+        behavior: "auto"
+      });
+    }
+    setProjectStatus(
+      `Audience Session Acceptance Pattern ${project.selectedPattern}: ${
+        beginner?.label ?? "First-time composer"
+      } guided 8-bar local session / ${
+        producer?.label ?? "Professional producer"
+      } studio handoff pass / acceptance routes unchanged`
+    );
+  }
+
   function focusAudienceSessionProofHandoffReadout(): void {
     const beginner = audienceSessionReadoutSummary.rows.find((row) => row.id === "beginner");
     const producer = audienceSessionReadoutSummary.rows.find((row) => row.id === "producer");
@@ -9353,6 +9371,7 @@ export function App(): ReactElement {
     onSelectAudienceSessionRow: selectAudienceSessionRow,
     onCreateAudienceStarter: createAudienceStarter,
     onFocusAudienceDeliveryProofBridgeReadout: focusAudienceDeliveryProofBridgeReadout,
+    onFocusAudienceSessionAcceptanceReadout: focusAudienceSessionAcceptanceReadout,
     onFocusAudienceSessionProofHandoffReadout: focusAudienceSessionProofHandoffReadout,
     onFocusAudienceRouteBridgeReadout: focusAudienceRouteBridgeReadout,
     onFocusAudienceCompletionRouteReadout: focusAudienceCompletionRouteReadout,
@@ -9845,6 +9864,30 @@ export function App(): ReactElement {
       };
     };
 
+    const readAudienceSessionAcceptanceEvidence = (): GrooveforgeLaunchSmokeAudienceSessionAcceptanceEvidence => {
+      const rowElements = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-testid^="audience-session-acceptance-"]')
+      ).filter((element) => element.dataset.audienceSessionAcceptanceRow);
+
+      return {
+        activeAudience:
+          document.querySelector<HTMLElement>('[data-testid="audience-session-acceptance"]')?.dataset
+            .audienceSessionAcceptanceActive ?? "",
+        beginnerEvidence: readDomText('[data-testid="audience-session-acceptance-beginner-evidence"]'),
+        beginnerLane: readDomText('[data-testid="audience-session-acceptance-beginner-lane"]'),
+        beginnerNext: readDomText('[data-testid="audience-session-acceptance-beginner-next"]'),
+        beginnerProof: readDomText('[data-testid="audience-session-acceptance-beginner-proof"]'),
+        beginnerTarget: readDomText('[data-testid="audience-session-acceptance-beginner-target"]'),
+        present: document.querySelector('[data-testid="audience-session-acceptance"]') !== null,
+        producerEvidence: readDomText('[data-testid="audience-session-acceptance-producer-evidence"]'),
+        producerLane: readDomText('[data-testid="audience-session-acceptance-producer-lane"]'),
+        producerNext: readDomText('[data-testid="audience-session-acceptance-producer-next"]'),
+        producerProof: readDomText('[data-testid="audience-session-acceptance-producer-proof"]'),
+        producerTarget: readDomText('[data-testid="audience-session-acceptance-producer-target"]'),
+        rowCount: rowElements.length
+      };
+    };
+
     const readAudienceDeliverySnapshotEvidence = (): GrooveforgeLaunchSmokeAudienceDeliverySnapshotEvidence => {
       const rowElements = Array.from(
         document.querySelectorAll<HTMLElement>('[data-testid^="audience-delivery-snapshot-"]')
@@ -10042,6 +10085,10 @@ export function App(): ReactElement {
         const completionBeginner = quickActionEvidenceById("audience-completion-route-beginner-action");
         markLaunchSmokePaletteStep("completion-producer");
         const completionProducer = quickActionEvidenceById("audience-completion-route-producer-action");
+        markLaunchSmokePaletteStep("session-acceptance");
+        const sessionAcceptanceReadout = quickActionEvidenceById("audience-session-acceptance-readout-action");
+        const sessionAcceptanceBeginner = quickActionEvidenceById("audience-session-acceptance-beginner-action");
+        const sessionAcceptanceProducer = quickActionEvidenceById("audience-session-acceptance-producer-action");
         markLaunchSmokePaletteStep("session-proof");
         const sessionProofReadout = quickActionEvidenceById("audience-session-proof-handoff-readout-action");
         const sessionProofBeginner = quickActionEvidenceById("audience-session-proof-handoff-beginner-action");
@@ -10080,6 +10127,10 @@ export function App(): ReactElement {
           routeBridge,
           routeBridgeCompletion,
           routeBridgeReadiness,
+          sessionAcceptanceBeginner,
+          sessionAcceptance: readAudienceSessionAcceptanceEvidence(),
+          sessionAcceptanceProducer,
+          sessionAcceptanceReadout,
           sessionProofBeginner,
           sessionProofHandoff: readAudienceSessionProofHandoffEvidence(),
           sessionProofProducer,
@@ -10098,6 +10149,9 @@ export function App(): ReactElement {
             completionReadout.resultTitle.length > 0 &&
             completionBeginner.resultTitle.length > 0 &&
             completionProducer.resultTitle.length > 0 &&
+            sessionAcceptanceReadout.resultTitle.length > 0 &&
+            sessionAcceptanceBeginner.resultTitle.length > 0 &&
+            sessionAcceptanceProducer.resultTitle.length > 0 &&
             sessionProofReadout.resultTitle.length > 0 &&
             sessionProofBeginner.resultTitle.length > 0 &&
             sessionProofProducer.resultTitle.length > 0 &&
@@ -10118,6 +10172,9 @@ export function App(): ReactElement {
             completionReadout.searchMetricValue.length > 0 &&
             completionBeginner.searchMetricValue.length > 0 &&
             completionProducer.searchMetricValue.length > 0 &&
+            sessionAcceptanceReadout.searchMetricValue.length > 0 &&
+            sessionAcceptanceBeginner.searchMetricValue.length > 0 &&
+            sessionAcceptanceProducer.searchMetricValue.length > 0 &&
             sessionProofReadout.searchMetricValue.length > 0 &&
             sessionProofBeginner.searchMetricValue.length > 0 &&
             sessionProofProducer.searchMetricValue.length > 0 &&

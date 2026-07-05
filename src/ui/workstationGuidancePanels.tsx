@@ -217,6 +217,74 @@ const audienceSessionProofHandoffNext: Record<AudienceSessionReadoutRow["id"], s
   producer: "Next check: open Handoff Package Check receipt"
 };
 
+const audienceSessionAcceptanceTarget: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Acceptance: complete a guided 8-bar first beat",
+  producer: "Acceptance: complete a studio-ready handoff pass"
+};
+
+const audienceSessionAcceptanceEvidence: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Evidence: rendered path, workflow, package, reopen, export/Handoff",
+  producer: "Evidence: rendered path, workflow, package, reopen, export/Handoff"
+};
+
+const audienceSessionAcceptanceProof: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Proof posture: local WAV, stems, MIDI, Handoff Sheet ready",
+  producer: "Proof posture: receipt, stem package, send order ready"
+};
+
+const audienceSessionAcceptanceNext: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Next check: Export Preflight deliverables",
+  producer: "Next check: Handoff Package Check receipt"
+};
+
+function AudienceSessionAcceptance({
+  rows,
+  summary
+}: {
+  rows: AudienceSessionReadoutRow[];
+  summary: AudienceSessionReadoutSummary;
+}): ReactElement {
+  return (
+    <div
+      aria-label="Audience Session Acceptance"
+      className="audience-session-acceptance"
+      data-audience-session-acceptance-active={summary.activeAudience}
+      data-testid="audience-session-acceptance"
+      title={`${summary.activeAudienceLabel}: local session acceptance for beginner and professional producer workflows`}
+    >
+      <strong
+        className="audience-session-acceptance-title"
+        data-testid="audience-session-acceptance-headline"
+      >
+        Audience Session Acceptance
+      </strong>
+      {rows.map((row) => (
+        <div
+          className={`audience-session-acceptance-row ${row.tone}`}
+          data-audience-session-acceptance-row={row.id}
+          data-testid={`audience-session-acceptance-${row.id}`}
+          key={row.id}
+          title={`${row.label}: ${audienceSessionAcceptanceTarget[row.id]} / ${audienceSessionAcceptanceEvidence[row.id]} / ${audienceSessionAcceptanceProof[row.id]} / ${audienceSessionAcceptanceNext[row.id]}`}
+        >
+          <span data-testid={`audience-session-acceptance-${row.id}-lane`}>{row.label}</span>
+          <strong data-testid={`audience-session-acceptance-${row.id}-target`}>
+            {audienceSessionAcceptanceTarget[row.id]}
+          </strong>
+          <small data-testid={`audience-session-acceptance-${row.id}-evidence`}>
+            {audienceSessionAcceptanceEvidence[row.id]}
+          </small>
+          <em data-testid={`audience-session-acceptance-${row.id}-proof`}>
+            {audienceSessionAcceptanceProof[row.id]}
+          </em>
+          <em data-testid={`audience-session-acceptance-${row.id}-next`}>
+            {audienceSessionAcceptanceNext[row.id]}
+          </em>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AudienceSessionProofHandoff({
   rows,
   summary
@@ -719,6 +787,7 @@ export function AudienceSessionReadout({
         <em data-testid="audience-session-next-check">{summary.nextCheck}</em>
       </div>
       <AudienceNextStepRail rows={summary.rows} summary={summary} onSelectAudience={onSelectAudience} />
+      <AudienceSessionAcceptance rows={summary.rows} summary={summary} />
       <AudienceSessionProofHandoff rows={summary.rows} summary={summary} />
       <AudienceCompletionCheckpoints rows={summary.rows} summary={summary} />
       <AudienceDeliverySnapshot rows={summary.rows} summary={summary} />
@@ -1937,6 +2006,74 @@ export function createAudienceSessionProofHandoffQuickActions({
       ].join(" / "),
       group: "Project",
       keywords: `audience session proof handoff producer professional producer studio handoff package check receipt send order stems midi persona delivery package reopen ${producer?.detail ?? ""}`,
+      resultTargetId: "producer",
+      run: () => onFocusHandoffPackageCheck(producerCard)
+    }
+  ];
+}
+
+export function createAudienceSessionAcceptanceQuickActions({
+  exportPreflightSummary,
+  handoffPackageCheckSummary,
+  onFocusExportPreflight,
+  onFocusHandoffPackageCheck,
+  onFocusRouteReadout,
+  rows
+}: {
+  exportPreflightSummary: ExportPreflightSummary;
+  handoffPackageCheckSummary: HandoffPackageCheckSummary;
+  onFocusExportPreflight: (card: ExportPreflightCard) => void;
+  onFocusHandoffPackageCheck: (card: HandoffPackageCheckCard) => void;
+  onFocusRouteReadout: () => void;
+  rows: AudienceSessionReadoutRow[];
+}): QuickAction[] {
+  const beginner = rows.find((row) => row.id === "beginner") ?? rows[0];
+  const producer = rows.find((row) => row.id === "producer") ?? rows[1] ?? rows[0];
+  const beginnerCard = exportPreflightSummary.cards.find((card) => card.id === "deliverables") ?? exportPreflightSummary.cards[0];
+  const producerCard = handoffPackageCheckSummary.cards.find((card) => card.id === "receipt") ?? handoffPackageCheckSummary.cards[0];
+  const routeDetail = [
+    `${beginner?.label ?? "First-time composer"}: ${audienceSessionAcceptanceTarget.beginner}`,
+    `${producer?.label ?? "Professional producer"}: ${audienceSessionAcceptanceTarget.producer}`,
+    audienceSessionAcceptanceEvidence.beginner,
+    audienceSessionAcceptanceProof.producer,
+    "Visible Audience Session Acceptance rows unchanged"
+  ].join(" / ");
+
+  return [
+    {
+      id: "audience-session-acceptance-readout-action",
+      title: "Review Audience Session Acceptance",
+      detail: routeDetail,
+      group: "Project",
+      keywords: `audience session acceptance readout first-time composer professional producer beginner producer local session finished acceptance rendered path workflow package reopen export handoff ${routeDetail}`,
+      resultTargetId: "route",
+      run: onFocusRouteReadout
+    },
+    {
+      id: "audience-session-acceptance-beginner-action",
+      title: "Open Acceptance First-time composer",
+      detail: [
+        audienceSessionAcceptanceTarget.beginner,
+        audienceSessionAcceptanceEvidence.beginner,
+        audienceSessionAcceptanceProof.beginner,
+        audienceSessionAcceptanceNext.beginner
+      ].join(" / "),
+      group: "Project",
+      keywords: `audience session acceptance beginner first-time composer guided 8-bar first beat rendered path workflow package reopen export handoff wav stems midi ${beginner?.detail ?? ""}`,
+      resultTargetId: "beginner",
+      run: () => onFocusExportPreflight(beginnerCard)
+    },
+    {
+      id: "audience-session-acceptance-producer-action",
+      title: "Open Acceptance Professional producer",
+      detail: [
+        audienceSessionAcceptanceTarget.producer,
+        audienceSessionAcceptanceEvidence.producer,
+        audienceSessionAcceptanceProof.producer,
+        audienceSessionAcceptanceNext.producer
+      ].join(" / "),
+      group: "Project",
+      keywords: `audience session acceptance producer professional producer studio handoff pass rendered path workflow package reopen receipt send order stems ${producer?.detail ?? ""}`,
       resultTargetId: "producer",
       run: () => onFocusHandoffPackageCheck(producerCard)
     }
