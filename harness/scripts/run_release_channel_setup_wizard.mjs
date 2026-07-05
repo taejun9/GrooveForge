@@ -470,6 +470,89 @@ function formatPrivateInputFileLocationRows(rows) {
     .join("\n");
 }
 
+function privateInputLocationLabel(row) {
+  return `${row.privateInputFilePath}:${row.privateInputFileLine ?? "add"} ${row.key}`;
+}
+
+function summarizeRows(rows, formatter = (row) => String(row)) {
+  return rows.length > 0 ? rows.map(formatter).join(", ") : "none";
+}
+
+function buildOperatorHandoffRows({ inputReady, privateInputFileLocationRows, preflightReady, applyReady, strictLiveCheckReady }) {
+  const placeholderRows = privateInputFileLocationRows.filter((row) => row.privateInputFilePlaceholder === true);
+  const invalidShapeRows = privateInputFileLocationRows.filter(
+    (row) => row.privateInputFileKeyPresent === true && row.privateInputFilePlaceholder === false && row.privateInputFileShapeReady !== true
+  );
+  const missingRows = privateInputFileLocationRows.filter((row) => row.privateInputFileKeyPresent !== true);
+  const editRows = placeholderRows.length > 0 ? placeholderRows : invalidShapeRows.length > 0 ? invalidShapeRows : missingRows;
+  const editTargetSummary = summarizeRows(editRows, privateInputLocationLabel);
+  return [
+    {
+      order: 1,
+      action: "replace-private-input-file-rows",
+      command: "edit ignored private input file",
+      target: editTargetSummary,
+      ready: inputReady === true,
+      expected: "four shape-ready release-channel metadata rows",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      action: "preflight-private-inputs",
+      command: "npm run release:channel-apply-private-env-preflight",
+      target: "prove process-env or ignored private input-file metadata is shape-ready before writing",
+      ready: preflightReady === true,
+      expected: "preflight exits 0",
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      action: "apply-private-inputs",
+      command: "npm run release:channel-apply-private-env",
+      target: ".env.distribution.local release-channel rows",
+      ready: applyReady === true,
+      expected: "write only after preflight exits 0",
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      action: "strict-release-channel-proof",
+      command: "npm run release:channel-live-check-strict",
+      target: "four release-channel metadata rows",
+      ready: strictLiveCheckReady === true,
+      expected: "strict live check ready 4/4",
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      action: "full-private-edit-proof",
+      command: "npm run release:private-edit-strict-proof",
+      target: "post-edit release proof chain",
+      ready: strictLiveCheckReady === true,
+      expected: "post-edit, progress, and leak-audit proof readiness",
+      valueRecorded: false
+    },
+    {
+      order: 6,
+      action: "refresh-current-blocker",
+      command: "npm run release:current-blocker",
+      target: "current release completion blocker handoff",
+      ready: strictLiveCheckReady === true,
+      expected: "release-channel metadata blocker clears before next external action",
+      valueRecorded: false
+    }
+  ];
+}
+
+function formatOperatorHandoffRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.action)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.target)} | ${readyLabel(row.ready)} | ${escapeCell(row.expected)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function formatSyntheticRows(rows) {
   return rows.length > 0
     ? rows
@@ -496,10 +579,15 @@ function buildMarkdown(report) {
 - Private input file present: ${readyLabel(report.privateInputFilePresent)}
 - Private input file loaded keys: ${report.privateInputFileLoadedKeyCount} (${report.privateInputFileLoadedKeySummary})
 - Private input file location rows: ${report.privateInputFileLocationRowCount}
-- Private input file placeholder locations: ${report.privateInputFileLocationPlaceholderCount}
-- Private input file invalid-shape locations: ${report.privateInputFileLocationInvalidShapeCount}
-- Private input file missing key rows: ${report.privateInputFileLocationMissingKeyCount}
+- Private input file placeholder locations: ${report.privateInputFileLocationPlaceholderCount} (${report.privateInputFilePlaceholderLocationSummary})
+- Private input file invalid-shape locations: ${report.privateInputFileLocationInvalidShapeCount} (${report.privateInputFileInvalidShapeLocationSummary})
+- Private input file missing key rows: ${report.privateInputFileLocationMissingKeyCount} (${report.privateInputFileMissingKeyLocationSummary})
 - Private input source rows: ${report.privateInputSourceRowCount}
+- Operator handoff ready: ${readyLabel(report.operatorHandoffReady)}
+- Operator handoff rows: ${report.operatorHandoffRowCount} (${report.operatorHandoffSummary})
+- Next private input edit target: ${report.nextPrivateInputEditTargetSummary}
+- Next operator command after private input edit: \`${report.nextOperatorCommandAfterPrivateInputEdit}\`
+- Next proof command after setup: \`${report.recommendedOperatorProofCommand}\`
 - Preflight command exit code: ${report.preflightExitCode}
 - Apply command exit code: ${report.applyExitCode}
 - Strict live-check exit code: ${report.strictLiveCheckExitCode}
@@ -522,6 +610,12 @@ function buildMarkdown(report) {
 | order | key | source | process env present | private input file present | private input file key present | interactive present | input present | shape ready | expected shape | value recorded |
 |---:|---|---|---:|---:|---:|---:|---:|---:|---|---:|
 ${formatInputRows(report.wizardInputRows)}
+
+## Operator Handoff
+
+| order | action | command | target | ready | expected | value recorded |
+|---:|---|---|---|---:|---|---:|
+${formatOperatorHandoffRows(report.operatorHandoffRows)}
 
 ## Private Input File Location Rows
 
@@ -623,6 +717,23 @@ async function main() {
   const currentReadyKeyCount = Number.isInteger(liveCheckReport?.releaseChannelLiveCheckCurrentReadyCount)
     ? liveCheckReport.releaseChannelLiveCheckCurrentReadyCount
     : 0;
+  const placeholderLocationRows = privateInputFileLocationRows.filter((row) => row.privateInputFilePlaceholder === true);
+  const invalidShapeLocationRows = privateInputFileLocationRows.filter(
+    (row) => row.privateInputFileKeyPresent === true && row.privateInputFilePlaceholder === false && row.privateInputFileShapeReady !== true
+  );
+  const missingKeyLocationRows = privateInputFileLocationRows.filter((row) => row.privateInputFileKeyPresent !== true);
+  const nextPrivateInputEditRows =
+    placeholderLocationRows.length > 0 ? placeholderLocationRows : invalidShapeLocationRows.length > 0 ? invalidShapeLocationRows : missingKeyLocationRows;
+  const preflightReady = preflightResult.status === 0 && preflightReport?.releaseChannelPrivateEnvApplyPreflightReady === true;
+  const applyReady = applyResult.status === 0 && applyReport?.releaseChannelPrivateEnvApplyReady === true;
+  const strictLiveCheckReady = strictResult.status === 0 && liveCheckReport?.strictReady === true;
+  const operatorHandoffRows = buildOperatorHandoffRows({
+    inputReady,
+    privateInputFileLocationRows,
+    preflightReady,
+    applyReady,
+    strictLiveCheckReady
+  });
   const report = {
     appName,
     bundleId,
@@ -666,6 +777,10 @@ async function main() {
     privateInputFileLocationInvalidShapeCount: privateInputFileLocationRows.filter(
       (row) => row.privateInputFileKeyPresent === true && row.privateInputFilePlaceholder === false && row.privateInputFileShapeReady !== true
     ).length,
+    privateInputFileLocationSummary: summarizeRows(privateInputFileLocationRows, privateInputLocationLabel),
+    privateInputFilePlaceholderLocationSummary: summarizeRows(placeholderLocationRows, privateInputLocationLabel),
+    privateInputFileInvalidShapeLocationSummary: summarizeRows(invalidShapeLocationRows, privateInputLocationLabel),
+    privateInputFileMissingKeyLocationSummary: summarizeRows(missingKeyLocationRows, privateInputLocationLabel),
     privateInputFilePlaceholderLocations: privateInputFileLocationRows
       .filter((row) => row.privateInputFilePlaceholder === true)
       .map((row) => `${row.privateInputFilePath}:${row.privateInputFileLine ?? "add"} ${row.key}`),
@@ -680,6 +795,14 @@ async function main() {
     privateInputSourceProcessEnvCount: inputRows.filter((row) => row.inputSource === "process-env").length,
     privateInputSourceFileCount: inputRows.filter((row) => row.inputSource === "private-input-file").length,
     privateInputSourceInteractiveCount: inputRows.filter((row) => row.inputSource === "interactive").length,
+    privateInputSourceSummary: summarizeRows(inputRows, (row) => `${row.inputSource} ${row.key}`),
+    operatorHandoffReady: operatorHandoffRows.length === 6 && operatorHandoffRows.every((row) => row.valueRecorded === false),
+    operatorHandoffRows,
+    operatorHandoffRowCount: operatorHandoffRows.length,
+    operatorHandoffSummary: summarizeRows(operatorHandoffRows, (row) => `${row.order}:${row.action}`),
+    nextPrivateInputEditTargetSummary: summarizeRows(nextPrivateInputEditRows, privateInputLocationLabel),
+    nextPrivateInputEditExpectedShapeSummary: summarizeRows(nextPrivateInputEditRows, (row) => `${row.key}: ${row.expectedShape}`),
+    nextOperatorCommandAfterPrivateInputEdit: "npm run release:channel-apply-private-env-preflight",
     inputReady,
     localEnvFileLoaded,
     prepareEnvRun: prepareResult.prepareEnvRun,
@@ -688,18 +811,18 @@ async function main() {
     preflightCommand: "npm run release:channel-apply-private-env-preflight",
     preflightExitCode: preflightResult.status,
     preflightReportReady: preflightReport?.releaseChannelPrivateEnvApplyPreflightReady === true,
-    preflightReady: preflightResult.status === 0 && preflightReport?.releaseChannelPrivateEnvApplyPreflightReady === true,
+    preflightReady,
     preflightReportPath: preflightReport ? relative(preflightJsonPath) : "none",
     applyCommand: "npm run release:channel-apply-private-env",
     applyExitCode: applyResult.status,
     applyReportReady: applyReport?.releaseChannelPrivateEnvApplyReady === true,
-    applyReady: applyResult.status === 0 && applyReport?.releaseChannelPrivateEnvApplyReady === true,
+    applyReady,
     applyReportPath: applyReport ? relative(applyJsonPath) : "none",
     realLocalEnvRead: resolvedLocalEnvRoot === root && localEnvFileLoaded === true,
     realLocalEnvModified: applyReport?.realLocalEnvModified === true,
     strictLiveCheckCommand: "npm run release:channel-live-check-strict",
     strictLiveCheckExitCode: strictResult.status,
-    strictLiveCheckReady: strictResult.status === 0 && liveCheckReport?.strictReady === true,
+    strictLiveCheckReady,
     strictLiveCheckReportPath: liveCheckReport ? relative(liveCheckJsonPath) : "none",
     currentReadyKeyCount,
     currentPlaceholderKeyCount: Number.isInteger(liveCheckReport?.currentPlaceholderKeyCount)
@@ -756,6 +879,28 @@ async function main() {
   );
   check(report.privateInputSourceRowCount === 4, "release-channel setup wizard should expose four private input source rows");
   check(report.privateInputSourceRows.every((row) => row.valueRecorded === false), "release-channel setup wizard source rows should be value-free");
+  check(report.operatorHandoffRowCount === 6, "release-channel setup wizard should expose six operator handoff rows");
+  check(report.operatorHandoffRows.every((row) => row.valueRecorded === false), "release-channel setup wizard operator handoff rows should be value-free");
+  check(
+    report.operatorHandoffRows.some((row) => row.command === "npm run release:channel-apply-private-env-preflight"),
+    "release-channel setup wizard handoff should expose the private env preflight command"
+  );
+  check(
+    report.operatorHandoffRows.some((row) => row.command === "npm run release:channel-apply-private-env"),
+    "release-channel setup wizard handoff should expose the private env apply command"
+  );
+  check(
+    report.operatorHandoffRows.some((row) => row.command === "npm run release:private-edit-strict-proof"),
+    "release-channel setup wizard handoff should expose the full proof chain"
+  );
+  check(
+    report.nextOperatorCommandAfterPrivateInputEdit === "npm run release:channel-apply-private-env-preflight",
+    "release-channel setup wizard should expose the next operator command after private input edits"
+  );
+  check(
+    report.nextPrivateInputEditTargetSummary === "none" || report.nextPrivateInputEditTargetSummary.includes(report.privateInputFilePath),
+    "release-channel setup wizard should summarize the next private input edit file/line targets"
+  );
   check(report.privateValuesRecorded === false, "release-channel setup wizard should not record private values");
   check(report.localEnvValueRecorded === false, "release-channel setup wizard should not record local env values");
   check(report.releaseUrlValueRecorded === false, "release-channel setup wizard should not record release URL values");
@@ -811,8 +956,11 @@ async function main() {
     console.error(`- Private input file present: ${readyLabel(report.privateInputFilePresent)}`);
     console.error(`- Private input file loaded keys: ${report.privateInputFileLoadedKeyCount}`);
     console.error(`- Private input file location rows: ${report.privateInputFileLocationRowCount}`);
-    console.error(`- Private input file placeholder locations: ${report.privateInputFileLocationPlaceholderCount}`);
-    console.error(`- Private input file invalid-shape locations: ${report.privateInputFileLocationInvalidShapeCount}`);
+    console.error(`- Private input file placeholder locations: ${report.privateInputFileLocationPlaceholderCount} (${report.privateInputFilePlaceholderLocationSummary})`);
+    console.error(`- Private input file invalid-shape locations: ${report.privateInputFileLocationInvalidShapeCount} (${report.privateInputFileInvalidShapeLocationSummary})`);
+    console.error(`- Operator handoff rows: ${report.operatorHandoffRowCount} (${report.operatorHandoffSummary})`);
+    console.error(`- Next private input edit target: ${report.nextPrivateInputEditTargetSummary}`);
+    console.error(`- Next operator command after private input edit: ${report.nextOperatorCommandAfterPrivateInputEdit}`);
     console.error(`- Real local env read: ${readyLabel(report.realLocalEnvRead)}`);
     console.error(`- Real local env modified: ${readyLabel(report.realLocalEnvModified)}`);
     console.error(`- Preflight ready: ${readyLabel(report.preflightReady)}`);
@@ -840,9 +988,12 @@ async function main() {
   console.log(`- Private input file present: ${readyLabel(report.privateInputFilePresent)}`);
   console.log(`- Private input file loaded keys: ${report.privateInputFileLoadedKeyCount}`);
   console.log(`- Private input file location rows: ${report.privateInputFileLocationRowCount}`);
-  console.log(`- Private input file placeholder locations: ${report.privateInputFileLocationPlaceholderCount}`);
-  console.log(`- Private input file invalid-shape locations: ${report.privateInputFileLocationInvalidShapeCount}`);
+  console.log(`- Private input file placeholder locations: ${report.privateInputFileLocationPlaceholderCount} (${report.privateInputFilePlaceholderLocationSummary})`);
+  console.log(`- Private input file invalid-shape locations: ${report.privateInputFileLocationInvalidShapeCount} (${report.privateInputFileInvalidShapeLocationSummary})`);
   console.log(`- Private input source rows: ${report.privateInputSourceRowCount}`);
+  console.log(`- Operator handoff rows: ${report.operatorHandoffRowCount} (${report.operatorHandoffSummary})`);
+  console.log(`- Next private input edit target: ${report.nextPrivateInputEditTargetSummary}`);
+  console.log(`- Next operator command after private input edit: ${report.nextOperatorCommandAfterPrivateInputEdit}`);
   console.log(`- Real local env read: ${readyLabel(report.realLocalEnvRead)}`);
   console.log(`- Real local env modified: ${readyLabel(report.realLocalEnvModified)}`);
   console.log(`- Preflight ready: ${readyLabel(report.preflightReady)}`);
