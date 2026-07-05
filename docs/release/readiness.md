@@ -268,6 +268,8 @@ npm run release:external-completion-run-packet-smoke
 npm run release:external-completion-resume-packet-smoke
 ```
 
+These packets mirror the value-free `operatorUnblock...` aliases from the completion summary, including the broad next command, exact first/start command, private input edit target, expected shapes, private input template command/path, preflight/apply/strict-proof path, refresh commands, guided setup fallback, and placeholder-location summary.
+
 Run the value-free release progress freshness smoke when the operator wants to know whether existing progress/current-blocker artifacts match the latest update-feed checkpoint 10-plan label:
 
 ```sh
@@ -519,7 +521,7 @@ Completion reports should cite `npm run release:channel-apply-private-env-proof`
 
 Completion reports should cite the Developer ID operator packet artifact when explaining Developer ID signing, notarization, stapled Gatekeeper, manual QA, distribution-channel blockers, and proof order.
 
-Completion reports should cite the external completion resume packet artifact when explaining the first blocked run row and next resume command from the ordered external completion run, including its real current private input receipt mode/presence/loaded/missing/placeholder/invalid counts, real operator preflight receipt status/counts/next-write command, and current private input placeholder location count/summary/rows plus the separate blocked-smoke private input file key/default, operator default path, current blocked-smoke path, loaded-key count, and guided setup fallback.
+Completion reports should cite the external completion resume packet artifact when explaining the first blocked run row and next resume command from the ordered external completion run, including its real current private input receipt mode/presence/loaded/missing/placeholder/invalid counts, real operator preflight receipt status/counts/next-write command, current private input placeholder location count/summary/rows, and `operatorUnblock...` aliases for the exact private release-channel edit target and preflight/apply/strict-proof path plus the separate blocked-smoke private input file key/default, operator default path, current blocked-smoke path, loaded-key count, and guided setup fallback.
 
 Completion reports should cite the current-blocker, progress refresh, completion summary, and completion summary refresh artifacts when explaining `npm run release:channel-setup-wizard` as a guided fallback for missing, placeholder, or shape-invalid private release-channel inputs, while keeping the source current operator start command as `npm run release:prepare-env` when the ignored env scaffold is missing or `npm run release:channel-apply-private-env-preflight` once the scaffold exists.
 
