@@ -1070,6 +1070,22 @@ function buildReport({
       releaseChannelPrivateInputReadyGateRole
     ),
     privateInputReadyGateMode: textValue(completionSummary.privateInputReadyGateMode),
+    privateInputReadyGateResumeCommand: textValue(
+      completionSummary.privateInputReadyGateResumeCommand,
+      textValue(completionSummary.privateInputReadyGateNextOperatorCommand, releaseChannelPrivateInputReadyGateCommand)
+    ),
+    privateInputReadyGateResumeEditTarget: textValue(
+      completionSummary.privateInputReadyGateResumeEditTarget,
+      textValue(completionSummary.privateInputReadyGateBlockedInputLocationSummary)
+    ),
+    privateInputReadyGateResumeMode: textValue(
+      completionSummary.privateInputReadyGateResumeMode,
+      textValue(completionSummary.privateInputReadyGateMode)
+    ),
+    privateInputReadyGateResumeExpected: textValue(completionSummary.privateInputReadyGateResumeExpected),
+    privateInputReadyGateResumeReadyToApply: completionSummary.privateInputReadyGateResumeReadyToApply === true,
+    privateInputReadyGateResumeValueRecorded:
+      completionSummary.privateInputReadyGateResumeValueRecorded === true ? true : false,
     privateInputReadyGateReadyToApply: completionSummary.privateInputReadyGateReadyToApply === true,
     privateInputReadyGateCurrentOperatorFirstCommand: textValue(
       completionSummary.privateInputReadyGateCurrentOperatorFirstCommand,
@@ -1671,6 +1687,8 @@ function buildMarkdown(report) {
 - Private input ready gate mode: ${report.privateInputReadyGateMode}
 - Private input ready gate command: \`${report.privateInputReadyGateCommand}\`
 - Private input ready gate next operator command: \`${report.privateInputReadyGateNextOperatorCommand}\`
+- Private input ready gate resume command: \`${report.privateInputReadyGateResumeCommand}\`
+- Private input ready gate resume edit target: ${report.privateInputReadyGateResumeEditTarget}
 - Private input ready gate ready/missing/placeholder/invalid rows: ${report.privateInputReadyGateReadyInputKeyCount}/${report.privateInputReadyGateMissingInputKeyCount}/${report.privateInputReadyGatePlaceholderInputKeyCount}/${report.privateInputReadyGateInvalidShapeInputKeyCount}
 - Private input ready gate blocked locations: ${report.privateInputReadyGateBlockedInputKeyCount} (${report.privateInputReadyGateBlockedInputLocationSummary})
 - Completion blocker action receipt ready: ${readyLabel(report.completionBlockerActionReceiptReady)}
@@ -2362,6 +2380,19 @@ function validateReport(report, markdown) {
     report.privateInputReadyGateNextProofCommand === "npm run release:private-edit-strict-proof",
     "release completion summary refresh private input ready gate should expose strict proof as next proof"
   );
+  check(
+    report.privateInputReadyGateResumeCommand === report.privateInputReadyGateNextOperatorCommand,
+    "release completion summary refresh private input ready gate resume command should mirror the ready-gate next operator command"
+  );
+  check(
+    report.privateInputReadyGateResumeMode === report.privateInputReadyGateMode,
+    "release completion summary refresh private input ready gate resume mode should mirror the gate mode"
+  );
+  check(
+    report.privateInputReadyGateResumeReadyToApply === report.privateInputReadyGateReadyToApply,
+    "release completion summary refresh private input ready gate resume ready posture should mirror ready-to-apply"
+  );
+  check(report.privateInputReadyGateResumeValueRecorded === false, "release completion summary refresh private input ready gate resume fields should be value-free");
   check(report.privateInputReadyGateRowCount === 5, "release completion summary refresh private input ready gate should expose five handoff rows");
   check(report.privateInputReadyGateRowsValueFree === true, "release completion summary refresh private input ready gate rows should be value-free");
   check(report.privateInputReadyGatePrivateInputRowCount === 4, "release completion summary refresh private input ready gate should expose four private input rows");
@@ -3110,6 +3141,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("Private input ready gate ready:"), "release completion summary refresh Markdown should include private input ready gate readiness");
   check(markdown.includes("Private input ready to apply:"), "release completion summary refresh Markdown should include private input ready-to-apply posture");
   check(markdown.includes("Private input ready gate mode:"), "release completion summary refresh Markdown should include private input ready gate mode");
+  check(markdown.includes("Private input ready gate resume command:"), "release completion summary refresh Markdown should include private input ready gate resume command");
+  check(markdown.includes("Private input ready gate resume edit target:"), "release completion summary refresh Markdown should include private input ready gate resume edit target");
   check(markdown.includes("npm run release:progress-refresh-smoke"), "release completion summary refresh Markdown should cite progress refresh command");
   check(markdown.includes("npm run release:completion-summary-smoke"), "release completion summary refresh Markdown should cite completion summary command");
   check(markdown.includes("npm run release:source-evidence-prereq-smoke"), "release completion summary refresh Markdown should cite source prereq command");
@@ -3342,6 +3375,8 @@ async function main() {
   console.log(`- Private input ready gate mode: ${report.privateInputReadyGateMode}`);
   console.log(`- Private input ready gate command: ${report.privateInputReadyGateCommand}`);
   console.log(`- Private input ready gate next operator command: ${report.privateInputReadyGateNextOperatorCommand}`);
+  console.log(`- Private input ready gate resume command: ${report.privateInputReadyGateResumeCommand}`);
+  console.log(`- Private input ready gate resume edit target: ${report.privateInputReadyGateResumeEditTarget}`);
   console.log(
     `- Private input ready gate ready/missing/placeholder/invalid rows: ${report.privateInputReadyGateReadyInputKeyCount}/${report.privateInputReadyGateMissingInputKeyCount}/${report.privateInputReadyGatePlaceholderInputKeyCount}/${report.privateInputReadyGateInvalidShapeInputKeyCount}`
   );

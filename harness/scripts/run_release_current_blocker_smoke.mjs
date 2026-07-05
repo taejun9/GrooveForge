@@ -2942,6 +2942,22 @@ function buildReport({
     ),
     privateInputReadyGateRole: releaseChannelPrivateInputReadyGateRole,
     privateInputReadyGateMode: textValue(releaseChannelPrivateInputReadyGate.readyGateMode),
+    privateInputReadyGateResumeCommand: textValue(
+      releaseChannelPrivateInputReadyGate.readyGateResumeCommand,
+      textValue(releaseChannelPrivateInputReadyGate.nextOperatorCommand, releaseChannelPrivateInputReadyGateCommand)
+    ),
+    privateInputReadyGateResumeEditTarget: textValue(
+      releaseChannelPrivateInputReadyGate.readyGateResumeEditTarget,
+      textValue(releaseChannelPrivateInputReadyGate.blockedInputLocationSummary)
+    ),
+    privateInputReadyGateResumeMode: textValue(
+      releaseChannelPrivateInputReadyGate.readyGateResumeMode,
+      textValue(releaseChannelPrivateInputReadyGate.readyGateMode)
+    ),
+    privateInputReadyGateResumeExpected: textValue(releaseChannelPrivateInputReadyGate.readyGateResumeExpected),
+    privateInputReadyGateResumeReadyToApply: releaseChannelPrivateInputReadyGate.readyGateResumeReadyToApply === true,
+    privateInputReadyGateResumeValueRecorded:
+      releaseChannelPrivateInputReadyGate.readyGateResumeValueRecorded === true ? true : false,
     privateInputReadyGateReadyToApply: releaseChannelPrivateInputReadyGate.releaseChannelPrivateInputReadyToApply === true,
     privateInputReadyGateCurrentOperatorFirstCommand: textValue(
       releaseChannelPrivateInputReadyGate.currentOperatorFirstCommand,
@@ -4135,6 +4151,36 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
     "release current blocker private input ready gate should expose the strict proof command"
   );
   check(
+    report.privateInputReadyGateResumeCommand === report.privateInputReadyGateNextOperatorCommand,
+    "release current blocker private input ready gate resume command should mirror the ready-gate next operator command"
+  );
+  check(
+    report.privateInputReadyGateResumeMode === report.privateInputReadyGateMode,
+    "release current blocker private input ready gate resume mode should mirror the gate mode"
+  );
+  check(
+    report.privateInputReadyGateResumeReadyToApply === report.privateInputReadyGateReadyToApply,
+    "release current blocker private input ready gate resume ready posture should mirror ready-to-apply"
+  );
+  check(report.privateInputReadyGateResumeValueRecorded === false, "release current blocker private input ready gate resume fields should be value-free");
+  if (report.privateInputReadyGateReadyToApply === false) {
+    check(
+      report.privateInputReadyGateResumeCommand === releaseChannelPrivateInputReadyGateCommand,
+      "release current blocker blocked ready gate resume command should ask for the ready gate"
+    );
+    check(
+      report.privateInputReadyGateBlockedInputKeyCount === 0 ||
+        report.privateInputReadyGateResumeEditTarget === report.privateInputReadyGateBlockedInputLocationSummary,
+      "release current blocker blocked ready gate resume edit target should mirror blocked locations"
+    );
+  }
+  if (report.privateInputReadyGateReadyToApply === true) {
+    check(
+      report.privateInputReadyGateResumeCommand === releaseChannelApplyPrivateEnvCommand,
+      "release current blocker ready gate resume command should hand off to apply when ready"
+    );
+  }
+  check(
     report.privateInputReadyGateRowCount === 5 && report.privateInputReadyGateRowsValueFree === true,
     "release current blocker private input ready gate should include five value-free handoff rows"
   );
@@ -4695,6 +4741,8 @@ function buildMarkdown(report) {
     `- Private input ready gate mode: ${report.privateInputReadyGateMode}`,
     `- Private input ready gate command: \`${report.privateInputReadyGateCommand}\``,
     `- Private input ready gate next operator command: \`${report.privateInputReadyGateNextOperatorCommand}\``,
+    `- Private input ready gate resume command: \`${report.privateInputReadyGateResumeCommand}\``,
+    `- Private input ready gate resume edit target: ${report.privateInputReadyGateResumeEditTarget}`,
     `- Private input ready gate ready/missing/placeholder/invalid rows: ${report.privateInputReadyGateReadyInputKeyCount}/${report.privateInputReadyGateMissingInputKeyCount}/${report.privateInputReadyGatePlaceholderInputKeyCount}/${report.privateInputReadyGateInvalidShapeInputKeyCount}`,
     `- Private input ready gate blocked locations: ${report.privateInputReadyGateBlockedInputKeyCount} (${report.privateInputReadyGateBlockedInputLocationSummary})`,
     `- Preflight process env checklist source ready: ${report.preflightProcessEnvChecklistSourceReady ? "yes" : "no"}`,
@@ -4943,6 +4991,11 @@ function buildMarkdown(report) {
     `- Current operator first command preserved: ${report.privateInputReadyGateCurrentOperatorFirstCommandPreserved ? "yes" : "no"}`,
     `- Current operator first command: \`${report.privateInputReadyGateCurrentOperatorFirstCommand}\``,
     `- Next operator command: \`${report.privateInputReadyGateNextOperatorCommand}\``,
+    `- Resume command: \`${report.privateInputReadyGateResumeCommand}\``,
+    `- Resume edit target: ${report.privateInputReadyGateResumeEditTarget}`,
+    `- Resume mode: ${report.privateInputReadyGateResumeMode}`,
+    `- Resume expected: ${report.privateInputReadyGateResumeExpected}`,
+    `- Resume value recorded: ${report.privateInputReadyGateResumeValueRecorded ? "yes" : "no"}`,
     `- Next write command: \`${report.privateInputReadyGateNextWriteCommand}\``,
     `- Next proof command: \`${report.privateInputReadyGateNextProofCommand}\``,
     `- Ready/missing/placeholder/invalid rows: ${report.privateInputReadyGateReadyInputKeyCount}/${report.privateInputReadyGateMissingInputKeyCount}/${report.privateInputReadyGatePlaceholderInputKeyCount}/${report.privateInputReadyGateInvalidShapeInputKeyCount}`,
@@ -5536,6 +5589,8 @@ check(markdown.includes("Release-Channel Placeholder Input Receipt"), "release c
 check(markdown.includes("Placeholder Input Operator Commands"), "release current blocker Markdown should include placeholder input command table");
 check(markdown.includes("Private input ready gate ready:"), "release current blocker Markdown should include private input ready gate readiness");
 check(markdown.includes("Private input ready to apply:"), "release current blocker Markdown should include private input ready-to-apply posture");
+check(markdown.includes("Private input ready gate resume command:"), "release current blocker Markdown should include private input ready gate resume command");
+check(markdown.includes("Resume edit target:"), "release current blocker Markdown should include private input ready gate resume edit target");
 check(markdown.includes("Release-Channel Private Input Ready Gate"), "release current blocker Markdown should include private input ready gate section");
 check(markdown.includes("Ready Gate Handoff Rows"), "release current blocker Markdown should include private input ready gate handoff rows");
 check(markdown.includes("Ready Gate Private Input Rows"), "release current blocker Markdown should include private input ready gate private input rows");
@@ -5779,6 +5834,8 @@ console.log(`- Private input ready to apply: ${report.privateInputReadyGateReady
 console.log(`- Private input ready gate mode: ${report.privateInputReadyGateMode}`);
 console.log(`- Private input ready gate command: ${report.privateInputReadyGateCommand}`);
 console.log(`- Private input ready gate next operator command: ${report.privateInputReadyGateNextOperatorCommand}`);
+console.log(`- Private input ready gate resume command: ${report.privateInputReadyGateResumeCommand}`);
+console.log(`- Private input ready gate resume edit target: ${report.privateInputReadyGateResumeEditTarget}`);
 console.log(
   `- Private input ready gate ready/missing/placeholder/invalid rows: ${report.privateInputReadyGateReadyInputKeyCount}/${report.privateInputReadyGateMissingInputKeyCount}/${report.privateInputReadyGatePlaceholderInputKeyCount}/${report.privateInputReadyGateInvalidShapeInputKeyCount}`
 );

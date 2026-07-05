@@ -256,6 +256,13 @@ function buildReport(receipt, sourceResult) {
     invalidShapeCount: invalidShapeRows.length
   });
   const gateRows = buildGateRows({ readyToApply, blockedRows });
+  const readyGateResumeCommand = readyToApply ? applyCommand : readyGateCommand;
+  const readyGateResumeEditTarget = readyToApply
+    ? "none; private input rows are shape-ready"
+    : summarizeLocations(blockedRows);
+  const readyGateResumeExpected = readyToApply
+    ? "run apply after the preserved preflight command stays ready"
+    : "replace blocked private input rows, rerun the ready gate, then run preflight and apply";
   return {
     generatedAt: new Date().toISOString(),
     appName,
@@ -292,6 +299,12 @@ function buildReport(receipt, sourceResult) {
     realLocalEnvModified: receipt.realLocalEnvModified === true,
     readyGateCommand,
     readyGateMode: mode,
+    readyGateResumeCommand,
+    readyGateResumeEditTarget,
+    readyGateResumeMode: mode,
+    readyGateResumeExpected,
+    readyGateResumeReadyToApply: readyToApply,
+    readyGateResumeValueRecorded: false,
     releaseChannelPrivateInputReadyGateReady: true,
     releaseChannelPrivateInputReadyToApply: readyToApply,
     currentOperatorFirstCommand: preflightCommand,
@@ -367,6 +380,9 @@ function buildMarkdown(report) {
 - Ready gate ready: ${readyLabel(report.releaseChannelPrivateInputReadyGateReady)}
 - Ready to apply: ${readyLabel(report.releaseChannelPrivateInputReadyToApply)}
 - Ready gate mode: ${report.readyGateMode}
+- Ready gate resume command: \`${report.readyGateResumeCommand}\`
+- Ready gate resume edit target: ${report.readyGateResumeEditTarget}
+- Ready gate resume expected: ${report.readyGateResumeExpected}
 - Synthetic smoke: ${readyLabel(report.syntheticSmoke)}
 - Strict exit requested: ${readyLabel(report.strictExit)}
 - Source receipt command: \`${report.sourceReceiptCommand}\`
@@ -426,6 +442,9 @@ function validateReport(report, markdown, sourceOutput) {
   check(report.readyGateRowsValueFree === true, "private input ready gate handoff rows should be value-free");
   check(report.currentOperatorFirstCommand === preflightCommand, "private input ready gate should preserve the preflight-first operator command");
   check(report.readyGateCommand === readyGateCommand, "private input ready gate should expose its rerun command");
+  check(report.readyGateResumeCommand === report.nextOperatorCommand, "private input ready gate resume command should mirror next operator command");
+  check(report.readyGateResumeMode === report.readyGateMode, "private input ready gate resume mode should mirror gate mode");
+  check(report.readyGateResumeValueRecorded === false, "private input ready gate resume fields should stay value-free");
   check(report.nextWriteCommand === applyCommand, "private input ready gate should expose the apply command");
   check(report.nextProofCommand === proofCommand, "private input ready gate should expose the strict proof command");
   check(report.localEnvModified === false, "private input ready gate should not modify local env");
@@ -450,12 +469,16 @@ function validateReport(report, markdown, sourceOutput) {
     check(report.readyGateMode === "blocked-placeholder-private-input", "blocked ready gate smoke should report placeholder-private-input mode");
     check(report.placeholderInputKeyCount === releaseChannelMetadataKeys.length, "blocked ready gate smoke should report four placeholder input rows");
     check(report.nextOperatorCommand === readyGateCommand, "blocked ready gate smoke should ask the operator to rerun the ready gate after edits");
+    check(report.readyGateResumeCommand === readyGateCommand, "blocked ready gate smoke should expose the ready gate as the resume command");
+    check(report.readyGateResumeEditTarget.includes(".env.release-channel.local"), "blocked ready gate smoke should expose the ignored private input edit target");
   }
   if (readySyntheticSmoke) {
     check(report.releaseChannelPrivateInputReadyToApply === true, "ready gate smoke should be ready to apply");
     check(report.readyGateMode === "ready-to-apply", "ready gate smoke should report ready-to-apply mode");
     check(report.readyInputKeyCount === releaseChannelMetadataKeys.length, "ready gate smoke should report four ready private input rows");
     check(report.nextOperatorCommand === applyCommand, "ready gate smoke should hand off to apply");
+    check(report.readyGateResumeCommand === applyCommand, "ready gate smoke should expose apply as the resume command");
+    check(report.readyGateResumeEditTarget.includes("shape-ready"), "ready gate smoke should not ask for another private edit when rows are ready");
   }
   check(!/https?:\/\//i.test(JSON.stringify(report)), "private input ready gate JSON should not include URL values");
   check(!/https?:\/\//i.test(markdown), "private input ready gate Markdown should not include URL values");
@@ -494,6 +517,8 @@ try {
   console.log(`- JSON: ${relative(jsonPath)}`);
   console.log(`- Ready to apply: ${report.releaseChannelPrivateInputReadyToApply ? "yes" : "no"}`);
   console.log(`- Ready gate mode: ${report.readyGateMode}`);
+  console.log(`- Ready gate resume command: ${report.readyGateResumeCommand}`);
+  console.log(`- Ready gate resume edit target: ${report.readyGateResumeEditTarget}`);
   console.log(`- Source receipt mode: ${report.sourceReceiptMode}`);
   console.log(`- Ready/missing/placeholder/invalid rows: ${report.readyInputKeyCount}/${report.missingInputKeyCount}/${report.placeholderInputKeyCount}/${report.invalidShapeInputKeyCount}`);
   console.log(`- Blocked private input locations: ${report.blockedInputKeyCount} (${report.blockedInputLocationSummary})`);
