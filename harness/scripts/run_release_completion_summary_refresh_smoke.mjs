@@ -2285,9 +2285,15 @@ function validateReport(report, markdown) {
   check(report.gitStatusPathsRecorded === false, "release completion summary refresh should not record git status paths");
   check(report.gitContextRows.length === report.gitContextRowCount, "release completion summary refresh should count git context rows");
   check(report.gitContextRows.every((row) => row.valueRecorded === false), "release completion summary refresh git context rows should be value-free");
-  check(report.refreshCommands.length === 6, "release completion summary refresh should record required commands, real preflight, plus conditional checkpoint command");
+  check(
+    report.refreshCommands.length === requiredRefreshCommands.length + 1,
+    "release completion summary refresh should record required commands, real preflight, plus conditional checkpoint command"
+  );
   check(report.refreshCommands.every((row) => row.valueRecorded === false), "release completion summary refresh command rows should be value-free");
-  check(report.refreshCommands.slice(0, 5).every((row) => row.skipped === false), "release completion summary refresh should always run the first five commands");
+  check(
+    report.refreshCommands.slice(0, requiredRefreshCommands.length).every((row) => row.skipped === false),
+    "release completion summary refresh should always run the required commands"
+  );
   check(
     report.refreshCommands.some(
       (row) => row.command === releaseChannelApplyPrivateEnvPreflightCommand && row.allowBlockedExit === true
