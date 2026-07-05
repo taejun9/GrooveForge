@@ -550,6 +550,8 @@ function buildCurrentActionReadyCriteria(actionId) {
 function buildCompletionGapSummary({
   currentActionLabel = "No pending release doctor action",
   currentActionNextCommand = "npm run release:doctor",
+  currentActionOperatorStartCommand = currentActionNextCommand,
+  currentActionOperatorStartCommandRole = operatorStartRoleForCommand(currentActionOperatorStartCommand),
   currentActionFirstBlocker = "none",
   currentActionEvidenceLabelSummary = "none",
   currentActionReadyCriteriaSummary = "none",
@@ -571,6 +573,10 @@ function buildCompletionGapSummary({
     completionGapCompletionStage: externalDistributionReady ? "external distribution evidence ready; hard gate pending" : "external distribution pending",
     completionGapCurrentProofTarget,
     completionGapNextProofCommand: currentActionNextCommand,
+    completionGapOperatorStartCommand: currentActionOperatorStartCommand,
+    completionGapNextOperatorCommand: currentActionOperatorStartCommand,
+    completionGapOperatorStartCommandRole: currentActionOperatorStartCommandRole,
+    completionGapOperatorStartCommandValueRecorded: false,
     completionGapHardGateCommand: hardExternalGateCommand,
     completionGapFirstBlocker: currentActionFirstBlocker || "none",
     completionGapEvidenceSummary: currentActionEvidenceLabelSummary,
@@ -849,6 +855,9 @@ function buildMarkdown(report) {
 - Completion gap summary: ${report.completionGapSummary}
 - Completion gap proof target: ${report.completionGapCurrentProofTarget}
 - Completion gap next proof command: \`${report.completionGapNextProofCommand}\`
+- Completion gap operator start command: \`${report.completionGapOperatorStartCommand}\`
+- Completion gap next operator command: \`${report.completionGapNextOperatorCommand}\`
+- Completion gap operator start command role: ${report.completionGapOperatorStartCommandRole}
 - Completion gap hard gate command: \`${report.completionGapHardGateCommand}\`
 - Completion gap first blocker: ${report.completionGapFirstBlocker}
 - Completion gap claim blockers: ${report.completionGapClaimBlockerCount} (${report.completionGapClaimBlockerSummary})
@@ -950,6 +959,10 @@ ${formatLocationRows(report.releasePrepareEnvExistingReleaseChannelPlaceholderEd
 - Completion stage: ${report.completionGapCompletionStage}
 - Proof target: ${report.completionGapCurrentProofTarget}
 - Next proof command: \`${report.completionGapNextProofCommand}\`
+- Operator start command: \`${report.completionGapOperatorStartCommand}\`
+- Next operator command: \`${report.completionGapNextOperatorCommand}\`
+- Operator start command role: ${report.completionGapOperatorStartCommandRole}
+- Operator start command value recorded: ${readyLabel(report.completionGapOperatorStartCommandValueRecorded)}
 - Hard gate command: \`${report.completionGapHardGateCommand}\`
 - First blocker: ${report.completionGapFirstBlocker}
 - Evidence summary: ${report.completionGapEvidenceSummary}
@@ -1169,6 +1182,8 @@ const currentAction = enrichCurrentAction(
 const completionGap = buildCompletionGapSummary({
   currentActionLabel: currentAction.currentActionLabel,
   currentActionNextCommand: currentAction.currentActionNextCommand,
+  currentActionOperatorStartCommand: currentAction.currentActionOperatorStartCommand,
+  currentActionOperatorStartCommandRole: currentAction.currentActionOperatorStartCommandRole,
   currentActionFirstBlocker: currentAction.currentActionFirstBlocker,
   currentActionEvidenceLabelSummary: currentAction.currentActionEvidenceLabelSummary,
   currentActionReadyCriteriaSummary: currentAction.currentActionReadyCriteriaSummary,
@@ -1436,6 +1451,22 @@ check(
 check(
   releaseDoctorReport.completionGapNextProofCommand === releaseDoctorReport.currentActionNextCommand,
   "release doctor completion gap next proof command should match current next command"
+);
+check(
+  releaseDoctorReport.completionGapOperatorStartCommand === releaseDoctorReport.currentActionOperatorStartCommand,
+  "release doctor completion gap operator start command should match current action operator start command"
+);
+check(
+  releaseDoctorReport.completionGapNextOperatorCommand === releaseDoctorReport.currentActionOperatorStartCommand,
+  "release doctor completion gap next operator command should match current action operator start command"
+);
+check(
+  releaseDoctorReport.completionGapOperatorStartCommandRole === releaseDoctorReport.currentActionOperatorStartCommandRole,
+  "release doctor completion gap operator start command role should match current action role"
+);
+check(
+  releaseDoctorReport.completionGapOperatorStartCommandValueRecorded === false,
+  "release doctor completion gap operator start command should not record values"
 );
 check(
   releaseDoctorReport.completionGapHardGateCommand === releaseDoctorReport.hardExternalGateCommand,
@@ -1917,6 +1948,9 @@ check(markdown.includes("Release Doctor"), "release doctor Markdown should inclu
 check(markdown.includes("Completion gap status:"), "release doctor Markdown should include completion gap status");
 check(markdown.includes("Completion gap proof target:"), "release doctor Markdown should include completion gap proof target");
 check(markdown.includes("Completion gap next proof command:"), "release doctor Markdown should include completion gap next proof command");
+check(markdown.includes("Completion gap operator start command:"), "release doctor Markdown should include completion gap operator start command");
+check(markdown.includes("Completion gap next operator command:"), "release doctor Markdown should include completion gap next operator command");
+check(markdown.includes("Operator start command value recorded: no"), "release doctor Markdown should state completion gap operator command value redaction");
 check(markdown.includes("Completion gap hard gate command:"), "release doctor Markdown should include completion gap hard gate command");
 check(markdown.includes("Completion gap claim blockers:"), "release doctor Markdown should include completion gap claim blocker count");
 check(markdown.includes("Completion Gap"), "release doctor Markdown should include completion gap section");
@@ -1988,6 +2022,9 @@ console.log(`- Completion gap status: ${releaseDoctorReport.completionGapStatus}
 console.log(`- Completion gap summary: ${releaseDoctorReport.completionGapSummary}`);
 console.log(`- Completion gap proof target: ${releaseDoctorReport.completionGapCurrentProofTarget}`);
 console.log(`- Completion gap next proof command: ${releaseDoctorReport.completionGapNextProofCommand}`);
+console.log(`- Completion gap operator start command: ${releaseDoctorReport.completionGapOperatorStartCommand}`);
+console.log(`- Completion gap next operator command: ${releaseDoctorReport.completionGapNextOperatorCommand}`);
+console.log(`- Completion gap operator start command role: ${releaseDoctorReport.completionGapOperatorStartCommandRole}`);
 console.log(`- Completion gap hard gate command: ${releaseDoctorReport.completionGapHardGateCommand}`);
 console.log(`- Completion gap claim blockers: ${releaseDoctorReport.completionGapClaimBlockerCount} (${releaseDoctorReport.completionGapClaimBlockerSummary})`);
 console.log(`- Local env file loaded: ${releaseDoctorReport.localEnvFileLoaded ? "yes" : "no"}`);
