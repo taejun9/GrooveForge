@@ -52,6 +52,14 @@ const strictProofReportStem = successSmoke
   ? "release-private-edit-strict-proof-success-smoke"
   : "release-private-edit-strict-proof";
 const completionSummaryReportStem = "release-completion-summary-smoke";
+const realPreflightCommand = "npm run release:channel-apply-private-env-preflight";
+const realApplyCommand = "npm run release:channel-apply-private-env";
+const realStrictProofCommand = "npm run release:private-edit-strict-proof";
+const realCompletionSummaryCommand = "npm run release:completion-summary-smoke";
+const realPrivateInputTemplateCommand = "npm run release:channel-private-input-template";
+const realCurrentBlockerRefreshCommand = "npm run release:current-blocker";
+const realNextActionsRefreshCommand = "npm run release:next-actions";
+const realGuidedSetupFallbackCommand = "npm run release:channel-setup-wizard";
 const failures = [];
 
 function check(condition, message) {
@@ -125,6 +133,62 @@ function preflightRemediationRows(preflightReport) {
     writeCommand: textValue(row.writeCommand, "npm run release:channel-apply-private-env"),
     guidedSetupFallbackCommand: textValue(row.guidedSetupFallbackCommand, "npm run release:channel-setup-wizard"),
     proofCommand: textValue(row.proofCommand, "npm run release:private-edit-strict-proof"),
+    valueRecorded: false
+  }));
+}
+
+function privateInputLocationLabel(row) {
+  return `${textValue(row.privateInputFilePath, ".env.release-channel.local")}:${row.privateInputFileLine || "add"} ${textValue(row.key)}`;
+}
+
+function summarizePrivateInputLocationRows(rows, formatter = privateInputLocationLabel) {
+  return rows.length > 0 ? rows.map(formatter).join(", ") : "none";
+}
+
+function selectProofRunnerResumeEditRows(rows) {
+  const placeholderRows = rows.filter((row) => row.privateInputFilePlaceholder === true || row.inputPlaceholder === true);
+  const invalidShapeRows = rows.filter(
+    (row) =>
+      row.inputPresent === true &&
+      row.inputPlaceholder !== true &&
+      row.privateInputFilePlaceholder !== true &&
+      row.inputShapeReady !== true
+  );
+  const missingRows = rows.filter((row) => row.inputPresent !== true);
+  if (placeholderRows.length > 0) {
+    return placeholderRows;
+  }
+  if (invalidShapeRows.length > 0) {
+    return invalidShapeRows;
+  }
+  return missingRows;
+}
+
+function buildProofRunnerResumeAliasRows(fields) {
+  const entries = [
+    ["current-blocker", fields.currentBlocker, "proof-runner-current-blocker"],
+    ["next-operator-action", fields.nextOperatorAction, "proof-runner-next-action"],
+    ["first-command", fields.firstCommand, "operator-command-sequence"],
+    ["start-command", fields.startCommand, "operator-command-sequence"],
+    ["private-input-edit-target", fields.privateInputEditTarget, "preflight-private-input-location-rows"],
+    ["expected-input-shapes", fields.expectedShapeSummary, "preflight-private-input-location-rows"],
+    ["private-input-template-command", fields.privateInputTemplateCommand, "private-input-template-helper"],
+    ["private-input-template-default-path", fields.privateInputTemplateDefaultPath, "private-input-template-helper"],
+    ["private-input-file-key", fields.privateInputFileKey, "private-input-template-helper"],
+    ["preflight-command", fields.preflightCommand, "proof-runner-sequence"],
+    ["apply-command", fields.applyCommand, "proof-runner-sequence"],
+    ["strict-proof-command", fields.strictProofCommand, "proof-runner-sequence"],
+    ["completion-summary-command", fields.completionSummaryCommand, "proof-runner-sequence"],
+    ["current-blocker-refresh-command", fields.currentBlockerRefreshCommand, "post-proof-refresh"],
+    ["next-actions-refresh-command", fields.nextActionsRefreshCommand, "post-proof-refresh"],
+    ["guided-setup-fallback-command", fields.guidedSetupFallbackCommand, "guided-fallback"],
+    ["placeholder-location-summary", fields.placeholderLocationSummary, "preflight-private-input-location-rows"]
+  ];
+  return entries.map(([alias, value, source], index) => ({
+    order: index + 1,
+    alias,
+    value: textValue(value),
+    source,
     valueRecorded: false
   }));
 }
@@ -267,6 +331,15 @@ function formatPreflightRemediationRows(rows) {
     .join("\n");
 }
 
+function formatProofRunnerResumeAliasRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.alias)} | ${escapeCell(row.value)} | ${escapeCell(row.source)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function formatKeyList(keys) {
   return keys.length > 0 ? keys.join(", ") : "none";
 }
@@ -326,6 +399,48 @@ function buildReport({
     completionSummaryReport?.currentOperatorFirstCommand,
     textValue(preflightReport?.currentOperatorFirstCommand, "npm run release:channel-apply-private-env-preflight")
   );
+  const currentFirstBlocker = textValue(
+    completionSummaryReport?.currentFirstBlocker,
+    preflightReady
+      ? "Release-channel apply proof runner has not completed all proof steps."
+      : "Release-channel private env preflight is blocked."
+  );
+  const proofRunnerResumeEditRows = selectProofRunnerResumeEditRows(privateInputRows);
+  const proofRunnerResumePrivateInputEditTarget =
+    proofRunnerResumeEditRows.length > 0
+      ? summarizePrivateInputLocationRows(proofRunnerResumeEditRows)
+      : preflightReady === true
+        ? "none; private inputs are shape-ready"
+        : "none; inspect preflight remediation rows";
+  const proofRunnerResumeExpectedShapeSummary =
+    proofRunnerResumeEditRows.length > 0
+      ? summarizePrivateInputLocationRows(proofRunnerResumeEditRows, (row) => `${textValue(row.key)}: ${textValue(row.expectedShape)}`)
+      : "none; private inputs are shape-ready";
+  const proofRunnerResumeCurrentBlockerAlias = runnerReady
+    ? "none; release-channel proof runner completed"
+    : currentFirstBlocker;
+  const proofRunnerResumeAliasRows = buildProofRunnerResumeAliasRows({
+    currentBlocker: proofRunnerResumeCurrentBlockerAlias,
+    nextOperatorAction:
+      preflightReady === true
+        ? "run apply only after preflight readiness"
+        : "replace private input placeholders or missing inputs, then rerun preflight",
+    firstCommand: realPreflightCommand,
+    startCommand: realPreflightCommand,
+    privateInputEditTarget: proofRunnerResumePrivateInputEditTarget,
+    expectedShapeSummary: proofRunnerResumeExpectedShapeSummary,
+    privateInputTemplateCommand: realPrivateInputTemplateCommand,
+    privateInputTemplateDefaultPath: textValue(preflightReport?.privateInputFileDefault, ".env.release-channel.local"),
+    privateInputFileKey: textValue(preflightReport?.privateInputFileKey, "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE"),
+    preflightCommand: realPreflightCommand,
+    applyCommand: realApplyCommand,
+    strictProofCommand: realStrictProofCommand,
+    completionSummaryCommand: realCompletionSummaryCommand,
+    currentBlockerRefreshCommand: realCurrentBlockerRefreshCommand,
+    nextActionsRefreshCommand: realNextActionsRefreshCommand,
+    guidedSetupFallbackCommand: realGuidedSetupFallbackCommand,
+    placeholderLocationSummary: formatKeyList(privateInputPlaceholderLocations)
+  });
   return {
     reportCommand: successSmoke
       ? "npm run release:channel-apply-private-env-proof-smoke"
@@ -394,16 +509,46 @@ function buildReport({
       integerValue(preflightReport?.currentPlaceholderKeyCount) ||
       currentPlaceholderKeys.length,
     currentPlaceholderKeys,
-    currentFirstBlocker: textValue(
-      completionSummaryReport?.currentFirstBlocker,
-      preflightReady
-        ? "Release-channel apply proof runner has not completed all proof steps."
-        : "Release-channel private env preflight is blocked."
-    ),
+    currentFirstBlocker,
     currentOperatorStartCommand,
     currentOperatorFirstCommand,
     currentOperatorStartCommandRole: textValue(completionSummaryReport?.currentOperatorStartCommandRole, "operator-preflight"),
     currentOperatorStartCommandMatchesFirstCommand: currentOperatorStartCommand === currentOperatorFirstCommand,
+    proofRunnerResumeAliasesReady:
+      proofRunnerResumeAliasRows.length === 17 && proofRunnerResumeAliasRows.every((row) => row.valueRecorded === false),
+    proofRunnerResumeAliasRows,
+    proofRunnerResumeAliasRowCount: proofRunnerResumeAliasRows.length,
+    proofRunnerResumeAliasRowsValueFree: proofRunnerResumeAliasRows.every((row) => row.valueRecorded === false),
+    proofRunnerResumeCurrentBlockerAlias,
+    proofRunnerResumeNextOperatorActionAlias:
+      preflightReady === true
+        ? "run apply only after preflight readiness"
+        : "replace private input placeholders or missing inputs, then rerun preflight",
+    proofRunnerResumeFirstCommandAlias: realPreflightCommand,
+    proofRunnerResumeStartCommandAlias: realPreflightCommand,
+    proofRunnerResumePrivateInputEditTarget: proofRunnerResumePrivateInputEditTarget,
+    proofRunnerResumeExpectedShapeSummary: proofRunnerResumeExpectedShapeSummary,
+    proofRunnerResumePrivateInputTemplateCommandAlias: realPrivateInputTemplateCommand,
+    proofRunnerResumePrivateInputTemplateDefaultPathAlias: textValue(preflightReport?.privateInputFileDefault, ".env.release-channel.local"),
+    proofRunnerResumePrivateInputFileKeyAlias: textValue(preflightReport?.privateInputFileKey, "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE"),
+    proofRunnerResumePreflightCommandAlias: realPreflightCommand,
+    proofRunnerResumeApplyCommandAlias: realApplyCommand,
+    proofRunnerResumeStrictProofCommandAlias: realStrictProofCommand,
+    proofRunnerResumeCompletionSummaryCommandAlias: realCompletionSummaryCommand,
+    proofRunnerResumeCurrentBlockerRefreshCommandAlias: realCurrentBlockerRefreshCommand,
+    proofRunnerResumeNextActionsRefreshCommandAlias: realNextActionsRefreshCommand,
+    proofRunnerResumeGuidedSetupFallbackCommandAlias: realGuidedSetupFallbackCommand,
+    proofRunnerResumePlaceholderLocationCount: privateInputPlaceholderLocations.length,
+    proofRunnerResumePlaceholderLocationSummary: formatKeyList(privateInputPlaceholderLocations),
+    proofRunnerResumeMissingLocationCount: privateInputRows.filter((row) => row.inputPresent !== true).length,
+    proofRunnerResumeInvalidShapeLocationCount: privateInputRows.filter(
+      (row) =>
+        row.inputPresent === true &&
+        row.inputPlaceholder !== true &&
+        row.privateInputFilePlaceholder !== true &&
+        row.inputShapeReady !== true
+    ).length,
+    proofRunnerResumeValueRecorded: false,
     userFacingCompletionPercent: completionPercent,
     userFacingRemainingPercent: remainingPercent,
     latestCompletedPlan: textValue(completionSummaryReport?.latestPlan ?? completionSummaryReport?.latestCompletedPlan, completedPlanState.latestPlan),
@@ -457,6 +602,13 @@ function buildMarkdown(report) {
 - Next write command: \`${report.nextWriteCommand}\`
 - Strict proof command: \`${report.strictProofCommand}\`
 - Completion summary command: \`${report.completionSummaryCommand}\`
+- Proof runner resume aliases ready: ${readyLabel(report.proofRunnerResumeAliasesReady)}
+- Proof runner resume first command alias: \`${report.proofRunnerResumeFirstCommandAlias}\`
+- Proof runner resume private input edit target: ${report.proofRunnerResumePrivateInputEditTarget}
+- Proof runner resume expected shapes: ${report.proofRunnerResumeExpectedShapeSummary}
+- Proof runner resume preflight/apply/strict proof: \`${report.proofRunnerResumePreflightCommandAlias}\` / \`${report.proofRunnerResumeApplyCommandAlias}\` / \`${report.proofRunnerResumeStrictProofCommandAlias}\`
+- Proof runner resume refresh commands: \`${report.proofRunnerResumeCurrentBlockerRefreshCommandAlias}\` / \`${report.proofRunnerResumeNextActionsRefreshCommandAlias}\`
+- Proof runner resume placeholder locations: ${report.proofRunnerResumePlaceholderLocationCount} (${report.proofRunnerResumePlaceholderLocationSummary})
 - Latest completed plan: ${report.latestCompletedPlan}
 - 10-plan progress: ${report.tenPlanProgress}
 - User-facing completion: ${report.userFacingCompletionPercent}
@@ -473,6 +625,12 @@ function buildMarkdown(report) {
 | order | command | role | attempted | exit status | success | status | value recorded |
 |---:|---|---|---|---:|---|---|---|
 ${formatCommandRows(report.commandRows)}
+
+## Proof Runner Resume Aliases
+
+| order | alias | value | source | value recorded |
+|---:|---|---|---|---|
+${formatProofRunnerResumeAliasRows(report.proofRunnerResumeAliasRows)}
 
 ## Source Artifacts
 
@@ -517,6 +675,29 @@ async function writeReport(report) {
   check(report.commandRowCount === 4, "release-channel proof runner should include four command rows");
   check(report.proofRunnerArtifactNameCount === 4, "release-channel proof runner should track four artifact names");
   check(report.commandRowsValueFree === true, "release-channel proof runner command rows should be value-free");
+  check(report.proofRunnerResumeAliasesReady === true, "release-channel proof runner should expose value-free resume aliases");
+  check(report.proofRunnerResumeAliasRowCount === 17, "release-channel proof runner resume aliases should include 17 rows");
+  check(report.proofRunnerResumeAliasRowsValueFree === true, "release-channel proof runner resume alias rows should be value-free");
+  check(report.proofRunnerResumeFirstCommandAlias === realPreflightCommand, "release-channel proof runner resume should preserve preflight as first command");
+  check(report.proofRunnerResumeStartCommandAlias === realPreflightCommand, "release-channel proof runner resume should preserve preflight as start command");
+  check(report.proofRunnerResumePreflightCommandAlias === realPreflightCommand, "release-channel proof runner resume should expose real preflight command");
+  check(report.proofRunnerResumeApplyCommandAlias === realApplyCommand, "release-channel proof runner resume should expose real apply command");
+  check(report.proofRunnerResumeStrictProofCommandAlias === realStrictProofCommand, "release-channel proof runner resume should expose real strict proof command");
+  check(report.proofRunnerResumeCompletionSummaryCommandAlias === realCompletionSummaryCommand, "release-channel proof runner resume should expose real completion summary command");
+  check(report.proofRunnerResumePrivateInputTemplateCommandAlias === realPrivateInputTemplateCommand, "release-channel proof runner resume should expose private input template command");
+  check(
+    report.proofRunnerResumePrivateInputTemplateDefaultPathAlias === report.privateInputFileDefault,
+    "release-channel proof runner resume template path should match private input default"
+  );
+  check(report.proofRunnerResumePrivateInputFileKeyAlias === report.privateInputFileKey, "release-channel proof runner resume file key should match private input key");
+  check(report.proofRunnerResumeCurrentBlockerRefreshCommandAlias === realCurrentBlockerRefreshCommand, "release-channel proof runner resume should expose current-blocker refresh");
+  check(report.proofRunnerResumeNextActionsRefreshCommandAlias === realNextActionsRefreshCommand, "release-channel proof runner resume should expose next-actions refresh");
+  check(report.proofRunnerResumeGuidedSetupFallbackCommandAlias === realGuidedSetupFallbackCommand, "release-channel proof runner resume should expose guided setup fallback");
+  check(
+    report.proofRunnerResumePlaceholderLocationCount === report.privateInputFilePlaceholderLocationCount,
+    "release-channel proof runner resume placeholder count should mirror private input rows"
+  );
+  check(report.proofRunnerResumeValueRecorded === false, "release-channel proof runner resume aliases should be value-free");
   check(report.sourceRowCount === 4, "release-channel proof runner should include four source rows");
   check(report.sourceRowsValueFree === true, "release-channel proof runner source rows should be value-free");
   check(report.privateInputFileLocationRowCount === report.privateInputFileLocationRows.length, "release-channel proof runner should mirror private input file location row count");
@@ -548,6 +729,7 @@ async function writeReport(report) {
   check(!/https?:\/\//i.test(json), "release-channel proof runner JSON should not include URL values");
   check(!/https?:\/\//i.test(markdown), "release-channel proof runner Markdown should not include URL values");
   check(markdown.includes("Command Rows"), "release-channel proof runner Markdown should include command rows");
+  check(markdown.includes("Proof Runner Resume Aliases"), "release-channel proof runner Markdown should include resume aliases");
   check(markdown.includes("Source Artifacts"), "release-channel proof runner Markdown should include source artifacts");
   check(markdown.includes("Private Input Location Rows"), "release-channel proof runner Markdown should include private input location rows");
   check(markdown.includes("Preflight Remediation Rows"), "release-channel proof runner Markdown should include preflight remediation rows");
@@ -665,6 +847,19 @@ console.log(`- Next operator action: ${report.nextOperatorAction}`);
 console.log(`- Next write command: ${report.nextWriteCommand}`);
 console.log(`- Strict proof command: ${report.strictProofCommand}`);
 console.log(`- Completion summary command: ${report.completionSummaryCommand}`);
+console.log(`- Proof runner resume aliases ready: ${report.proofRunnerResumeAliasesReady ? "yes" : "no"}`);
+console.log(`- Proof runner resume first command alias: ${report.proofRunnerResumeFirstCommandAlias}`);
+console.log(`- Proof runner resume private input edit target: ${report.proofRunnerResumePrivateInputEditTarget}`);
+console.log(`- Proof runner resume expected shapes: ${report.proofRunnerResumeExpectedShapeSummary}`);
+console.log(
+  `- Proof runner resume preflight/apply/strict proof: ${report.proofRunnerResumePreflightCommandAlias} / ${report.proofRunnerResumeApplyCommandAlias} / ${report.proofRunnerResumeStrictProofCommandAlias}`
+);
+console.log(
+  `- Proof runner resume refresh commands: ${report.proofRunnerResumeCurrentBlockerRefreshCommandAlias} / ${report.proofRunnerResumeNextActionsRefreshCommandAlias}`
+);
+console.log(
+  `- Proof runner resume placeholder locations: ${report.proofRunnerResumePlaceholderLocationCount} (${report.proofRunnerResumePlaceholderLocationSummary})`
+);
 console.log(`- Latest completed plan: ${report.latestCompletedPlan}`);
 console.log(`- 10-plan progress: ${report.tenPlanProgress}`);
 console.log(`- User-facing completion: ${report.userFacingCompletionPercent}`);

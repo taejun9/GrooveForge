@@ -82,6 +82,20 @@ if (report) {
   check(report.preflightRemediationRowCount === 4, "proof success report should include four preflight remediation rows");
   check(report.preflightRemediationRowsValueFree === true, "proof success preflight remediation rows should be value-free");
   check(report.nextOperatorAction === "run apply only after preflight readiness", "proof success report should expose the post-preflight next action");
+  check(report.proofRunnerResumeAliasesReady === true, "proof success report should expose resume aliases");
+  check(report.proofRunnerResumeAliasRowCount === 17, "proof success report should include 17 resume alias rows");
+  check(report.proofRunnerResumeAliasRowsValueFree === true, "proof success resume alias rows should be value-free");
+  check(
+    report.proofRunnerResumeFirstCommandAlias === "npm run release:channel-apply-private-env-preflight",
+    "proof success report should preserve preflight as the resume first command"
+  );
+  check(report.proofRunnerResumeApplyCommandAlias === "npm run release:channel-apply-private-env", "proof success report should expose apply resume alias");
+  check(report.proofRunnerResumeStrictProofCommandAlias === "npm run release:private-edit-strict-proof", "proof success report should expose strict proof resume alias");
+  check(
+    report.proofRunnerResumePrivateInputEditTarget === "none; private inputs are shape-ready",
+    "proof success report should not ask for private input edits after ready inputs"
+  );
+  check(report.proofRunnerResumePlaceholderLocationCount === 0, "proof success report should expose zero resume placeholder locations");
   check(report.appliedKeyCount === 4, "proof success report should apply four keys");
   check(report.currentReadyKeyCount === 4, "proof success report should report four ready keys");
   check(report.currentRequiredKeyCount === 4, "proof success report should track four release-channel keys");
@@ -104,6 +118,7 @@ if (report) {
   check(!hasUrlValue(JSON.stringify(report)), "proof success JSON should not include URL values");
 }
 check(!hasUrlValue(markdown), "proof success Markdown should not include URL values");
+check(markdown.includes("Proof Runner Resume Aliases"), "proof success Markdown should include resume aliases");
 check(markdown.includes("Private Input Location Rows"), "proof success Markdown should include private input location rows");
 check(markdown.includes("Preflight Remediation Rows"), "proof success Markdown should include preflight remediation rows");
 
@@ -124,6 +139,7 @@ console.log("- Preflight ready: yes");
 console.log("- Apply ready: yes");
 console.log("- Strict proof ready: yes");
 console.log("- Completion summary ready: yes");
+console.log("- Proof runner resume aliases: ready");
 console.log("- Applied rows: 4");
 console.log("- Current ready rows: 4/4");
 console.log("- Private values recorded: no");
