@@ -585,11 +585,17 @@ function formatGitContextRows(rows) {
 
 function userFacingCompletionRows(report) {
   return [
+    ["latest completed plan", report.latestCompletedPlan],
+    ["latest completed plan number", report.latestCompletedPlanNumber],
     ["completion percent", report.userFacingCompletionPercent],
     ["completion label", report.userFacingCompletionLabel],
+    ["completion alias", report.userFacingCompletion],
     ["remaining percent", report.userFacingRemainingPercent],
     ["remaining label", report.userFacingRemainingLabel],
-    ["source field", "completionPercent/remainingPercent"]
+    ["remaining alias", report.remainingCompletion],
+    ["current next command alias", report.currentNextCommandAlias],
+    ["current blocker alias", report.currentFirstBlockerAlias],
+    ["source field", "latestPlan/latestPlanNumber/completionPercent/remainingPercent/nextCommand/firstBlocker"]
   ].map(([field, value], index) => ({
     order: index + 1,
     field,
@@ -685,6 +691,10 @@ function buildReport({
   const userFacingRemainingPercent = percentNumber(completionSummary.remainingPercent);
   const userFacingCompletionLabel = percentLabel(completionSummary.completionPercent);
   const userFacingRemainingLabel = percentLabel(completionSummary.remainingPercent);
+  const latestCompletedPlanNumber = integerValue(completionSummary.latestPlanNumber);
+  const latestCompletedPlan = textValue(completionSummary.latestPlan);
+  const currentFirstBlockerAlias = textValue(completionSummary.firstBlocker);
+  const currentNextCommandAlias = textValue(completionSummary.nextCommand);
   const completionBlockerActionRows = objectRows(completionSummary.completionBlockerActionRows);
   const completionBlockerFocusRows = objectRows(completionSummary.completionBlockerFocusRows);
   const currentOperatorCommandRows = objectRows(completionSummary.currentOperatorCommandRows);
@@ -822,8 +832,10 @@ function buildReport({
     sourcePrereqNotarySubmissionAttempted: sourcePrereq.notarySubmissionAttempted === true,
     sourcePrereqClaimedExternalDistribution: sourcePrereq.releaseGateClaimedExternalDistribution === true,
     sourcePrereqValueRecorded: sourcePrereq.valueRecorded === true,
-    latestPlanNumber: integerValue(completionSummary.latestPlanNumber),
-    latestPlan: textValue(completionSummary.latestPlan),
+    latestPlanNumber: latestCompletedPlanNumber,
+    latestPlan: latestCompletedPlan,
+    latestCompletedPlanNumber,
+    latestCompletedPlan,
     tenPlanProgress: textValue(completionSummary.tenPlanProgress),
     tenPlanCompletedCount: integerValue(completionSummary.tenPlanCompletedCount),
     tenPlanTotal: integerValue(completionSummary.tenPlanTotal),
@@ -832,8 +844,10 @@ function buildReport({
     remainingPercent: userFacingRemainingLabel,
     userFacingCompletionPercent,
     userFacingCompletionLabel,
+    userFacingCompletion: userFacingCompletionLabel,
     userFacingRemainingPercent,
     userFacingRemainingLabel,
+    remainingCompletion: userFacingRemainingLabel,
     freshArtifactCount: integerValue(completionSummary.freshArtifactCount),
     staleArtifactCount: integerValue(completionSummary.staleArtifactCount),
     missingArtifactCount: integerValue(completionSummary.missingArtifactCount),
@@ -855,10 +869,12 @@ function buildReport({
     finalHandoffSuccessRedactionReady: completionSummary.finalHandoffSuccessRedactionReady === true,
     postClearanceNextAction: textValue(completionSummary.postClearanceNextAction),
     postClearanceProofCommand: textValue(completionSummary.postClearanceProofCommand),
-    firstBlocker: textValue(completionSummary.firstBlocker),
-    nextCommand: textValue(completionSummary.nextCommand),
-    currentFirstBlocker: textValue(completionSummary.firstBlocker),
-    currentNextCommand: textValue(completionSummary.nextCommand),
+    firstBlocker: currentFirstBlockerAlias,
+    nextCommand: currentNextCommandAlias,
+    currentFirstBlocker: currentFirstBlockerAlias,
+    currentNextCommand: currentNextCommandAlias,
+    currentFirstBlockerAlias,
+    currentNextCommandAlias,
     currentEnvEditTarget: textValue(completionSummary.currentEnvEditTarget, ".env.distribution.local"),
     currentRequiredKeyCount: integerValue(completionSummary.currentRequiredKeyCount),
     currentRequiredKeys: stringArrayValue(completionSummary.currentRequiredKeys),
@@ -1262,12 +1278,15 @@ function buildMarkdown(report) {
 - Completion summary readout ready: ${readyLabel(report.completionSummaryReadoutReady)}
 - Source evidence prerequisite ready: ${readyLabel(report.sourcePrereqReady)}
 - Latest completed plan: ${report.latestPlan}
+- Latest completed plan alias: ${report.latestCompletedPlan}
 - 10-plan progress: ${report.tenPlanProgress}
 - 10-plan report due: ${readyLabel(report.tenPlanReportDue)}
 - 10-plan checkpoint required: ${readyLabel(report.tenPlanCheckpointRequired)}
 - 10-plan checkpoint ready: ${checkpointReadyLabel(report)}
 - User-facing completion: ${report.userFacingCompletionLabel}
+- User-facing completion alias: ${report.userFacingCompletion}
 - Remaining completion: ${report.userFacingRemainingLabel}
+- Remaining completion alias: ${report.remainingCompletion}
 - Fresh artifacts: ${report.freshArtifactCount}
 - Stale artifacts: ${report.staleArtifactCount}
 - Missing artifacts: ${report.missingArtifactCount}
@@ -1280,6 +1299,8 @@ function buildMarkdown(report) {
 - Current first blocker: ${report.firstBlocker}
 - Current first blocker alias: ${report.currentFirstBlocker}
 - Current next command alias: \`${report.currentNextCommand}\`
+- User-facing current blocker alias: ${report.currentFirstBlockerAlias}
+- User-facing current next command alias: \`${report.currentNextCommandAlias}\`
 - Source prereq current first blocker alias: ${report.sourcePrereqCurrentFirstBlocker}
 - Source prereq current next command alias: \`${report.sourcePrereqCurrentNextCommand}\`
 - Source prereq artifacts present: ${report.sourcePrereqSourceArtifactPresentCount}/${report.sourcePrereqSourceArtifactTotal}
@@ -1738,6 +1759,11 @@ function validateReport(report, markdown) {
   check(report.sourcePrereqValueRecorded === false, "release completion summary refresh source prereq should remain value-free");
   check(report.latestPlanNumber > 0, "release completion summary refresh should include latest plan number");
   check(report.latestPlan === `plan-${report.latestPlanNumber}`, "release completion summary refresh should format latest plan");
+  check(report.latestCompletedPlan === report.latestPlan, "release completion summary refresh latest completed plan alias should mirror latest plan");
+  check(
+    report.latestCompletedPlanNumber === report.latestPlanNumber,
+    "release completion summary refresh latest completed plan number alias should mirror latest plan number"
+  );
   check(report.tenPlanTotal === 10, "release completion summary refresh should keep 10-plan denominator");
   check(report.tenPlanCompletedCount >= 1 && report.tenPlanCompletedCount <= 10, "release completion summary refresh should keep current 10-plan count");
   check(report.tenPlanProgress.includes(`${report.tenPlanCompletedCount}/10`), "release completion summary refresh should include current 10-plan progress");
@@ -1745,6 +1771,8 @@ function validateReport(report, markdown) {
   check(report.remainingPercent === "0.000001%", "release completion summary refresh should keep current remaining completion");
   check(report.userFacingCompletionLabel === report.completionPercent, "release completion summary refresh user-facing completion label should mirror completion percent");
   check(report.userFacingRemainingLabel === report.remainingPercent, "release completion summary refresh user-facing remaining label should mirror remaining percent");
+  check(report.userFacingCompletion === report.userFacingCompletionLabel, "release completion summary refresh user-facing completion alias should mirror completion label");
+  check(report.remainingCompletion === report.userFacingRemainingLabel, "release completion summary refresh remaining completion alias should mirror remaining label");
   check(
     Math.abs(report.userFacingCompletionPercent - 99.999999) < 0.000000001,
     "release completion summary refresh should expose numeric user-facing completion percent"
@@ -1771,6 +1799,8 @@ function validateReport(report, markdown) {
   check(report.postClearanceProofCommand === "npm run desktop:auto-update-readiness-smoke", "release completion summary refresh should keep auto-update readiness as post-clearance proof command");
   check(report.currentFirstBlocker === report.firstBlocker, "release completion summary refresh current first blocker alias should mirror firstBlocker");
   check(report.currentNextCommand === report.nextCommand, "release completion summary refresh current next command alias should mirror nextCommand");
+  check(report.currentFirstBlockerAlias === report.currentFirstBlocker, "release completion summary refresh user-facing current blocker alias should mirror current first blocker");
+  check(report.currentNextCommandAlias === report.currentNextCommand, "release completion summary refresh user-facing current next command alias should mirror current next command");
   check(report.currentFirstBlocker !== "none", "release completion summary refresh current first blocker alias should be populated");
   check(report.currentNextCommand !== "none", "release completion summary refresh current next command alias should be populated");
   check(report.currentEnvEditTarget !== "none", "release completion summary refresh should expose current env edit target");
@@ -2553,6 +2583,7 @@ async function main() {
   console.log(`- Markdown: ${relative(receiptMarkdownPath)}`);
   console.log(`- JSON: ${relative(receiptJsonPath)}`);
   console.log(`- Latest completed plan: ${report.latestPlan}`);
+  console.log(`- Latest completed plan alias: ${report.latestCompletedPlan}`);
   console.log(`- 10-plan progress: ${report.tenPlanProgress}`);
   console.log(`- 10-plan checkpoint required: ${report.tenPlanCheckpointRequired ? "yes" : "no"}`);
   console.log(`- 10-plan checkpoint run: ${report.tenPlanCheckpointRun ? "yes" : "no"}`);
@@ -2578,7 +2609,9 @@ async function main() {
   );
   console.log(`- Git context: ${report.gitBranch}@${report.gitHeadShortSha} (${report.gitWorktreeName}, dirty ${report.gitDirty ? "yes" : "no"})`);
   console.log(`- User-facing completion: ${report.userFacingCompletionLabel}`);
+  console.log(`- User-facing completion alias: ${report.userFacingCompletion}`);
   console.log(`- Remaining completion: ${report.userFacingRemainingLabel}`);
+  console.log(`- Remaining completion alias: ${report.remainingCompletion}`);
   console.log(`- Fresh artifacts: ${report.freshArtifactCount}`);
   console.log(`- Stale artifacts: ${report.staleArtifactCount}`);
   console.log(`- Missing artifacts: ${report.missingArtifactCount}`);
@@ -2588,6 +2621,8 @@ async function main() {
   );
   console.log(`- Source prereq current first blocker alias: ${report.sourcePrereqCurrentFirstBlocker}`);
   console.log(`- Source prereq current next command alias: ${report.sourcePrereqCurrentNextCommand}`);
+  console.log(`- User-facing current blocker alias: ${report.currentFirstBlockerAlias}`);
+  console.log(`- User-facing current next command alias: ${report.currentNextCommandAlias}`);
   console.log(
     `- Source prereq private input placeholder locations: ${report.sourcePrereqCurrentPrivateInputPlaceholderLocationCount} (${report.sourcePrereqCurrentPrivateInputPlaceholderLocationSummary})`
   );
