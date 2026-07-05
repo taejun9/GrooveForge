@@ -21,6 +21,11 @@ const markdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-$
 const jsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${reportStem}.json`);
 const proofBundleJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-proof-bundle.json`);
 const completionSummaryJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-completion-summary-refresh-smoke.json`);
+const currentBlockerJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.json`);
+const placeholderInputReceiptJsonPath = path.join(
+  packageRoot,
+  `${appName}-${packageJson.version}-${platformArch}-release-channel-placeholder-input-receipt.json`
+);
 const failures = [];
 
 const artifactDefinitions = [
@@ -195,6 +200,145 @@ function textValue(value, fallback = "none") {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
 }
 
+function integerValue(value, fallback = 0) {
+  return Number.isInteger(value) ? value : fallback;
+}
+
+function objectRows(value) {
+  return Array.isArray(value) ? value.filter((row) => row && typeof row === "object" && !Array.isArray(row)) : [];
+}
+
+function valueFreeObjectRows(value) {
+  return objectRows(value).filter((row) => row.valueRecorded === false);
+}
+
+function copyPrivateInputPlaceholderLocationRows(rows, source) {
+  return valueFreeObjectRows(rows).map((row, index) => {
+    const file = textValue(row.file, textValue(row.privateInputFilePath));
+    const line = integerValue(row.line, integerValue(row.privateInputFileLine));
+    const location = textValue(row.location, line > 0 && file !== "none" ? `${file}:${line}` : file);
+    return {
+      order: index + 1,
+      key: textValue(row.key),
+      file,
+      line,
+      location,
+      placeholder: row.placeholder === true || row.privateInputFilePlaceholder === true,
+      source,
+      valueRecorded: false
+    };
+  });
+}
+
+function privateInputPlaceholderLocationRows(receipt) {
+  return valueFreeObjectRows(receipt?.privateInputFileLocationRows)
+    .filter((row) => row.privateInputFilePlaceholder === true)
+    .map((row, index) => {
+      const file = textValue(row.privateInputFilePath);
+      const line = integerValue(row.privateInputFileLine);
+      return {
+        order: index + 1,
+        key: textValue(row.key),
+        file,
+        line,
+        location: line > 0 ? `${file}:${line}` : file,
+        placeholder: true,
+        source: "placeholder-input-receipt",
+        valueRecorded: false
+      };
+    });
+}
+
+function formatLocationSummary(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "none";
+  }
+  return rows
+    .map((row) => {
+      const file = textValue(row.file);
+      const line = integerValue(row.line);
+      const location = textValue(row.location, line > 0 && file !== "none" ? `${file}:${line}` : file);
+      return `${location} ${textValue(row.key)}`;
+    })
+    .join(", ");
+}
+
+function currentPrivateInputPlaceholderLocationEvidence({
+  completionSummary,
+  proofBundle,
+  currentBlocker,
+  placeholderInputReceipt
+}) {
+  const locationSources = [
+    {
+      source: "completion-summary",
+      rows: copyPrivateInputPlaceholderLocationRows(
+        completionSummary?.currentPrivateInputPlaceholderLocations,
+        "completion-summary"
+      )
+    },
+    {
+      source: "proof-bundle",
+      rows: copyPrivateInputPlaceholderLocationRows(proofBundle?.currentPrivateInputPlaceholderLocations, "proof-bundle")
+    },
+    {
+      source: "current-blocker",
+      rows: copyPrivateInputPlaceholderLocationRows(
+        currentBlocker?.currentPrivateInputPlaceholderLocations,
+        "current-blocker"
+      )
+    },
+    {
+      source: "placeholder-input-receipt",
+      rows: privateInputPlaceholderLocationRows(placeholderInputReceipt)
+    }
+  ];
+  const rowSource = locationSources.find((entry) => entry.rows.length > 0);
+  if (rowSource) {
+    const locations = rowSource.rows.map((row, index) => ({ ...row, order: index + 1 }));
+    return {
+      currentPrivateInputPlaceholderLocationSource: rowSource.source,
+      currentPrivateInputPlaceholderLocations: locations,
+      currentPrivateInputPlaceholderLocationCount: locations.length,
+      currentPrivateInputPlaceholderLocationSummary: formatLocationSummary(locations)
+    };
+  }
+
+  const summarySources = [
+    {
+      source: "completion-summary",
+      count: integerValue(completionSummary?.currentPrivateInputPlaceholderLocationCount),
+      summary: textValue(completionSummary?.currentPrivateInputPlaceholderLocationSummary)
+    },
+    {
+      source: "proof-bundle",
+      count: integerValue(proofBundle?.currentPrivateInputPlaceholderLocationCount),
+      summary: textValue(proofBundle?.currentPrivateInputPlaceholderLocationSummary)
+    },
+    {
+      source: "current-blocker",
+      count: integerValue(currentBlocker?.currentPrivateInputPlaceholderLocationCount),
+      summary: textValue(currentBlocker?.currentPrivateInputPlaceholderLocationSummary)
+    }
+  ];
+  const summarySource = summarySources.find((entry) => entry.count > 0 && entry.summary !== "none");
+  if (summarySource) {
+    return {
+      currentPrivateInputPlaceholderLocationSource: `${summarySource.source}-summary`,
+      currentPrivateInputPlaceholderLocations: [],
+      currentPrivateInputPlaceholderLocationCount: summarySource.count,
+      currentPrivateInputPlaceholderLocationSummary: summarySource.summary
+    };
+  }
+
+  return {
+    currentPrivateInputPlaceholderLocationSource: "none",
+    currentPrivateInputPlaceholderLocations: [],
+    currentPrivateInputPlaceholderLocationCount: 0,
+    currentPrivateInputPlaceholderLocationSummary: "none"
+  };
+}
+
 async function readJsonIfExists(filePath) {
   if (!existsSync(filePath)) {
     return null;
@@ -276,7 +420,19 @@ function formatCommandRows(rows) {
     .join("\n");
 }
 
-function buildReport({ proofBundle, completionSummary }) {
+function formatPrivateInputPlaceholderLocationRows(rows) {
+  if (rows.length === 0) {
+    return "| none | none | none | none | none | none | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.file)} | ${row.line} | ${escapeCell(row.location)} | ${escapeCell(row.source)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
+function buildReport({ proofBundle, completionSummary, currentBlocker, placeholderInputReceipt }) {
   const numbers = completedPlanNumbers();
   const latestCompletedPlanNumber = numbers.length > 0 ? numbers[numbers.length - 1] : null;
   const latestCompletedPlan = latestCompletedPlanNumber ? `plan-${latestCompletedPlanNumber}` : "none";
@@ -314,6 +470,12 @@ function buildReport({ proofBundle, completionSummary }) {
   const tenPlanProgress = completionSummaryMatchesCompletedPlan
     ? textValue(completionSummary?.tenPlanProgress, completedPlanTenPlanProgress)
     : completedPlanTenPlanProgress;
+  const currentPrivateInputPlaceholderLocationEvidenceResult = currentPrivateInputPlaceholderLocationEvidence({
+    completionSummary,
+    proofBundle,
+    currentBlocker,
+    placeholderInputReceipt
+  });
   return {
     generatedAt: new Date().toISOString(),
     appName,
@@ -335,14 +497,15 @@ function buildReport({ proofBundle, completionSummary }) {
     proofBundleReady: proofBundle?.proofBundleReady === true,
     proofBundleCurrentFirstBlocker: currentFirstBlocker,
     completionSummaryPresent: completionSummary !== null,
+    currentBlockerPresent: currentBlocker !== null,
+    placeholderInputReceiptPresent: placeholderInputReceipt !== null,
     userFacingCompletion: textValue(completionSummary?.userFacingCompletionLabel, "unknown"),
     userFacingRemaining: textValue(completionSummary?.userFacingRemainingLabel, "unknown"),
     currentFirstBlocker,
     currentNextCommand,
     currentOperatorFirstCommand,
     operatorProofCommand: textValue(completionSummary?.operatorProofCommand, "npm run release:private-edit-strict-proof"),
-    currentPrivateInputPlaceholderLocationCount: completionSummary?.currentPrivateInputPlaceholderLocationCount ?? 0,
-    currentPrivateInputPlaceholderLocationSummary: textValue(completionSummary?.currentPrivateInputPlaceholderLocationSummary),
+    ...currentPrivateInputPlaceholderLocationEvidenceResult,
     artifactRows,
     sourceArtifactTotal: artifactRows.length,
     sourceArtifactPresentCount: artifactRows.length - missingArtifactRows.length,
@@ -383,6 +546,8 @@ function buildMarkdown(report) {
 - Completed-plan 10-plan progress: ${report.completedPlanTenPlanProgress}
 - Completion summary latest plan matches completed plans: ${readyLabel(report.completionSummaryMatchesCompletedPlan)}
 - Proof bundle present: ${readyLabel(report.proofBundlePresent)}
+- Current blocker present: ${readyLabel(report.currentBlockerPresent)}
+- Placeholder input receipt present: ${readyLabel(report.placeholderInputReceiptPresent)}
 - Proof bundle source evidence ready: ${readyLabel(report.proofBundleSourceEvidenceReady)}
 - Proof bundle ready: ${readyLabel(report.proofBundleReady)}
 - Current first blocker: ${report.proofBundleCurrentFirstBlocker}
@@ -393,6 +558,7 @@ function buildMarkdown(report) {
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
 - Operator proof command: \`${report.operatorProofCommand}\`
 - Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})
+- Current private input placeholder location source: ${report.currentPrivateInputPlaceholderLocationSource}
 - Source artifacts present: ${report.sourceArtifactPresentCount}/${report.sourceArtifactTotal}
 - Missing source artifacts: ${report.sourceArtifactMissingCount} (${report.sourceArtifactMissingSummary})
 - Private values recorded: ${readyLabel(report.privateValuesRecorded)}
@@ -408,6 +574,12 @@ function buildMarkdown(report) {
 | order | artifact | present | path | refresh command | prerequisite | value recorded |
 |---:|---|---|---|---|---|---|
 ${formatArtifactRows(report.artifactRows)}
+
+## Current Private Input Placeholder Location Rows
+
+| order | key | file | line | location | source | value recorded |
+|---:|---|---|---:|---|---|---|
+${formatPrivateInputPlaceholderLocationRows(report.currentPrivateInputPlaceholderLocations)}
 
 ## Missing Artifact Command Rows
 
@@ -429,6 +601,26 @@ function validateReport(report, markdown) {
   check(report.currentFirstBlocker === report.proofBundleCurrentFirstBlocker, "source evidence prereq current first blocker alias should mirror first blocker");
   check(report.currentFirstBlocker !== "none", "source evidence prereq current first blocker alias should be populated");
   check(report.currentNextCommand.startsWith("npm run "), "source evidence prereq current next command alias should expose an npm run command");
+  check(Array.isArray(report.currentPrivateInputPlaceholderLocations), "source evidence prereq should include current private input placeholder location rows");
+  check(
+    report.currentPrivateInputPlaceholderLocations.every((row) => row.valueRecorded === false),
+    "source evidence prereq private input placeholder location rows should be value-free"
+  );
+  check(
+    report.currentPrivateInputPlaceholderLocations.every((row) => row.source !== "none"),
+    "source evidence prereq private input placeholder location rows should carry source labels"
+  );
+  check(
+    report.currentPrivateInputPlaceholderLocations.length === 0 ||
+      report.currentPrivateInputPlaceholderLocationCount === report.currentPrivateInputPlaceholderLocations.length,
+    "source evidence prereq private input placeholder location count should match recovered rows"
+  );
+  check(
+    !["proof-bundle", "current-blocker", "placeholder-input-receipt"].some((source) =>
+      report.currentPrivateInputPlaceholderLocations.some((row) => row.source === source)
+    ) || report.currentPrivateInputPlaceholderLocationSource !== "completion-summary",
+    "source evidence prereq should label fallback private input placeholder row sources"
+  );
   check(
     report.currentPrivateInputPlaceholderLocationCount === 0 ||
       report.currentPrivateInputPlaceholderLocationSummary.includes(".env.release-channel.local"),
@@ -458,6 +650,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("https://") === false, "source evidence prereq Markdown should not include URL values");
   check(markdown.includes("Release Source Evidence Prerequisite Smoke"), "source evidence prereq Markdown should include title");
   check(markdown.includes("Source Artifact Rows"), "source evidence prereq Markdown should include artifact rows");
+  check(markdown.includes("Current Private Input Placeholder Location Rows"), "source evidence prereq Markdown should include private input placeholder location rows");
   check(markdown.includes("Missing Artifact Command Rows"), "source evidence prereq Markdown should include command rows");
 }
 
@@ -465,7 +658,9 @@ try {
   await mkdir(packageRoot, { recursive: true });
   const proofBundle = await readJsonIfExists(proofBundleJsonPath);
   const completionSummary = await readJsonIfExists(completionSummaryJsonPath);
-  const report = buildReport({ proofBundle, completionSummary });
+  const currentBlocker = await readJsonIfExists(currentBlockerJsonPath);
+  const placeholderInputReceipt = await readJsonIfExists(placeholderInputReceiptJsonPath);
+  const report = buildReport({ proofBundle, completionSummary, currentBlocker, placeholderInputReceipt });
   const markdown = buildMarkdown(report);
   validateReport(report, markdown);
 
@@ -493,6 +688,7 @@ try {
   console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
   console.log(`- Operator proof command: ${report.operatorProofCommand}`);
   console.log(`- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})`);
+  console.log(`- Current private input placeholder location source: ${report.currentPrivateInputPlaceholderLocationSource}`);
   console.log("- Private values recorded: no");
   console.log("- Network: no distribution channel probe, release upload, update feed publish, Apple notary submission, or signing attempted");
   console.log("- Not claimed: auto-update, Developer ID signing, notarization, Gatekeeper approval, manual QA approval, app-store submission, or external distribution completion");
