@@ -16,6 +16,7 @@ const receiptStem = "release-completion-summary-refresh-smoke";
 const progressRefreshStem = "release-progress-refresh-smoke";
 const completionSummaryStem = "release-completion-summary-smoke";
 const checkpointStem = "release-10-plan-checkpoint-smoke";
+const sourcePrereqStem = "release-source-evidence-prereq-smoke";
 const externalRunPacketStem = "release-external-completion-run-packet-smoke";
 const externalResumePacketStem = "release-external-completion-resume-packet-smoke";
 const operatorPreflightStem = "release-channel-apply-private-env-preflight";
@@ -23,6 +24,7 @@ const realOperatorPreflightSnapshotStem = "release-completion-summary-refresh-re
 const progressRefreshJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${progressRefreshStem}.json`);
 const completionSummaryJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${completionSummaryStem}.json`);
 const checkpointJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${checkpointStem}.json`);
+const sourcePrereqJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${sourcePrereqStem}.json`);
 const externalRunPacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${externalRunPacketStem}.json`);
 const externalResumePacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${externalResumePacketStem}.json`);
 const operatorPreflightJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${operatorPreflightStem}.json`);
@@ -92,11 +94,19 @@ const requiredRefreshCommands = [
     condition: "always",
     skipped: false,
     valueRecorded: false
+  },
+  {
+    order: 6,
+    command: "npm run release:source-evidence-prereq-smoke",
+    role: "mirror source artifact prerequisite coverage and current-field aliases into the after-work receipt",
+    condition: "always",
+    skipped: false,
+    valueRecorded: false
   }
 ];
 
 const checkpointCommandRow = {
-  order: 6,
+  order: 7,
   command: "npm run release:10-plan-checkpoint-smoke",
   role: "emit the 10-plan checkpoint receipt at a completed report boundary",
   condition: "when 10-plan progress is 10/10",
@@ -649,6 +659,7 @@ function formatSetupWizardHandoffRows(rows) {
 function buildReport({
   progressRefresh,
   completionSummary,
+  sourcePrereq,
   externalRun,
   externalResume,
   operatorPreflight,
@@ -721,6 +732,8 @@ function buildReport({
     externalResume.valueRecorded === false;
   const realSetupWizardFields = setupWizardComparableFields(externalRun);
   const realSetupWizardMatchesExternalResume = setupWizardFieldsMatch(externalRun, externalResume);
+  const sourcePrereqArtifactRows = objectRows(sourcePrereq.artifactRows);
+  const sourcePrereqCommandRows = objectRows(sourcePrereq.commandRows);
   const report = {
     appName,
     bundleId,
@@ -735,6 +748,7 @@ function buildReport({
     tenPlanCheckpointCommand: checkpointCommandRow.command,
     progressRefreshJsonArtifactName: "release-progress-refresh-smoke.json",
     completionSummaryJsonArtifactName: "release-completion-summary-smoke.json",
+    sourcePrereqJsonArtifactName: "release-source-evidence-prereq-smoke.json",
     externalCompletionRunPacketJsonArtifactName: "release-external-completion-run-packet-smoke.json",
     externalCompletionResumePacketJsonArtifactName: "release-external-completion-resume-packet-smoke.json",
     realOperatorPreflightJsonArtifactName: "release-channel-apply-private-env-preflight.json",
@@ -744,6 +758,7 @@ function buildReport({
     completionSummaryRefreshJsonArtifactName: "release-completion-summary-refresh-smoke.json",
     progressRefreshJsonPath: relative(progressRefreshJsonPath),
     completionSummaryJsonPath: relative(completionSummaryJsonPath),
+    sourcePrereqJsonPath: relative(sourcePrereqJsonPath),
     externalCompletionRunPacketJsonPath: relative(externalRunPacketJsonPath),
     externalCompletionResumePacketJsonPath: relative(externalResumePacketJsonPath),
     realOperatorPreflightJsonPath: relative(operatorPreflightJsonPath),
@@ -758,6 +773,33 @@ function buildReport({
     completionSummarySourceReady: completionSummary.sourceReady === true,
     completionSummarySourceSummaryReady: completionSummary.sourceSummaryReady === true,
     completionSummarySourceLabelsMatch: completionSummary.sourceLabelsMatch === true,
+    sourcePrereqReady: sourcePrereq.sourceArtifactPresentCount === sourcePrereq.sourceArtifactTotal,
+    sourcePrereqLatestCompletedPlan: textValue(sourcePrereq.latestCompletedPlan),
+    sourcePrereqTenPlanProgress: textValue(sourcePrereq.tenPlanProgress),
+    sourcePrereqSourceArtifactPresentCount: integerValue(sourcePrereq.sourceArtifactPresentCount),
+    sourcePrereqSourceArtifactTotal: integerValue(sourcePrereq.sourceArtifactTotal),
+    sourcePrereqSourceArtifactMissingCount: integerValue(sourcePrereq.sourceArtifactMissingCount),
+    sourcePrereqCurrentFirstBlocker: textValue(sourcePrereq.currentFirstBlocker),
+    sourcePrereqCurrentNextCommand: textValue(sourcePrereq.currentNextCommand),
+    sourcePrereqCurrentOperatorFirstCommand: textValue(sourcePrereq.currentOperatorFirstCommand),
+    sourcePrereqOperatorProofCommand: textValue(sourcePrereq.operatorProofCommand),
+    sourcePrereqCurrentPrivateInputPlaceholderLocationCount: integerValue(
+      sourcePrereq.currentPrivateInputPlaceholderLocationCount
+    ),
+    sourcePrereqCurrentPrivateInputPlaceholderLocationSummary: textValue(
+      sourcePrereq.currentPrivateInputPlaceholderLocationSummary
+    ),
+    sourcePrereqArtifactRowsValueFree: valueFreeRows(sourcePrereqArtifactRows),
+    sourcePrereqCommandRowsValueFree: valueFreeRows(sourcePrereqCommandRows),
+    sourcePrereqPrivateValuesRecorded: sourcePrereq.privateValuesRecorded === true,
+    sourcePrereqLocalEnvValueRecorded: sourcePrereq.localEnvValueRecorded === true,
+    sourcePrereqNetworkProbeAttempted: sourcePrereq.networkProbeAttempted === true,
+    sourcePrereqReleaseUploadAttempted: sourcePrereq.releaseUploadAttempted === true,
+    sourcePrereqUpdateFeedPublishAttempted: sourcePrereq.updateFeedPublishAttempted === true,
+    sourcePrereqSigningAttempted: sourcePrereq.signingAttempted === true,
+    sourcePrereqNotarySubmissionAttempted: sourcePrereq.notarySubmissionAttempted === true,
+    sourcePrereqClaimedExternalDistribution: sourcePrereq.releaseGateClaimedExternalDistribution === true,
+    sourcePrereqValueRecorded: sourcePrereq.valueRecorded === true,
     latestPlanNumber: integerValue(completionSummary.latestPlanNumber),
     latestPlan: textValue(completionSummary.latestPlan),
     tenPlanProgress: textValue(completionSummary.tenPlanProgress),
@@ -1196,6 +1238,7 @@ function buildMarkdown(report) {
 - Refresh receipt ready: ${readyLabel(report.completionSummaryRefreshReady)}
 - Progress refresh ready: ${readyLabel(report.progressRefreshReady)}
 - Completion summary readout ready: ${readyLabel(report.completionSummaryReadoutReady)}
+- Source evidence prerequisite ready: ${readyLabel(report.sourcePrereqReady)}
 - Latest completed plan: ${report.latestPlan}
 - 10-plan progress: ${report.tenPlanProgress}
 - 10-plan report due: ${readyLabel(report.tenPlanReportDue)}
@@ -1215,6 +1258,9 @@ function buildMarkdown(report) {
 - Current first blocker: ${report.firstBlocker}
 - Current first blocker alias: ${report.currentFirstBlocker}
 - Current next command alias: \`${report.currentNextCommand}\`
+- Source prereq current first blocker alias: ${report.sourcePrereqCurrentFirstBlocker}
+- Source prereq current next command alias: \`${report.sourcePrereqCurrentNextCommand}\`
+- Source prereq artifacts present: ${report.sourcePrereqSourceArtifactPresentCount}/${report.sourcePrereqSourceArtifactTotal}
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})
 - Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})
@@ -1309,10 +1355,30 @@ function buildMarkdown(report) {
 |---:|---|---|---|---|---:|
 ${formatCommandRows(report.refreshCommands)}
 
+## Source Evidence Prerequisite Mirror
+
+- Source prereq JSON: ${report.sourcePrereqJsonPath}
+- Source prereq ready: ${readyLabel(report.sourcePrereqReady)}
+- Source prereq latest completed plan: ${report.sourcePrereqLatestCompletedPlan}
+- Source prereq 10-plan progress: ${report.sourcePrereqTenPlanProgress}
+- Source prereq artifacts present: ${report.sourcePrereqSourceArtifactPresentCount}/${report.sourcePrereqSourceArtifactTotal}
+- Source prereq missing artifacts: ${report.sourcePrereqSourceArtifactMissingCount}
+- Source prereq current first blocker alias: ${report.sourcePrereqCurrentFirstBlocker}
+- Source prereq current next command alias: \`${report.sourcePrereqCurrentNextCommand}\`
+- Source prereq current operator first command: \`${report.sourcePrereqCurrentOperatorFirstCommand}\`
+- Source prereq operator proof command: \`${report.sourcePrereqOperatorProofCommand}\`
+- Source prereq private input placeholder locations: ${report.sourcePrereqCurrentPrivateInputPlaceholderLocationCount} (${report.sourcePrereqCurrentPrivateInputPlaceholderLocationSummary})
+- Source prereq artifact rows value-free: ${readyLabel(report.sourcePrereqArtifactRowsValueFree)}
+- Source prereq command rows value-free: ${readyLabel(report.sourcePrereqCommandRowsValueFree)}
+- Source prereq private values recorded: ${readyLabel(report.sourcePrereqPrivateValuesRecorded)}
+- Source prereq network attempted: ${readyLabel(report.sourcePrereqNetworkProbeAttempted)}
+- Source prereq external distribution claimed: ${readyLabel(report.sourcePrereqClaimedExternalDistribution)}
+
 ## Source Artifacts
 
 - Progress refresh JSON: ${report.progressRefreshJsonPath}
 - Completion summary JSON: ${report.completionSummaryJsonPath}
+- Source prereq JSON: ${report.sourcePrereqJsonPath}
 - External completion run packet JSON: ${report.externalCompletionRunPacketJsonPath}
 - External completion resume packet JSON: ${report.externalCompletionResumePacketJsonPath}
 - Real operator preflight JSON: ${report.realOperatorPreflightJsonPath}
@@ -1581,6 +1647,42 @@ function validateReport(report, markdown) {
   check(report.completionSummarySourceReady === true, "release completion summary refresh should keep completion summary source ready");
   check(report.completionSummarySourceSummaryReady === true, "release completion summary refresh should keep completion summary source compact summary ready");
   check(report.completionSummarySourceLabelsMatch === true, "release completion summary refresh should keep completion summary labels matched");
+  check(report.sourcePrereqReady === true, "release completion summary refresh should mirror ready source evidence prerequisite smoke");
+  check(report.sourcePrereqLatestCompletedPlan === report.latestPlan, "release completion summary refresh source prereq latest plan should match latest plan");
+  check(report.sourcePrereqTenPlanProgress === report.tenPlanProgress, "release completion summary refresh source prereq 10-plan progress should match");
+  check(report.sourcePrereqSourceArtifactTotal === 21, "release completion summary refresh source prereq should cover 21 source artifacts");
+  check(
+    report.sourcePrereqSourceArtifactPresentCount === report.sourcePrereqSourceArtifactTotal,
+    "release completion summary refresh source prereq should show all source artifacts present"
+  );
+  check(report.sourcePrereqSourceArtifactMissingCount === 0, "release completion summary refresh source prereq should show zero missing artifacts");
+  check(
+    report.sourcePrereqCurrentFirstBlocker === report.currentFirstBlocker,
+    "release completion summary refresh source prereq current first blocker alias should align"
+  );
+  check(
+    report.sourcePrereqCurrentNextCommand === report.currentNextCommand,
+    "release completion summary refresh source prereq current next command alias should align"
+  );
+  check(
+    report.sourcePrereqCurrentOperatorFirstCommand === report.currentOperatorFirstCommand,
+    "release completion summary refresh source prereq current operator first command should align"
+  );
+  check(
+    report.sourcePrereqOperatorProofCommand === report.operatorProofCommand,
+    "release completion summary refresh source prereq operator proof command should align"
+  );
+  check(report.sourcePrereqArtifactRowsValueFree === true, "release completion summary refresh source prereq artifact rows should be value-free");
+  check(report.sourcePrereqCommandRowsValueFree === true, "release completion summary refresh source prereq command rows should be value-free");
+  check(report.sourcePrereqPrivateValuesRecorded === false, "release completion summary refresh source prereq should not record private values");
+  check(report.sourcePrereqLocalEnvValueRecorded === false, "release completion summary refresh source prereq should not record local env values");
+  check(report.sourcePrereqNetworkProbeAttempted === false, "release completion summary refresh source prereq should not attempt network probes");
+  check(report.sourcePrereqReleaseUploadAttempted === false, "release completion summary refresh source prereq should not attempt uploads");
+  check(report.sourcePrereqUpdateFeedPublishAttempted === false, "release completion summary refresh source prereq should not publish update feeds");
+  check(report.sourcePrereqSigningAttempted === false, "release completion summary refresh source prereq should not attempt signing");
+  check(report.sourcePrereqNotarySubmissionAttempted === false, "release completion summary refresh source prereq should not attempt notarization");
+  check(report.sourcePrereqClaimedExternalDistribution === false, "release completion summary refresh source prereq should not claim external distribution");
+  check(report.sourcePrereqValueRecorded === false, "release completion summary refresh source prereq should remain value-free");
   check(report.latestPlanNumber > 0, "release completion summary refresh should include latest plan number");
   check(report.latestPlan === `plan-${report.latestPlanNumber}`, "release completion summary refresh should format latest plan");
   check(report.tenPlanTotal === 10, "release completion summary refresh should keep 10-plan denominator");
@@ -2285,6 +2387,11 @@ function validateReport(report, markdown) {
   check(markdown.includes("Placeholder private input placeholder locations:"), "release completion summary refresh Markdown should include placeholder input file/line locations");
   check(markdown.includes("npm run release:progress-refresh-smoke"), "release completion summary refresh Markdown should cite progress refresh command");
   check(markdown.includes("npm run release:completion-summary-smoke"), "release completion summary refresh Markdown should cite completion summary command");
+  check(markdown.includes("npm run release:source-evidence-prereq-smoke"), "release completion summary refresh Markdown should cite source prereq command");
+  check(markdown.includes("## Source Evidence Prerequisite Mirror"), "release completion summary refresh Markdown should include source prereq mirror");
+  check(markdown.includes("Source prereq current first blocker alias:"), "release completion summary refresh Markdown should include source prereq current first blocker alias");
+  check(markdown.includes("Source prereq current next command alias:"), "release completion summary refresh Markdown should include source prereq current next command alias");
+  check(markdown.includes("Source prereq artifacts present:"), "release completion summary refresh Markdown should include source prereq artifact counts");
   check(markdown.includes("npm run release:10-plan-checkpoint-smoke"), "release completion summary refresh Markdown should cite checkpoint command");
   check(markdown.includes("## 10-Plan Checkpoint"), "release completion summary refresh Markdown should include checkpoint section");
   check(markdown.includes("## 10-Plan Checkpoint Rows"), "release completion summary refresh Markdown should include checkpoint rows");
@@ -2341,9 +2448,10 @@ async function main() {
     );
   }
 
-  const [progressRefresh, completionSummary, externalRun, externalResume, operatorPreflight] = await Promise.all([
+  const [progressRefresh, completionSummary, sourcePrereq, externalRun, externalResume, operatorPreflight] = await Promise.all([
     readJsonRequired(progressRefreshJsonPath, "release progress refresh"),
     readJsonRequired(completionSummaryJsonPath, "release completion summary"),
+    readJsonRequired(sourcePrereqJsonPath, "release source evidence prerequisite"),
     readJsonRequired(externalRunPacketJsonPath, "release external completion run packet"),
     readJsonRequired(externalResumePacketJsonPath, "release external completion resume packet"),
     readJsonRequired(realOperatorPreflightSnapshotJsonPath, "real release-channel private env apply preflight snapshot")
@@ -2362,6 +2470,7 @@ async function main() {
   const report = buildReport({
     progressRefresh,
     completionSummary,
+    sourcePrereq,
     externalRun,
     externalResume,
     operatorPreflight,
@@ -2414,6 +2523,12 @@ async function main() {
   console.log(`- Fresh artifacts: ${report.freshArtifactCount}`);
   console.log(`- Stale artifacts: ${report.staleArtifactCount}`);
   console.log(`- Missing artifacts: ${report.missingArtifactCount}`);
+  console.log(`- Source evidence prerequisite ready: ${report.sourcePrereqReady ? "yes" : "no"}`);
+  console.log(
+    `- Source prereq artifacts present: ${report.sourcePrereqSourceArtifactPresentCount}/${report.sourcePrereqSourceArtifactTotal}`
+  );
+  console.log(`- Source prereq current first blocker alias: ${report.sourcePrereqCurrentFirstBlocker}`);
+  console.log(`- Source prereq current next command alias: ${report.sourcePrereqCurrentNextCommand}`);
   console.log(`- Operator proof command: ${report.operatorProofCommand}`);
   console.log(`- Release-channel metadata needs ignored env: ${report.releaseChannelMetadataNeedsIgnoredEnv ? "yes" : "no"}`);
   console.log(`- Strict proof handoff ready: ${report.strictProofHandoffReceiptReady ? "yes" : "no"}`);
