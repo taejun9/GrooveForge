@@ -14,10 +14,12 @@ const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformAr
 const sourceStem = "release-progress-refresh-smoke";
 const readoutStem = "release-completion-summary-smoke";
 const operatorPreflightStem = "release-channel-apply-private-env-preflight";
+const privateInputReadyGateStem = "release-channel-private-input-ready-gate";
 const sourceRefreshCommand = "npm run release:progress-refresh-smoke";
 const readoutRefreshCommand = "npm run release:completion-summary-refresh-smoke";
 const sourceJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${sourceStem}.json`);
 const operatorPreflightJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${operatorPreflightStem}.json`);
+const privateInputReadyGateJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${privateInputReadyGateStem}.json`);
 const readoutMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${readoutStem}.md`);
 const readoutJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${readoutStem}.json`);
 const completedPlanRoot = path.join(root, "docs", "exec_plans", "completed");
@@ -25,6 +27,9 @@ const failures = [];
 const releaseChannelPrivateInputTemplateCommand = "npm run release:channel-private-input-template";
 const releaseChannelPrivateInputTemplateRole =
   "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
+const releaseChannelPrivateInputReadyGateCommand = "npm run release:channel-private-input-ready-gate";
+const releaseChannelPrivateInputReadyGateRole =
+  "summarize whether the ignored private input file is ready to apply without replacing the preflight-first operator sequence";
 const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvPreflightRole =
   "verify operator-owned release-channel metadata from process env or the ignored private input file before writing the ignored local env";
@@ -156,7 +161,7 @@ async function currentCompletedPlanState() {
   };
 }
 
-function buildReport(source, completedPlanState, operatorPreflight) {
+function buildReport(source, completedPlanState, operatorPreflight, privateInputReadyGate) {
   const summary = source.completionSummary ?? {};
   const completionBlockerActionRows = objectRows(summary.completionBlockerActionRows);
   const completionBlockerFocusRows = objectRows(summary.completionBlockerFocusRows);
@@ -290,6 +295,51 @@ function buildReport(source, completedPlanState, operatorPreflight) {
     placeholderInputReceiptNextOperatorCommand: textValue(summary.placeholderInputReceiptNextOperatorCommand),
     placeholderInputReceiptNextProofCommand: textValue(summary.placeholderInputReceiptNextProofCommand),
     placeholderInputReceiptValueRecorded: summary.placeholderInputReceiptValueRecorded === true ? true : false,
+    privateInputReadyGateReady: privateInputReadyGate.releaseChannelPrivateInputReadyGateReady === true,
+    privateInputReadyGateArtifactPath: relative(privateInputReadyGateJsonPath),
+    privateInputReadyGateReportCommand: textValue(
+      privateInputReadyGate.reportCommand,
+      releaseChannelPrivateInputReadyGateCommand
+    ),
+    privateInputReadyGateCommand: textValue(
+      privateInputReadyGate.readyGateCommand,
+      releaseChannelPrivateInputReadyGateCommand
+    ),
+    privateInputReadyGateRole: releaseChannelPrivateInputReadyGateRole,
+    privateInputReadyGateMode: textValue(privateInputReadyGate.readyGateMode),
+    privateInputReadyGateReadyToApply: privateInputReadyGate.releaseChannelPrivateInputReadyToApply === true,
+    privateInputReadyGateCurrentOperatorFirstCommand: textValue(
+      privateInputReadyGate.currentOperatorFirstCommand,
+      releaseChannelApplyPrivateEnvPreflightCommand
+    ),
+    privateInputReadyGateCurrentOperatorFirstCommandPreserved:
+      privateInputReadyGate.currentOperatorFirstCommandPreserved === true,
+    privateInputReadyGateNextOperatorCommand: textValue(
+      privateInputReadyGate.nextOperatorCommand,
+      releaseChannelPrivateInputReadyGateCommand
+    ),
+    privateInputReadyGateNextWriteCommand: textValue(
+      privateInputReadyGate.nextWriteCommand,
+      releaseChannelApplyPrivateEnvCommand
+    ),
+    privateInputReadyGateNextProofCommand: textValue(
+      privateInputReadyGate.nextProofCommand,
+      "npm run release:private-edit-strict-proof"
+    ),
+    privateInputReadyGateReadyInputKeyCount: integerValue(privateInputReadyGate.readyInputKeyCount),
+    privateInputReadyGateMissingInputKeyCount: integerValue(privateInputReadyGate.missingInputKeyCount),
+    privateInputReadyGatePlaceholderInputKeyCount: integerValue(privateInputReadyGate.placeholderInputKeyCount),
+    privateInputReadyGateInvalidShapeInputKeyCount: integerValue(privateInputReadyGate.invalidShapeInputKeyCount),
+    privateInputReadyGateBlockedInputKeyCount: integerValue(privateInputReadyGate.blockedInputKeyCount),
+    privateInputReadyGateBlockedInputLocationSummary: textValue(privateInputReadyGate.blockedInputLocationSummary),
+    privateInputReadyGateRowCount: integerValue(privateInputReadyGate.readyGateRowCount),
+    privateInputReadyGateRowsValueFree: privateInputReadyGate.readyGateRowsValueFree === true,
+    privateInputReadyGatePrivateInputRowCount: integerValue(privateInputReadyGate.privateInputReadyRowCount),
+    privateInputReadyGatePrivateInputRowsValueFree: privateInputReadyGate.privateInputReadyRowsValueFree === true,
+    privateInputReadyGateValueRecorded:
+      privateInputReadyGate.valueRecorded === true ||
+      privateInputReadyGate.privateValuesRecorded === true ||
+      privateInputReadyGate.privateInputFileValueRecorded === true,
     completionBlockerActionReceiptReady: summary.completionBlockerActionReceiptReady === true,
     completionBlockerActionRows,
     completionBlockerActionRowCount: integerValue(summary.completionBlockerActionRowCount),
@@ -534,6 +584,13 @@ function buildMarkdown(report) {
 - Placeholder private input placeholder locations: ${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount} (${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary})
 - Placeholder private input invalid-shape locations: ${report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount} (${report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary})
 - Placeholder input next operator command: \`${report.placeholderInputReceiptNextOperatorCommand}\`
+- Private input ready gate ready: ${readyLabel(report.privateInputReadyGateReady)}
+- Private input ready to apply: ${readyLabel(report.privateInputReadyGateReadyToApply)}
+- Private input ready gate mode: ${report.privateInputReadyGateMode}
+- Private input ready gate command: \`${report.privateInputReadyGateCommand}\`
+- Private input ready gate next operator command: \`${report.privateInputReadyGateNextOperatorCommand}\`
+- Private input ready gate ready/missing/placeholder/invalid rows: ${report.privateInputReadyGateReadyInputKeyCount}/${report.privateInputReadyGateMissingInputKeyCount}/${report.privateInputReadyGatePlaceholderInputKeyCount}/${report.privateInputReadyGateInvalidShapeInputKeyCount}
+- Private input ready gate blocked locations: ${report.privateInputReadyGateBlockedInputKeyCount} (${report.privateInputReadyGateBlockedInputLocationSummary})
 - Completion blocker action receipt ready: ${readyLabel(report.completionBlockerActionReceiptReady)}
 - Completion blocker action rows: ${report.completionBlockerActionRowCount}
 - Completion blocker focus receipt ready: ${readyLabel(report.completionBlockerFocusReceiptReady)}
@@ -770,6 +827,41 @@ function validateReport(report, markdown) {
       report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary !== "none",
     "release completion summary should expose private input invalid-shape file/key locations"
   );
+  check(report.privateInputReadyGateReady === true, "release completion summary should expose ready private input ready gate evidence");
+  check(
+    report.privateInputReadyGateReportCommand === releaseChannelPrivateInputReadyGateCommand,
+    "release completion summary private input ready gate should use the real gate command"
+  );
+  check(
+    report.privateInputReadyGateCommand === releaseChannelPrivateInputReadyGateCommand,
+    "release completion summary private input ready gate should expose the ready gate command"
+  );
+  check(
+    report.privateInputReadyGateCurrentOperatorFirstCommand === releaseChannelApplyPrivateEnvPreflightCommand,
+    "release completion summary private input ready gate should preserve preflight as the current first operator command"
+  );
+  check(
+    report.privateInputReadyGateCurrentOperatorFirstCommandPreserved === true,
+    "release completion summary private input ready gate should prove current first command preservation"
+  );
+  check(
+    report.privateInputReadyGateNextWriteCommand === releaseChannelApplyPrivateEnvCommand,
+    "release completion summary private input ready gate should expose apply as the next write command"
+  );
+  check(
+    report.privateInputReadyGateNextProofCommand === "npm run release:private-edit-strict-proof",
+    "release completion summary private input ready gate should expose strict proof as next proof"
+  );
+  check(report.privateInputReadyGateRowCount === 5, "release completion summary private input ready gate should expose five handoff rows");
+  check(report.privateInputReadyGateRowsValueFree === true, "release completion summary private input ready gate rows should be value-free");
+  check(report.privateInputReadyGatePrivateInputRowCount === 4, "release completion summary private input ready gate should expose four private input rows");
+  check(report.privateInputReadyGatePrivateInputRowsValueFree === true, "release completion summary private input ready gate private rows should be value-free");
+  check(
+    report.privateInputReadyGateReadyToApply ===
+      (report.privateInputReadyGateMode === "ready-to-apply" && report.privateInputReadyGateReadyInputKeyCount === 4),
+    "release completion summary private input ready gate ready-to-apply posture should match row counts"
+  );
+  check(report.privateInputReadyGateValueRecorded === false, "release completion summary private input ready gate should not record values");
   check(report.completionBlockerActionReceiptReady === true, "release completion summary should expose ready blocker action receipt");
   check(report.completionBlockerActionRowCount === report.completionBlockerActionRows.length, "release completion summary blocker action row count should match rows");
   check(report.completionBlockerActionRowCount === 7, "release completion summary blocker action receipt should include seven rows");
@@ -932,6 +1024,9 @@ function validateReport(report, markdown) {
   check(markdown.includes("Current private input placeholder locations:"), "release completion summary Markdown should include current private input placeholder locations");
   check(markdown.includes("Placeholder private input missing/placeholder/invalid rows:"), "release completion summary Markdown should include placeholder input row counts");
   check(markdown.includes("Placeholder private input placeholder locations:"), "release completion summary Markdown should include placeholder input file/line locations");
+  check(markdown.includes("Private input ready gate ready:"), "release completion summary Markdown should include private input ready gate readiness");
+  check(markdown.includes("Private input ready to apply:"), "release completion summary Markdown should include private input ready-to-apply posture");
+  check(markdown.includes("Private input ready gate mode:"), "release completion summary Markdown should include private input ready gate mode");
   check(markdown.includes("Current Operator Command Sequence"), "release completion summary Markdown should include current operator command sequence");
   check(markdown.includes("Private input template command:"), "release completion summary Markdown should include private input template command");
   check(markdown.includes("Real operator preflight receipt ready:"), "release completion summary Markdown should include real operator preflight readiness");
@@ -942,12 +1037,13 @@ function validateReport(report, markdown) {
   }
 }
 
-const [source, operatorPreflight] = await Promise.all([
+const [source, operatorPreflight, privateInputReadyGate] = await Promise.all([
   readJsonRequired(sourceJsonPath, "Release progress refresh smoke"),
-  readJsonRequired(operatorPreflightJsonPath, "release-channel private env apply preflight")
+  readJsonRequired(operatorPreflightJsonPath, "release-channel private env apply preflight"),
+  readJsonRequired(privateInputReadyGateJsonPath, "release-channel private input ready gate")
 ]);
 const completedPlanState = await currentCompletedPlanState();
-const report = buildReport(source, completedPlanState, operatorPreflight);
+const report = buildReport(source, completedPlanState, operatorPreflight, privateInputReadyGate);
 report.completionSummaryReadoutReady = true;
 const markdown = buildMarkdown(report);
 validateReport(report, markdown);
@@ -1028,6 +1124,17 @@ console.log(
   `- Placeholder private input placeholder locations: ${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount} (${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary})`
 );
 console.log(`- Placeholder input next operator command: ${report.placeholderInputReceiptNextOperatorCommand}`);
+console.log(`- Private input ready gate ready: ${report.privateInputReadyGateReady ? "yes" : "no"}`);
+console.log(`- Private input ready to apply: ${report.privateInputReadyGateReadyToApply ? "yes" : "no"}`);
+console.log(`- Private input ready gate mode: ${report.privateInputReadyGateMode}`);
+console.log(`- Private input ready gate command: ${report.privateInputReadyGateCommand}`);
+console.log(`- Private input ready gate next operator command: ${report.privateInputReadyGateNextOperatorCommand}`);
+console.log(
+  `- Private input ready gate ready/missing/placeholder/invalid rows: ${report.privateInputReadyGateReadyInputKeyCount}/${report.privateInputReadyGateMissingInputKeyCount}/${report.privateInputReadyGatePlaceholderInputKeyCount}/${report.privateInputReadyGateInvalidShapeInputKeyCount}`
+);
+console.log(
+  `- Private input ready gate blocked locations: ${report.privateInputReadyGateBlockedInputKeyCount} (${report.privateInputReadyGateBlockedInputLocationSummary})`
+);
 console.log(`- Current first blocker: ${report.firstBlocker}`);
 console.log(`- Private values recorded: ${report.privateValuesRecorded ? "yes" : "no"}`);
 console.log("- Network: no update feed probe, feed publish, distribution channel probe, release upload, Apple notary submission, or signing attempted");

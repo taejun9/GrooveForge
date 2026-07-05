@@ -26,6 +26,10 @@ const releaseChannelPlaceholderInputReceiptJsonPath = path.join(
   packageRoot,
   `${appName}-${packageJson.version}-${platformArch}-release-channel-placeholder-input-receipt.json`
 );
+const releaseChannelPrivateInputReadyGateJsonPath = path.join(
+  packageRoot,
+  `${appName}-${packageJson.version}-${platformArch}-release-channel-private-input-ready-gate.json`
+);
 const currentBlockerMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.md`);
 const currentBlockerJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.json`);
 const fromExisting = process.argv.includes("--from-existing");
@@ -38,7 +42,8 @@ const refreshCommandsAfterSourceCheck = [
   ["run", "desktop:external-distribution-gate-smoke"],
   ["run", "release:update-feed-checkpoint-smoke"],
   ["run", "release:progress-smoke"],
-  ["run", "release:channel-placeholder-input-receipt"]
+  ["run", "release:channel-placeholder-input-receipt"],
+  ["run", "release:channel-private-input-ready-gate"]
 ];
 const refreshCommands = [...refreshCommandsBeforeSourceCheck, ...refreshCommandsAfterSourceCheck];
 const recommendedPrivateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
@@ -50,6 +55,9 @@ const releaseChannelApplyPrivateEnvProofRole =
 const releaseChannelPrivateInputTemplateCommand = "npm run release:channel-private-input-template";
 const releaseChannelPrivateInputTemplateRole =
   "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
+const releaseChannelPrivateInputReadyGateCommand = "npm run release:channel-private-input-ready-gate";
+const releaseChannelPrivateInputReadyGateRole =
+  "summarize whether the ignored private input file is ready to apply without replacing the preflight-first operator sequence";
 const releaseChannelPrivateInputTemplateDefaultPath = ".env.release-channel.local";
 const releaseChannelPrivateInputTemplatePrivateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
 const releaseChannelPrivateInputSourceLabel = "process env values or ignored private input file rows";
@@ -614,6 +622,30 @@ function formatPlaceholderInputCommandRows(rows) {
     .map(
       (row) =>
         `| ${row.order ?? "?"} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${row.requiredBeforeApply ? "yes" : "no"} | ${row.valueRecorded === false ? "no" : "yes"} |`
+    )
+    .join("\n");
+}
+
+function formatPrivateInputReadyGateRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | no | none | none | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order ?? "?"} | ${escapeCell(row.step)} | \`${escapeCell(row.command)}\` | ${row.ready ? "yes" : "no"} | ${escapeCell(row.target)} | ${escapeCell(row.expected)} | ${row.valueRecorded === false ? "no" : "yes"} |`
+    )
+    .join("\n");
+}
+
+function formatPrivateInputReadyRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | no | no | no | no | no | none | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order ?? "?"} | ${escapeCell(row.key)} | ${escapeCell(row.privateInputFilePath)} | ${escapeCell(row.privateInputFileLine ?? "add")} | ${row.privateInputFilePresent ? "yes" : "no"} | ${row.privateInputFileKeyPresent ? "yes" : "no"} | ${row.privateInputFilePlaceholder ? "yes" : "no"} | ${row.privateInputFileShapeReady ? "yes" : "no"} | ${row.readyToApply ? "yes" : "no"} | ${escapeCell(row.gateState)} | ${row.valueRecorded === false ? "no" : "yes"} |`
     )
     .join("\n");
 }
@@ -1874,7 +1906,8 @@ function buildReport({
   releaseProgress,
   completedPlanWindow,
   releaseChannelPreflightBlocked,
-  releaseChannelPlaceholderInputReceipt
+  releaseChannelPlaceholderInputReceipt,
+  releaseChannelPrivateInputReadyGate
 }) {
   const doctorRequiredKeys = stringArrayValue(releaseDoctor.currentActionRequiredKeys);
   const proofRequiredKeys = stringArrayValue(externalProofBundle.currentRequiredKeys);
@@ -2041,6 +2074,12 @@ function buildReport({
     { label: "External proof bundle", path: relative(externalProofBundleJsonPath), present: true, valueRecorded: false },
     { label: "External distribution gate", path: relative(externalGateJsonPath), present: true, valueRecorded: false },
     { label: "Release progress report", path: relative(releaseProgressJsonPath), present: true, valueRecorded: false },
+    {
+      label: "Release-channel private input ready gate",
+      path: relative(releaseChannelPrivateInputReadyGateJsonPath),
+      present: releaseChannelPrivateInputReadyGate.releaseChannelPrivateInputReadyGateReady === true,
+      valueRecorded: false
+    },
     { label: "Release-channel unblock smoke", path: textValue(releaseProgress.sourceReleaseChannelUnblockPath, "none"), present: releaseProgress.sourceReleaseChannelUnblockReady === true, valueRecorded: false },
     { label: "Release-channel live check", path: textValue(releaseProgress.sourceReleaseChannelLiveCheckPath, "none"), present: releaseProgress.sourceReleaseChannelLiveCheckReady === true, valueRecorded: false }
   ];
@@ -2891,6 +2930,66 @@ function buildReport({
       releaseChannelPlaceholderInputReceipt.valueRecorded === true ||
       releaseChannelPlaceholderInputReceipt.privateValuesRecorded === true ||
       releaseChannelPlaceholderInputReceipt.privateInputFileValueRecorded === true,
+    privateInputReadyGateReady: releaseChannelPrivateInputReadyGate.releaseChannelPrivateInputReadyGateReady === true,
+    privateInputReadyGateArtifactPath: relative(releaseChannelPrivateInputReadyGateJsonPath),
+    privateInputReadyGateReportCommand: textValue(
+      releaseChannelPrivateInputReadyGate.reportCommand,
+      releaseChannelPrivateInputReadyGateCommand
+    ),
+    privateInputReadyGateCommand: textValue(
+      releaseChannelPrivateInputReadyGate.readyGateCommand,
+      releaseChannelPrivateInputReadyGateCommand
+    ),
+    privateInputReadyGateRole: releaseChannelPrivateInputReadyGateRole,
+    privateInputReadyGateMode: textValue(releaseChannelPrivateInputReadyGate.readyGateMode),
+    privateInputReadyGateReadyToApply: releaseChannelPrivateInputReadyGate.releaseChannelPrivateInputReadyToApply === true,
+    privateInputReadyGateCurrentOperatorFirstCommand: textValue(
+      releaseChannelPrivateInputReadyGate.currentOperatorFirstCommand,
+      releaseChannelApplyPrivateEnvPreflightCommand
+    ),
+    privateInputReadyGateCurrentOperatorFirstCommandPreserved:
+      releaseChannelPrivateInputReadyGate.currentOperatorFirstCommandPreserved === true,
+    privateInputReadyGateNextOperatorCommand: textValue(
+      releaseChannelPrivateInputReadyGate.nextOperatorCommand,
+      releaseChannelPrivateInputReadyGateCommand
+    ),
+    privateInputReadyGateNextWriteCommand: textValue(
+      releaseChannelPrivateInputReadyGate.nextWriteCommand,
+      releaseChannelApplyPrivateEnvCommand
+    ),
+    privateInputReadyGateNextProofCommand: textValue(
+      releaseChannelPrivateInputReadyGate.nextProofCommand,
+      recommendedPrivateEditOperatorProofCommand
+    ),
+    privateInputReadyGateReadyInputKeyCount: integerValue(releaseChannelPrivateInputReadyGate.readyInputKeyCount),
+    privateInputReadyGateMissingInputKeyCount: integerValue(releaseChannelPrivateInputReadyGate.missingInputKeyCount),
+    privateInputReadyGatePlaceholderInputKeyCount: integerValue(
+      releaseChannelPrivateInputReadyGate.placeholderInputKeyCount
+    ),
+    privateInputReadyGateInvalidShapeInputKeyCount: integerValue(
+      releaseChannelPrivateInputReadyGate.invalidShapeInputKeyCount
+    ),
+    privateInputReadyGateBlockedInputKeyCount: integerValue(
+      releaseChannelPrivateInputReadyGate.blockedInputKeyCount
+    ),
+    privateInputReadyGateBlockedInputLocationSummary: textValue(
+      releaseChannelPrivateInputReadyGate.blockedInputLocationSummary
+    ),
+    privateInputReadyGateRowCount: integerValue(releaseChannelPrivateInputReadyGate.readyGateRowCount),
+    privateInputReadyGateRows: valueFreeObjectRows(releaseChannelPrivateInputReadyGate.readyGateRows),
+    privateInputReadyGateRowsValueFree: releaseChannelPrivateInputReadyGate.readyGateRowsValueFree === true,
+    privateInputReadyGatePrivateInputRowCount: integerValue(
+      releaseChannelPrivateInputReadyGate.privateInputReadyRowCount
+    ),
+    privateInputReadyGatePrivateInputRows: valueFreeObjectRows(
+      releaseChannelPrivateInputReadyGate.privateInputReadyRows
+    ),
+    privateInputReadyGatePrivateInputRowsValueFree:
+      releaseChannelPrivateInputReadyGate.privateInputReadyRowsValueFree === true,
+    privateInputReadyGateValueRecorded:
+      releaseChannelPrivateInputReadyGate.valueRecorded === true ||
+      releaseChannelPrivateInputReadyGate.privateValuesRecorded === true ||
+      releaseChannelPrivateInputReadyGate.privateInputFileValueRecorded === true,
     preflightProcessEnvChecklistSourceReady,
     preflightProcessEnvChecklistArtifactPath: relative(releaseChannelPreflightBlockedJsonPath),
     preflightProcessEnvChecklistReportCommand: textValue(releaseChannelPreflightBlocked.sourceCommand, releaseChannelApplyPrivateEnvPreflightCommand),
@@ -4010,6 +4109,57 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
       "release current blocker promoted private input placeholder rows should point to the ignored private input file"
     );
   }
+  check(report.privateInputReadyGateReady === true, "release current blocker should include ready private input ready gate evidence");
+  check(
+    report.privateInputReadyGateReportCommand === releaseChannelPrivateInputReadyGateCommand,
+    "release current blocker private input ready gate should use the real gate command"
+  );
+  check(
+    report.privateInputReadyGateCommand === releaseChannelPrivateInputReadyGateCommand,
+    "release current blocker private input ready gate should expose its rerun command"
+  );
+  check(
+    report.privateInputReadyGateCurrentOperatorFirstCommand === releaseChannelApplyPrivateEnvPreflightCommand,
+    "release current blocker private input ready gate should preserve preflight as the current first operator command"
+  );
+  check(
+    report.privateInputReadyGateCurrentOperatorFirstCommandPreserved === true,
+    "release current blocker private input ready gate should mark first command preservation ready"
+  );
+  check(
+    report.privateInputReadyGateNextWriteCommand === releaseChannelApplyPrivateEnvCommand,
+    "release current blocker private input ready gate should expose the private env apply command"
+  );
+  check(
+    report.privateInputReadyGateNextProofCommand === recommendedPrivateEditOperatorProofCommand,
+    "release current blocker private input ready gate should expose the strict proof command"
+  );
+  check(
+    report.privateInputReadyGateRowCount === 5 && report.privateInputReadyGateRowsValueFree === true,
+    "release current blocker private input ready gate should include five value-free handoff rows"
+  );
+  check(
+    report.privateInputReadyGatePrivateInputRowCount === releaseChannelMetadataKeys.length &&
+      report.privateInputReadyGatePrivateInputRowsValueFree === true,
+    "release current blocker private input ready gate should include four value-free private input rows"
+  );
+  check(
+    report.privateInputReadyGateReadyToApply ===
+      (report.privateInputReadyGateMode === "ready-to-apply" &&
+        report.privateInputReadyGateReadyInputKeyCount === releaseChannelMetadataKeys.length),
+    "release current blocker private input ready gate ready-to-apply posture should match row counts"
+  );
+  check(
+    report.privateInputReadyGateReadyToApply === false ||
+      report.privateInputReadyGateNextOperatorCommand === releaseChannelApplyPrivateEnvCommand,
+    "release current blocker private input ready gate should hand off to apply only when ready"
+  );
+  check(
+    report.privateInputReadyGateReadyToApply === true ||
+      report.privateInputReadyGateNextOperatorCommand === releaseChannelPrivateInputReadyGateCommand,
+    "release current blocker private input ready gate should ask for a gate rerun while blocked"
+  );
+  check(report.privateInputReadyGateValueRecorded === false, "release current blocker private input ready gate should not record values");
   check(report.preflightProcessEnvChecklistSourceReady === true, "release current blocker should include ready private-env preflight checklist source");
   check(report.preflightProcessEnvChecklistBlockedSmokeReady === true, "release current blocker preflight checklist should come from the blocked preflight smoke");
   check(report.preflightProcessEnvChecklistExpectedBlockedExitObserved === true, "release current blocker preflight checklist should preserve expected blocked exit evidence");
@@ -4540,6 +4690,13 @@ function buildMarkdown(report) {
     `- Placeholder private input placeholder locations: ${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount} (${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary})`,
     `- Placeholder private input invalid-shape locations: ${report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationCount} (${report.placeholderInputReceiptPrivateInputFileInvalidShapeLocationSummary})`,
     `- Placeholder input next operator command: \`${report.placeholderInputReceiptNextOperatorCommand}\``,
+    `- Private input ready gate ready: ${report.privateInputReadyGateReady ? "yes" : "no"}`,
+    `- Private input ready to apply: ${report.privateInputReadyGateReadyToApply ? "yes" : "no"}`,
+    `- Private input ready gate mode: ${report.privateInputReadyGateMode}`,
+    `- Private input ready gate command: \`${report.privateInputReadyGateCommand}\``,
+    `- Private input ready gate next operator command: \`${report.privateInputReadyGateNextOperatorCommand}\``,
+    `- Private input ready gate ready/missing/placeholder/invalid rows: ${report.privateInputReadyGateReadyInputKeyCount}/${report.privateInputReadyGateMissingInputKeyCount}/${report.privateInputReadyGatePlaceholderInputKeyCount}/${report.privateInputReadyGateInvalidShapeInputKeyCount}`,
+    `- Private input ready gate blocked locations: ${report.privateInputReadyGateBlockedInputKeyCount} (${report.privateInputReadyGateBlockedInputLocationSummary})`,
     `- Preflight process env checklist source ready: ${report.preflightProcessEnvChecklistSourceReady ? "yes" : "no"}`,
     `- Preflight process env checklist rows: ${report.preflightProcessEnvChecklistRowCount} (${report.preflightProcessEnvChecklistSummary})`,
     `- Preflight process env checklist ready rows: ${report.preflightProcessEnvChecklistReadyCount}/${report.preflightProcessEnvChecklistRowCount}`,
@@ -4774,6 +4931,37 @@ function buildMarkdown(report) {
     "| order | command | role | required before apply | value recorded |",
     "|---:|---|---|---:|---:|",
     formatPlaceholderInputCommandRows(report.placeholderInputReceiptCommandRows),
+    "",
+    "## Release-Channel Private Input Ready Gate",
+    "",
+    `- Gate ready: ${report.privateInputReadyGateReady ? "yes" : "no"}`,
+    `- Ready to apply: ${report.privateInputReadyGateReadyToApply ? "yes" : "no"}`,
+    `- Gate mode: ${report.privateInputReadyGateMode}`,
+    `- Report command: \`${report.privateInputReadyGateReportCommand}\``,
+    `- Gate command: \`${report.privateInputReadyGateCommand}\``,
+    `- Gate role: ${report.privateInputReadyGateRole}`,
+    `- Current operator first command preserved: ${report.privateInputReadyGateCurrentOperatorFirstCommandPreserved ? "yes" : "no"}`,
+    `- Current operator first command: \`${report.privateInputReadyGateCurrentOperatorFirstCommand}\``,
+    `- Next operator command: \`${report.privateInputReadyGateNextOperatorCommand}\``,
+    `- Next write command: \`${report.privateInputReadyGateNextWriteCommand}\``,
+    `- Next proof command: \`${report.privateInputReadyGateNextProofCommand}\``,
+    `- Ready/missing/placeholder/invalid rows: ${report.privateInputReadyGateReadyInputKeyCount}/${report.privateInputReadyGateMissingInputKeyCount}/${report.privateInputReadyGatePlaceholderInputKeyCount}/${report.privateInputReadyGateInvalidShapeInputKeyCount}`,
+    `- Blocked input locations: ${report.privateInputReadyGateBlockedInputKeyCount} (${report.privateInputReadyGateBlockedInputLocationSummary})`,
+    `- Gate handoff rows: ${report.privateInputReadyGateRowCount}`,
+    `- Private input rows: ${report.privateInputReadyGatePrivateInputRowCount}`,
+    `- Value recorded: ${report.privateInputReadyGateValueRecorded ? "yes" : "no"}`,
+    "",
+    "### Ready Gate Handoff Rows",
+    "",
+    "| order | step | command | ready | target | expected | value recorded |",
+    "|---:|---|---|---:|---|---|---:|",
+    formatPrivateInputReadyGateRows(report.privateInputReadyGateRows),
+    "",
+    "### Ready Gate Private Input Rows",
+    "",
+    "| order | key | file | line | file present | key present | placeholder | shape ready | ready to apply | gate state | value recorded |",
+    "|---:|---|---|---:|---:|---:|---:|---:|---:|---|---:|",
+    formatPrivateInputReadyRows(report.privateInputReadyGatePrivateInputRows),
     "",
     "## Preflight Process Env Input Checklist",
     "",
@@ -5290,6 +5478,10 @@ const releaseChannelPlaceholderInputReceipt = await readRequiredJson(
   releaseChannelPlaceholderInputReceiptJsonPath,
   "Release-channel placeholder input receipt"
 );
+const releaseChannelPrivateInputReadyGate = await readRequiredJson(
+  releaseChannelPrivateInputReadyGateJsonPath,
+  "Release-channel private input ready gate"
+);
 const report = buildReport({
   releaseDoctor,
   externalNextActions,
@@ -5298,7 +5490,8 @@ const report = buildReport({
   releaseProgress,
   completedPlanWindow,
   releaseChannelPreflightBlocked,
-  releaseChannelPlaceholderInputReceipt
+  releaseChannelPlaceholderInputReceipt,
+  releaseChannelPrivateInputReadyGate
 });
 validateReport(report, { releaseDoctor, externalNextActions, externalProofBundle, externalGate, releaseProgress, completedPlanWindow });
 
@@ -5341,6 +5534,11 @@ check(markdown.includes("Placeholder input receipt mode:"), "release current blo
 check(markdown.includes("Placeholder private input missing/placeholder/invalid rows:"), "release current blocker Markdown should include placeholder input private row counts");
 check(markdown.includes("Release-Channel Placeholder Input Receipt"), "release current blocker Markdown should include placeholder input receipt section");
 check(markdown.includes("Placeholder Input Operator Commands"), "release current blocker Markdown should include placeholder input command table");
+check(markdown.includes("Private input ready gate ready:"), "release current blocker Markdown should include private input ready gate readiness");
+check(markdown.includes("Private input ready to apply:"), "release current blocker Markdown should include private input ready-to-apply posture");
+check(markdown.includes("Release-Channel Private Input Ready Gate"), "release current blocker Markdown should include private input ready gate section");
+check(markdown.includes("Ready Gate Handoff Rows"), "release current blocker Markdown should include private input ready gate handoff rows");
+check(markdown.includes("Ready Gate Private Input Rows"), "release current blocker Markdown should include private input ready gate private input rows");
 check(markdown.includes("Preflight process env checklist source ready:"), "release current blocker Markdown should include preflight process env checklist source readiness");
 check(markdown.includes("Preflight process env checklist rows:"), "release current blocker Markdown should include preflight process env checklist row summary");
 check(markdown.includes("Preflight Process Env Input Checklist"), "release current blocker Markdown should include preflight process env checklist table");
@@ -5576,6 +5774,17 @@ console.log(
   `- Placeholder private input placeholder locations: ${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationCount} (${report.placeholderInputReceiptPrivateInputFilePlaceholderLocationSummary})`
 );
 console.log(`- Placeholder input next operator command: ${report.placeholderInputReceiptNextOperatorCommand}`);
+console.log(`- Private input ready gate ready: ${report.privateInputReadyGateReady ? "yes" : "no"}`);
+console.log(`- Private input ready to apply: ${report.privateInputReadyGateReadyToApply ? "yes" : "no"}`);
+console.log(`- Private input ready gate mode: ${report.privateInputReadyGateMode}`);
+console.log(`- Private input ready gate command: ${report.privateInputReadyGateCommand}`);
+console.log(`- Private input ready gate next operator command: ${report.privateInputReadyGateNextOperatorCommand}`);
+console.log(
+  `- Private input ready gate ready/missing/placeholder/invalid rows: ${report.privateInputReadyGateReadyInputKeyCount}/${report.privateInputReadyGateMissingInputKeyCount}/${report.privateInputReadyGatePlaceholderInputKeyCount}/${report.privateInputReadyGateInvalidShapeInputKeyCount}`
+);
+console.log(
+  `- Private input ready gate blocked locations: ${report.privateInputReadyGateBlockedInputKeyCount} (${report.privateInputReadyGateBlockedInputLocationSummary})`
+);
 console.log(`- Post-edit proof sequence receipt ready: ${report.postEditProofSequenceReceiptReady ? "yes" : "no"}`);
 console.log(`- Post-edit proof sequence rows: ${report.postEditProofSequenceReceiptRowCount} (${report.postEditProofSequenceReceiptSummary})`);
 console.log(`- Post-edit proof sequence recommended proof chain: ${report.postEditProofSequenceReceiptRecommendedProofCommand}`);
