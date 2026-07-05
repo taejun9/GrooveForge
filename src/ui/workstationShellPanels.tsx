@@ -3652,6 +3652,12 @@ export function CommandReferenceDialog({
     searchInputRef.current?.focus();
   }
 
+  function openQuickActionsFromCommandReference(): void {
+    window.setTimeout(() => {
+      onOpenQuickActions();
+    }, 0);
+  }
+
   if (!open) {
     return null;
   }
@@ -3675,7 +3681,7 @@ export function CommandReferenceDialog({
           <div className="command-reference-heading-actions">
             <button
               data-testid="command-reference-open-quick-actions"
-              onClick={onOpenQuickActions}
+              onClick={openQuickActionsFromCommandReference}
               title="Open Quick Actions"
               type="button"
             >
@@ -3740,7 +3746,7 @@ export function CommandReferenceDialog({
               <button
                 className="command-reference-spotlight-open-quick-actions"
                 data-testid="command-reference-spotlight-open-quick-actions"
-                onClick={onOpenQuickActions}
+                onClick={openQuickActionsFromCommandReference}
                 title={`Open Quick Actions from Spotlight: ${commandReferenceSearchSpotlight.label}`}
                 type="button"
               >
