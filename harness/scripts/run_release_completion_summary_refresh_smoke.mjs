@@ -619,6 +619,31 @@ function formatUserFacingCompletionRows(rows) {
   return rows.map((row) => `| ${row.order} | ${escapeCell(row.field)} | ${escapeCell(row.value)} | ${row.valueRecorded ? "yes" : "no"} |`).join("\n");
 }
 
+function operatorUnblockAliasRows(report) {
+  return [
+    ["receipt ready", readyLabel(report.operatorUnblockReceiptReady)],
+    ["current blocker", report.operatorUnblockCurrentBlockerAlias],
+    ["broad next command", report.operatorUnblockBroadNextCommandAlias],
+    ["first operator command", report.operatorUnblockFirstCommandAlias],
+    ["start command", report.operatorUnblockStartCommandAlias],
+    ["private input edit target", report.operatorUnblockPrivateInputEditTarget],
+    ["expected private input shape", report.operatorUnblockExpectedShapeSummary],
+    ["private input template command", report.operatorUnblockPrivateInputTemplateCommandAlias],
+    ["preflight command", report.operatorUnblockPreflightCommandAlias],
+    ["apply command", report.operatorUnblockApplyCommandAlias],
+    ["strict proof command", report.operatorUnblockStrictProofCommandAlias],
+    ["blocker refresh command", report.operatorUnblockBlockerRefreshCommandAlias],
+    ["next-actions refresh command", report.operatorUnblockNextActionsRefreshCommandAlias],
+    ["guided setup fallback", report.operatorUnblockGuidedSetupFallbackCommandAlias],
+    ["placeholder locations", report.operatorUnblockPlaceholderLocationSummary]
+  ].map(([field, value], index) => ({
+    order: index + 1,
+    field,
+    value,
+    valueRecorded: false
+  }));
+}
+
 function formatCompletionBlockerActionRows(rows) {
   return rows
     .map(
@@ -981,6 +1006,45 @@ function buildReport({
     currentOperatorStartCommandValueRecorded:
       completionSummary.currentOperatorStartCommandValueRecorded === true ? true : false,
     currentOperatorValueRecorded: completionSummary.currentOperatorValueRecorded === true ? true : false,
+    operatorUnblockReceiptReady:
+      completionSummary.currentOperatorCommandSequenceReady === true &&
+      realSetupWizardFields.operatorHandoffReady === true &&
+      completionSummary.placeholderInputReceiptReady === true &&
+      valueFreeRows(currentOperatorCommandRows) &&
+      realSetupWizardFields.valueRecorded === false,
+    operatorUnblockCommandSequenceReady: completionSummary.currentOperatorCommandSequenceReady === true,
+    operatorUnblockSetupWizardHandoffReady: realSetupWizardFields.operatorHandoffReady === true,
+    operatorUnblockPrivateInputReceiptReady: completionSummary.placeholderInputReceiptReady === true,
+    operatorUnblockCurrentBlockerAlias: currentFirstBlockerAlias,
+    operatorUnblockBroadNextCommandAlias: currentNextCommandAlias,
+    operatorUnblockFirstCommandAlias: textValue(completionSummary.currentOperatorFirstCommand),
+    operatorUnblockStartCommandAlias: textValue(
+      completionSummary.currentOperatorStartCommand,
+      textValue(completionSummary.currentOperatorFirstCommand)
+    ),
+    operatorUnblockStartCommandRoleAlias: textValue(completionSummary.currentOperatorStartCommandRole, currentOperatorCommandRows[0]?.role ?? "none"),
+    operatorUnblockPrivateInputEditTarget: realSetupWizardFields.nextPrivateInputEditTargetSummary,
+    operatorUnblockExpectedShapeSummary: realSetupWizardFields.nextPrivateInputEditExpectedShapeSummary,
+    operatorUnblockPrivateInputTemplateCommandAlias: textValue(
+      completionSummary.releaseChannelPrivateInputTemplateCommand,
+      releaseChannelPrivateInputTemplateCommand
+    ),
+    operatorUnblockPrivateInputTemplateDefaultPathAlias: textValue(
+      completionSummary.releaseChannelPrivateInputTemplateDefaultPath,
+      defaultPrivateInputFileName
+    ),
+    operatorUnblockPreflightCommandAlias: textValue(completionSummary.currentOperatorPreflightCommand, releaseChannelApplyPrivateEnvPreflightCommand),
+    operatorUnblockApplyCommandAlias: textValue(completionSummary.currentOperatorApplyCommand, releaseChannelApplyPrivateEnvCommand),
+    operatorUnblockStrictProofCommandAlias: textValue(completionSummary.currentOperatorStrictProofCommand, "npm run release:private-edit-strict-proof"),
+    operatorUnblockBlockerRefreshCommandAlias: textValue(completionSummary.currentOperatorBlockerRefreshCommand, "npm run release:current-blocker"),
+    operatorUnblockNextActionsRefreshCommandAlias: textValue(completionSummary.currentOperatorNextActionsRefreshCommand, "npm run release:next-actions"),
+    operatorUnblockGuidedSetupFallbackCommandAlias: textValue(
+      completionSummary.releaseChannelGuidedSetupFallbackCommand,
+      releaseChannelSetupWizardCommand
+    ),
+    operatorUnblockPlaceholderLocationCount: integerValue(completionSummary.currentPrivateInputPlaceholderLocationCount),
+    operatorUnblockPlaceholderLocationSummary: textValue(completionSummary.currentPrivateInputPlaceholderLocationSummary),
+    operatorUnblockValueRecorded: false,
     releaseChannelGuidedSetupFallbackCommand: textValue(
       completionSummary.releaseChannelGuidedSetupFallbackCommand,
       releaseChannelSetupWizardCommand
@@ -1299,6 +1363,10 @@ function buildReport({
   report.userFacingCompletionRows = userFacingCompletionRows(report);
   report.userFacingCompletionRowCount = report.userFacingCompletionRows.length;
   report.userFacingCompletionRowSummary = `${report.userFacingCompletionRowCount} user-facing completion alias rows`;
+  report.operatorUnblockAliasRows = operatorUnblockAliasRows(report);
+  report.operatorUnblockAliasRowCount = report.operatorUnblockAliasRows.length;
+  report.operatorUnblockAliasRowSummary = `${report.operatorUnblockAliasRowCount} operator unblock alias rows`;
+  report.operatorUnblockAliasRowsValueFree = valueFreeRows(report.operatorUnblockAliasRows);
   return report;
 }
 
@@ -1339,6 +1407,11 @@ function buildMarkdown(report) {
 - Current first blocker: ${report.firstBlocker}
 - Current first blocker alias: ${report.currentFirstBlocker}
 - Current next command alias: \`${report.currentNextCommand}\`
+- Operator unblock aliases ready: ${readyLabel(report.operatorUnblockReceiptReady)}
+- Operator unblock first command alias: \`${report.operatorUnblockFirstCommandAlias}\`
+- Operator unblock broad next command alias: \`${report.operatorUnblockBroadNextCommandAlias}\`
+- Operator unblock private input edit target: ${report.operatorUnblockPrivateInputEditTarget}
+- Operator unblock preflight/apply/strict proof: \`${report.operatorUnblockPreflightCommandAlias}\` / \`${report.operatorUnblockApplyCommandAlias}\` / \`${report.operatorUnblockStrictProofCommandAlias}\`
 - User-facing current blocker alias: ${report.currentFirstBlockerAlias}
 - User-facing current next command alias: \`${report.currentNextCommandAlias}\`
 - Source prereq current first blocker alias: ${report.sourcePrereqCurrentFirstBlocker}
@@ -1438,6 +1511,32 @@ function buildMarkdown(report) {
 | order | command | role | condition | status | value recorded |
 |---:|---|---|---|---|---:|
 ${formatCommandRows(report.refreshCommands)}
+
+## Operator Unblock Aliases
+
+- Receipt ready: ${readyLabel(report.operatorUnblockReceiptReady)}
+- Current blocker alias: ${report.operatorUnblockCurrentBlockerAlias}
+- Broad next command alias: \`${report.operatorUnblockBroadNextCommandAlias}\`
+- First operator command alias: \`${report.operatorUnblockFirstCommandAlias}\`
+- Start command alias: \`${report.operatorUnblockStartCommandAlias}\`
+- Start command role alias: ${report.operatorUnblockStartCommandRoleAlias}
+- Private input edit target: ${report.operatorUnblockPrivateInputEditTarget}
+- Expected private input shape: ${report.operatorUnblockExpectedShapeSummary}
+- Private input template command alias: \`${report.operatorUnblockPrivateInputTemplateCommandAlias}\`
+- Private input template default path alias: \`${report.operatorUnblockPrivateInputTemplateDefaultPathAlias}\`
+- Preflight command alias: \`${report.operatorUnblockPreflightCommandAlias}\`
+- Apply command alias: \`${report.operatorUnblockApplyCommandAlias}\`
+- Strict proof command alias: \`${report.operatorUnblockStrictProofCommandAlias}\`
+- Blocker refresh command alias: \`${report.operatorUnblockBlockerRefreshCommandAlias}\`
+- Next-actions refresh command alias: \`${report.operatorUnblockNextActionsRefreshCommandAlias}\`
+- Guided setup fallback command alias: \`${report.operatorUnblockGuidedSetupFallbackCommandAlias}\`
+- Placeholder locations: ${report.operatorUnblockPlaceholderLocationCount} (${report.operatorUnblockPlaceholderLocationSummary})
+- Alias rows: ${report.operatorUnblockAliasRowCount} (${report.operatorUnblockAliasRowSummary})
+- Alias rows value-free: ${readyLabel(report.operatorUnblockAliasRowsValueFree)}
+
+| order | field | value | value recorded |
+|---:|---|---|---:|
+${formatUserFacingCompletionRows(report.operatorUnblockAliasRows)}
 
 ## Source Evidence Prerequisite Mirror
 
@@ -1978,6 +2077,34 @@ function validateReport(report, markdown) {
   check(report.currentOperatorBlockerRefreshCommand === "npm run release:current-blocker", "release completion summary refresh current operator sequence should include current-blocker refresh");
   check(report.currentOperatorNextActionsRefreshCommand === "npm run release:next-actions", "release completion summary refresh current operator sequence should include next-actions refresh");
   check(report.currentOperatorValueRecorded === false, "release completion summary refresh current operator sequence should be value-free");
+  check(report.operatorUnblockReceiptReady === true, "release completion summary refresh should expose ready operator unblock aliases");
+  check(report.operatorUnblockCommandSequenceReady === true, "release completion summary refresh operator unblock aliases should mirror ready command sequence");
+  check(report.operatorUnblockSetupWizardHandoffReady === true, "release completion summary refresh operator unblock aliases should mirror setup wizard handoff readiness");
+  check(report.operatorUnblockPrivateInputReceiptReady === true, "release completion summary refresh operator unblock aliases should mirror private input receipt readiness");
+  check(report.operatorUnblockCurrentBlockerAlias === report.currentFirstBlockerAlias, "release completion summary refresh operator unblock blocker alias should mirror current blocker");
+  check(report.operatorUnblockBroadNextCommandAlias === report.currentNextCommandAlias, "release completion summary refresh operator unblock broad next command should mirror current next command");
+  check(report.operatorUnblockFirstCommandAlias === report.currentOperatorFirstCommand, "release completion summary refresh operator unblock first command should mirror current operator first command");
+  check(report.operatorUnblockStartCommandAlias === report.currentOperatorStartCommand, "release completion summary refresh operator unblock start command should mirror current operator start command");
+  check(report.operatorUnblockStartCommandRoleAlias === report.currentOperatorStartCommandRole, "release completion summary refresh operator unblock start role should mirror current operator role");
+  check(report.operatorUnblockPrivateInputEditTarget === report.realSetupWizardNextPrivateInputEditTargetSummary, "release completion summary refresh operator unblock edit target should mirror setup wizard target");
+  check(report.operatorUnblockExpectedShapeSummary === report.realSetupWizardNextPrivateInputEditExpectedShapeSummary, "release completion summary refresh operator unblock expected shape should mirror setup wizard shape summary");
+  check(report.operatorUnblockPrivateInputEditTarget !== "none", "release completion summary refresh operator unblock edit target should be populated");
+  check(report.operatorUnblockExpectedShapeSummary !== "none", "release completion summary refresh operator unblock expected shape should be populated");
+  check(report.operatorUnblockPrivateInputTemplateCommandAlias === report.releaseChannelPrivateInputTemplateCommand, "release completion summary refresh operator unblock template command should mirror release-channel template command");
+  check(report.operatorUnblockPrivateInputTemplateDefaultPathAlias === report.releaseChannelPrivateInputTemplateDefaultPath, "release completion summary refresh operator unblock template path should mirror release-channel template path");
+  check(report.operatorUnblockPreflightCommandAlias === report.currentOperatorPreflightCommand, "release completion summary refresh operator unblock preflight command should mirror current operator preflight");
+  check(report.operatorUnblockApplyCommandAlias === report.currentOperatorApplyCommand, "release completion summary refresh operator unblock apply command should mirror current operator apply");
+  check(report.operatorUnblockStrictProofCommandAlias === report.currentOperatorStrictProofCommand, "release completion summary refresh operator unblock strict proof command should mirror current operator strict proof");
+  check(report.operatorUnblockBlockerRefreshCommandAlias === report.currentOperatorBlockerRefreshCommand, "release completion summary refresh operator unblock blocker refresh should mirror current operator refresh");
+  check(report.operatorUnblockNextActionsRefreshCommandAlias === report.currentOperatorNextActionsRefreshCommand, "release completion summary refresh operator unblock next-actions refresh should mirror current operator refresh");
+  check(report.operatorUnblockGuidedSetupFallbackCommandAlias === report.releaseChannelGuidedSetupFallbackCommand, "release completion summary refresh operator unblock guided setup fallback should mirror fallback command");
+  check(report.operatorUnblockPlaceholderLocationCount === report.currentPrivateInputPlaceholderLocationCount, "release completion summary refresh operator unblock placeholder count should mirror current private input placeholder count");
+  check(report.operatorUnblockPlaceholderLocationSummary === report.currentPrivateInputPlaceholderLocationSummary, "release completion summary refresh operator unblock placeholder summary should mirror current private input placeholder summary");
+  check(report.operatorUnblockAliasRows.length === report.operatorUnblockAliasRowCount, "release completion summary refresh operator unblock alias row count should match rows");
+  check(report.operatorUnblockAliasRowCount >= 15, "release completion summary refresh operator unblock alias rows should include the full unblock path");
+  check(report.operatorUnblockAliasRowsValueFree === true, "release completion summary refresh operator unblock alias rows should be value-free");
+  check(report.operatorUnblockAliasRows.every((row) => row.valueRecorded === false), "release completion summary refresh operator unblock alias rows should not record values");
+  check(report.operatorUnblockValueRecorded === false, "release completion summary refresh operator unblock aliases should be value-free");
   check(report.releaseChannelGuidedSetupFallbackCommand === releaseChannelSetupWizardCommand, "release completion summary refresh should expose guided setup fallback command");
   check(report.releaseChannelGuidedSetupFallbackReady === true, "release completion summary refresh guided setup fallback should be ready");
   check(
@@ -2546,6 +2673,15 @@ function validateReport(report, markdown) {
   check(markdown.includes("Crash restricted GUI preflight ready: yes"), "release completion summary refresh Markdown should include restricted GUI preflight readiness");
   check(markdown.includes("npm run desktop:crash-report-regression-smoke"), "release completion summary refresh Markdown should cite crash report regression command");
   check(markdown.includes("Desktop crash report regression JSON:"), "release completion summary refresh Markdown should include crash report regression artifact path");
+  check(markdown.includes("Operator unblock aliases ready: yes"), "release completion summary refresh Markdown should include operator unblock alias readiness");
+  check(markdown.includes("Operator unblock first command alias:"), "release completion summary refresh Markdown should include operator unblock first command alias");
+  check(markdown.includes("Operator unblock broad next command alias:"), "release completion summary refresh Markdown should include operator unblock broad next command alias");
+  check(markdown.includes("Operator unblock private input edit target:"), "release completion summary refresh Markdown should include operator unblock edit target");
+  check(markdown.includes("Operator unblock preflight/apply/strict proof:"), "release completion summary refresh Markdown should include operator unblock proof chain");
+  check(markdown.includes("## Operator Unblock Aliases"), "release completion summary refresh Markdown should include operator unblock alias section");
+  check(markdown.includes("Private input edit target:"), "release completion summary refresh Markdown should include operator unblock target row");
+  check(markdown.includes("Expected private input shape:"), "release completion summary refresh Markdown should include operator unblock shape row");
+  check(markdown.includes("Alias rows value-free: yes"), "release completion summary refresh Markdown should include operator unblock value-free row status");
   check(markdown.includes("## Command Order"), "release completion summary refresh Markdown should include command order");
   check(markdown.includes("condition | status"), "release completion summary refresh Markdown should include command conditions and statuses");
   check(markdown.includes("Current operator command sequence ready: yes"), "release completion summary refresh Markdown should include current operator command sequence readiness");
@@ -2721,6 +2857,13 @@ async function main() {
   console.log(`- Source prereq current next command alias: ${report.sourcePrereqCurrentNextCommand}`);
   console.log(`- User-facing current blocker alias: ${report.currentFirstBlockerAlias}`);
   console.log(`- User-facing current next command alias: ${report.currentNextCommandAlias}`);
+  console.log(`- Operator unblock aliases ready: ${report.operatorUnblockReceiptReady ? "yes" : "no"}`);
+  console.log(`- Operator unblock first command alias: ${report.operatorUnblockFirstCommandAlias}`);
+  console.log(`- Operator unblock broad next command alias: ${report.operatorUnblockBroadNextCommandAlias}`);
+  console.log(`- Operator unblock private input edit target: ${report.operatorUnblockPrivateInputEditTarget}`);
+  console.log(
+    `- Operator unblock preflight/apply/strict proof: ${report.operatorUnblockPreflightCommandAlias} / ${report.operatorUnblockApplyCommandAlias} / ${report.operatorUnblockStrictProofCommandAlias}`
+  );
   console.log(
     `- Source prereq private input placeholder locations: ${report.sourcePrereqCurrentPrivateInputPlaceholderLocationCount} (${report.sourcePrereqCurrentPrivateInputPlaceholderLocationSummary})`
   );
