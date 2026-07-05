@@ -793,6 +793,8 @@ function buildReport({
     postClearanceProofCommand: textValue(completionSummary.postClearanceProofCommand),
     firstBlocker: textValue(completionSummary.firstBlocker),
     nextCommand: textValue(completionSummary.nextCommand),
+    currentFirstBlocker: textValue(completionSummary.firstBlocker),
+    currentNextCommand: textValue(completionSummary.nextCommand),
     currentEnvEditTarget: textValue(completionSummary.currentEnvEditTarget, ".env.distribution.local"),
     currentRequiredKeyCount: integerValue(completionSummary.currentRequiredKeyCount),
     currentRequiredKeys: stringArrayValue(completionSummary.currentRequiredKeys),
@@ -1211,6 +1213,8 @@ function buildMarkdown(report) {
 - Final handoff success-redaction ready: ${readyLabel(report.finalHandoffSuccessRedactionReady)}
 - Release-channel metadata needs ignored env: ${readyLabel(report.releaseChannelMetadataNeedsIgnoredEnv)}
 - Current first blocker: ${report.firstBlocker}
+- Current first blocker alias: ${report.currentFirstBlocker}
+- Current next command alias: \`${report.currentNextCommand}\`
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})
 - Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})
@@ -1610,6 +1614,10 @@ function validateReport(report, markdown) {
   check(report.finalHandoffSuccessRedactionReady === true, "release completion summary refresh should expose final handoff success-redaction readiness");
   check(report.postClearanceNextAction === "auto-update-feed", "release completion summary refresh should keep auto-update-feed as post-clearance next action");
   check(report.postClearanceProofCommand === "npm run desktop:auto-update-readiness-smoke", "release completion summary refresh should keep auto-update readiness as post-clearance proof command");
+  check(report.currentFirstBlocker === report.firstBlocker, "release completion summary refresh current first blocker alias should mirror firstBlocker");
+  check(report.currentNextCommand === report.nextCommand, "release completion summary refresh current next command alias should mirror nextCommand");
+  check(report.currentFirstBlocker !== "none", "release completion summary refresh current first blocker alias should be populated");
+  check(report.currentNextCommand !== "none", "release completion summary refresh current next command alias should be populated");
   check(report.currentEnvEditTarget !== "none", "release completion summary refresh should expose current env edit target");
   check(report.currentRequiredKeyCount === 4, "release completion summary refresh should expose four current release-channel required keys");
   check(report.currentRequiredKeys.length === report.currentRequiredKeyCount, "release completion summary refresh required keys should match count");
@@ -2103,11 +2111,11 @@ function validateReport(report, markdown) {
   check(report.externalCompletionResumeLatestPlan === report.latestPlan, "release completion summary refresh should align resume latest plan");
   check(report.externalCompletionResumeTenPlanProgress === report.tenPlanProgress, "release completion summary refresh should align resume 10-plan progress");
   check(
-    report.externalCompletionResumeCurrentFirstBlocker === report.firstBlocker,
+    report.externalCompletionResumeCurrentFirstBlocker === report.currentFirstBlocker,
     "release completion summary refresh should align resume current first blocker"
   );
   check(
-    report.externalCompletionResumeCurrentNextCommand === report.nextCommand,
+    report.externalCompletionResumeCurrentNextCommand === report.currentNextCommand,
     "release completion summary refresh should align resume current next command"
   );
   check(
@@ -2499,6 +2507,8 @@ async function main() {
   console.log(`- Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})`);
   console.log(`- Current private input placeholder locations: ${report.currentPrivateInputPlaceholderLocationCount} (${report.currentPrivateInputPlaceholderLocationSummary})`);
   console.log(`- Current first blocker: ${report.firstBlocker}`);
+  console.log(`- Current first blocker alias: ${report.currentFirstBlocker}`);
+  console.log(`- Current next command alias: ${report.currentNextCommand}`);
   console.log("- Private values recorded: no");
   console.log("- Network: no update feed probe, feed publish, distribution channel probe, release upload, Apple notary submission, or signing attempted");
   console.log("- Not claimed: auto-update, Developer ID signing, notarization, Gatekeeper approval, manual QA approval, app-store submission, or external distribution completion");
