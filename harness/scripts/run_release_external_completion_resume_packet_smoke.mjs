@@ -176,6 +176,9 @@ function buildSetupWizardSourceFields(sourcePacket) {
     realSetupWizardNextOperatorCommandAfterPrivateInputEdit: textValue(
       sourcePacket.realSetupWizardNextOperatorCommandAfterPrivateInputEdit
     ),
+    realSetupWizardNextOperatorCommand: textValue(
+      sourcePacket.realSetupWizardNextOperatorCommandAfterPrivateInputEdit
+    ),
     realSetupWizardPreflightReady: sourcePacket.realSetupWizardPreflightReady === true,
     realSetupWizardApplyReady: sourcePacket.realSetupWizardApplyReady === true,
     realSetupWizardStrictLiveCheckReady: sourcePacket.realSetupWizardStrictLiveCheckReady === true,
@@ -410,6 +413,8 @@ function buildReport(sourcePacket, preflightBlocked) {
     privateEnvPreflightClaimedExternalDistribution: preflightBlocked.claimedExternalDistribution === true,
     latestPlan: textValue(sourcePacket.latestPlan),
     latestPlanNumber: integerValue(sourcePacket.latestPlanNumber),
+    latestCompletedPlan: textValue(sourcePacket.latestPlan),
+    latestCompletedPlanNumber: integerValue(sourcePacket.latestPlanNumber),
     tenPlanProgress: textValue(sourcePacket.tenPlanProgress),
     tenPlanCompletedCount: integerValue(sourcePacket.tenPlanCompletedCount),
     tenPlanTotal: integerValue(sourcePacket.tenPlanTotal),
@@ -787,6 +792,7 @@ function buildMarkdown(report) {
 - Private-env private input file loaded keys: ${report.privateEnvPreflightPrivateInputFileLoadedKeyCount} (${report.privateEnvPreflightPrivateInputFileLoadedKeySummary})
 - Private-env guided setup fallback command: \`${report.privateEnvPreflightGuidedSetupFallbackCommand}\`
 - Latest completed plan: ${report.latestPlan}
+- Latest completed plan alias: ${report.latestCompletedPlan}
 - 10-plan progress: ${report.tenPlanProgress}
 - User-facing completion: ${report.completionPercent}%
 - Remaining completion: ${report.remainingPercent}%
@@ -809,6 +815,7 @@ function buildMarkdown(report) {
 - Real setup wizard handoff rows: ${report.realSetupWizardOperatorHandoffRowCount} (${report.realSetupWizardOperatorHandoffSummary})
 - Real setup wizard next private input edit target: ${report.realSetupWizardNextPrivateInputEditTargetSummary}
 - Real setup wizard next operator command: \`${report.realSetupWizardNextOperatorCommandAfterPrivateInputEdit}\`
+- Real setup wizard next operator command alias: \`${report.realSetupWizardNextOperatorCommand}\`
 - Current operator command sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
 - Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
@@ -1190,6 +1197,11 @@ function validateReport(report, markdown) {
   check(report.privateEnvPreflightPrivateValuesRecorded === false, "external completion resume packet blocked preflight should not record private values");
   check(report.privateEnvPreflightClaimedExternalDistribution === false, "external completion resume packet blocked preflight should not claim external distribution");
   check(report.latestPlanNumber > 0, "external completion resume packet should include latest plan number");
+  check(report.latestCompletedPlan === report.latestPlan, "external completion resume packet should mirror latest completed plan alias");
+  check(
+    report.latestCompletedPlanNumber === report.latestPlanNumber,
+    "external completion resume packet should mirror latest completed plan number alias"
+  );
   check(report.tenPlanTotal === 10, "external completion resume packet should keep ten-plan total");
   check(report.completionPercent === 99.999999, "external completion resume packet should preserve completion percent");
   check(report.remainingPercent === 0.000001, "external completion resume packet should preserve remaining percent");
@@ -1370,6 +1382,10 @@ function validateReport(report, markdown) {
     "external completion resume packet setup wizard should point the next operator command at preflight"
   );
   check(
+    report.realSetupWizardNextOperatorCommand === report.realSetupWizardNextOperatorCommandAfterPrivateInputEdit,
+    "external completion resume packet setup wizard next operator command alias should match the source command"
+  );
+  check(
     report.realSetupWizardRecommendedOperatorProofCommand === privateEditStrictProofCommand,
     "external completion resume packet setup wizard should expose the strict proof command"
   );
@@ -1541,6 +1557,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("## First Blocked Run Row"), "external completion resume packet Markdown should include first blocked row");
   check(markdown.includes("## Resume Rows"), "external completion resume packet Markdown should include resume rows");
   check(markdown.includes("## Current Operator Command Sequence"), "external completion resume packet Markdown should include current operator command sequence");
+  check(markdown.includes("Latest completed plan alias:"), "external completion resume packet Markdown should include latest completed plan alias");
   check(markdown.includes("Current operator start command:"), "external completion resume packet Markdown should include current operator start command");
   check(markdown.includes("Next resume matches current operator start command:"), "external completion resume packet Markdown should include resume/start-command match");
   check(markdown.includes("Current private input placeholder locations:"), "external completion resume packet Markdown should include current private input placeholder locations");
@@ -1552,6 +1569,10 @@ function validateReport(report, markdown) {
   check(markdown.includes("Real setup wizard receipt:"), "external completion resume packet Markdown should include setup wizard summary");
   check(markdown.includes("Real Setup Wizard Handoff"), "external completion resume packet Markdown should include setup wizard handoff section");
   check(markdown.includes("Next private input edit target:"), "external completion resume packet Markdown should include setup wizard edit target");
+  check(
+    markdown.includes("Real setup wizard next operator command alias:"),
+    "external completion resume packet Markdown should include setup wizard next operator command alias"
+  );
   check(markdown.includes("Private input template command:"), "external completion resume packet Markdown should include private input template command");
   check(
     markdown.includes("Private env apply proof runner command:"),
@@ -1593,6 +1614,7 @@ console.log("GrooveForge release external completion resume packet smoke passed.
 console.log(`- Markdown: ${relative(resumePacketMarkdownPath)}`);
 console.log(`- JSON: ${relative(resumePacketJsonPath)}`);
 console.log(`- Latest completed plan: ${report.latestPlan}`);
+console.log(`- Latest completed plan alias: ${report.latestCompletedPlan}`);
 console.log(`- 10-plan progress: ${report.tenPlanProgress}`);
 console.log(`- User-facing completion: ${report.completionPercent}%`);
 console.log(`- Remaining completion: ${report.remainingPercent}%`);
@@ -1614,6 +1636,7 @@ console.log(`- Real setup wizard receipt ready: ${report.realSetupWizardReceiptR
 console.log(`- Real setup wizard handoff rows: ${report.realSetupWizardOperatorHandoffRowCount} (${report.realSetupWizardOperatorHandoffSummary})`);
 console.log(`- Real setup wizard next private input edit target: ${report.realSetupWizardNextPrivateInputEditTargetSummary}`);
 console.log(`- Real setup wizard next operator command: ${report.realSetupWizardNextOperatorCommandAfterPrivateInputEdit}`);
+console.log(`- Real setup wizard next operator command alias: ${report.realSetupWizardNextOperatorCommand}`);
 console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
 console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
