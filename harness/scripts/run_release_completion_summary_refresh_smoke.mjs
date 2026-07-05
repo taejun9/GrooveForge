@@ -928,6 +928,8 @@ function buildReport({
       crashReportRegression.dyldCodeSignatureReportClassified === true,
     crashReportRegressionSquirrelDyldStaleWorktreeCodeSignatureReportClassified:
       crashReportRegression.dyldStaleWorktreeCodeSignatureReportClassified === true,
+    crashReportRegressionAttachmentFingerprintReady: crashReportRegression.attachmentFingerprintReady === true,
+    crashReportRegressionAttachmentFingerprintRowCount: objectRows(crashReportRegression.attachmentFingerprintRows).length,
     crashReportRegressionRestrictedGuiPreflightReady: crashReportRegression.restrictedGuiPreflightReady === true,
     crashReportRegressionPrivateValuesRecorded: crashReportRegression.privateValuesRecorded === true,
     crashReportRegressionFullCrashReportRecorded: crashReportRegression.fullCrashReportRecorded === true,
@@ -1631,6 +1633,8 @@ function buildMarkdown(report) {
 - Crash AppKit abort report classified: ${readyLabel(report.crashReportRegressionAppKitReportClassified)}
 - Crash Squirrel dyld report classified: ${readyLabel(report.crashReportRegressionSquirrelDyldReportClassified)}
 - Crash Squirrel dyld stale-worktree report classified: ${readyLabel(report.crashReportRegressionSquirrelDyldStaleWorktreeCodeSignatureReportClassified)}
+- Crash attached report fingerprints ready: ${readyLabel(report.crashReportRegressionAttachmentFingerprintReady)}
+- Crash attached report fingerprint rows: ${report.crashReportRegressionAttachmentFingerprintRowCount}
 - Crash restricted GUI preflight ready: ${readyLabel(report.crashReportRegressionRestrictedGuiPreflightReady)}
 - Progress refresh ready: ${readyLabel(report.progressRefreshReady)}
 - Completion summary readout ready: ${readyLabel(report.completionSummaryReadoutReady)}
@@ -2158,7 +2162,7 @@ function validateReport(report, markdown) {
   check(report.progressRefreshLabelsMatch === true, "release completion summary refresh should keep progress labels matched");
   check(report.crashReportRegressionReady === true, "release completion summary refresh should run ready desktop crash report regression smoke");
   check(
-    report.crashReportRegressionReadyRowCount === report.crashReportRegressionRowCount && report.crashReportRegressionRowCount >= 12,
+    report.crashReportRegressionReadyRowCount === report.crashReportRegressionRowCount && report.crashReportRegressionRowCount >= 14,
     "release completion summary refresh crash report regression rows should all be ready"
   );
   check(
@@ -2172,6 +2176,11 @@ function validateReport(report, markdown) {
   check(
     report.crashReportRegressionSquirrelDyldStaleWorktreeCodeSignatureReportClassified === true,
     "release completion summary refresh should classify the stale-worktree Squirrel dyld report"
+  );
+  check(
+    report.crashReportRegressionAttachmentFingerprintReady === true &&
+      report.crashReportRegressionAttachmentFingerprintRowCount >= 2,
+    "release completion summary refresh should prove attached crash report fingerprints"
   );
   check(
     report.crashReportRegressionRestrictedGuiPreflightReady === true,
@@ -3103,6 +3112,10 @@ function validateReport(report, markdown) {
     markdown.includes("Crash Squirrel dyld stale-worktree report classified: yes"),
     "release completion summary refresh Markdown should include stale-worktree Squirrel dyld classification"
   );
+  check(
+    markdown.includes("Crash attached report fingerprints ready: yes"),
+    "release completion summary refresh Markdown should include attached crash report fingerprint readiness"
+  );
   check(markdown.includes("Crash restricted GUI preflight ready: yes"), "release completion summary refresh Markdown should include restricted GUI preflight readiness");
   check(markdown.includes("npm run desktop:crash-report-regression-smoke"), "release completion summary refresh Markdown should cite crash report regression command");
   check(markdown.includes("Desktop crash report regression JSON:"), "release completion summary refresh Markdown should include crash report regression artifact path");
@@ -3284,6 +3297,7 @@ async function main() {
       report.crashReportRegressionSquirrelDyldStaleWorktreeCodeSignatureReportClassified ? "yes" : "no"
     }`
   );
+  console.log(`- Crash attached report fingerprints ready: ${report.crashReportRegressionAttachmentFingerprintReady ? "yes" : "no"}`);
   console.log(`- Crash restricted GUI preflight ready: ${report.crashReportRegressionRestrictedGuiPreflightReady ? "yes" : "no"}`);
   console.log(`- 10-plan progress: ${report.tenPlanProgress}`);
   console.log(`- 10-plan checkpoint required: ${report.tenPlanCheckpointRequired ? "yes" : "no"}`);

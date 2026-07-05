@@ -48,6 +48,8 @@ const squirrelDyldStaleWorktreeCodeSignatureReportShape = [
   "Process: GrooveForge [15208]",
   "Path: /Users/USER/*/GrooveForge.app/Contents/MacOS/GrooveForge",
   "Identifier: app.grooveforge.desktop",
+  "Version: 0.1.0 (0.1.0)",
+  "OS Version: macOS 26.x",
   "Exception Type: EXC_CRASH (SIGABRT)",
   "Termination Reason: Namespace DYLD, Code 1, Library missing",
   "Library not loaded: @rpath/Squirrel.framework/Squirrel",
@@ -60,6 +62,8 @@ const squirrelDyldStaleWorktreeCodeSignatureReportShape = [
 const appKitAbortReportShape = [
   "Process: Electron [3070]",
   "Identifier: com.github.Electron",
+  "Version: 39.x (39.x)",
+  "OS Version: macOS 26.x",
   "Exception Type: EXC_CRASH (SIGABRT)",
   "Termination Reason: Namespace SIGNAL, Code 6, Abort trap: 6",
   "Application Specific Information:",
@@ -147,6 +151,50 @@ const appKitDiagnostic = macGuiLaunchAbortDetails("npm run desktop:launch-smoke"
   output: appKitAbortReportShape
 });
 const restrictedGuiPreflight = macGuiLaunchBlockDetails("npm run desktop:launch-smoke", { CODEX_SANDBOX: "seatbelt" }, "darwin");
+
+const attachmentFingerprintRows = [
+  {
+    id: "attached-electron-appkit-fingerprint",
+    ready:
+      appKitClassified &&
+      appKitDiagnostic.includes("Crash signature: Electron SIGABRT / exit code 6 / Abort trap: 6") &&
+      includesAll(appKitAbortReportShape, [
+        "Process: Electron",
+        "Identifier: com.github.Electron",
+        "Version: 39.x",
+        "OS Version: macOS 26.x",
+        "___RegisterApplication_block_invoke",
+        "_RegisterApplication",
+        "GetCurrentProcess",
+        "Responsible Process: Codex",
+        "Coalition: com.openai.codex"
+      ]),
+    source: "sanitized user-provided Electron AppKit report fingerprint",
+    evidence: "Electron 39.x / macOS 26.x / AppKit registration abort / Codex responsible process",
+    valueRecorded: false
+  },
+  {
+    id: "attached-squirrel-stale-worktree-fingerprint",
+    ready:
+      dyldStaleWorktreeCodeSignatureClassified &&
+      dyldStaleWorktreeCodeSignatureDiagnostic.includes("fresh `npm run build`") &&
+      dyldStaleWorktreeCodeSignatureDiagnostic.includes("strict code signatures") &&
+      includesAll(squirrelDyldStaleWorktreeCodeSignatureReportShape, [
+        "Process: GrooveForge",
+        "Identifier: app.grooveforge.desktop",
+        "Version: 0.1.0",
+        "OS Version: macOS 26.x",
+        "Namespace DYLD, Code 1, Library missing",
+        "@rpath/Squirrel.framework/Squirrel",
+        ".worktree/plan-1278-audience-session-result-smoke",
+        "code signature in sanitized stale worktree framework blocked dyld loading",
+        "fatalDyldError: 1"
+      ]),
+    source: "sanitized user-provided GrooveForge stale-worktree dyld report fingerprint",
+    evidence: "GrooveForge 0.1.0 / macOS 26.x / stale worktree package path / Squirrel code-signature dyld abort",
+    valueRecorded: false
+  }
+];
 
 const reportRows = [
   {
@@ -326,12 +374,13 @@ const commandRows = [
   }
 ];
 
-const allRows = [...reportRows, ...guardRows, ...launchBearingRows, ...commandRows];
+const allRows = [...attachmentFingerprintRows, ...reportRows, ...guardRows, ...launchBearingRows, ...commandRows];
 const summary = {
   smokeReady: allRows.every((row) => row.ready === true && row.valueRecorded === false),
   command: "npm run desktop:crash-report-regression-smoke",
   markdownPath: relative(markdownPath),
   jsonPath: relative(jsonPath),
+  attachmentFingerprintRows,
   reportRows,
   guardRows,
   launchBearingRows,
@@ -342,6 +391,7 @@ const summary = {
   dyldCodeSignatureReportClassified: dyldCodeSignatureClassified,
   dyldStaleWorktreeCodeSignatureReportClassified: dyldStaleWorktreeCodeSignatureClassified,
   appKitReportClassified: appKitClassified,
+  attachmentFingerprintReady: attachmentFingerprintRows.every((row) => row.ready === true && row.valueRecorded === false),
   restrictedGuiPreflightReady: Boolean(restrictedGuiPreflight),
   squirrelDyldInstallName: "@rpath/Squirrel.framework/Squirrel",
   privateValuesRecorded: false,
@@ -371,6 +421,7 @@ check(
   "desktop crash report regression should classify the attached stale worktree Squirrel dyld code-signature report"
 );
 check(summary.appKitReportClassified === true, "desktop crash report regression should classify the AppKit abort report");
+check(summary.attachmentFingerprintReady === true, "desktop crash report regression should prove attached report fingerprints");
 check(summary.restrictedGuiPreflightReady === true, "desktop crash report regression should prove restricted GUI preflight readiness");
 check(allRows.every((row) => row.valueRecorded === false), "desktop crash report regression rows should not record values");
 check(!squirrelDyldReportShape.includes("taejungkim"), "desktop crash report regression should not record real user paths");
@@ -396,6 +447,7 @@ const markdown = `# GrooveForge Desktop Crash Report Regression Smoke
 - Squirrel dyld code-signature report classified: ${summary.dyldCodeSignatureReportClassified ? "yes" : "no"}
 - Squirrel dyld stale-worktree code-signature report classified: ${summary.dyldStaleWorktreeCodeSignatureReportClassified ? "yes" : "no"}
 - AppKit abort report classified: ${summary.appKitReportClassified ? "yes" : "no"}
+- Attached report fingerprints ready: ${summary.attachmentFingerprintReady ? "yes" : "no"}
 - Restricted GUI preflight ready: ${summary.restrictedGuiPreflightReady ? "yes" : "no"}
 - Squirrel dyld install name: \`${summary.squirrelDyldInstallName}\`
 - Full crash report recorded: no
@@ -408,6 +460,12 @@ const markdown = `# GrooveForge Desktop Crash Report Regression Smoke
 - External distribution claimed: no
 
 ## Report Shapes
+
+| id | ready | source | evidence | value recorded |
+|---|---:|---|---|---:|
+${formatRows(summary.attachmentFingerprintRows)}
+
+## Report Classifiers
 
 | id | ready | source | evidence | value recorded |
 |---|---:|---|---|---:|
@@ -443,6 +501,7 @@ console.log(`- Squirrel dyld report classified: ${summary.dyldReportClassified ?
 console.log(`- Squirrel dyld code-signature report classified: ${summary.dyldCodeSignatureReportClassified ? "yes" : "no"}`);
 console.log(`- Squirrel dyld stale-worktree code-signature report classified: ${summary.dyldStaleWorktreeCodeSignatureReportClassified ? "yes" : "no"}`);
 console.log(`- AppKit abort report classified: ${summary.appKitReportClassified ? "yes" : "no"}`);
+console.log(`- Attached report fingerprints ready: ${summary.attachmentFingerprintReady ? "yes" : "no"}`);
 console.log(`- Restricted GUI preflight ready: ${summary.restrictedGuiPreflightReady ? "yes" : "no"}`);
 console.log(`- Guard rows ready: ${summary.guardRows.filter((row) => row.ready).length}/${summary.guardRows.length}`);
 console.log(`- Launch-bearing rows ready: ${summary.launchBearingRows.filter((row) => row.ready).length}/${summary.launchBearingRows.length}`);
