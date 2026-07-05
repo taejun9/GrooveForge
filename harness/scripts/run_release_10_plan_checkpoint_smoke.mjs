@@ -31,6 +31,7 @@ const expectedSourceRefreshCommands = [
   "npm run release:update-feed-checkpoint-smoke",
   "npm run release:progress-smoke",
   "npm run release:channel-placeholder-input-receipt",
+  "npm run release:channel-private-input-ready-gate",
   "npm run release:current-blocker-smoke",
   "npm run release:completion-report-packet-smoke",
   "npm run release:progress-freshness-smoke",

@@ -30,6 +30,9 @@ const expectedLiveTestIds = [
   "audience-completion-checkpoints",
   "audience-completion-checkpoint-beginner",
   "audience-completion-checkpoint-producer",
+  "audience-delivery-snapshot",
+  "audience-delivery-snapshot-beginner",
+  "audience-delivery-snapshot-producer",
   "audience-starter-action-beginner",
   "audience-starter-action-producer",
   "audience-route-bridge",
@@ -234,6 +237,26 @@ function checkResult(result) {
       String(evidence?.palette?.completionCheckpoints?.producerDelivery ?? "").includes("Production Snapshot") &&
       String(evidence?.palette?.completionCheckpoints?.producerDelivery ?? "").includes("Export Preflight"),
     "live desktop Audience Completion Checkpoints should show the professional producer delivery path"
+  );
+  check(
+    evidence?.palette?.deliverySnapshot?.present === true && evidence?.palette?.deliverySnapshot?.rowCount === 2,
+    "live desktop Audience Delivery Snapshot should render two audience delivery rows"
+  );
+  check(
+    String(evidence?.palette?.deliverySnapshot?.beginnerLane ?? "").includes("First-time composer") &&
+      String(evidence?.palette?.deliverySnapshot?.beginnerFocus ?? "").includes("first-beat") &&
+      String(evidence?.palette?.deliverySnapshot?.beginnerDeliverables ?? "").includes("WAV") &&
+      String(evidence?.palette?.deliverySnapshot?.beginnerDeliverables ?? "").includes("Handoff Sheet") &&
+      String(evidence?.palette?.deliverySnapshot?.beginnerProof ?? "").includes("package reopen"),
+    "live desktop Audience Delivery Snapshot should show the beginner local delivery proof path"
+  );
+  check(
+    String(evidence?.palette?.deliverySnapshot?.producerLane ?? "").includes("Professional producer") &&
+      String(evidence?.palette?.deliverySnapshot?.producerFocus ?? "").includes("handoff") &&
+      String(evidence?.palette?.deliverySnapshot?.producerDeliverables ?? "").includes("stem") &&
+      String(evidence?.palette?.deliverySnapshot?.producerHandoff ?? "").includes("Export Preflight") &&
+      String(evidence?.palette?.deliverySnapshot?.producerProof ?? "").includes("persona delivery package"),
+    "live desktop Audience Delivery Snapshot should show the professional producer handoff proof path"
   );
   check(
     evidence?.palette?.starterBeginner?.buttonPresent === true &&
@@ -625,6 +648,7 @@ child.on("exit", (code, signal) => {
   console.log("- Audience session rows: First-time composer, Professional producer");
   console.log("- Audience next-step rail: visible beginner and professional producer action rows passed");
   console.log("- Audience completion checkpoints: visible beginner and professional producer completion paths passed");
+  console.log("- Audience delivery snapshot: visible beginner and professional producer delivery proof rows passed");
   console.log("- Audience session Quick Actions: renderer palette search and run evidence passed for Enter Guided and Enter Studio");
   console.log("- Audience Starter controls: visible beginner and producer starter creation evidence passed");
   console.log("- Audience Starter Command Reference: live search, row context, and Quick Actions handoff evidence passed");

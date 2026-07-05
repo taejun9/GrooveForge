@@ -237,6 +237,67 @@ function AudienceCompletionCheckpoints({
   );
 }
 
+const audienceDeliverySnapshotFocus: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Local first-beat package",
+  producer: "Producer handoff package"
+};
+
+const audienceDeliverySnapshotDeliverables: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "WAV mix / 4 stems / MIDI / Handoff Sheet",
+  producer: "Full mix WAV / stem WAVs / arrangement MIDI / Handoff Sheet"
+};
+
+const audienceDeliverySnapshotHandoff: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Export Preflight -> Handoff Package Check",
+  producer: "Review Queue -> Export Preflight -> Handoff Package Check"
+};
+
+const audienceDeliverySnapshotProof: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Proof: local delivery package + package reopen",
+  producer: "Proof: persona delivery package + package reopen"
+};
+
+function AudienceDeliverySnapshot({
+  rows,
+  summary
+}: {
+  rows: AudienceSessionReadoutRow[];
+  summary: AudienceSessionReadoutSummary;
+}): ReactElement {
+  return (
+    <div
+      className="audience-delivery-snapshot"
+      data-audience-delivery-snapshot-active={summary.activeAudience}
+      data-testid="audience-delivery-snapshot"
+      title={`${summary.activeAudienceLabel}: local WAV, stem, MIDI, and Handoff proof stays inside the workstation`}
+    >
+      {rows.map((row) => (
+        <div
+          className={`audience-delivery-snapshot-row ${row.tone}`}
+          data-audience-delivery-snapshot-row={row.id}
+          data-testid={`audience-delivery-snapshot-${row.id}`}
+          key={row.id}
+          title={`${row.label}: ${audienceDeliverySnapshotFocus[row.id]} / ${audienceDeliverySnapshotDeliverables[row.id]} / ${audienceDeliverySnapshotHandoff[row.id]} / ${audienceDeliverySnapshotProof[row.id]}`}
+        >
+          <span data-testid={`audience-delivery-snapshot-${row.id}-lane`}>{row.label}</span>
+          <strong data-testid={`audience-delivery-snapshot-${row.id}-focus`}>
+            {audienceDeliverySnapshotFocus[row.id]}
+          </strong>
+          <small data-testid={`audience-delivery-snapshot-${row.id}-deliverables`}>
+            {audienceDeliverySnapshotDeliverables[row.id]}
+          </small>
+          <em data-testid={`audience-delivery-snapshot-${row.id}-handoff`}>
+            {audienceDeliverySnapshotHandoff[row.id]}
+          </em>
+          <em data-testid={`audience-delivery-snapshot-${row.id}-proof`}>
+            {audienceDeliverySnapshotProof[row.id]}
+          </em>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type GuideQuickStartDecision = {
   source: "path" | "session" | "workflow";
   statusLabel: string;
@@ -523,6 +584,7 @@ export function AudienceSessionReadout({
       </div>
       <AudienceNextStepRail rows={summary.rows} summary={summary} onSelectAudience={onSelectAudience} />
       <AudienceCompletionCheckpoints rows={summary.rows} summary={summary} />
+      <AudienceDeliverySnapshot rows={summary.rows} summary={summary} />
       <div className="audience-session-grid" data-testid="audience-session-grid">
         {summary.rows.map((row) => (
           <div

@@ -9699,6 +9699,30 @@ export function App(): ReactElement {
       };
     };
 
+    const readAudienceDeliverySnapshotEvidence = (): GrooveforgeLaunchSmokeAudienceDeliverySnapshotEvidence => {
+      const rowElements = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-testid^="audience-delivery-snapshot-"]')
+      ).filter((element) => element.dataset.audienceDeliverySnapshotRow);
+
+      return {
+        activeAudience:
+          document.querySelector<HTMLElement>('[data-testid="audience-delivery-snapshot"]')?.dataset
+            .audienceDeliverySnapshotActive ?? "",
+        beginnerDeliverables: readDomText('[data-testid="audience-delivery-snapshot-beginner-deliverables"]'),
+        beginnerFocus: readDomText('[data-testid="audience-delivery-snapshot-beginner-focus"]'),
+        beginnerHandoff: readDomText('[data-testid="audience-delivery-snapshot-beginner-handoff"]'),
+        beginnerLane: readDomText('[data-testid="audience-delivery-snapshot-beginner-lane"]'),
+        beginnerProof: readDomText('[data-testid="audience-delivery-snapshot-beginner-proof"]'),
+        present: document.querySelector('[data-testid="audience-delivery-snapshot"]') !== null,
+        producerDeliverables: readDomText('[data-testid="audience-delivery-snapshot-producer-deliverables"]'),
+        producerFocus: readDomText('[data-testid="audience-delivery-snapshot-producer-focus"]'),
+        producerHandoff: readDomText('[data-testid="audience-delivery-snapshot-producer-handoff"]'),
+        producerLane: readDomText('[data-testid="audience-delivery-snapshot-producer-lane"]'),
+        producerProof: readDomText('[data-testid="audience-delivery-snapshot-producer-proof"]'),
+        rowCount: rowElements.length
+      };
+    };
+
     const readAudienceStarterFollowupRouteResult = (
       starterId: AudienceStarterProjectId,
       route: AudienceStarterFollowupRoute
@@ -9876,6 +9900,7 @@ export function App(): ReactElement {
           completionBeginner,
           completionProducer,
           completionReadout,
+          deliverySnapshot: readAudienceDeliverySnapshotEvidence(),
           dualBeginner,
           dualProducer,
           dualReadout,

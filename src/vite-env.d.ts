@@ -112,11 +112,28 @@ type GrooveforgeLaunchSmokeAudienceCompletionCheckpointEvidence = {
   rowCount: number;
 };
 
+type GrooveforgeLaunchSmokeAudienceDeliverySnapshotEvidence = {
+  activeAudience: string;
+  beginnerDeliverables: string;
+  beginnerFocus: string;
+  beginnerHandoff: string;
+  beginnerLane: string;
+  beginnerProof: string;
+  present: boolean;
+  producerDeliverables: string;
+  producerFocus: string;
+  producerHandoff: string;
+  producerLane: string;
+  producerProof: string;
+  rowCount: number;
+};
+
 type GrooveforgeLaunchSmokePaletteEvidence = {
   completionCheckpoints: GrooveforgeLaunchSmokeAudienceCompletionCheckpointEvidence;
   completionBeginner: GrooveforgeLaunchSmokeRouteEvidence;
   completionProducer: GrooveforgeLaunchSmokeRouteEvidence;
   completionReadout: GrooveforgeLaunchSmokeRouteEvidence;
+  deliverySnapshot: GrooveforgeLaunchSmokeAudienceDeliverySnapshotEvidence;
   dualBeginner: GrooveforgeLaunchSmokeRouteEvidence;
   dualProducer: GrooveforgeLaunchSmokeRouteEvidence;
   dualReadout: GrooveforgeLaunchSmokeRouteEvidence;
