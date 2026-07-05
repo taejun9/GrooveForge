@@ -21,7 +21,9 @@ const externalRunPacketStem = "release-external-completion-run-packet-smoke";
 const externalResumePacketStem = "release-external-completion-resume-packet-smoke";
 const crashReportRegressionStem = "desktop-crash-report-regression-smoke";
 const operatorPreflightStem = "release-channel-apply-private-env-preflight";
+const proofRunnerStem = "release-channel-apply-private-env-proof";
 const realOperatorPreflightSnapshotStem = "release-completion-summary-refresh-real-operator-preflight";
+const proofRunnerSnapshotStem = "release-completion-summary-refresh-proof-runner";
 const progressRefreshJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${progressRefreshStem}.json`);
 const completionSummaryJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${completionSummaryStem}.json`);
 const checkpointJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${checkpointStem}.json`);
@@ -30,9 +32,14 @@ const externalRunPacketJsonPath = path.join(packageRoot, `${appName}-${packageJs
 const externalResumePacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${externalResumePacketStem}.json`);
 const crashReportRegressionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${crashReportRegressionStem}.json`);
 const operatorPreflightJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${operatorPreflightStem}.json`);
+const proofRunnerJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${proofRunnerStem}.json`);
 const realOperatorPreflightSnapshotJsonPath = path.join(
   packageRoot,
   `${appName}-${packageJson.version}-${platformArch}-${realOperatorPreflightSnapshotStem}.json`
+);
+const proofRunnerSnapshotJsonPath = path.join(
+  packageRoot,
+  `${appName}-${packageJson.version}-${platformArch}-${proofRunnerSnapshotStem}.json`
 );
 const receiptMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${receiptStem}.md`);
 const receiptJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${receiptStem}.json`);
@@ -84,6 +91,15 @@ const requiredRefreshCommands = [
   },
   {
     order: 4,
+    command: releaseChannelApplyPrivateEnvProofCommand,
+    role: "run the value-free private env proof runner and preserve its resume aliases for the after-work report",
+    condition: "always; exit 0 or expected blocked exit 1",
+    allowBlockedExit: true,
+    skipped: false,
+    valueRecorded: false
+  },
+  {
+    order: 5,
     command: "npm run release:completion-summary-smoke",
     role: "emit compact after-work completion summary from the refreshed progress receipt",
     condition: "always",
@@ -91,7 +107,7 @@ const requiredRefreshCommands = [
     valueRecorded: false
   },
   {
-    order: 5,
+    order: 6,
     command: "npm run release:external-completion-run-packet-smoke -- --from-existing-completion-summary",
     role: "refresh the ordered external completion run packet from the just-refreshed completion summary",
     condition: "always",
@@ -99,7 +115,7 @@ const requiredRefreshCommands = [
     valueRecorded: false
   },
   {
-    order: 6,
+    order: 7,
     command: "npm run release:external-completion-resume-packet-smoke -- --from-existing-run-packet",
     role: "refresh the current external completion resume packet from the ordered run packet",
     condition: "always",
@@ -107,7 +123,7 @@ const requiredRefreshCommands = [
     valueRecorded: false
   },
   {
-    order: 7,
+    order: 8,
     command: "npm run release:source-evidence-prereq-smoke",
     role: "mirror source artifact prerequisite coverage and current-field aliases into the after-work receipt",
     condition: "always",
@@ -117,7 +133,7 @@ const requiredRefreshCommands = [
 ];
 
 const checkpointCommandRow = {
-  order: 8,
+  order: 9,
   command: "npm run release:10-plan-checkpoint-smoke",
   role: "emit the 10-plan checkpoint receipt at a completed report boundary",
   condition: "when 10-plan progress is 10/10",
@@ -644,6 +660,25 @@ function operatorUnblockAliasRows(report) {
   }));
 }
 
+function proofRunnerResumeAliasRows(proofRunner) {
+  return objectRows(proofRunner.proofRunnerResumeAliasRows).map((row, index) => ({
+    order: integerValue(row.order) || index + 1,
+    alias: textValue(row.alias),
+    value: textValue(row.value),
+    source: textValue(row.source),
+    valueRecorded: false
+  }));
+}
+
+function formatProofRunnerResumeAliasRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.alias)} | ${escapeCell(row.value)} | ${escapeCell(row.source)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function formatCompletionBlockerActionRows(rows) {
   return rows
     .map(
@@ -719,6 +754,8 @@ function buildReport({
   externalResume,
   operatorPreflight,
   operatorPreflightExitStatus,
+  proofRunner,
+  proofRunnerExitStatus,
   checkpoint,
   gitContext
 }) {
@@ -746,6 +783,7 @@ function buildReport({
   const realOperatorPreflightProcessEnvInputRows = objectRows(operatorPreflight.processEnvInputChecklistRows);
   const realOperatorPreflightRemediationRows = objectRows(operatorPreflight.preflightRemediationRows);
   const realOperatorPreflightOperatorReceiptRows = objectRows(operatorPreflight.operatorReceiptRows);
+  const proofRunnerResumeRows = proofRunnerResumeAliasRows(proofRunner);
   const realOperatorPreflightReady =
     operatorPreflight.reportCommand === releaseChannelApplyPrivateEnvPreflightCommand &&
     operatorPreflight.preflightOnly === true &&
@@ -763,6 +801,38 @@ function buildReport({
     operatorPreflight.notarySubmissionAttempted === false &&
     operatorPreflight.signingAttempted === false &&
     operatorPreflight.releaseGateClaimedExternalDistribution === false;
+  const proofRunnerResumeReady =
+    proofRunner.reportCommand === releaseChannelApplyPrivateEnvProofCommand &&
+    proofRunner.sourceMode === "real-operator-runner" &&
+    [0, 1].includes(proofRunnerExitStatus) &&
+    proofRunner.proofRunnerResumeAliasesReady === true &&
+    integerValue(proofRunner.proofRunnerResumeAliasRowCount) === proofRunnerResumeRows.length &&
+    proofRunnerResumeRows.length === 17 &&
+    proofRunner.proofRunnerResumeAliasRowsValueFree === true &&
+    valueFreeRows(proofRunnerResumeRows) &&
+    proofRunner.proofRunnerResumeFirstCommandAlias === releaseChannelApplyPrivateEnvPreflightCommand &&
+    proofRunner.proofRunnerResumeStartCommandAlias === releaseChannelApplyPrivateEnvPreflightCommand &&
+    proofRunner.proofRunnerResumePreflightCommandAlias === releaseChannelApplyPrivateEnvPreflightCommand &&
+    proofRunner.proofRunnerResumeApplyCommandAlias === releaseChannelApplyPrivateEnvCommand &&
+    proofRunner.proofRunnerResumeStrictProofCommandAlias === "npm run release:private-edit-strict-proof" &&
+    proofRunner.proofRunnerResumeCompletionSummaryCommandAlias === "npm run release:completion-summary-smoke" &&
+    proofRunner.proofRunnerResumePrivateInputTemplateCommandAlias === releaseChannelPrivateInputTemplateCommand &&
+    proofRunner.proofRunnerResumeCurrentBlockerRefreshCommandAlias === "npm run release:current-blocker" &&
+    proofRunner.proofRunnerResumeNextActionsRefreshCommandAlias === "npm run release:next-actions" &&
+    proofRunner.proofRunnerResumeGuidedSetupFallbackCommandAlias === releaseChannelSetupWizardCommand &&
+    proofRunner.proofRunnerResumeValueRecorded === false &&
+    proofRunner.privateValuesRecorded === false &&
+    proofRunner.localEnvValueRecorded === false &&
+    proofRunner.releaseUrlValueRecorded === false &&
+    proofRunner.supportUrlValueRecorded === false &&
+    proofRunner.channelValueRecorded === false &&
+    proofRunner.networkProbeAttempted === false &&
+    proofRunner.updateFeedProbeAttempted === false &&
+    proofRunner.releaseUploadAttempted === false &&
+    proofRunner.signingAttempted === false &&
+    proofRunner.notarySubmissionAttempted === false &&
+    proofRunner.claimedAutoUpdate === false &&
+    proofRunner.claimedExternalDistribution === false;
   const realOperatorPreflightReportFields = buildRealOperatorPreflightReportFields({
     operatorPreflight,
     operatorPreflightExitStatus,
@@ -815,7 +885,9 @@ function buildReport({
     externalCompletionResumePacketJsonArtifactName: "release-external-completion-resume-packet-smoke.json",
     crashReportRegressionJsonArtifactName: "desktop-crash-report-regression-smoke.json",
     realOperatorPreflightJsonArtifactName: "release-channel-apply-private-env-preflight.json",
+    proofRunnerJsonArtifactName: "release-channel-apply-private-env-proof.json",
     realOperatorPreflightSnapshotJsonArtifactName: "release-completion-summary-refresh-real-operator-preflight.json",
+    proofRunnerSnapshotJsonArtifactName: "release-completion-summary-refresh-proof-runner.json",
     tenPlanCheckpointJsonArtifactName: "release-10-plan-checkpoint-smoke.json",
     completionSummaryRefreshMarkdownArtifactName: "release-completion-summary-refresh-smoke.md",
     completionSummaryRefreshJsonArtifactName: "release-completion-summary-refresh-smoke.json",
@@ -826,7 +898,9 @@ function buildReport({
     externalCompletionResumePacketJsonPath: relative(externalResumePacketJsonPath),
     crashReportRegressionJsonPath: relative(crashReportRegressionJsonPath),
     realOperatorPreflightJsonPath: relative(operatorPreflightJsonPath),
+    proofRunnerJsonPath: relative(proofRunnerJsonPath),
     realOperatorPreflightSnapshotJsonPath: relative(realOperatorPreflightSnapshotJsonPath),
+    proofRunnerSnapshotJsonPath: relative(proofRunnerSnapshotJsonPath),
     tenPlanCheckpointJsonPath: checkpointRequired ? relative(checkpointJsonPath) : "not due",
     completionSummaryRefreshMarkdownPath: relative(receiptMarkdownPath),
     completionSummaryRefreshJsonPath: relative(receiptJsonPath),
@@ -1100,6 +1174,99 @@ function buildReport({
       completionSummary.releaseChannelPrivateEnvApplyProofAfterPreflight === true ||
       textValue(completionSummary.releaseChannelPrivateEnvApplyProofCommand, releaseChannelApplyPrivateEnvProofCommand) === releaseChannelApplyPrivateEnvProofCommand,
     releaseChannelPrivateEnvApplyProofValueRecorded: completionSummary.releaseChannelPrivateEnvApplyProofValueRecorded === true ? true : false,
+    proofRunnerReceiptReady: proofRunnerResumeReady,
+    proofRunnerCommand: releaseChannelApplyPrivateEnvProofCommand,
+    proofRunnerRole: releaseChannelApplyPrivateEnvProofRole,
+    proofRunnerExitStatus,
+    proofRunnerSnapshotReady: true,
+    proofRunnerSnapshotSourceCommand: releaseChannelApplyPrivateEnvProofCommand,
+    proofRunnerSnapshotSourceExitStatus: proofRunnerExitStatus,
+    proofRunnerSnapshotValueRecorded: false,
+    proofRunnerRunnerReady: proofRunner.releaseChannelApplyPrivateEnvProofRunnerReady === true,
+    proofRunnerSourceMode: textValue(proofRunner.sourceMode),
+    proofRunnerPreflightReady: proofRunner.preflightReady === true,
+    proofRunnerApplyAttempted: proofRunner.applyAttempted === true,
+    proofRunnerApplyReady: proofRunner.applyReady === true,
+    proofRunnerStrictProofAttempted: proofRunner.strictProofAttempted === true,
+    proofRunnerStrictProofReady: proofRunner.strictProofReady === true,
+    proofRunnerCompletionSummaryAttempted: proofRunner.completionSummaryAttempted === true,
+    proofRunnerCompletionSummaryReady: proofRunner.completionSummaryReady === true,
+    proofRunnerCommandRows: objectRows(proofRunner.commandRows),
+    proofRunnerCommandRowCount: integerValue(proofRunner.commandRowCount),
+    proofRunnerCommandRowsValueFree:
+      proofRunner.commandRowsValueFree === true && valueFreeRows(objectRows(proofRunner.commandRows)),
+    proofRunnerSourceRows: objectRows(proofRunner.sourceRows),
+    proofRunnerSourceRowCount: integerValue(proofRunner.sourceRowCount),
+    proofRunnerSourceRowsValueFree:
+      proofRunner.sourceRowsValueFree === true && valueFreeRows(objectRows(proofRunner.sourceRows)),
+    proofRunnerResumeAliasesReady: proofRunner.proofRunnerResumeAliasesReady === true,
+    proofRunnerResumeAliasRows: proofRunnerResumeRows,
+    proofRunnerResumeAliasRowCount: integerValue(proofRunner.proofRunnerResumeAliasRowCount),
+    proofRunnerResumeAliasRowsValueFree:
+      proofRunner.proofRunnerResumeAliasRowsValueFree === true && valueFreeRows(proofRunnerResumeRows),
+    proofRunnerResumeCurrentBlockerAlias: textValue(proofRunner.proofRunnerResumeCurrentBlockerAlias),
+    proofRunnerResumeNextOperatorActionAlias: textValue(proofRunner.proofRunnerResumeNextOperatorActionAlias),
+    proofRunnerResumeFirstCommandAlias: textValue(proofRunner.proofRunnerResumeFirstCommandAlias),
+    proofRunnerResumeStartCommandAlias: textValue(proofRunner.proofRunnerResumeStartCommandAlias),
+    proofRunnerResumePrivateInputEditTarget: textValue(proofRunner.proofRunnerResumePrivateInputEditTarget),
+    proofRunnerResumeExpectedShapeSummary: textValue(proofRunner.proofRunnerResumeExpectedShapeSummary),
+    proofRunnerResumePrivateInputTemplateCommandAlias: textValue(
+      proofRunner.proofRunnerResumePrivateInputTemplateCommandAlias,
+      releaseChannelPrivateInputTemplateCommand
+    ),
+    proofRunnerResumePrivateInputTemplateDefaultPathAlias: textValue(
+      proofRunner.proofRunnerResumePrivateInputTemplateDefaultPathAlias,
+      defaultPrivateInputFileName
+    ),
+    proofRunnerResumePrivateInputFileKeyAlias: textValue(
+      proofRunner.proofRunnerResumePrivateInputFileKeyAlias,
+      privateInputFileKey
+    ),
+    proofRunnerResumePreflightCommandAlias: textValue(
+      proofRunner.proofRunnerResumePreflightCommandAlias,
+      releaseChannelApplyPrivateEnvPreflightCommand
+    ),
+    proofRunnerResumeApplyCommandAlias: textValue(
+      proofRunner.proofRunnerResumeApplyCommandAlias,
+      releaseChannelApplyPrivateEnvCommand
+    ),
+    proofRunnerResumeStrictProofCommandAlias: textValue(
+      proofRunner.proofRunnerResumeStrictProofCommandAlias,
+      "npm run release:private-edit-strict-proof"
+    ),
+    proofRunnerResumeCompletionSummaryCommandAlias: textValue(
+      proofRunner.proofRunnerResumeCompletionSummaryCommandAlias,
+      "npm run release:completion-summary-smoke"
+    ),
+    proofRunnerResumeCurrentBlockerRefreshCommandAlias: textValue(
+      proofRunner.proofRunnerResumeCurrentBlockerRefreshCommandAlias,
+      "npm run release:current-blocker"
+    ),
+    proofRunnerResumeNextActionsRefreshCommandAlias: textValue(
+      proofRunner.proofRunnerResumeNextActionsRefreshCommandAlias,
+      "npm run release:next-actions"
+    ),
+    proofRunnerResumeGuidedSetupFallbackCommandAlias: textValue(
+      proofRunner.proofRunnerResumeGuidedSetupFallbackCommandAlias,
+      releaseChannelSetupWizardCommand
+    ),
+    proofRunnerResumePlaceholderLocationCount: integerValue(proofRunner.proofRunnerResumePlaceholderLocationCount),
+    proofRunnerResumePlaceholderLocationSummary: textValue(proofRunner.proofRunnerResumePlaceholderLocationSummary),
+    proofRunnerResumeMissingLocationCount: integerValue(proofRunner.proofRunnerResumeMissingLocationCount),
+    proofRunnerResumeInvalidShapeLocationCount: integerValue(proofRunner.proofRunnerResumeInvalidShapeLocationCount),
+    proofRunnerResumeValueRecorded: proofRunner.proofRunnerResumeValueRecorded === true ? true : false,
+    proofRunnerPrivateValuesRecorded: proofRunner.privateValuesRecorded === true,
+    proofRunnerLocalEnvValueRecorded: proofRunner.localEnvValueRecorded === true,
+    proofRunnerReleaseUrlValueRecorded: proofRunner.releaseUrlValueRecorded === true,
+    proofRunnerSupportUrlValueRecorded: proofRunner.supportUrlValueRecorded === true,
+    proofRunnerChannelValueRecorded: proofRunner.channelValueRecorded === true,
+    proofRunnerNetworkProbeAttempted: proofRunner.networkProbeAttempted === true,
+    proofRunnerUpdateFeedProbeAttempted: proofRunner.updateFeedProbeAttempted === true,
+    proofRunnerReleaseUploadAttempted: proofRunner.releaseUploadAttempted === true,
+    proofRunnerSigningAttempted: proofRunner.signingAttempted === true,
+    proofRunnerNotarySubmissionAttempted: proofRunner.notarySubmissionAttempted === true,
+    proofRunnerClaimedAutoUpdate: proofRunner.claimedAutoUpdate === true,
+    proofRunnerClaimedExternalDistribution: proofRunner.claimedExternalDistribution === true,
     releaseChannelFirstProofCommandAfterPrivateEdits: textValue(completionSummary.releaseChannelFirstProofCommandAfterPrivateEdits),
     releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits: textValue(completionSummary.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits),
     ...realOperatorPreflightReportFields,
@@ -1457,6 +1624,17 @@ function buildMarkdown(report) {
 - Private env apply before strict proof: ${readyLabel(report.releaseChannelPrivateEnvApplyBeforeStrictProof)}
 - Private env apply proof runner command: \`${report.releaseChannelPrivateEnvApplyProofCommand}\`
 - Private env apply proof runner after preflight: ${readyLabel(report.releaseChannelPrivateEnvApplyProofAfterPreflight)}
+- Proof runner receipt ready: ${readyLabel(report.proofRunnerReceiptReady)}
+- Proof runner snapshot JSON: ${report.proofRunnerSnapshotJsonPath}
+- Proof runner exit status: ${report.proofRunnerExitStatus}
+- Proof runner runner ready: ${readyLabel(report.proofRunnerRunnerReady)}
+- Proof runner resume aliases ready: ${readyLabel(report.proofRunnerResumeAliasesReady)}
+- Proof runner resume first command alias: \`${report.proofRunnerResumeFirstCommandAlias}\`
+- Proof runner resume private input edit target: ${report.proofRunnerResumePrivateInputEditTarget}
+- Proof runner resume expected shapes: ${report.proofRunnerResumeExpectedShapeSummary}
+- Proof runner resume preflight/apply/strict proof: \`${report.proofRunnerResumePreflightCommandAlias}\` / \`${report.proofRunnerResumeApplyCommandAlias}\` / \`${report.proofRunnerResumeStrictProofCommandAlias}\`
+- Proof runner resume refresh commands: \`${report.proofRunnerResumeCurrentBlockerRefreshCommandAlias}\` / \`${report.proofRunnerResumeNextActionsRefreshCommandAlias}\`
+- Proof runner resume placeholder locations: ${report.proofRunnerResumePlaceholderLocationCount} (${report.proofRunnerResumePlaceholderLocationSummary})
 - First proof after private edits: \`${report.releaseChannelFirstProofCommandAfterPrivateEdits}\`
 - Recommended operator proof chain: \`${report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits}\`
 - Real operator preflight receipt ready: ${readyLabel(report.realOperatorPreflightReceiptReady)}
@@ -1575,7 +1753,58 @@ ${formatSourcePrereqPrivateInputPlaceholderLocationRows(report.sourcePrereqCurre
 - External completion resume packet JSON: ${report.externalCompletionResumePacketJsonPath}
 - Real operator preflight JSON: ${report.realOperatorPreflightJsonPath}
 - Real operator preflight snapshot JSON: ${report.realOperatorPreflightSnapshotJsonPath}
+- Proof runner JSON: ${report.proofRunnerJsonPath}
+- Proof runner snapshot JSON: ${report.proofRunnerSnapshotJsonPath}
 - 10-plan checkpoint JSON: ${report.tenPlanCheckpointJsonPath}
+
+## Proof Runner Resume Alias Snapshot
+
+- Receipt ready: ${readyLabel(report.proofRunnerReceiptReady)}
+- Snapshot ready: ${readyLabel(report.proofRunnerSnapshotReady)}
+- Snapshot JSON: ${report.proofRunnerSnapshotJsonPath}
+- Snapshot source command: \`${report.proofRunnerSnapshotSourceCommand}\`
+- Snapshot source exit status: ${report.proofRunnerSnapshotSourceExitStatus}
+- Snapshot value recorded: ${readyLabel(report.proofRunnerSnapshotValueRecorded)}
+- Command: \`${report.proofRunnerCommand}\`
+- Role: ${report.proofRunnerRole}
+- Source mode: ${report.proofRunnerSourceMode}
+- Exit status: ${report.proofRunnerExitStatus}
+- Runner ready: ${readyLabel(report.proofRunnerRunnerReady)}
+- Preflight ready: ${readyLabel(report.proofRunnerPreflightReady)}
+- Apply attempted/ready: ${readyLabel(report.proofRunnerApplyAttempted)}/${readyLabel(report.proofRunnerApplyReady)}
+- Strict proof attempted/ready: ${readyLabel(report.proofRunnerStrictProofAttempted)}/${readyLabel(report.proofRunnerStrictProofReady)}
+- Completion summary attempted/ready: ${readyLabel(report.proofRunnerCompletionSummaryAttempted)}/${readyLabel(report.proofRunnerCompletionSummaryReady)}
+- Command rows: ${report.proofRunnerCommandRowCount}
+- Command rows value-free: ${readyLabel(report.proofRunnerCommandRowsValueFree)}
+- Source rows: ${report.proofRunnerSourceRowCount}
+- Source rows value-free: ${readyLabel(report.proofRunnerSourceRowsValueFree)}
+- Resume aliases ready: ${readyLabel(report.proofRunnerResumeAliasesReady)}
+- Resume alias rows: ${report.proofRunnerResumeAliasRowCount}
+- Resume alias rows value-free: ${readyLabel(report.proofRunnerResumeAliasRowsValueFree)}
+- Current blocker alias: ${report.proofRunnerResumeCurrentBlockerAlias}
+- Next operator action alias: ${report.proofRunnerResumeNextOperatorActionAlias}
+- First command alias: \`${report.proofRunnerResumeFirstCommandAlias}\`
+- Start command alias: \`${report.proofRunnerResumeStartCommandAlias}\`
+- Private input edit target: ${report.proofRunnerResumePrivateInputEditTarget}
+- Expected private input shape: ${report.proofRunnerResumeExpectedShapeSummary}
+- Private input template command alias: \`${report.proofRunnerResumePrivateInputTemplateCommandAlias}\`
+- Private input template default path alias: \`${report.proofRunnerResumePrivateInputTemplateDefaultPathAlias}\`
+- Private input file key alias: \`${report.proofRunnerResumePrivateInputFileKeyAlias}\`
+- Preflight command alias: \`${report.proofRunnerResumePreflightCommandAlias}\`
+- Apply command alias: \`${report.proofRunnerResumeApplyCommandAlias}\`
+- Strict proof command alias: \`${report.proofRunnerResumeStrictProofCommandAlias}\`
+- Completion summary command alias: \`${report.proofRunnerResumeCompletionSummaryCommandAlias}\`
+- Blocker refresh command alias: \`${report.proofRunnerResumeCurrentBlockerRefreshCommandAlias}\`
+- Next-actions refresh command alias: \`${report.proofRunnerResumeNextActionsRefreshCommandAlias}\`
+- Guided setup fallback command alias: \`${report.proofRunnerResumeGuidedSetupFallbackCommandAlias}\`
+- Placeholder locations: ${report.proofRunnerResumePlaceholderLocationCount} (${report.proofRunnerResumePlaceholderLocationSummary})
+- Missing/invalid-shape locations: ${report.proofRunnerResumeMissingLocationCount}/${report.proofRunnerResumeInvalidShapeLocationCount}
+- Private values recorded: ${readyLabel(report.proofRunnerPrivateValuesRecorded)}
+- External distribution claimed: ${readyLabel(report.proofRunnerClaimedExternalDistribution)}
+
+| order | alias | value | source | value recorded |
+|---:|---|---|---|---:|
+${formatProofRunnerResumeAliasRows(report.proofRunnerResumeAliasRows)}
 
 ## Real Operator Preflight Readout
 
@@ -2131,6 +2360,64 @@ function validateReport(report, markdown) {
   check(report.releaseChannelPrivateEnvApplyProofRole === releaseChannelApplyPrivateEnvProofRole, "release completion summary refresh should describe private env apply proof runner role");
   check(report.releaseChannelPrivateEnvApplyProofAfterPreflight === true, "release completion summary refresh should keep proof runner after preflight readiness");
   check(report.releaseChannelPrivateEnvApplyProofValueRecorded === false, "release completion summary refresh private env apply proof runner command should be value-free");
+  check(report.proofRunnerReceiptReady === true, "release completion summary refresh should preserve a ready proof-runner resume receipt");
+  check(report.proofRunnerCommand === releaseChannelApplyPrivateEnvProofCommand, "release completion summary refresh proof runner should cite the proof runner command");
+  check(report.proofRunnerRole === releaseChannelApplyPrivateEnvProofRole, "release completion summary refresh proof runner should describe its role");
+  check([0, 1].includes(report.proofRunnerExitStatus), "release completion summary refresh proof runner should record success or expected blocked exit");
+  check(report.proofRunnerSnapshotReady === true, "release completion summary refresh should preserve the proof runner snapshot");
+  check(report.proofRunnerSnapshotJsonPath === relative(proofRunnerSnapshotJsonPath), "release completion summary refresh should expose the proof runner snapshot path");
+  check(report.proofRunnerSnapshotSourceCommand === releaseChannelApplyPrivateEnvProofCommand, "release completion summary refresh proof runner snapshot should cite the proof runner command");
+  check(report.proofRunnerSnapshotSourceExitStatus === report.proofRunnerExitStatus, "release completion summary refresh proof runner snapshot exit should match the proof runner readout");
+  check(report.proofRunnerSnapshotValueRecorded === false, "release completion summary refresh proof runner snapshot should be value-free");
+  check(report.proofRunnerSourceMode === "real-operator-runner", "release completion summary refresh proof runner should use the real operator runner");
+  check(
+    (report.proofRunnerRunnerReady === true && report.proofRunnerExitStatus === 0) ||
+      (report.proofRunnerRunnerReady === false && report.proofRunnerExitStatus === 1),
+    "release completion summary refresh proof runner exit status should match runner readiness"
+  );
+  check(report.proofRunnerCommandRows.length === report.proofRunnerCommandRowCount, "release completion summary refresh proof runner command row count should match rows");
+  check(report.proofRunnerCommandRowCount === 4, "release completion summary refresh proof runner should expose four command rows");
+  check(report.proofRunnerCommandRowsValueFree === true, "release completion summary refresh proof runner command rows should be value-free");
+  check(report.proofRunnerSourceRows.length === report.proofRunnerSourceRowCount, "release completion summary refresh proof runner source row count should match rows");
+  check(report.proofRunnerSourceRowCount === 4, "release completion summary refresh proof runner should expose four source rows");
+  check(report.proofRunnerSourceRowsValueFree === true, "release completion summary refresh proof runner source rows should be value-free");
+  check(report.proofRunnerResumeAliasesReady === true, "release completion summary refresh proof runner should expose ready resume aliases");
+  check(report.proofRunnerResumeAliasRows.length === report.proofRunnerResumeAliasRowCount, "release completion summary refresh proof runner resume alias count should match rows");
+  check(report.proofRunnerResumeAliasRowCount === 17, "release completion summary refresh proof runner resume aliases should include 17 rows");
+  check(report.proofRunnerResumeAliasRowsValueFree === true, "release completion summary refresh proof runner resume alias rows should be value-free");
+  check(report.proofRunnerResumeAliasRows.every((row) => row.valueRecorded === false), "release completion summary refresh proof runner resume alias rows should not record values");
+  check(report.proofRunnerResumeFirstCommandAlias === releaseChannelApplyPrivateEnvPreflightCommand, "release completion summary refresh proof runner resume should preserve preflight as first command");
+  check(report.proofRunnerResumeStartCommandAlias === releaseChannelApplyPrivateEnvPreflightCommand, "release completion summary refresh proof runner resume should preserve preflight as start command");
+  check(report.proofRunnerResumePreflightCommandAlias === releaseChannelApplyPrivateEnvPreflightCommand, "release completion summary refresh proof runner resume should expose preflight command");
+  check(report.proofRunnerResumeApplyCommandAlias === releaseChannelApplyPrivateEnvCommand, "release completion summary refresh proof runner resume should expose apply command");
+  check(report.proofRunnerResumeStrictProofCommandAlias === "npm run release:private-edit-strict-proof", "release completion summary refresh proof runner resume should expose strict proof command");
+  check(report.proofRunnerResumeCompletionSummaryCommandAlias === "npm run release:completion-summary-smoke", "release completion summary refresh proof runner resume should expose completion summary command");
+  check(report.proofRunnerResumePrivateInputTemplateCommandAlias === releaseChannelPrivateInputTemplateCommand, "release completion summary refresh proof runner resume should expose private input template command");
+  check(report.proofRunnerResumePrivateInputTemplateDefaultPathAlias === defaultPrivateInputFileName, "release completion summary refresh proof runner resume should expose private input template default path");
+  check(report.proofRunnerResumePrivateInputFileKeyAlias === privateInputFileKey, "release completion summary refresh proof runner resume should expose private input file key");
+  check(report.proofRunnerResumeCurrentBlockerRefreshCommandAlias === "npm run release:current-blocker", "release completion summary refresh proof runner resume should expose current-blocker refresh");
+  check(report.proofRunnerResumeNextActionsRefreshCommandAlias === "npm run release:next-actions", "release completion summary refresh proof runner resume should expose next-actions refresh");
+  check(report.proofRunnerResumeGuidedSetupFallbackCommandAlias === releaseChannelSetupWizardCommand, "release completion summary refresh proof runner resume should expose guided setup fallback");
+  check(report.proofRunnerResumePrivateInputEditTarget !== "none", "release completion summary refresh proof runner resume should expose an edit target or readiness note");
+  check(report.proofRunnerResumeExpectedShapeSummary !== "none", "release completion summary refresh proof runner resume should expose expected private input shapes");
+  check(
+    report.proofRunnerResumePlaceholderLocationCount >= 0 &&
+      report.proofRunnerResumePlaceholderLocationSummary !== undefined,
+    "release completion summary refresh proof runner resume should expose placeholder location posture"
+  );
+  check(report.proofRunnerResumeValueRecorded === false, "release completion summary refresh proof runner resume should be value-free");
+  check(report.proofRunnerPrivateValuesRecorded === false, "release completion summary refresh proof runner should not record private values");
+  check(report.proofRunnerLocalEnvValueRecorded === false, "release completion summary refresh proof runner should not record local env values");
+  check(report.proofRunnerReleaseUrlValueRecorded === false, "release completion summary refresh proof runner should not record release URL values");
+  check(report.proofRunnerSupportUrlValueRecorded === false, "release completion summary refresh proof runner should not record support URL values");
+  check(report.proofRunnerChannelValueRecorded === false, "release completion summary refresh proof runner should not record channel values");
+  check(report.proofRunnerNetworkProbeAttempted === false, "release completion summary refresh proof runner should not probe networks");
+  check(report.proofRunnerUpdateFeedProbeAttempted === false, "release completion summary refresh proof runner should not probe update feeds");
+  check(report.proofRunnerReleaseUploadAttempted === false, "release completion summary refresh proof runner should not upload releases");
+  check(report.proofRunnerSigningAttempted === false, "release completion summary refresh proof runner should not sign artifacts");
+  check(report.proofRunnerNotarySubmissionAttempted === false, "release completion summary refresh proof runner should not submit to Apple");
+  check(report.proofRunnerClaimedAutoUpdate === false, "release completion summary refresh proof runner should not claim auto-update");
+  check(report.proofRunnerClaimedExternalDistribution === false, "release completion summary refresh proof runner should not claim external distribution");
   check(report.releaseChannelFirstProofCommandAfterPrivateEdits === "npm run release:channel-live-check", "release completion summary refresh should expose release-channel first proof command");
   check(report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits === "npm run release:private-edit-strict-proof", "release completion summary refresh should expose recommended private edit proof chain");
   check(report.realOperatorPreflightReceiptReady === true, "release completion summary refresh should leave a ready real operator preflight readout");
@@ -2568,7 +2855,7 @@ function validateReport(report, markdown) {
   check(report.gitContextRows.every((row) => row.valueRecorded === false), "release completion summary refresh git context rows should be value-free");
   check(
     report.refreshCommands.length === requiredRefreshCommands.length + 1,
-    "release completion summary refresh should record required commands, real preflight, plus conditional checkpoint command"
+    "release completion summary refresh should record required commands, proof runner, plus conditional checkpoint command"
   );
   check(report.refreshCommands.every((row) => row.valueRecorded === false), "release completion summary refresh command rows should be value-free");
   check(
@@ -2584,6 +2871,12 @@ function validateReport(report, markdown) {
       (row) => row.command === releaseChannelApplyPrivateEnvPreflightCommand && row.allowBlockedExit === true
     ),
     "release completion summary refresh command rows should include the real operator preflight with expected blocked exit allowed"
+  );
+  check(
+    report.refreshCommands.some(
+      (row) => row.command === releaseChannelApplyPrivateEnvProofCommand && row.allowBlockedExit === true
+    ),
+    "release completion summary refresh command rows should include the proof runner with expected blocked exit allowed"
   );
   check(Boolean(checkpointRow), "release completion summary refresh should include checkpoint command row");
   check(checkpointRow?.skipped === !checkpointExpected, "release completion summary refresh should skip checkpoint only when the 10-plan window is not due");
@@ -2691,6 +2984,15 @@ function validateReport(report, markdown) {
   check(markdown.includes("Guided setup fallback command:"), "release completion summary refresh Markdown should include guided setup fallback command");
   check(markdown.includes("Guided setup fallback separate from primary sequence:"), "release completion summary refresh Markdown should include guided fallback primary sequence boundary");
   check(markdown.includes("Private input template command:"), "release completion summary refresh Markdown should include private input template command");
+  check(markdown.includes("Proof runner receipt ready:"), "release completion summary refresh Markdown should include proof runner receipt readiness");
+  check(markdown.includes("Proof runner snapshot JSON:"), "release completion summary refresh Markdown should include proof runner snapshot path");
+  check(markdown.includes("Proof runner resume aliases ready:"), "release completion summary refresh Markdown should include proof runner resume alias readiness");
+  check(markdown.includes("Proof runner resume first command alias:"), "release completion summary refresh Markdown should include proof runner first command alias");
+  check(markdown.includes("Proof runner resume private input edit target:"), "release completion summary refresh Markdown should include proof runner edit target");
+  check(markdown.includes("Proof runner resume expected shapes:"), "release completion summary refresh Markdown should include proof runner expected shapes");
+  check(markdown.includes("Proof runner resume preflight/apply/strict proof:"), "release completion summary refresh Markdown should include proof runner proof chain");
+  check(markdown.includes("## Proof Runner Resume Alias Snapshot"), "release completion summary refresh Markdown should include proof runner resume alias snapshot section");
+  check(markdown.includes("Proof runner JSON:"), "release completion summary refresh Markdown should include proof runner source artifact path");
   check(markdown.includes("Placeholder input receipt ready:"), "release completion summary refresh Markdown should include placeholder input receipt readiness");
   check(markdown.includes("Placeholder input receipt mode:"), "release completion summary refresh Markdown should include placeholder input receipt mode");
   check(markdown.includes("Current private input placeholder locations:"), "release completion summary refresh Markdown should include current private input placeholder locations");
@@ -2738,6 +3040,8 @@ function validateReport(report, markdown) {
 async function main() {
   let operatorPreflightExitStatus = 0;
   let operatorPreflightSnapshot = null;
+  let proofRunnerExitStatus = 0;
+  let proofRunnerSnapshot = null;
   for (const step of requiredRefreshCommands) {
     console.log(`Refreshing release completion summary evidence: ${step.command}`);
     const exitStatus = runNpmScript(step.command, { allowBlockedExit: step.allowBlockedExit === true });
@@ -2750,6 +3054,15 @@ async function main() {
       await mkdir(packageRoot, { recursive: true });
       await writeFile(realOperatorPreflightSnapshotJsonPath, `${JSON.stringify(operatorPreflightSnapshot, null, 2)}\n`, "utf8");
     }
+    if (step.command === releaseChannelApplyPrivateEnvProofCommand) {
+      proofRunnerExitStatus = exitStatus;
+      proofRunnerSnapshot = await readJsonRequired(
+        proofRunnerJsonPath,
+        "real release-channel private env apply proof runner"
+      );
+      await mkdir(packageRoot, { recursive: true });
+      await writeFile(proofRunnerSnapshotJsonPath, `${JSON.stringify(proofRunnerSnapshot, null, 2)}\n`, "utf8");
+    }
   }
 
   if (!operatorPreflightSnapshot) {
@@ -2758,15 +3071,22 @@ async function main() {
       `Expected ${releaseChannelApplyPrivateEnvPreflightCommand} to write ${relative(realOperatorPreflightSnapshotJsonPath)} before external resume evidence.`
     );
   }
+  if (!proofRunnerSnapshot) {
+    fail(
+      "Proof runner snapshot was not captured.",
+      `Expected ${releaseChannelApplyPrivateEnvProofCommand} to write ${relative(proofRunnerSnapshotJsonPath)} before after-work completion summary readout.`
+    );
+  }
 
-  const [crashReportRegression, progressRefresh, completionSummary, sourcePrereq, externalRun, externalResume, operatorPreflight] = await Promise.all([
+  const [crashReportRegression, progressRefresh, completionSummary, sourcePrereq, externalRun, externalResume, operatorPreflight, proofRunner] = await Promise.all([
     readJsonRequired(crashReportRegressionJsonPath, "desktop crash report regression smoke"),
     readJsonRequired(progressRefreshJsonPath, "release progress refresh"),
     readJsonRequired(completionSummaryJsonPath, "release completion summary"),
     readJsonRequired(sourcePrereqJsonPath, "release source evidence prerequisite"),
     readJsonRequired(externalRunPacketJsonPath, "release external completion run packet"),
     readJsonRequired(externalResumePacketJsonPath, "release external completion resume packet"),
-    readJsonRequired(realOperatorPreflightSnapshotJsonPath, "real release-channel private env apply preflight snapshot")
+    readJsonRequired(realOperatorPreflightSnapshotJsonPath, "real release-channel private env apply preflight snapshot"),
+    readJsonRequired(proofRunnerSnapshotJsonPath, "real release-channel private env apply proof runner snapshot")
   ]);
 
   let checkpoint = null;
@@ -2788,6 +3108,8 @@ async function main() {
     externalResume,
     operatorPreflight,
     operatorPreflightExitStatus,
+    proofRunner,
+    proofRunnerExitStatus,
     checkpoint,
     gitContext
   });
@@ -2929,6 +3251,23 @@ async function main() {
   console.log(`- Private env apply before strict proof: ${report.releaseChannelPrivateEnvApplyBeforeStrictProof ? "yes" : "no"}`);
   console.log(`- Private env apply proof runner command: ${report.releaseChannelPrivateEnvApplyProofCommand}`);
   console.log(`- Private env apply proof runner after preflight: ${report.releaseChannelPrivateEnvApplyProofAfterPreflight ? "yes" : "no"}`);
+  console.log(`- Proof runner receipt ready: ${report.proofRunnerReceiptReady ? "yes" : "no"}`);
+  console.log(`- Proof runner snapshot: ${report.proofRunnerSnapshotJsonPath}`);
+  console.log(`- Proof runner exit status: ${report.proofRunnerExitStatus}`);
+  console.log(`- Proof runner runner ready: ${report.proofRunnerRunnerReady ? "yes" : "no"}`);
+  console.log(`- Proof runner resume aliases ready: ${report.proofRunnerResumeAliasesReady ? "yes" : "no"}`);
+  console.log(`- Proof runner resume first command alias: ${report.proofRunnerResumeFirstCommandAlias}`);
+  console.log(`- Proof runner resume private input edit target: ${report.proofRunnerResumePrivateInputEditTarget}`);
+  console.log(`- Proof runner resume expected shapes: ${report.proofRunnerResumeExpectedShapeSummary}`);
+  console.log(
+    `- Proof runner resume preflight/apply/strict proof: ${report.proofRunnerResumePreflightCommandAlias} / ${report.proofRunnerResumeApplyCommandAlias} / ${report.proofRunnerResumeStrictProofCommandAlias}`
+  );
+  console.log(
+    `- Proof runner resume refresh commands: ${report.proofRunnerResumeCurrentBlockerRefreshCommandAlias} / ${report.proofRunnerResumeNextActionsRefreshCommandAlias}`
+  );
+  console.log(
+    `- Proof runner resume placeholder locations: ${report.proofRunnerResumePlaceholderLocationCount} (${report.proofRunnerResumePlaceholderLocationSummary})`
+  );
   console.log(`- External resume packet ready: ${report.externalCompletionResumePacketReady ? "yes" : "no"}`);
   console.log(`- External resume private input template command: ${report.externalCompletionResumePrivateInputTemplateCommand}`);
   console.log(
