@@ -2,7 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,10 +20,12 @@ const sourcePrereqJsonPath = path.join(packageRoot, `${appName}-${packageJson.ve
 const developerIdSigningJsonPath = path.join(summaryRoot, `${appName}-${platformArch}-developer-id-signing.json`);
 const notarizationJsonPath = path.join(summaryRoot, `${appName}-${platformArch}-notarization.json`);
 const packagedAppPath = path.join(packageRoot, `${appName}.app`);
+const pkgPayloadAppPath = path.join(packageRoot, "pkg-payload-smoke", "payload", `${appName}.app`);
 const dmgPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}.dmg`);
 const pkgPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}.pkg`);
 const failures = [];
 const cleanupRows = [];
+const restoreRows = [];
 
 const refreshCommands = [
   {
@@ -59,7 +61,10 @@ const refreshCommands = [
   {
     command: "npm run desktop:pkg-smoke",
     role: "refresh local unsigned PKG artifact evidence",
-    sourceArtifact: "Release manifest prerequisite"
+    sourceArtifact: "Release manifest prerequisite",
+    cleanupAfter: [
+      packagedAppPath
+    ]
   },
   {
     command: "npm run desktop:pkg-payload-smoke",
@@ -70,6 +75,7 @@ const refreshCommands = [
     command: "npm run desktop:pkg-payload-project-io-smoke",
     role: "refresh PKG payload project IO evidence",
     sourceArtifact: "Completion audit prerequisite",
+    restorePackagedAppFromPayload: true,
     cleanupAfter: [
       path.join(packageRoot, "pkg-payload-smoke"),
       path.join(packageRoot, "pkg-payload-smoke-expanded")
@@ -362,6 +368,26 @@ async function cleanupAfterCommand(row) {
   }
 }
 
+async function restoreAfterCommand(row) {
+  if (row.restorePackagedAppFromPayload !== true) {
+    return;
+  }
+  const payloadPresentBeforeRestore = existsSync(pkgPayloadAppPath);
+  await rm(packagedAppPath, { recursive: true, force: true });
+  if (payloadPresentBeforeRestore) {
+    await cp(pkgPayloadAppPath, packagedAppPath, { recursive: true, verbatimSymlinks: true });
+  }
+  restoreRows.push({
+    order: restoreRows.length + 1,
+    afterCommand: row.command,
+    sourcePath: relative(pkgPayloadAppPath),
+    targetPath: relative(packagedAppPath),
+    sourcePresentBeforeRestore: payloadPresentBeforeRestore,
+    restored: existsSync(packagedAppPath),
+    valueRecorded: false
+  });
+}
+
 async function readJsonIfExists(filePath) {
   if (!existsSync(filePath)) {
     return null;
@@ -394,6 +420,18 @@ function formatCleanupRows(rows) {
     .join("\n");
 }
 
+function formatRestoreRows(rows) {
+  if (rows.length === 0) {
+    return "| none | none | none | none | no | no | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | \`${escapeCell(row.afterCommand)}\` | ${escapeCell(row.sourcePath)} | ${escapeCell(row.targetPath)} | ${readyLabel(row.sourcePresentBeforeRestore)} | ${readyLabel(row.restored)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function buildMarkdown(report) {
   return `# Release Source Evidence Refresh Smoke
 
@@ -402,6 +440,7 @@ function buildMarkdown(report) {
 - 10-plan progress: ${report.tenPlanProgress}
 - Refresh command count: ${report.commandCount}
 - Cleanup row count: ${report.cleanupRowCount}
+- Restore row count: ${report.restoreRowCount}
 - Source artifacts present after refresh: ${report.sourceArtifactPresentCount}/${report.sourceArtifactTotal}
 - Missing source artifacts after refresh: ${report.sourceArtifactMissingCount} (${report.sourceArtifactMissingSummary})
 - Release manifest DMG retained for follow-up update metadata checks: ${readyLabel(report.releaseManifestDmgRetained)}
@@ -428,6 +467,12 @@ ${formatCommandRows(report.commandRows)}
 |---:|---|---|---|---|---|
 ${formatCleanupRows(report.cleanupRows)}
 
+## Restore Rows
+
+| order | after command | source path | target path | source present before restore | restored | value recorded |
+|---:|---|---|---|---|---|---|
+${formatRestoreRows(report.restoreRows)}
+
 This refresh chain is local-only release evidence generation. It disables Apple notarization submission through \`GROOVEFORGE_NOTARY_SUBMIT=0\`, does not upload releases, publish update feeds, probe distribution channels, or record release/support/feed URLs, channel values, credentials, tokens, Developer ID identity labels, private beats, or real user audio. Developer ID signing remains isolated to the existing Developer ID smoke and is not claimed as primary release signing by this receipt.
 `;
 }
@@ -440,6 +485,9 @@ function validateReport(report, markdown) {
   check(report.commandRows.every((row) => row.stdoutRecorded === false && row.stderrRecorded === false), "source evidence refresh report should not store command output");
   check(report.cleanupRows.every((row) => row.valueRecorded === false), "source evidence refresh cleanup rows should be value-free");
   check(report.cleanupRows.every((row) => row.removed === true), "source evidence refresh cleanup rows should remove generated intermediate dirs");
+  check(report.restoreRows.every((row) => row.valueRecorded === false), "source evidence refresh restore rows should be value-free");
+  check(report.restoreRows.every((row) => row.sourcePresentBeforeRestore === true && row.restored === true), "source evidence refresh should restore packaged app from verified PKG payload before DMG evidence");
+  check(report.restoreRowCount >= 1, "source evidence refresh should record at least one packaged app restore row");
   check(report.commandSummary.includes("npm run release:source-evidence-prereq-smoke"), "source evidence refresh should end with prerequisite refresh");
   check(report.sourcePrereqPresent === true, "source evidence refresh should produce the prerequisite JSON");
   check(report.sourceArtifactTotal === 21, "source evidence refresh should validate the 21 source artifact prerequisite set");
@@ -479,6 +527,7 @@ try {
   const commandRows = [];
   for (const row of refreshCommands) {
     commandRows.push(runNpmCommand(row));
+    await restoreAfterCommand(row);
     await cleanupAfterCommand(row);
   }
 
@@ -504,6 +553,8 @@ try {
     commandSummary: commandSummary(commandRows),
     cleanupRows,
     cleanupRowCount: cleanupRows.length,
+    restoreRows,
+    restoreRowCount: restoreRows.length,
     sourcePrereqPresent: Boolean(sourcePrereq),
     sourcePrereqPath: relative(sourcePrereqJsonPath),
     latestCompletedPlan: textValue(sourcePrereq?.latestCompletedPlan),
@@ -557,6 +608,8 @@ try {
   console.log(`- Markdown: ${relative(reportMarkdownPath)}`);
   console.log(`- JSON: ${relative(reportJsonPath)}`);
   console.log(`- Commands: ${report.commandCount}`);
+  console.log(`- Cleanup rows: ${report.cleanupRowCount}`);
+  console.log(`- Restore rows: ${report.restoreRowCount}`);
   console.log(`- Source artifacts present: ${report.sourceArtifactPresentCount}/${report.sourceArtifactTotal}`);
   console.log(`- Missing source artifacts: ${report.sourceArtifactMissingCount} (${report.sourceArtifactMissingSummary})`);
   console.log(`- Release manifest DMG retained: ${readyLabel(report.releaseManifestDmgRetained)}`);
