@@ -38,7 +38,7 @@ Run the source evidence prerequisite smoke when the operator needs a value-free 
 npm run release:source-evidence-prereq-smoke
 ```
 
-That packet reads the external proof bundle and completion summary when they exist, otherwise falls back to the expected 21 source artifacts. It writes ignored Markdown/JSON with present/missing artifact rows, refresh command rows, prerequisite notes, `currentFirstBlocker`/`currentNextCommand` aliases, current operator first command, strict proof command, current private input placeholder locations, and non-claiming posture without running packaging, signing, notarization, uploads, feed publishing, channel probes, hard gates, or ignored env writes.
+That packet reads the external proof bundle, completion summary, current blocker, and placeholder input receipt when they exist, otherwise falls back to the expected 21 source artifacts. It writes ignored Markdown/JSON with present/missing artifact rows, refresh command rows, prerequisite notes, `currentFirstBlocker`/`currentNextCommand` aliases, current operator first command, strict proof command, current private input placeholder locations plus their source, and non-claiming posture without running packaging, signing, notarization, uploads, feed publishing, channel probes, hard gates, or ignored env writes. Placeholder file/line/key rows are recovered from the compact completion summary first, then proof bundle, current blocker, and placeholder input receipt so stale completion-summary evidence cannot hide the ignored private input edit target.
 
 Run the source evidence refresh smoke when those prerequisite rows need to be regenerated from local-only evidence before another completion readout:
 
