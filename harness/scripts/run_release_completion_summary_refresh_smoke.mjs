@@ -17,6 +17,7 @@ const progressRefreshStem = "release-progress-refresh-smoke";
 const completionSummaryStem = "release-completion-summary-smoke";
 const checkpointStem = "release-10-plan-checkpoint-smoke";
 const sourcePrereqStem = "release-source-evidence-prereq-smoke";
+const operatorCompletionBriefStem = "release-operator-completion-brief-smoke";
 const externalRunPacketStem = "release-external-completion-run-packet-smoke";
 const externalResumePacketStem = "release-external-completion-resume-packet-smoke";
 const crashReportRegressionStem = "desktop-crash-report-regression-smoke";
@@ -28,6 +29,7 @@ const progressRefreshJsonPath = path.join(packageRoot, `${appName}-${packageJson
 const completionSummaryJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${completionSummaryStem}.json`);
 const checkpointJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${checkpointStem}.json`);
 const sourcePrereqJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${sourcePrereqStem}.json`);
+const operatorCompletionBriefJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${operatorCompletionBriefStem}.json`);
 const externalRunPacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${externalRunPacketStem}.json`);
 const externalResumePacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${externalResumePacketStem}.json`);
 const crashReportRegressionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${crashReportRegressionStem}.json`);
@@ -44,6 +46,7 @@ const proofRunnerSnapshotJsonPath = path.join(
 const receiptMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${receiptStem}.md`);
 const receiptJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${receiptStem}.json`);
 const failures = [];
+const releaseCompletionSummaryRefreshCommand = "npm run release:completion-summary-refresh-smoke";
 const releaseChannelPrivateInputTemplateCommand = "npm run release:channel-private-input-template";
 const releaseChannelPrivateInputTemplateRole =
   "create the ignored .env.release-channel.local skeleton for the four private release-channel metadata values before preflight";
@@ -60,6 +63,8 @@ const releaseChannelPrivateInputReadyGateCommand = "npm run release:channel-priv
 const releaseChannelPrivateInputReadyGateRole =
   "summarize whether the ignored private input file is ready to apply without replacing the preflight-first operator sequence";
 const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
+const privateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const currentBlockerCommand = "npm run release:current-blocker";
 const privateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
 const defaultPrivateInputFileName = ".env.release-channel.local";
 const operatorPrivateInputFileDefaultPath = defaultPrivateInputFileName;
@@ -671,6 +676,62 @@ function operatorUnblockAliasRows(report) {
   }));
 }
 
+function copyKoreanOperatorHandoffRow(row) {
+  return {
+    order: integerValue(row.order),
+    label: textValue(row.label),
+    action: textValue(row.action),
+    command: textValue(row.command),
+    proof: textValue(row.proof),
+    valueRecorded: false
+  };
+}
+
+function copyKoreanPrivateInputRow(row) {
+  return {
+    order: integerValue(row.order),
+    key: textValue(row.key),
+    editTarget: textValue(row.editTarget),
+    expectedShape: textValue(row.expectedShape),
+    preflightCommand: textValue(row.preflightCommand),
+    applyCommand: textValue(row.applyCommand),
+    proofCommand: textValue(row.proofCommand),
+    valueRecorded: false
+  };
+}
+
+function koreanOperatorHandoffRowsReady(rows, currentNextCommand) {
+  const commands = rows.map((row) => row.command);
+  return (
+    rows.length === 7 &&
+    rows.every((row) => row.valueRecorded === false) &&
+    rows[0]?.command === currentNextCommand &&
+    commands.includes(releaseChannelPrivateInputTemplateCommand) &&
+    commands.includes(releaseChannelApplyPrivateEnvPreflightCommand) &&
+    commands.includes(releaseChannelApplyPrivateEnvCommand) &&
+    commands.includes(privateEditOperatorProofCommand) &&
+    commands.includes(currentBlockerCommand) &&
+    commands.includes(releaseCompletionSummaryRefreshCommand)
+  );
+}
+
+function koreanPrivateInputRowsReady(rows, currentRequiredKeys) {
+  return (
+    rows.length === 4 &&
+    rows.every((row, index) => row.editTarget === `${defaultPrivateInputFileName}:${index + 6}`) &&
+    rows.every((row) => currentRequiredKeys.includes(row.key)) &&
+    rows.every((row) => row.expectedShape !== "none") &&
+    rows.every((row) => row.preflightCommand === releaseChannelApplyPrivateEnvPreflightCommand) &&
+    rows.every((row) => row.applyCommand === releaseChannelApplyPrivateEnvCommand) &&
+    rows.every((row) => row.proofCommand === privateEditOperatorProofCommand) &&
+    rows.every((row) => row.valueRecorded === false)
+  );
+}
+
+function rowsContainUrl(rows) {
+  return /https?:\/\//i.test(JSON.stringify(rows));
+}
+
 function proofRunnerResumeAliasRows(proofRunner) {
   return objectRows(proofRunner.proofRunnerResumeAliasRows).map((row, index) => ({
     order: integerValue(row.order) || index + 1,
@@ -744,6 +805,24 @@ function formatSetupWizardHandoffRows(rows) {
     .join("\n");
 }
 
+function formatKoreanOperatorHandoffRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.label)} | ${escapeCell(row.action)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.proof)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
+function formatKoreanPrivateInputRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.key)} | ${escapeCell(row.editTarget)} | ${escapeCell(row.expectedShape)} | \`${escapeCell(row.preflightCommand)}\` | \`${escapeCell(row.applyCommand)}\` | \`${escapeCell(row.proofCommand)}\` | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function formatSourcePrereqPrivateInputPlaceholderLocationRows(rows) {
   if (rows.length === 0) {
     return "| none | none | none | none | none | none | no |";
@@ -761,6 +840,7 @@ function buildReport({
   progressRefresh,
   completionSummary,
   sourcePrereq,
+  operatorBrief,
   externalRun,
   externalResume,
   operatorPreflight,
@@ -783,6 +863,7 @@ function buildReport({
   const completionBlockerActionRows = objectRows(completionSummary.completionBlockerActionRows);
   const completionBlockerFocusRows = objectRows(completionSummary.completionBlockerFocusRows);
   const currentOperatorCommandRows = objectRows(completionSummary.currentOperatorCommandRows);
+  const currentRequiredKeys = stringArrayValue(completionSummary.currentRequiredKeys);
   const currentPrivateInputPlaceholderLocations = objectRows(
     completionSummary.currentPrivateInputPlaceholderLocations
   ).filter((row) => row.valueRecorded === false);
@@ -795,6 +876,10 @@ function buildReport({
   const realOperatorPreflightRemediationRows = objectRows(operatorPreflight.preflightRemediationRows);
   const realOperatorPreflightOperatorReceiptRows = objectRows(operatorPreflight.operatorReceiptRows);
   const proofRunnerResumeRows = proofRunnerResumeAliasRows(proofRunner);
+  const koreanOperatorHandoffRows = objectRows(operatorBrief.koreanOperatorHandoffRows).map(
+    copyKoreanOperatorHandoffRow
+  );
+  const koreanPrivateInputRows = objectRows(operatorBrief.koreanPrivateInputRows).map(copyKoreanPrivateInputRow);
   const realOperatorPreflightReady =
     operatorPreflight.reportCommand === releaseChannelApplyPrivateEnvPreflightCommand &&
     operatorPreflight.preflightOnly === true &&
@@ -884,7 +969,7 @@ function buildReport({
     platform: process.platform,
     arch: process.arch,
     platformArch,
-    reportCommand: "npm run release:completion-summary-refresh-smoke",
+    reportCommand: releaseCompletionSummaryRefreshCommand,
     refreshCommands: buildRefreshCommands(checkpointRequired),
     progressRefreshCommand: "npm run release:progress-refresh-smoke",
     completionSummaryCommand: "npm run release:completion-summary-smoke",
@@ -892,6 +977,7 @@ function buildReport({
     progressRefreshJsonArtifactName: "release-progress-refresh-smoke.json",
     completionSummaryJsonArtifactName: "release-completion-summary-smoke.json",
     sourcePrereqJsonArtifactName: "release-source-evidence-prereq-smoke.json",
+    operatorCompletionBriefJsonArtifactName: "release-operator-completion-brief-smoke.json",
     externalCompletionRunPacketJsonArtifactName: "release-external-completion-run-packet-smoke.json",
     externalCompletionResumePacketJsonArtifactName: "release-external-completion-resume-packet-smoke.json",
     crashReportRegressionJsonArtifactName: "desktop-crash-report-regression-smoke.json",
@@ -905,6 +991,7 @@ function buildReport({
     progressRefreshJsonPath: relative(progressRefreshJsonPath),
     completionSummaryJsonPath: relative(completionSummaryJsonPath),
     sourcePrereqJsonPath: relative(sourcePrereqJsonPath),
+    operatorCompletionBriefJsonPath: relative(operatorCompletionBriefJsonPath),
     externalCompletionRunPacketJsonPath: relative(externalRunPacketJsonPath),
     externalCompletionResumePacketJsonPath: relative(externalResumePacketJsonPath),
     crashReportRegressionJsonPath: relative(crashReportRegressionJsonPath),
@@ -945,6 +1032,27 @@ function buildReport({
     completionSummarySourceSummaryReady: completionSummary.sourceSummaryReady === true,
     completionSummarySourceLabelsMatch: completionSummary.sourceLabelsMatch === true,
     sourcePrereqReady: sourcePrereq.sourceArtifactPresentCount === sourcePrereq.sourceArtifactTotal,
+    operatorCompletionBriefReady: operatorBrief.releaseOperatorCompletionBriefReady === true,
+    operatorCompletionBriefReportCommand: textValue(
+      operatorBrief.reportCommand,
+      "npm run release:operator-completion-brief-smoke"
+    ),
+    operatorCompletionBriefKoreanOperatorHandoffReady: operatorBrief.koreanOperatorHandoffReady === true,
+    koreanOperatorHandoffReady:
+      operatorBrief.koreanOperatorHandoffReady === true &&
+      koreanOperatorHandoffRowsReady(koreanOperatorHandoffRows, currentNextCommandAlias),
+    koreanOperatorHandoffRows,
+    koreanOperatorHandoffRowCount: integerValue(operatorBrief.koreanOperatorHandoffRowCount),
+    koreanOperatorHandoffRowsValueFree:
+      operatorBrief.koreanOperatorHandoffRowsValueFree === true && valueFreeRows(koreanOperatorHandoffRows),
+    koreanPrivateInputRows,
+    koreanPrivateInputRowCount: integerValue(operatorBrief.koreanPrivateInputRowCount),
+    koreanPrivateInputRowsValueFree:
+      operatorBrief.koreanPrivateInputRowsValueFree === true &&
+      koreanPrivateInputRowsReady(koreanPrivateInputRows, currentRequiredKeys),
+    koreanPrivateInputEditTargetSummary:
+      koreanPrivateInputRows.length > 0 ? koreanPrivateInputRows.map((row) => row.editTarget).join(", ") : "none",
+    koreanOperatorHandoffValueRecorded: false,
     sourcePrereqLatestCompletedPlan: textValue(sourcePrereq.latestCompletedPlan),
     sourcePrereqTenPlanProgress: textValue(sourcePrereq.tenPlanProgress),
     sourcePrereqSourceArtifactPresentCount: integerValue(sourcePrereq.sourceArtifactPresentCount),
@@ -1023,7 +1131,7 @@ function buildReport({
     currentNextCommandAlias,
     currentEnvEditTarget: textValue(completionSummary.currentEnvEditTarget, ".env.distribution.local"),
     currentRequiredKeyCount: integerValue(completionSummary.currentRequiredKeyCount),
-    currentRequiredKeys: stringArrayValue(completionSummary.currentRequiredKeys),
+    currentRequiredKeys,
     currentPlaceholderKeyCount: integerValue(completionSummary.currentPlaceholderKeyCount),
     currentPlaceholderKeys: stringArrayValue(completionSummary.currentPlaceholderKeys),
     currentPlaceholderEditLocationCount: integerValue(completionSummary.currentPlaceholderEditLocationCount),
@@ -1666,6 +1774,11 @@ function buildMarkdown(report) {
 - Operator unblock broad next command alias: \`${report.operatorUnblockBroadNextCommandAlias}\`
 - Operator unblock private input edit target: ${report.operatorUnblockPrivateInputEditTarget}
 - Operator unblock preflight/apply/strict proof: \`${report.operatorUnblockPreflightCommandAlias}\` / \`${report.operatorUnblockApplyCommandAlias}\` / \`${report.operatorUnblockStrictProofCommandAlias}\`
+- Operator completion brief ready: ${readyLabel(report.operatorCompletionBriefReady)}
+- Korean operator handoff ready: ${readyLabel(report.koreanOperatorHandoffReady)}
+- Korean operator handoff rows: ${report.koreanOperatorHandoffRowCount}
+- Korean private input rows: ${report.koreanPrivateInputRowCount}
+- Korean private input edit targets: ${report.koreanPrivateInputEditTargetSummary}
 - User-facing current blocker alias: ${report.currentFirstBlockerAlias}
 - User-facing current next command alias: \`${report.currentNextCommandAlias}\`
 - Source prereq current first blocker alias: ${report.sourcePrereqCurrentFirstBlocker}
@@ -1812,6 +1925,26 @@ ${formatCommandRows(report.refreshCommands)}
 |---:|---|---|---:|
 ${formatUserFacingCompletionRows(report.operatorUnblockAliasRows)}
 
+## 한국어 운영자 핸드오프
+
+- Source operator brief JSON: ${report.operatorCompletionBriefJsonPath}
+- Operator completion brief command: \`${report.operatorCompletionBriefReportCommand}\`
+- Handoff ready: ${readyLabel(report.koreanOperatorHandoffReady)}
+- Handoff rows value-free: ${readyLabel(report.koreanOperatorHandoffRowsValueFree)}
+
+| 순서 | 항목 | 운영자 작업 | 명령 | 확인 기준 | value recorded |
+|---:|---|---|---|---|---:|
+${formatKoreanOperatorHandoffRows(report.koreanOperatorHandoffRows)}
+
+## 한국어 릴리스 채널 입력 행
+
+- Private input rows value-free: ${readyLabel(report.koreanPrivateInputRowsValueFree)}
+- Private input edit targets: ${report.koreanPrivateInputEditTargetSummary}
+
+| 순서 | key | 입력 위치 | 기대 형상 | 사전 검증 | 적용 | 증거 체인 | value recorded |
+|---:|---|---|---|---|---|---|---:|
+${formatKoreanPrivateInputRows(report.koreanPrivateInputRows)}
+
 ## Source Evidence Prerequisite Mirror
 
 - Source prereq JSON: ${report.sourcePrereqJsonPath}
@@ -1845,6 +1978,7 @@ ${formatSourcePrereqPrivateInputPlaceholderLocationRows(report.sourcePrereqCurre
 - Desktop crash report regression JSON: ${report.crashReportRegressionJsonPath}
 - Completion summary JSON: ${report.completionSummaryJsonPath}
 - Source prereq JSON: ${report.sourcePrereqJsonPath}
+- Operator completion brief JSON: ${report.operatorCompletionBriefJsonPath}
 - External completion run packet JSON: ${report.externalCompletionRunPacketJsonPath}
 - External completion resume packet JSON: ${report.externalCompletionResumePacketJsonPath}
 - Real operator preflight JSON: ${report.realOperatorPreflightJsonPath}
@@ -2257,6 +2391,79 @@ function validateReport(report, markdown) {
   check(report.sourcePrereqNotarySubmissionAttempted === false, "release completion summary refresh source prereq should not attempt notarization");
   check(report.sourcePrereqClaimedExternalDistribution === false, "release completion summary refresh source prereq should not claim external distribution");
   check(report.sourcePrereqValueRecorded === false, "release completion summary refresh source prereq should remain value-free");
+  check(report.operatorCompletionBriefReady === true, "release completion summary refresh should mirror a ready operator completion brief");
+  check(
+    report.operatorCompletionBriefReportCommand === "npm run release:operator-completion-brief-smoke",
+    "release completion summary refresh should identify the operator completion brief command"
+  );
+  check(
+    report.operatorCompletionBriefKoreanOperatorHandoffReady === true,
+    "release completion summary refresh should read the operator brief Korean handoff readiness"
+  );
+  check(report.koreanOperatorHandoffReady === true, "release completion summary refresh should mirror a ready Korean operator handoff");
+  check(report.koreanOperatorHandoffRows.length === report.koreanOperatorHandoffRowCount, "release completion summary refresh Korean handoff row count should match rows");
+  check(report.koreanOperatorHandoffRowCount === 7, "release completion summary refresh Korean handoff should include seven rows");
+  check(report.koreanOperatorHandoffRowsValueFree === true, "release completion summary refresh Korean handoff rows should be value-free");
+  check(report.koreanOperatorHandoffRows.every((row) => row.valueRecorded === false), "release completion summary refresh Korean handoff rows should not record values");
+  check(
+    report.koreanOperatorHandoffRows[0]?.command === report.currentNextCommandAlias,
+    "release completion summary refresh Korean handoff should start from the current next command alias"
+  );
+  check(
+    report.koreanOperatorHandoffRows.some((row) => row.command === releaseChannelPrivateInputTemplateCommand),
+    "release completion summary refresh Korean handoff should include the private input template command"
+  );
+  check(
+    report.koreanOperatorHandoffRows.some((row) => row.command === releaseChannelApplyPrivateEnvPreflightCommand),
+    "release completion summary refresh Korean handoff should include preflight before apply"
+  );
+  check(
+    report.koreanOperatorHandoffRows.some((row) => row.command === releaseChannelApplyPrivateEnvCommand),
+    "release completion summary refresh Korean handoff should include apply after preflight"
+  );
+  check(
+    report.koreanOperatorHandoffRows.some((row) => row.command === privateEditOperatorProofCommand),
+    "release completion summary refresh Korean handoff should include the strict proof chain"
+  );
+  check(
+    report.koreanOperatorHandoffRows.some((row) => row.command === currentBlockerCommand),
+    "release completion summary refresh Korean handoff should include current blocker refresh"
+  );
+  check(
+    report.koreanOperatorHandoffRows.some((row) => row.command === releaseCompletionSummaryRefreshCommand),
+    "release completion summary refresh Korean handoff should include the after-work completion summary refresh"
+  );
+  check(report.koreanPrivateInputRows.length === report.koreanPrivateInputRowCount, "release completion summary refresh Korean input row count should match rows");
+  check(report.koreanPrivateInputRowCount === 4, "release completion summary refresh Korean input section should include four private input rows");
+  check(report.koreanPrivateInputRowsValueFree === true, "release completion summary refresh Korean input rows should be value-free");
+  check(report.koreanPrivateInputRows.every((row) => row.valueRecorded === false), "release completion summary refresh Korean input rows should not record values");
+  check(
+    report.koreanPrivateInputRows.every((row, index) => row.editTarget === `${defaultPrivateInputFileName}:${index + 6}`),
+    "release completion summary refresh Korean input rows should expose default private input edit lines"
+  );
+  check(
+    report.koreanPrivateInputRows.every((row) => report.currentRequiredKeys.includes(row.key)),
+    "release completion summary refresh Korean input rows should cover current required release-channel keys"
+  );
+  check(
+    report.koreanPrivateInputRows.every((row) => row.expectedShape !== "none"),
+    "release completion summary refresh Korean input rows should preserve expected shapes"
+  );
+  check(
+    report.koreanPrivateInputRows.every((row) => row.preflightCommand === releaseChannelApplyPrivateEnvPreflightCommand),
+    "release completion summary refresh Korean input rows should keep preflight first"
+  );
+  check(
+    report.koreanPrivateInputRows.every((row) => row.applyCommand === releaseChannelApplyPrivateEnvCommand),
+    "release completion summary refresh Korean input rows should expose apply command"
+  );
+  check(
+    report.koreanPrivateInputRows.every((row) => row.proofCommand === privateEditOperatorProofCommand),
+    "release completion summary refresh Korean input rows should expose strict proof command"
+  );
+  check(!rowsContainUrl(report.koreanOperatorHandoffRows), "release completion summary refresh Korean handoff rows should not record URLs");
+  check(!rowsContainUrl(report.koreanPrivateInputRows), "release completion summary refresh Korean input rows should not record URLs");
+  check(report.koreanOperatorHandoffValueRecorded === false, "release completion summary refresh Korean operator handoff should stay value-free");
   check(report.latestPlanNumber > 0, "release completion summary refresh should include latest plan number");
   check(report.latestPlan === `plan-${report.latestPlanNumber}`, "release completion summary refresh should format latest plan");
   check(report.latestCompletedPlan === report.latestPlan, "release completion summary refresh latest completed plan alias should mirror latest plan");
@@ -3128,6 +3335,17 @@ function validateReport(report, markdown) {
   check(markdown.includes("Private input edit target:"), "release completion summary refresh Markdown should include operator unblock target row");
   check(markdown.includes("Expected private input shape:"), "release completion summary refresh Markdown should include operator unblock shape row");
   check(markdown.includes("Alias rows value-free: yes"), "release completion summary refresh Markdown should include operator unblock value-free row status");
+  check(markdown.includes("Operator completion brief ready: yes"), "release completion summary refresh Markdown should include operator brief readiness");
+  check(markdown.includes("Korean operator handoff ready: yes"), "release completion summary refresh Markdown should include Korean handoff readiness");
+  check(markdown.includes("Korean private input edit targets:"), "release completion summary refresh Markdown should include Korean private input edit targets");
+  check(markdown.includes("## 한국어 운영자 핸드오프"), "release completion summary refresh Markdown should include Korean operator handoff section");
+  check(markdown.includes("## 한국어 릴리스 채널 입력 행"), "release completion summary refresh Markdown should include Korean release-channel input rows");
+  check(markdown.includes(".env.release-channel.local:6"), "release completion summary refresh Markdown should include first Korean private input edit line");
+  check(
+    markdown.includes(releaseCompletionSummaryRefreshCommand),
+    "release completion summary refresh Markdown should include Korean after-work refresh command"
+  );
+  check(markdown.includes("Operator completion brief JSON:"), "release completion summary refresh Markdown should include operator brief artifact path");
   check(markdown.includes("## Command Order"), "release completion summary refresh Markdown should include command order");
   check(markdown.includes("condition | status"), "release completion summary refresh Markdown should include command conditions and statuses");
   check(markdown.includes("Current operator command sequence ready: yes"), "release completion summary refresh Markdown should include current operator command sequence readiness");
@@ -3236,11 +3454,22 @@ async function main() {
     );
   }
 
-  const [crashReportRegression, progressRefresh, completionSummary, sourcePrereq, externalRun, externalResume, operatorPreflight, proofRunner] = await Promise.all([
+  const [
+    crashReportRegression,
+    progressRefresh,
+    completionSummary,
+    sourcePrereq,
+    operatorBrief,
+    externalRun,
+    externalResume,
+    operatorPreflight,
+    proofRunner
+  ] = await Promise.all([
     readJsonRequired(crashReportRegressionJsonPath, "desktop crash report regression smoke"),
     readJsonRequired(progressRefreshJsonPath, "release progress refresh"),
     readJsonRequired(completionSummaryJsonPath, "release completion summary"),
     readJsonRequired(sourcePrereqJsonPath, "release source evidence prerequisite"),
+    readJsonRequired(operatorCompletionBriefJsonPath, "release operator completion brief"),
     readJsonRequired(externalRunPacketJsonPath, "release external completion run packet"),
     readJsonRequired(externalResumePacketJsonPath, "release external completion resume packet"),
     readJsonRequired(realOperatorPreflightSnapshotJsonPath, "real release-channel private env apply preflight snapshot"),
@@ -3262,6 +3491,7 @@ async function main() {
     progressRefresh,
     completionSummary,
     sourcePrereq,
+    operatorBrief,
     externalRun,
     externalResume,
     operatorPreflight,
@@ -3345,6 +3575,11 @@ async function main() {
   console.log(
     `- Operator unblock preflight/apply/strict proof: ${report.operatorUnblockPreflightCommandAlias} / ${report.operatorUnblockApplyCommandAlias} / ${report.operatorUnblockStrictProofCommandAlias}`
   );
+  console.log(`- Operator completion brief ready: ${report.operatorCompletionBriefReady ? "yes" : "no"}`);
+  console.log(`- Korean operator handoff ready: ${report.koreanOperatorHandoffReady ? "yes" : "no"}`);
+  console.log(`- Korean operator handoff rows: ${report.koreanOperatorHandoffRowCount}`);
+  console.log(`- Korean private input rows: ${report.koreanPrivateInputRowCount}`);
+  console.log(`- Korean private input edit targets: ${report.koreanPrivateInputEditTargetSummary}`);
   console.log(
     `- Source prereq private input placeholder locations: ${report.sourcePrereqCurrentPrivateInputPlaceholderLocationCount} (${report.sourcePrereqCurrentPrivateInputPlaceholderLocationSummary})`
   );
