@@ -72,6 +72,17 @@ function textValue(value, fallback = "none") {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
 }
 
+function percentLabel(value, fallback = "none") {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return `${value}%`;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    const trimmed = value.trim();
+    return trimmed.endsWith("%") ? trimmed : `${trimmed}%`;
+  }
+  return fallback;
+}
+
 function integerValue(value) {
   return Number.isInteger(value) ? value : 0;
 }
@@ -531,6 +542,33 @@ function formatPrivateEnvProofRunnerRows(rows) {
     .join("\n");
 }
 
+function operatorAliasRows(report) {
+  return [
+    ["latest completed plan", report.latestCompletedPlan, "latestCompletedPlan"],
+    ["latest completed plan number", report.latestCompletedPlanNumber, "latestCompletedPlanNumber"],
+    ["completion", report.userFacingCompletion, "userFacingCompletion"],
+    ["remaining completion", report.remainingCompletion, "remainingCompletion"],
+    ["current blocker", report.currentFirstBlockerAlias, "currentFirstBlockerAlias"],
+    ["current next command", report.currentNextCommandAlias, "currentNextCommandAlias"],
+    ["operator start command", report.currentOperatorStartCommandAlias, "currentOperatorStartCommandAlias"]
+  ].map(([field, value, sourceField], index) => ({
+    order: index + 1,
+    field,
+    value,
+    sourceField,
+    valueRecorded: false
+  }));
+}
+
+function formatOperatorAliasRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.field)} | ${escapeCell(row.value)} | ${escapeCell(row.sourceField)} | ${row.valueRecorded === false ? "no" : "yes"} |`
+    )
+    .join("\n");
+}
+
 function formatNextActionRows(rows) {
   return rows
     .map((row) => `| ${row.order} | ${escapeCell(row.stage)} | ${escapeCell(row.actionId)} | ${escapeCell(row.label)} | \`${escapeCell(row.proofCommand)}\` | ${escapeCell(row.evidence)} | ${escapeCell(row.sourceField)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
@@ -544,9 +582,14 @@ function buildMarkdown(report) {
 - Report command: \`${report.reportCommand}\`
 - Source privacy boundary ready: ${readyLabel(report.sourcePrivacyBoundaryReady)}
 - User-facing completion: ${report.userFacingCompletionPercent}%
+- User-facing completion alias: ${report.userFacingCompletion}
 - Remaining completion: ${report.userFacingRemainingPercent}%
+- Remaining completion alias: ${report.remainingCompletion}
+- Latest completed plan alias: ${report.latestCompletedPlan}
 - Current 10-plan progress: ${report.latestTenPlanProgressLabel}
 - Current blocker: ${report.currentFirstBlocker}
+- Current blocker alias: ${report.currentFirstBlockerAlias}
+- Current next command alias: \`${report.currentNextCommandAlias}\`
 - Current edit target: ${report.currentEnvEditTarget}
 - Current placeholder keys: ${report.currentPlaceholderKeyCount}/${report.currentRequiredKeyCount}
 - Release-channel metadata blocked: ${readyLabel(report.releaseChannelMetadataBlocked)}
@@ -557,6 +600,7 @@ function buildMarkdown(report) {
 - Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
 - Current operator first command: \`${report.currentOperatorFirstCommand}\`
 - Current operator start command: \`${report.currentOperatorStartCommand}\`
+- Current operator start command alias: \`${report.currentOperatorStartCommandAlias}\`
 - Current operator start command role: ${report.currentOperatorStartCommandRole}
 - Current operator start command matches first command: ${readyLabel(report.currentOperatorStartCommandMatchesFirstCommand)}
 - Operator brief first command: \`${report.operatorBriefFirstCommand}\`
@@ -609,6 +653,12 @@ function buildMarkdown(report) {
 | label | path | command | present | ready | 10-plan | value recorded |
 |---|---|---|---:|---:|---|---:|
 ${formatSourceRows(report.sourceArtifactRows)}
+
+## User-Facing Operator Aliases
+
+| order | field | value | source field | value recorded |
+|---:|---|---|---|---:|
+${formatOperatorAliasRows(report.userFacingOperatorAliasRows)}
 
 ## Preflight Process Env Input Checklist
 
@@ -674,6 +724,13 @@ function outputLooksValueFree(text) {
 
 function buildReport({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness, releaseChannelPreflightBlocked }) {
   const latestTenPlanProgressLabel = textValue(completionReportPacket.latestTenPlanProgressLabel);
+  const latestCompletedPlanNumber = integerValue(completionReportPacket.latestCompletedPlanNumber);
+  const latestCompletedPlan =
+    latestCompletedPlanNumber > 0 ? `plan-${latestCompletedPlanNumber}` : textValue(completionReportPacket.latestCompletedPlan);
+  const userFacingCompletion = percentLabel(completionReportPacket.userFacingCompletionPercent);
+  const remainingCompletion = percentLabel(completionReportPacket.userFacingRemainingPercent);
+  const currentFirstBlockerAlias = textValue(completionReportPacket.currentFirstBlocker, currentBlocker.currentFirstBlocker);
+  const currentNextCommandAlias = textValue(completionReportPacket.currentNextCommand, currentBlocker.currentNextCommand);
   const sourceRows = sourceArtifactRows({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness });
   const preflightProcessEnvChecklistRows = sanitizeProcessEnvInputChecklistRows(releaseChannelPreflightBlocked.processEnvInputChecklistRows);
   const preflightOperatorReceiptRows = sanitizePreflightOperatorReceiptRows(releaseChannelPreflightBlocked.operatorReceiptRows);
@@ -727,6 +784,7 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
   const currentOperatorStrictProofCommandOrder = integerValue(currentBlocker.currentOperatorStrictProofCommandOrder) || commandOrder(currentOperatorCommandRows, privateEditOperatorProofCommand);
   const currentOperatorFirstCommand = textValue(currentBlocker.currentOperatorFirstCommand, currentOperatorCommandRows[0]?.command ?? "none");
   const currentOperatorStartCommand = textValue(currentBlocker.currentOperatorStartCommand, currentOperatorFirstCommand);
+  const currentOperatorStartCommandAlias = currentOperatorStartCommand;
   const currentOperatorStartCommandRole = textValue(
     currentBlocker.currentOperatorStartCommandRole,
     currentOperatorCommandRows[0]?.role ?? "none"
@@ -813,7 +871,7 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     currentBlocker.claimedExternalDistribution === false &&
     releaseProgress.releaseGateClaimedExternalDistribution === false &&
     progressFreshness.claimedExternalDistribution === false;
-  return {
+  const report = {
     appName,
     bundleId,
     version: packageJson.version,
@@ -887,6 +945,7 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
       currentOperatorCommandRows.length > 0 ? `${currentOperatorCommandRows.length} value-free current operator command rows` : "none",
     currentOperatorFirstCommand,
     currentOperatorStartCommand,
+    currentOperatorStartCommandAlias,
     currentOperatorStartCommandRole,
     currentOperatorStartCommandMatchesFirstCommand:
       currentBlocker.currentOperatorStartCommandMatchesFirstCommand === true ||
@@ -907,16 +966,22 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     currentOperatorStartCommandValueRecorded:
       currentBlocker.currentOperatorStartCommandValueRecorded === true ? true : false,
     currentOperatorValueRecorded: currentOperatorCommandRows.some((row) => row.valueRecorded !== false),
-    latestCompletedPlanNumber: integerValue(completionReportPacket.latestCompletedPlanNumber),
+    latestCompletedPlan,
+    latestCompletedPlanNumber,
     latestTenPlanProgressLabel,
     latestTenPlanCompletedCount: integerValue(completionReportPacket.latestTenPlanCompletedCount),
     latestTenPlanTotal: integerValue(completionReportPacket.latestTenPlanTotal),
     tenPlanProgressReportDue: completionReportPacket.tenPlanProgressReportDue === true,
     nextScheduledTenPlanProgressReportAt: textValue(completionReportPacket.nextScheduledTenPlanProgressReportAt),
     userFacingCompletionPercent: completionReportPacket.userFacingCompletionPercent,
+    userFacingCompletion,
     userFacingRemainingPercent: completionReportPacket.userFacingRemainingPercent,
+    remainingCompletion,
     currentActionLabel: textValue(completionReportPacket.currentActionLabel, currentBlocker.currentPriorityActionLabel),
-    currentFirstBlocker: textValue(completionReportPacket.currentFirstBlocker, currentBlocker.currentFirstBlocker),
+    currentFirstBlocker: currentFirstBlockerAlias,
+    currentFirstBlockerAlias,
+    currentNextCommand: currentNextCommandAlias,
+    currentNextCommandAlias,
     currentEnvEditTarget,
     currentRequiredKeyCount: integerValue(completionReportPacket.currentRequiredKeyCount),
     currentPlaceholderKeyCount: integerValue(completionReportPacket.currentPlaceholderKeyCount),
@@ -982,6 +1047,10 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     claimedExternalDistribution: false,
     valueRecorded: false
   };
+  report.userFacingOperatorAliasRows = operatorAliasRows(report);
+  report.userFacingOperatorAliasRowCount = report.userFacingOperatorAliasRows.length;
+  report.userFacingOperatorAliasRowsValueFree = rowsValueFree(report.userFacingOperatorAliasRows);
+  return report;
 }
 
 const completionReportPacket = await readJsonRequired(completionReportPacketJsonPath, "Completion report packet");
@@ -1044,8 +1113,15 @@ check(
 check(report.preflightOperatorReceiptIncludesHardGate === true, "release operator completion brief preflight operator receipt should include hard-gate boundary");
 check(report.preflightOperatorReceiptRows.every((row) => row.valueRecorded === false), "release operator completion brief preflight operator receipt rows should be value-free");
 check(report.latestTenPlanProgressLabel === completionReportPacket.latestTenPlanProgressLabel, "release operator completion brief should mirror completion packet 10-plan progress");
+check(report.latestCompletedPlan === `plan-${report.latestCompletedPlanNumber}`, "release operator completion brief latest completed plan alias should mirror latest completed plan number");
 check(report.userFacingCompletionPercent === 99.999999, "release operator completion brief should keep user-facing completion percent");
+check(report.userFacingCompletion === percentLabel(report.userFacingCompletionPercent), "release operator completion brief user-facing completion alias should mirror completion percent");
 check(report.userFacingRemainingPercent === 0.000001, "release operator completion brief should keep remaining completion percent");
+check(report.remainingCompletion === percentLabel(report.userFacingRemainingPercent), "release operator completion brief remaining completion alias should mirror remaining percent");
+check(report.currentFirstBlockerAlias === report.currentFirstBlocker, "release operator completion brief current blocker alias should mirror current first blocker");
+check(report.currentNextCommand === report.currentNextCommandAlias, "release operator completion brief current next command should mirror current next command alias");
+check(report.currentNextCommandAlias !== "none", "release operator completion brief current next command alias should be populated");
+check(report.currentNextCommandAlias.startsWith("npm run "), "release operator completion brief current next command alias should be an npm run command");
 check(report.currentEnvEditTarget !== "none", "release operator completion brief should point at the ignored local env target");
 check(report.releaseChannelMetadataPostureReady === true, "release operator completion brief should accept blocked or cleared release-channel metadata posture");
 check(report.releaseChannelCurrentRequiredKeyCount === 4, "release operator completion brief should track four release-channel metadata keys");
@@ -1082,6 +1158,7 @@ check(report.currentOperatorCommandRows.length >= 5, "release operator completio
 check(report.currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false), "release operator completion brief current operator command rows should be ready and value-free");
 check(report.currentOperatorFirstCommand !== "none", "release operator completion brief should expose current operator first command");
 check(report.currentOperatorStartCommand === report.currentOperatorFirstCommand, "release operator completion brief current operator start command should mirror first command");
+check(report.currentOperatorStartCommandAlias === report.currentOperatorStartCommand, "release operator completion brief operator start command alias should mirror current operator start command");
 check(report.currentOperatorStartCommand === report.currentOperatorCommandRows[0]?.command, "release operator completion brief current operator start command should match first row command");
 check(report.currentOperatorStartCommandRole === report.currentOperatorCommandRows[0]?.role, "release operator completion brief current operator start command role should match first row role");
 check(report.currentOperatorStartCommandMatchesFirstCommand === true, "release operator completion brief current operator start command should declare first-command match");
@@ -1155,6 +1232,10 @@ check(rowsValueFree(report.operatorBriefRows), "release operator completion brie
 check(rowsValueFree(report.currentOperatorCommandRows), "release operator completion brief current operator command rows should not record values");
 check(rowsValueFree(report.privateEditProofCommandRows), "release operator completion brief proof rows should not record values");
 check(rowsValueFree(report.postClearanceNextActionRows), "release operator completion brief next action rows should not record values");
+check(report.userFacingOperatorAliasRowCount === 7, "release operator completion brief should include seven user-facing operator alias rows");
+check(report.userFacingOperatorAliasRows.length === report.userFacingOperatorAliasRowCount, "release operator completion brief user-facing operator alias row count should match rows");
+check(report.userFacingOperatorAliasRowsValueFree === true, "release operator completion brief user-facing operator alias rows should be value-free");
+check(rowsValueFree(report.userFacingOperatorAliasRows), "release operator completion brief user-facing operator alias rows should not record values");
 check(report.privateValuesRecorded === false, "release operator completion brief should not record private values");
 check(report.feedValueRecorded === false, "release operator completion brief should not record feed values");
 check(report.channelValueRecorded === false, "release operator completion brief should not record channel values");
@@ -1173,6 +1254,13 @@ check(markdown.includes("Preflight Process Env Input Checklist"), "release opera
 check(markdown.includes("Preflight operator private input file default path:"), "release operator completion brief Markdown should include operator private input path guidance");
 check(markdown.includes("Preflight guided setup fallback command:"), "release operator completion brief Markdown should include guided setup fallback");
 check(markdown.includes("Preflight Operator Receipt"), "release operator completion brief Markdown should include preflight operator receipt");
+check(markdown.includes("User-Facing Operator Aliases"), "release operator completion brief Markdown should include user-facing operator aliases");
+check(markdown.includes("Latest completed plan alias:"), "release operator completion brief Markdown should include latest completed plan alias");
+check(markdown.includes("User-facing completion alias:"), "release operator completion brief Markdown should include user-facing completion alias");
+check(markdown.includes("Remaining completion alias:"), "release operator completion brief Markdown should include remaining completion alias");
+check(markdown.includes("Current blocker alias:"), "release operator completion brief Markdown should include current blocker alias");
+check(markdown.includes("Current next command alias:"), "release operator completion brief Markdown should include current next command alias");
+check(markdown.includes("Current operator start command alias:"), "release operator completion brief Markdown should include current operator start command alias");
 check(markdown.includes("Operator Brief Rows"), "release operator completion brief Markdown should include operator rows");
 check(markdown.includes("Current Operator Command Sequence"), "release operator completion brief Markdown should include current operator command sequence");
 check(markdown.includes("Current operator start command:"), "release operator completion brief Markdown should include current operator start command");
@@ -1195,9 +1283,14 @@ console.log(`- JSON: ${relative(briefJsonPath)}`);
 console.log(`- Operator completion brief ready: ${report.releaseOperatorCompletionBriefReady ? "yes" : "no"}`);
 console.log(`- Source privacy boundary ready: ${report.sourcePrivacyBoundaryReady ? "yes" : "no"}`);
 console.log(`- User-facing completion: ${report.userFacingCompletionPercent}%`);
+console.log(`- User-facing completion alias: ${report.userFacingCompletion}`);
 console.log(`- Remaining completion: ${report.userFacingRemainingPercent}%`);
+console.log(`- Remaining completion alias: ${report.remainingCompletion}`);
+console.log(`- Latest completed plan alias: ${report.latestCompletedPlan}`);
 console.log(`- Current 10-plan progress: ${report.latestTenPlanProgressLabel}`);
 console.log(`- Current blocker: ${report.currentFirstBlocker}`);
+console.log(`- Current blocker alias: ${report.currentFirstBlockerAlias}`);
+console.log(`- Current next command alias: ${report.currentNextCommandAlias}`);
 console.log(`- Current edit target: ${report.currentEnvEditTarget}`);
 console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount}/${report.currentRequiredKeyCount}`);
 console.log(`- Release-channel metadata blocked: ${report.releaseChannelMetadataBlocked ? "yes" : "no"}`);
@@ -1208,6 +1301,7 @@ console.log(`- Current operator command sequence ready: ${report.currentOperator
 console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
 console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
 console.log(`- Current operator start command: ${report.currentOperatorStartCommand}`);
+console.log(`- Current operator start command alias: ${report.currentOperatorStartCommandAlias}`);
 console.log(`- Current operator start command role: ${report.currentOperatorStartCommandRole}`);
 console.log(`- Current operator start command matches first command: ${report.currentOperatorStartCommandMatchesFirstCommand ? "yes" : "no"}`);
 console.log(`- Operator brief first command: ${report.operatorBriefFirstCommand}`);
