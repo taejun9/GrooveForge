@@ -19,6 +19,7 @@ const checkpointStem = "release-10-plan-checkpoint-smoke";
 const sourcePrereqStem = "release-source-evidence-prereq-smoke";
 const externalRunPacketStem = "release-external-completion-run-packet-smoke";
 const externalResumePacketStem = "release-external-completion-resume-packet-smoke";
+const crashReportRegressionStem = "desktop-crash-report-regression-smoke";
 const operatorPreflightStem = "release-channel-apply-private-env-preflight";
 const realOperatorPreflightSnapshotStem = "release-completion-summary-refresh-real-operator-preflight";
 const progressRefreshJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${progressRefreshStem}.json`);
@@ -27,6 +28,7 @@ const checkpointJsonPath = path.join(packageRoot, `${appName}-${packageJson.vers
 const sourcePrereqJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${sourcePrereqStem}.json`);
 const externalRunPacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${externalRunPacketStem}.json`);
 const externalResumePacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${externalResumePacketStem}.json`);
+const crashReportRegressionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${crashReportRegressionStem}.json`);
 const operatorPreflightJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${operatorPreflightStem}.json`);
 const realOperatorPreflightSnapshotJsonPath = path.join(
   packageRoot,
@@ -52,10 +54,19 @@ const privateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
 const defaultPrivateInputFileName = ".env.release-channel.local";
 const operatorPrivateInputFileDefaultPath = defaultPrivateInputFileName;
 const blockedPrivateInputFilePathMode = "blocked-smoke-isolated-missing-input-file";
+const crashReportRegressionCommand = "npm run desktop:crash-report-regression-smoke";
 
 const requiredRefreshCommands = [
   {
     order: 1,
+    command: crashReportRegressionCommand,
+    role: "prove the attached AppKit abort and Squirrel dyld report classes stay covered before after-work readout",
+    condition: "always",
+    skipped: false,
+    valueRecorded: false
+  },
+  {
+    order: 2,
     command: "npm run release:progress-refresh-smoke",
     role: "refresh progress, current-blocker, completion-packet, freshness, and operator-brief evidence",
     condition: "always",
@@ -63,7 +74,7 @@ const requiredRefreshCommands = [
     valueRecorded: false
   },
   {
-    order: 2,
+    order: 3,
     command: releaseChannelApplyPrivateEnvPreflightCommand,
     role: "leave the real operator private-input preflight receipt before completion-summary and external packet mirroring",
     condition: "always; exit 0 or expected blocked exit 1",
@@ -72,7 +83,7 @@ const requiredRefreshCommands = [
     valueRecorded: false
   },
   {
-    order: 3,
+    order: 4,
     command: "npm run release:completion-summary-smoke",
     role: "emit compact after-work completion summary from the refreshed progress receipt",
     condition: "always",
@@ -80,7 +91,7 @@ const requiredRefreshCommands = [
     valueRecorded: false
   },
   {
-    order: 4,
+    order: 5,
     command: "npm run release:external-completion-run-packet-smoke -- --from-existing-completion-summary",
     role: "refresh the ordered external completion run packet from the just-refreshed completion summary",
     condition: "always",
@@ -88,7 +99,7 @@ const requiredRefreshCommands = [
     valueRecorded: false
   },
   {
-    order: 5,
+    order: 6,
     command: "npm run release:external-completion-resume-packet-smoke -- --from-existing-run-packet",
     role: "refresh the current external completion resume packet from the ordered run packet",
     condition: "always",
@@ -96,7 +107,7 @@ const requiredRefreshCommands = [
     valueRecorded: false
   },
   {
-    order: 6,
+    order: 7,
     command: "npm run release:source-evidence-prereq-smoke",
     role: "mirror source artifact prerequisite coverage and current-field aliases into the after-work receipt",
     condition: "always",
@@ -106,7 +117,7 @@ const requiredRefreshCommands = [
 ];
 
 const checkpointCommandRow = {
-  order: 7,
+  order: 8,
   command: "npm run release:10-plan-checkpoint-smoke",
   role: "emit the 10-plan checkpoint receipt at a completed report boundary",
   condition: "when 10-plan progress is 10/10",
@@ -675,6 +686,7 @@ function formatSourcePrereqPrivateInputPlaceholderLocationRows(rows) {
 }
 
 function buildReport({
+  crashReportRegression,
   progressRefresh,
   completionSummary,
   sourcePrereq,
@@ -776,6 +788,7 @@ function buildReport({
     sourcePrereqJsonArtifactName: "release-source-evidence-prereq-smoke.json",
     externalCompletionRunPacketJsonArtifactName: "release-external-completion-run-packet-smoke.json",
     externalCompletionResumePacketJsonArtifactName: "release-external-completion-resume-packet-smoke.json",
+    crashReportRegressionJsonArtifactName: "desktop-crash-report-regression-smoke.json",
     realOperatorPreflightJsonArtifactName: "release-channel-apply-private-env-preflight.json",
     realOperatorPreflightSnapshotJsonArtifactName: "release-completion-summary-refresh-real-operator-preflight.json",
     tenPlanCheckpointJsonArtifactName: "release-10-plan-checkpoint-smoke.json",
@@ -786,6 +799,7 @@ function buildReport({
     sourcePrereqJsonPath: relative(sourcePrereqJsonPath),
     externalCompletionRunPacketJsonPath: relative(externalRunPacketJsonPath),
     externalCompletionResumePacketJsonPath: relative(externalResumePacketJsonPath),
+    crashReportRegressionJsonPath: relative(crashReportRegressionJsonPath),
     realOperatorPreflightJsonPath: relative(operatorPreflightJsonPath),
     realOperatorPreflightSnapshotJsonPath: relative(realOperatorPreflightSnapshotJsonPath),
     tenPlanCheckpointJsonPath: checkpointRequired ? relative(checkpointJsonPath) : "not due",
@@ -794,6 +808,26 @@ function buildReport({
     progressRefreshReady: progressRefresh.releaseProgressRefreshReady === true,
     progressRefreshCompletionSummaryReady: progressRefresh.completionSummary?.ready === true,
     progressRefreshLabelsMatch: progressRefresh.labelsMatch === true,
+    crashReportRegressionCommand,
+    crashReportRegressionReady: crashReportRegression.smokeReady === true,
+    crashReportRegressionRowCount: integerValue(crashReportRegression.rowCount),
+    crashReportRegressionReadyRowCount: integerValue(crashReportRegression.readyRowCount),
+    crashReportRegressionAppKitReportClassified: crashReportRegression.appKitReportClassified === true,
+    crashReportRegressionSquirrelDyldReportClassified: crashReportRegression.dyldReportClassified === true,
+    crashReportRegressionSquirrelDyldCodeSignatureReportClassified:
+      crashReportRegression.dyldCodeSignatureReportClassified === true,
+    crashReportRegressionSquirrelDyldStaleWorktreeCodeSignatureReportClassified:
+      crashReportRegression.dyldStaleWorktreeCodeSignatureReportClassified === true,
+    crashReportRegressionRestrictedGuiPreflightReady: crashReportRegression.restrictedGuiPreflightReady === true,
+    crashReportRegressionPrivateValuesRecorded: crashReportRegression.privateValuesRecorded === true,
+    crashReportRegressionFullCrashReportRecorded: crashReportRegression.fullCrashReportRecorded === true,
+    crashReportRegressionUserPathRecorded: crashReportRegression.userPathRecorded === true,
+    crashReportRegressionNetworkProbeAttempted: crashReportRegression.networkProbeAttempted === true,
+    crashReportRegressionReleaseUploadAttempted: crashReportRegression.releaseUploadAttempted === true,
+    crashReportRegressionSigningAttempted: crashReportRegression.signingAttempted === true,
+    crashReportRegressionNotarySubmissionAttempted: crashReportRegression.appleNotarySubmissionAttempted === true,
+    crashReportRegressionClaimedExternalDistribution: crashReportRegression.externalDistributionClaimed === true,
+    crashReportRegressionValueRecorded: crashReportRegression.valueRecorded === true,
     completionSummaryReadoutReady: completionSummary.completionSummaryReadoutReady === true,
     completionSummarySourceReady: completionSummary.sourceReady === true,
     completionSummarySourceSummaryReady: completionSummary.sourceSummaryReady === true,
@@ -1274,6 +1308,12 @@ function buildMarkdown(report) {
 ## Summary
 
 - Refresh receipt ready: ${readyLabel(report.completionSummaryRefreshReady)}
+- Crash report regression ready: ${readyLabel(report.crashReportRegressionReady)}
+- Crash report regression rows: ${report.crashReportRegressionReadyRowCount}/${report.crashReportRegressionRowCount}
+- Crash AppKit abort report classified: ${readyLabel(report.crashReportRegressionAppKitReportClassified)}
+- Crash Squirrel dyld report classified: ${readyLabel(report.crashReportRegressionSquirrelDyldReportClassified)}
+- Crash Squirrel dyld stale-worktree report classified: ${readyLabel(report.crashReportRegressionSquirrelDyldStaleWorktreeCodeSignatureReportClassified)}
+- Crash restricted GUI preflight ready: ${readyLabel(report.crashReportRegressionRestrictedGuiPreflightReady)}
 - Progress refresh ready: ${readyLabel(report.progressRefreshReady)}
 - Completion summary readout ready: ${readyLabel(report.completionSummaryReadoutReady)}
 - Source evidence prerequisite ready: ${readyLabel(report.sourcePrereqReady)}
@@ -1429,6 +1469,7 @@ ${formatSourcePrereqPrivateInputPlaceholderLocationRows(report.sourcePrereqCurre
 ## Source Artifacts
 
 - Progress refresh JSON: ${report.progressRefreshJsonPath}
+- Desktop crash report regression JSON: ${report.crashReportRegressionJsonPath}
 - Completion summary JSON: ${report.completionSummaryJsonPath}
 - Source prereq JSON: ${report.sourcePrereqJsonPath}
 - External completion run packet JSON: ${report.externalCompletionRunPacketJsonPath}
@@ -1695,6 +1736,36 @@ function validateReport(report, markdown) {
   check(report.progressRefreshReady === true, "release completion summary refresh should run a ready progress refresh first");
   check(report.progressRefreshCompletionSummaryReady === true, "release completion summary refresh should keep progress compact summary ready");
   check(report.progressRefreshLabelsMatch === true, "release completion summary refresh should keep progress labels matched");
+  check(report.crashReportRegressionReady === true, "release completion summary refresh should run ready desktop crash report regression smoke");
+  check(
+    report.crashReportRegressionReadyRowCount === report.crashReportRegressionRowCount && report.crashReportRegressionRowCount >= 12,
+    "release completion summary refresh crash report regression rows should all be ready"
+  );
+  check(
+    report.crashReportRegressionAppKitReportClassified === true,
+    "release completion summary refresh should classify the attached AppKit abort report"
+  );
+  check(
+    report.crashReportRegressionSquirrelDyldReportClassified === true,
+    "release completion summary refresh should classify the attached Squirrel dyld report"
+  );
+  check(
+    report.crashReportRegressionSquirrelDyldStaleWorktreeCodeSignatureReportClassified === true,
+    "release completion summary refresh should classify the stale-worktree Squirrel dyld report"
+  );
+  check(
+    report.crashReportRegressionRestrictedGuiPreflightReady === true,
+    "release completion summary refresh should prove restricted GUI preflight readiness"
+  );
+  check(report.crashReportRegressionPrivateValuesRecorded === false, "release completion summary refresh crash regression should not record private values");
+  check(report.crashReportRegressionFullCrashReportRecorded === false, "release completion summary refresh crash regression should not record full crash reports");
+  check(report.crashReportRegressionUserPathRecorded === false, "release completion summary refresh crash regression should not record user paths");
+  check(report.crashReportRegressionNetworkProbeAttempted === false, "release completion summary refresh crash regression should not probe networks");
+  check(report.crashReportRegressionReleaseUploadAttempted === false, "release completion summary refresh crash regression should not upload releases");
+  check(report.crashReportRegressionSigningAttempted === false, "release completion summary refresh crash regression should not sign artifacts");
+  check(report.crashReportRegressionNotarySubmissionAttempted === false, "release completion summary refresh crash regression should not submit to Apple");
+  check(report.crashReportRegressionClaimedExternalDistribution === false, "release completion summary refresh crash regression should not claim external distribution");
+  check(report.crashReportRegressionValueRecorded === false, "release completion summary refresh crash regression should remain value-free");
   check(report.completionSummaryReadoutReady === true, "release completion summary refresh should emit ready completion summary readout");
   check(report.completionSummarySourceReady === true, "release completion summary refresh should keep completion summary source ready");
   check(report.completionSummarySourceSummaryReady === true, "release completion summary refresh should keep completion summary source compact summary ready");
@@ -2378,6 +2449,10 @@ function validateReport(report, markdown) {
     "release completion summary refresh should always run the required commands"
   );
   check(
+    report.refreshCommands[0]?.command === crashReportRegressionCommand,
+    "release completion summary refresh command rows should start with desktop crash report regression smoke"
+  );
+  check(
     report.refreshCommands.some(
       (row) => row.command === releaseChannelApplyPrivateEnvPreflightCommand && row.allowBlockedExit === true
     ),
@@ -2460,6 +2535,17 @@ function validateReport(report, markdown) {
     check(report.checkpointUserReportRows.length === 0, "release completion summary refresh should not expose checkpoint user report rows when not due");
   }
 
+  check(markdown.includes("Crash report regression ready: yes"), "release completion summary refresh Markdown should include crash report regression readiness");
+  check(markdown.includes("Crash report regression rows:"), "release completion summary refresh Markdown should include crash report regression row counts");
+  check(markdown.includes("Crash AppKit abort report classified: yes"), "release completion summary refresh Markdown should include AppKit abort classification");
+  check(markdown.includes("Crash Squirrel dyld report classified: yes"), "release completion summary refresh Markdown should include Squirrel dyld classification");
+  check(
+    markdown.includes("Crash Squirrel dyld stale-worktree report classified: yes"),
+    "release completion summary refresh Markdown should include stale-worktree Squirrel dyld classification"
+  );
+  check(markdown.includes("Crash restricted GUI preflight ready: yes"), "release completion summary refresh Markdown should include restricted GUI preflight readiness");
+  check(markdown.includes("npm run desktop:crash-report-regression-smoke"), "release completion summary refresh Markdown should cite crash report regression command");
+  check(markdown.includes("Desktop crash report regression JSON:"), "release completion summary refresh Markdown should include crash report regression artifact path");
   check(markdown.includes("## Command Order"), "release completion summary refresh Markdown should include command order");
   check(markdown.includes("condition | status"), "release completion summary refresh Markdown should include command conditions and statuses");
   check(markdown.includes("Current operator command sequence ready: yes"), "release completion summary refresh Markdown should include current operator command sequence readiness");
@@ -2537,7 +2623,8 @@ async function main() {
     );
   }
 
-  const [progressRefresh, completionSummary, sourcePrereq, externalRun, externalResume, operatorPreflight] = await Promise.all([
+  const [crashReportRegression, progressRefresh, completionSummary, sourcePrereq, externalRun, externalResume, operatorPreflight] = await Promise.all([
+    readJsonRequired(crashReportRegressionJsonPath, "desktop crash report regression smoke"),
     readJsonRequired(progressRefreshJsonPath, "release progress refresh"),
     readJsonRequired(completionSummaryJsonPath, "release completion summary"),
     readJsonRequired(sourcePrereqJsonPath, "release source evidence prerequisite"),
@@ -2557,6 +2644,7 @@ async function main() {
 
   const gitContext = buildGitContext();
   const report = buildReport({
+    crashReportRegression,
     progressRefresh,
     completionSummary,
     sourcePrereq,
@@ -2584,6 +2672,16 @@ async function main() {
   console.log(`- JSON: ${relative(receiptJsonPath)}`);
   console.log(`- Latest completed plan: ${report.latestPlan}`);
   console.log(`- Latest completed plan alias: ${report.latestCompletedPlan}`);
+  console.log(`- Crash report regression ready: ${report.crashReportRegressionReady ? "yes" : "no"}`);
+  console.log(`- Crash report regression rows: ${report.crashReportRegressionReadyRowCount}/${report.crashReportRegressionRowCount}`);
+  console.log(`- Crash AppKit abort report classified: ${report.crashReportRegressionAppKitReportClassified ? "yes" : "no"}`);
+  console.log(`- Crash Squirrel dyld report classified: ${report.crashReportRegressionSquirrelDyldReportClassified ? "yes" : "no"}`);
+  console.log(
+    `- Crash Squirrel dyld stale-worktree report classified: ${
+      report.crashReportRegressionSquirrelDyldStaleWorktreeCodeSignatureReportClassified ? "yes" : "no"
+    }`
+  );
+  console.log(`- Crash restricted GUI preflight ready: ${report.crashReportRegressionRestrictedGuiPreflightReady ? "yes" : "no"}`);
   console.log(`- 10-plan progress: ${report.tenPlanProgress}`);
   console.log(`- 10-plan checkpoint required: ${report.tenPlanCheckpointRequired ? "yes" : "no"}`);
   console.log(`- 10-plan checkpoint run: ${report.tenPlanCheckpointRun ? "yes" : "no"}`);
