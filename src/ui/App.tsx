@@ -6980,6 +6980,24 @@ export function App(): ReactElement {
     );
   }
 
+  function focusAudienceSessionProofHandoffReadout(): void {
+    const beginner = audienceSessionReadoutSummary.rows.find((row) => row.id === "beginner");
+    const producer = audienceSessionReadoutSummary.rows.find((row) => row.id === "producer");
+    if (typeof document !== "undefined") {
+      document.querySelector<HTMLElement>('[data-testid="audience-session-proof-handoff"]')?.scrollIntoView({
+        block: "start",
+        behavior: "auto"
+      });
+    }
+    setProjectStatus(
+      `Audience Session Proof Handoff Pattern ${project.selectedPattern}: ${
+        beginner?.label ?? "First-time composer"
+      } guided export proof / ${
+        producer?.label ?? "Professional producer"
+      } studio handoff receipt / session proof routes unchanged`
+    );
+  }
+
   function focusDualAudienceReadinessRouteReadout(): void {
     const rows = createDualAudienceReadinessRows({
       beatReadinessChecks,
@@ -9335,6 +9353,7 @@ export function App(): ReactElement {
     onSelectAudienceSessionRow: selectAudienceSessionRow,
     onCreateAudienceStarter: createAudienceStarter,
     onFocusAudienceDeliveryProofBridgeReadout: focusAudienceDeliveryProofBridgeReadout,
+    onFocusAudienceSessionProofHandoffReadout: focusAudienceSessionProofHandoffReadout,
     onFocusAudienceRouteBridgeReadout: focusAudienceRouteBridgeReadout,
     onFocusAudienceCompletionRouteReadout: focusAudienceCompletionRouteReadout,
     onFocusDualAudienceReadinessRouteReadout: focusDualAudienceReadinessRouteReadout,
@@ -9802,6 +9821,30 @@ export function App(): ReactElement {
       };
     };
 
+    const readAudienceSessionProofHandoffEvidence = (): GrooveforgeLaunchSmokeAudienceSessionProofHandoffEvidence => {
+      const rowElements = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-testid^="audience-session-proof-handoff-"]')
+      ).filter((element) => element.dataset.audienceSessionProofHandoffRow);
+
+      return {
+        activeAudience:
+          document.querySelector<HTMLElement>('[data-testid="audience-session-proof-handoff"]')?.dataset
+            .audienceSessionProofHandoffActive ?? "",
+        beginnerArtifact: readDomText('[data-testid="audience-session-proof-handoff-beginner-artifact"]'),
+        beginnerLane: readDomText('[data-testid="audience-session-proof-handoff-beginner-lane"]'),
+        beginnerNext: readDomText('[data-testid="audience-session-proof-handoff-beginner-next"]'),
+        beginnerProof: readDomText('[data-testid="audience-session-proof-handoff-beginner-proof"]'),
+        beginnerRoute: readDomText('[data-testid="audience-session-proof-handoff-beginner-route"]'),
+        present: document.querySelector('[data-testid="audience-session-proof-handoff"]') !== null,
+        producerArtifact: readDomText('[data-testid="audience-session-proof-handoff-producer-artifact"]'),
+        producerLane: readDomText('[data-testid="audience-session-proof-handoff-producer-lane"]'),
+        producerNext: readDomText('[data-testid="audience-session-proof-handoff-producer-next"]'),
+        producerProof: readDomText('[data-testid="audience-session-proof-handoff-producer-proof"]'),
+        producerRoute: readDomText('[data-testid="audience-session-proof-handoff-producer-route"]'),
+        rowCount: rowElements.length
+      };
+    };
+
     const readAudienceDeliverySnapshotEvidence = (): GrooveforgeLaunchSmokeAudienceDeliverySnapshotEvidence => {
       const rowElements = Array.from(
         document.querySelectorAll<HTMLElement>('[data-testid^="audience-delivery-snapshot-"]')
@@ -9999,6 +10042,10 @@ export function App(): ReactElement {
         const completionBeginner = quickActionEvidenceById("audience-completion-route-beginner-action");
         markLaunchSmokePaletteStep("completion-producer");
         const completionProducer = quickActionEvidenceById("audience-completion-route-producer-action");
+        markLaunchSmokePaletteStep("session-proof");
+        const sessionProofReadout = quickActionEvidenceById("audience-session-proof-handoff-readout-action");
+        const sessionProofBeginner = quickActionEvidenceById("audience-session-proof-handoff-beginner-action");
+        const sessionProofProducer = quickActionEvidenceById("audience-session-proof-handoff-producer-action");
         markLaunchSmokePaletteStep("delivery-proof");
         const deliveryProofReadout = quickActionEvidenceById("audience-delivery-proof-bridge-readout-action");
         const deliveryProofBeginner = quickActionEvidenceById("audience-delivery-proof-bridge-beginner-action");
@@ -10033,6 +10080,10 @@ export function App(): ReactElement {
           routeBridge,
           routeBridgeCompletion,
           routeBridgeReadiness,
+          sessionProofBeginner,
+          sessionProofHandoff: readAudienceSessionProofHandoffEvidence(),
+          sessionProofProducer,
+          sessionProofReadout,
           starterBeginner,
           starterProducer,
           resultPresent:
@@ -10047,6 +10098,12 @@ export function App(): ReactElement {
             completionReadout.resultTitle.length > 0 &&
             completionBeginner.resultTitle.length > 0 &&
             completionProducer.resultTitle.length > 0 &&
+            sessionProofReadout.resultTitle.length > 0 &&
+            sessionProofBeginner.resultTitle.length > 0 &&
+            sessionProofProducer.resultTitle.length > 0 &&
+            deliveryProofReadout.resultTitle.length > 0 &&
+            deliveryProofBeginner.resultTitle.length > 0 &&
+            deliveryProofProducer.resultTitle.length > 0 &&
             starterBeginner.resultTitle.length > 0 &&
             starterProducer.resultTitle.length > 0,
           searchPresent:
@@ -10061,6 +10118,12 @@ export function App(): ReactElement {
             completionReadout.searchMetricValue.length > 0 &&
             completionBeginner.searchMetricValue.length > 0 &&
             completionProducer.searchMetricValue.length > 0 &&
+            sessionProofReadout.searchMetricValue.length > 0 &&
+            sessionProofBeginner.searchMetricValue.length > 0 &&
+            sessionProofProducer.searchMetricValue.length > 0 &&
+            deliveryProofReadout.searchMetricValue.length > 0 &&
+            deliveryProofBeginner.searchMetricValue.length > 0 &&
+            deliveryProofProducer.searchMetricValue.length > 0 &&
             starterBeginner.searchMetricValue.length > 0 &&
             starterProducer.searchMetricValue.length > 0
         };

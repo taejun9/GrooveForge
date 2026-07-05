@@ -839,6 +839,7 @@ import {
   createGuideQuickStartCompletionBreakdownItems,
   createGuideQuickStartCompletionScore,
   createAudienceDeliveryProofBridgeQuickActions,
+  createAudienceSessionProofHandoffQuickActions,
   createAudienceRouteBridgeQuickActions,
   createAudienceRouteBridgeSummary,
   createAudienceCompletionRouteQuickActions,
@@ -1501,6 +1502,7 @@ export function createQuickActions({
   onSelectStyle,
   onSelectAudienceSessionRow,
   onFocusAudienceDeliveryProofBridgeReadout,
+  onFocusAudienceSessionProofHandoffReadout,
   onFocusAudienceRouteBridgeReadout,
   onFocusAudienceCompletionRouteReadout,
   onFocusDualAudienceReadinessRouteReadout,
@@ -1893,6 +1895,7 @@ export function createQuickActions({
   onSelectAudienceSessionRow: (row: AudienceSessionReadoutRow) => void;
   onCreateAudienceStarter: (starterId: AudienceStarterProjectId) => void;
   onFocusAudienceDeliveryProofBridgeReadout: () => void;
+  onFocusAudienceSessionProofHandoffReadout: () => void;
   onFocusAudienceRouteBridgeReadout: () => void;
   onFocusAudienceCompletionRouteReadout: () => void;
   onFocusDualAudienceReadinessRouteReadout: () => void;
@@ -3024,6 +3027,14 @@ export function createQuickActions({
     onFocusExportPreflight,
     onFocusHandoffPackageCheck,
     onFocusRouteReadout: onFocusAudienceDeliveryProofBridgeReadout,
+    rows: audienceSessionReadoutSummary.rows
+  });
+  const audienceSessionProofHandoffActions = createAudienceSessionProofHandoffQuickActions({
+    exportPreflightSummary,
+    handoffPackageCheckSummary,
+    onFocusExportPreflight,
+    onFocusHandoffPackageCheck,
+    onFocusRouteReadout: onFocusAudienceSessionProofHandoffReadout,
     rows: audienceSessionReadoutSummary.rows
   });
   const audienceRouteBridgeSummary = createAudienceRouteBridgeSummary({
@@ -5691,6 +5702,7 @@ export function createQuickActions({
     },
     ...sessionPassActions,
     ...audienceCompletionRouteActions,
+    ...audienceSessionProofHandoffActions,
     ...audienceDeliveryProofBridgeActions,
     ...dualAudienceReadinessActions,
     ...audienceSessionActions,
@@ -7581,6 +7593,7 @@ export function createQuickActionResult(
     action.id === "stem-audition-route-readout-action" ||
     action.id === "timbre-check" ||
     action.id.startsWith("audience-delivery-proof-bridge-") ||
+    action.id.startsWith("audience-session-proof-handoff-") ||
     action.id.startsWith("audience-route-bridge-") ||
     action.id.startsWith("audience-completion-route-") ||
     action.id.startsWith("dual-audience-readiness-") ||
@@ -9098,6 +9111,74 @@ export function audienceRouteBridgeQuickActionLane(action: QuickAction): {
   }
 
   return null;
+}
+
+export function audienceSessionProofHandoffQuickActionLane(action: QuickAction): {
+  laneLabel: string;
+  nextCheck: string;
+  routeLabel: string;
+} | null {
+  if (!action.id.startsWith("audience-session-proof-handoff-")) {
+    return null;
+  }
+
+  if (action.id === "audience-session-proof-handoff-readout-action") {
+    return {
+      laneLabel: "Audience Session Proof Handoff",
+      nextCheck: "Choose the first-time composer or professional producer proof handoff lane before sending files.",
+      routeLabel: "Audience Session Proof Handoff Readout"
+    };
+  }
+
+  if (action.id === "audience-session-proof-handoff-beginner-action" || action.resultTargetId === "beginner") {
+    return {
+      laneLabel: "First-time composer session proof",
+      nextCheck: "Open Export Preflight deliverables and confirm the local package reopen path.",
+      routeLabel: "Open first-time composer session proof"
+    };
+  }
+
+  if (action.id === "audience-session-proof-handoff-producer-action" || action.resultTargetId === "producer") {
+    return {
+      laneLabel: "Professional producer session proof",
+      nextCheck: "Open Handoff Package Check receipt and confirm send order plus stem handoff.",
+      routeLabel: "Open professional producer session proof"
+    };
+  }
+
+  return null;
+}
+
+export function quickActionAudienceSessionProofHandoffMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const lane = audienceSessionProofHandoffQuickActionLane(action);
+  if (!lane) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+
+  return {
+    id: "audience-session-proof-handoff",
+    label: "Audience Session Proof Handoff",
+    value: [
+      lane.routeLabel,
+      lane.laneLabel,
+      action.detail,
+      `${modeLabel(project.mode)} mode`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} selected-pattern events`,
+      `${projectEventTotal(project)} editable project events`,
+      `${arrangementTotalBars(project)} bars`,
+      "session proof handoff readout",
+      "project data unchanged",
+      "playback unchanged",
+      "export unchanged",
+      "local-only proof route"
+    ].join(" / ")
+  };
 }
 
 export function audienceDeliveryProofBridgeQuickActionLane(action: QuickAction): {
@@ -16898,6 +16979,16 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
+  if (action.id.startsWith("audience-session-proof-handoff-")) {
+    return (
+      quickActionAudienceSessionProofHandoffMetricSnapshot(project, action) ?? {
+        id: "audience-session-proof-handoff",
+        label: "Audience Session Proof Handoff",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id.startsWith("audience-route-bridge-")) {
     return (
       quickActionAudienceRouteBridgeMetricSnapshot(project, action) ?? {
@@ -21938,6 +22029,32 @@ export function quickActionResultFollowup(
             "Use the professional producer delivery proof lane to confirm the studio handoff package receipt before delivery.",
           nextCheck:
             "Confirm the result names Handoff Package Check receipt, package reopen, send order, and stem handoff proof."
+        };
+  }
+
+  const audienceSessionProofHandoffLane = audienceSessionProofHandoffQuickActionLane(action);
+  if (audienceSessionProofHandoffLane) {
+    if (action.id === "audience-session-proof-handoff-readout-action") {
+      return {
+        auditionCue:
+          "Read the Audience Session Proof Handoff before choosing the beginner export proof or producer handoff proof lane.",
+        nextCheck:
+          "Open first-time composer session proof for Export Preflight deliverables, or professional producer session proof for Handoff Package Check receipt."
+      };
+    }
+
+    return audienceSessionProofHandoffLane.laneLabel === "First-time composer session proof"
+      ? {
+          auditionCue:
+            "Use the first-time composer session proof lane to confirm the local package reopen path before sending files.",
+          nextCheck:
+            "Confirm the result names Export Preflight deliverables, WAV, stems, MIDI, Handoff Sheet, and local package reopen proof."
+        }
+      : {
+          auditionCue:
+            "Use the professional producer session proof lane to confirm the studio receipt and handoff posture before delivery.",
+          nextCheck:
+            "Confirm the result names Handoff Package Check receipt, send order, stem handoff, and persona package reopen proof."
         };
   }
 

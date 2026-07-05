@@ -262,6 +262,26 @@ function checkResult(result) {
     "live desktop Audience Delivery Snapshot should show the professional producer handoff proof path"
   );
   check(
+    evidence?.palette?.sessionProofHandoff?.present === true && evidence?.palette?.sessionProofHandoff?.rowCount === 2,
+    "live desktop Audience Session Proof Handoff should render two audience proof handoff rows"
+  );
+  check(
+    String(evidence?.palette?.sessionProofHandoff?.beginnerLane ?? "").includes("First-time composer") &&
+      String(evidence?.palette?.sessionProofHandoff?.beginnerRoute ?? "").includes("Export Preflight") &&
+      String(evidence?.palette?.sessionProofHandoff?.beginnerProof ?? "").includes("WAV") &&
+      String(evidence?.palette?.sessionProofHandoff?.beginnerArtifact ?? "").includes("local delivery package") &&
+      String(evidence?.palette?.sessionProofHandoff?.beginnerNext ?? "").includes("Export Preflight"),
+    "live desktop Audience Session Proof Handoff should show the beginner export proof path"
+  );
+  check(
+    String(evidence?.palette?.sessionProofHandoff?.producerLane ?? "").includes("Professional producer") &&
+      String(evidence?.palette?.sessionProofHandoff?.producerRoute ?? "").includes("Handoff Package Check") &&
+      String(evidence?.palette?.sessionProofHandoff?.producerProof ?? "").includes("send order") &&
+      String(evidence?.palette?.sessionProofHandoff?.producerArtifact ?? "").includes("persona delivery package") &&
+      String(evidence?.palette?.sessionProofHandoff?.producerNext ?? "").includes("Handoff Package Check"),
+    "live desktop Audience Session Proof Handoff should show the professional producer receipt proof path"
+  );
+  check(
     evidence?.palette?.deliveryProofBridge?.present === true && evidence?.palette?.deliveryProofBridge?.rowCount === 2,
     "live desktop Audience Delivery Proof Bridge should render two audience proof rows"
   );
@@ -545,6 +565,28 @@ function checkResult(result) {
     "live desktop Quick Actions Audience Completion producer lane should guide the next producer completion check"
   );
   check(
+    evidence?.palette?.sessionProofReadout?.actionPresent === true &&
+      evidence?.palette?.sessionProofReadout?.spotlightAction === "audience-session-proof-handoff-readout-action" &&
+      String(evidence?.palette?.sessionProofReadout?.spotlightTitle ?? "").includes("Review Audience Session Proof Handoff"),
+    "live desktop Quick Actions palette should show Audience Session Proof Handoff Readout"
+  );
+  check(
+    String(evidence?.palette?.sessionProofReadout?.resultMetricValue ?? "").includes("Audience Session Proof Handoff Readout"),
+    "live desktop Quick Actions Audience Session Proof Handoff readout result should include the handoff readout"
+  );
+  check(
+    evidence?.palette?.sessionProofBeginner?.actionPresent === true &&
+      String(evidence?.palette?.sessionProofBeginner?.resultMetricValue ?? "").includes("First-time composer session proof") &&
+      String(evidence?.palette?.sessionProofBeginner?.resultNextCheck ?? "").includes("Export Preflight"),
+    "live desktop Quick Actions Audience Session Proof Handoff beginner lane should execute with Export Preflight evidence"
+  );
+  check(
+    evidence?.palette?.sessionProofProducer?.actionPresent === true &&
+      String(evidence?.palette?.sessionProofProducer?.resultMetricValue ?? "").includes("Professional producer session proof") &&
+      String(evidence?.palette?.sessionProofProducer?.resultNextCheck ?? "").includes("Handoff Package Check"),
+    "live desktop Quick Actions Audience Session Proof Handoff producer lane should execute with Handoff Package Check evidence"
+  );
+  check(
     evidence?.palette?.deliveryProofReadout?.actionPresent === true &&
       evidence?.palette?.deliveryProofReadout?.spotlightAction === "audience-delivery-proof-bridge-readout-action" &&
       String(evidence?.palette?.deliveryProofReadout?.spotlightTitle ?? "").includes("Review Audience Delivery Proof Bridge"),
@@ -694,6 +736,7 @@ child.on("exit", (code, signal) => {
   console.log("- Audience next-step rail: visible beginner and professional producer action rows passed");
   console.log("- Audience completion checkpoints: visible beginner and professional producer completion paths passed");
   console.log("- Audience delivery snapshot: visible beginner and professional producer delivery proof rows passed");
+  console.log("- Audience Session Proof Handoff: visible beginner/professional producer proof handoff rows plus Quick Actions route and lane evidence passed");
   console.log("- Audience session Quick Actions: renderer palette search and run evidence passed for Enter Guided and Enter Studio");
   console.log("- Audience Starter controls: visible beginner and producer starter creation evidence passed");
   console.log("- Audience Starter Command Reference: live search, row context, and Quick Actions handoff evidence passed");
@@ -708,10 +751,10 @@ child.on("exit", (code, signal) => {
     "- Audience Delivery Proof Bridge: visible beginner/professional producer proof rows plus Quick Actions route and lane evidence passed"
   );
   console.log(
-    "- Beginner path: Audience Session Readout, Audience Route Bridge, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, Enter Guided, Guide Quick Start, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
+    "- Beginner path: Audience Session Readout, Audience Route Bridge, Dual Audience Readiness, Audience Completion Route, Audience Session Proof Handoff, Audience Delivery Proof Bridge, Enter Guided, Guide Quick Start, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
   );
   console.log(
-    "- Producer path: Audience Session Readout, Audience Route Bridge, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, Enter Studio, Studio mode, Review Queue, Production Snapshot, Mix Coach, Handoff Pack, Quick Actions, Command Reference"
+    "- Producer path: Audience Session Readout, Audience Route Bridge, Dual Audience Readiness, Audience Completion Route, Audience Session Proof Handoff, Audience Delivery Proof Bridge, Enter Studio, Studio mode, Review Queue, Production Snapshot, Mix Coach, Handoff Pack, Quick Actions, Command Reference"
   );
   console.log("- Workstation path: transport, compose, sound, arrange, mix, master, export controls, Handoff Pack");
 });

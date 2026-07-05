@@ -158,12 +158,6 @@ function AudienceNextStepRail({
       data-testid="audience-next-step-rail"
       title={`${summary.activeAudienceLabel}: ${summary.nextCheck}`}
     >
-      <strong
-        className="audience-delivery-proof-bridge-title"
-        data-testid="audience-delivery-proof-bridge-headline"
-      >
-        Audience Delivery Proof Bridge
-      </strong>
       {rows.map((row) => (
         <div
           className={`audience-next-step-row ${row.tone}`}
@@ -202,6 +196,74 @@ const audienceCompletionCheckpointDelivery: Record<AudienceSessionReadoutRow["id
   beginner: "Completion: First Beat Path -> Export Preflight -> Handoff Package Check",
   producer: "Completion: Production Snapshot -> Export Preflight -> Handoff Package Check"
 };
+
+const audienceSessionProofHandoffRoute: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Route: Guided first beat -> Export Preflight",
+  producer: "Route: Studio scan -> Handoff Package Check"
+};
+
+const audienceSessionProofHandoffProof: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Proof target: WAV, stems, MIDI, and Handoff Sheet readiness",
+  producer: "Proof target: receipt, send order, and stem handoff readiness"
+};
+
+const audienceSessionProofHandoffArtifact: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Artifact proof: local delivery package reopen",
+  producer: "Artifact proof: persona delivery package reopen"
+};
+
+const audienceSessionProofHandoffNext: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "Next check: open Export Preflight deliverables",
+  producer: "Next check: open Handoff Package Check receipt"
+};
+
+function AudienceSessionProofHandoff({
+  rows,
+  summary
+}: {
+  rows: AudienceSessionReadoutRow[];
+  summary: AudienceSessionReadoutSummary;
+}): ReactElement {
+  return (
+    <div
+      aria-label="Audience Session Proof Handoff"
+      className="audience-session-proof-handoff"
+      data-audience-session-proof-handoff-active={summary.activeAudience}
+      data-testid="audience-session-proof-handoff"
+      title={`${summary.activeAudienceLabel}: session proof handoff for local export and handoff verification`}
+    >
+      <strong
+        className="audience-session-proof-handoff-title"
+        data-testid="audience-session-proof-handoff-headline"
+      >
+        Audience Session Proof Handoff
+      </strong>
+      {rows.map((row) => (
+        <div
+          className={`audience-session-proof-handoff-row ${row.tone}`}
+          data-audience-session-proof-handoff-row={row.id}
+          data-testid={`audience-session-proof-handoff-${row.id}`}
+          key={row.id}
+          title={`${row.label}: ${audienceSessionProofHandoffRoute[row.id]} / ${audienceSessionProofHandoffProof[row.id]} / ${audienceSessionProofHandoffArtifact[row.id]} / ${audienceSessionProofHandoffNext[row.id]}`}
+        >
+          <span data-testid={`audience-session-proof-handoff-${row.id}-lane`}>{row.label}</span>
+          <strong data-testid={`audience-session-proof-handoff-${row.id}-route`}>
+            {audienceSessionProofHandoffRoute[row.id]}
+          </strong>
+          <small data-testid={`audience-session-proof-handoff-${row.id}-proof`}>
+            {audienceSessionProofHandoffProof[row.id]}
+          </small>
+          <em data-testid={`audience-session-proof-handoff-${row.id}-artifact`}>
+            {audienceSessionProofHandoffArtifact[row.id]}
+          </em>
+          <em data-testid={`audience-session-proof-handoff-${row.id}-next`}>
+            {audienceSessionProofHandoffNext[row.id]}
+          </em>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function AudienceCompletionCheckpoints({
   rows,
@@ -339,6 +401,12 @@ function AudienceDeliveryProofBridge({
       data-testid="audience-delivery-proof-bridge"
       title={`${summary.activeAudienceLabel}: delivery proof bridge for local package and handoff verification`}
     >
+      <strong
+        className="audience-delivery-proof-bridge-title"
+        data-testid="audience-delivery-proof-bridge-headline"
+      >
+        Audience Delivery Proof Bridge
+      </strong>
       {rows.map((row) => (
         <div
           className={`audience-delivery-proof-bridge-row ${row.tone}`}
@@ -651,6 +719,7 @@ export function AudienceSessionReadout({
         <em data-testid="audience-session-next-check">{summary.nextCheck}</em>
       </div>
       <AudienceNextStepRail rows={summary.rows} summary={summary} onSelectAudience={onSelectAudience} />
+      <AudienceSessionProofHandoff rows={summary.rows} summary={summary} />
       <AudienceCompletionCheckpoints rows={summary.rows} summary={summary} />
       <AudienceDeliverySnapshot rows={summary.rows} summary={summary} />
       <AudienceDeliveryProofBridge rows={summary.rows} summary={summary} />
@@ -1804,6 +1873,74 @@ export function createAudienceCompletionRouteQuickActions({
   }));
 
   return [routeAction, ...laneActions];
+}
+
+export function createAudienceSessionProofHandoffQuickActions({
+  exportPreflightSummary,
+  handoffPackageCheckSummary,
+  onFocusExportPreflight,
+  onFocusHandoffPackageCheck,
+  onFocusRouteReadout,
+  rows
+}: {
+  exportPreflightSummary: ExportPreflightSummary;
+  handoffPackageCheckSummary: HandoffPackageCheckSummary;
+  onFocusExportPreflight: (card: ExportPreflightCard) => void;
+  onFocusHandoffPackageCheck: (card: HandoffPackageCheckCard) => void;
+  onFocusRouteReadout: () => void;
+  rows: AudienceSessionReadoutRow[];
+}): QuickAction[] {
+  const beginner = rows.find((row) => row.id === "beginner") ?? rows[0];
+  const producer = rows.find((row) => row.id === "producer") ?? rows[1] ?? rows[0];
+  const beginnerCard = exportPreflightSummary.cards.find((card) => card.id === "deliverables") ?? exportPreflightSummary.cards[0];
+  const producerCard = handoffPackageCheckSummary.cards.find((card) => card.id === "receipt") ?? handoffPackageCheckSummary.cards[0];
+  const routeDetail = [
+    `${beginner?.label ?? "First-time composer"}: ${audienceSessionProofHandoffRoute.beginner}`,
+    `${producer?.label ?? "Professional producer"}: ${audienceSessionProofHandoffRoute.producer}`,
+    audienceSessionProofHandoffArtifact.beginner,
+    audienceSessionProofHandoffArtifact.producer,
+    "Visible Audience Session Proof Handoff rows unchanged"
+  ].join(" / ");
+
+  return [
+    {
+      id: "audience-session-proof-handoff-readout-action",
+      title: "Review Audience Session Proof Handoff",
+      detail: routeDetail,
+      group: "Project",
+      keywords: `audience session proof handoff readout first-time composer professional producer export preflight handoff package check local package reopen persona package reopen wav stems midi receipt send order ${routeDetail}`,
+      resultTargetId: "route",
+      run: onFocusRouteReadout
+    },
+    {
+      id: "audience-session-proof-handoff-beginner-action",
+      title: "Open Session Proof First-time composer",
+      detail: [
+        audienceSessionProofHandoffRoute.beginner,
+        audienceSessionProofHandoffProof.beginner,
+        audienceSessionProofHandoffArtifact.beginner,
+        audienceSessionProofHandoffNext.beginner
+      ].join(" / "),
+      group: "Project",
+      keywords: `audience session proof handoff beginner first-time composer guided first beat export preflight deliverables wav stems midi handoff sheet local delivery package reopen ${beginner?.detail ?? ""}`,
+      resultTargetId: "beginner",
+      run: () => onFocusExportPreflight(beginnerCard)
+    },
+    {
+      id: "audience-session-proof-handoff-producer-action",
+      title: "Open Session Proof Professional producer",
+      detail: [
+        audienceSessionProofHandoffRoute.producer,
+        audienceSessionProofHandoffProof.producer,
+        audienceSessionProofHandoffArtifact.producer,
+        audienceSessionProofHandoffNext.producer
+      ].join(" / "),
+      group: "Project",
+      keywords: `audience session proof handoff producer professional producer studio handoff package check receipt send order stems midi persona delivery package reopen ${producer?.detail ?? ""}`,
+      resultTargetId: "producer",
+      run: () => onFocusHandoffPackageCheck(producerCard)
+    }
+  ];
 }
 
 export function createAudienceDeliveryProofBridgeQuickActions({

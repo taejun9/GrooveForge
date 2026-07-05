@@ -136,6 +136,9 @@ type LaunchSmokePaletteEvidence = {
   routeBridge: LaunchSmokePaletteRouteEvidence;
   routeBridgeCompletion: LaunchSmokePaletteRouteEvidence;
   routeBridgeReadiness: LaunchSmokePaletteRouteEvidence;
+  sessionProofBeginner: LaunchSmokePaletteRouteEvidence;
+  sessionProofProducer: LaunchSmokePaletteRouteEvidence;
+  sessionProofReadout: LaunchSmokePaletteRouteEvidence;
   starterBeginner: LaunchSmokeAudienceStarterEvidence;
   starterProducer: LaunchSmokeAudienceStarterEvidence;
   resultPresent: boolean;
@@ -945,6 +948,9 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "audience-completion-checkpoints",
         "audience-completion-checkpoint-beginner",
         "audience-completion-checkpoint-producer",
+        "audience-session-proof-handoff",
+        "audience-session-proof-handoff-beginner",
+        "audience-session-proof-handoff-producer",
         "audience-delivery-snapshot",
         "audience-delivery-snapshot-beginner",
         "audience-delivery-snapshot-producer",
@@ -985,6 +991,7 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "Audience session",
         "Audience Route Bridge",
         "Dual Audience Readiness",
+        "Audience Session Proof Handoff",
         "Audience Delivery Proof Bridge",
         "First-time composer",
         "First-time composer lane",

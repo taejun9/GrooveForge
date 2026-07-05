@@ -78,6 +78,9 @@ function validateFirstRunRenderer(html) {
       'data-testid="audience-completion-route"',
       "Audience Completion Route",
       "First-time composer completion",
+      'data-testid="audience-session-proof-handoff"',
+      "Audience Session Proof Handoff",
+      "Route: Guided first beat -&gt; Export Preflight",
       'data-testid="audience-delivery-proof-bridge"',
       "Audience Delivery Proof Bridge",
       "Beginner delivery proof",
@@ -206,6 +209,19 @@ function createAudienceDeliveryProofSmokeAction({ id, resultTargetId, title }) {
       "Audience Delivery Proof Bridge Readout / First-time composer delivery proof / Professional producer delivery proof / Export Preflight deliverables / Handoff Package Check receipt / local delivery package reopen / persona delivery package reopen",
     group: "Project",
     keywords: "audience delivery proof bridge first-time composer professional producer local delivery package handoff receipt route readout",
+    resultTargetId,
+    run() {}
+  };
+}
+
+function createAudienceSessionProofHandoffSmokeAction({ id, resultTargetId, title }) {
+  return {
+    id,
+    title,
+    detail:
+      "Audience Session Proof Handoff Readout / First-time composer session proof / Professional producer session proof / Guided first beat -> Export Preflight / Studio scan -> Handoff Package Check / local delivery package reopen / persona delivery package reopen",
+    group: "Project",
+    keywords: "audience session proof handoff first-time composer professional producer export preflight handoff package check route readout",
     resultTargetId,
     run() {}
   };
@@ -603,6 +619,81 @@ function validateAudienceDeliveryProofQuickActionResults(quickActions, workstati
     check(result.tone === "good", `${testCase.label} should report a good tone`);
     check(result.metric.id === "audience-delivery-proof-bridge", `${testCase.label} should use the Audience Delivery Proof metric id`);
     check(result.metric.label === "Audience Delivery Proof Bridge", `${testCase.label} should use the Audience Delivery Proof metric label`);
+    check(result.metric.tone === "good", `${testCase.label} metric should report a good tone`);
+
+    for (const needle of testCase.metricNeedles) {
+      checkIncludes(result.metric.after, needle, `${testCase.label} after metric`);
+    }
+    for (const needle of testCase.nextNeedles) {
+      checkIncludes(result.nextCheck, needle, `${testCase.label} next check`);
+    }
+  }
+}
+
+function validateAudienceSessionProofHandoffQuickActionResults(quickActions, workstation) {
+  const cases = [
+    {
+      label: "Audience Session Proof Handoff readout result",
+      action: createAudienceSessionProofHandoffSmokeAction({
+        id: "audience-session-proof-handoff-readout-action",
+        resultTargetId: "route",
+        title: "Review Audience Session Proof Handoff"
+      }),
+      metricNeedles: [
+        "Audience Session Proof Handoff Readout",
+        "First-time composer session proof",
+        "Professional producer session proof",
+        "Pattern A",
+        "selected-pattern events",
+        "editable project events"
+      ],
+      nextNeedles: ["first-time composer", "professional producer", "session proof"]
+    },
+    {
+      label: "Audience Session Proof Handoff beginner lane result",
+      action: createAudienceSessionProofHandoffSmokeAction({
+        id: "audience-session-proof-handoff-beginner-action",
+        resultTargetId: "beginner",
+        title: "Open Session Proof First-time composer"
+      }),
+      metricNeedles: [
+        "Open first-time composer session proof",
+        "First-time composer session proof",
+        "Export Preflight",
+        "local delivery package reopen"
+      ],
+      nextNeedles: ["Export Preflight", "WAV", "Handoff Sheet", "local package reopen"]
+    },
+    {
+      label: "Audience Session Proof Handoff producer lane result",
+      action: createAudienceSessionProofHandoffSmokeAction({
+        id: "audience-session-proof-handoff-producer-action",
+        resultTargetId: "producer",
+        title: "Open Session Proof Professional producer"
+      }),
+      metricNeedles: [
+        "Open professional producer session proof",
+        "Professional producer session proof",
+        "Handoff Package Check",
+        "persona delivery package reopen"
+      ],
+      nextNeedles: ["Handoff Package Check", "send order", "stem handoff", "persona package reopen"]
+    }
+  ];
+
+  for (const testCase of cases) {
+    const result = quickActions.createQuickActionResult(
+      testCase.action,
+      workstation.starterProject,
+      workstation.starterProject,
+      "complete"
+    );
+
+    check(result.actionId === testCase.action.id, `${testCase.label} should return the executed action id`);
+    check(result.status === "Focused", `${testCase.label} should report Focused status`);
+    check(result.tone === "good", `${testCase.label} should report a good tone`);
+    check(result.metric.id === "audience-session-proof-handoff", `${testCase.label} should use the Audience Session Proof metric id`);
+    check(result.metric.label === "Audience Session Proof Handoff", `${testCase.label} should use the Audience Session Proof metric label`);
     check(result.metric.tone === "good", `${testCase.label} metric should report a good tone`);
 
     for (const needle of testCase.metricNeedles) {
@@ -1085,6 +1176,100 @@ function validateAudienceDeliveryProofQuickActionPalette(guidancePanels, palette
   check(runs.join(",") === "route,export:deliverables,handoff:receipt", "Audience Delivery Proof palette actions should run route and lane handlers");
 }
 
+function validateAudienceSessionProofHandoffQuickActionPalette(guidancePanels, palette) {
+  const runs = [];
+  const actions = guidancePanels.createAudienceSessionProofHandoffQuickActions({
+    exportPreflightSummary: {
+      headline: "Export Preflight",
+      detail: "Session proof",
+      tone: "warn",
+      cards: [
+        {
+          id: "deliverables",
+          focusId: "deliverables",
+          label: "Deliverables",
+          value: "WAV / stems / MIDI / Handoff Sheet",
+          detail: "Confirm local delivery package files",
+          focusLabel: "Deliver",
+          tone: "warn"
+        }
+      ]
+    },
+    handoffPackageCheckSummary: {
+      headline: "Handoff Package Check",
+      detail: "Session receipt",
+      tone: "warn",
+      cards: [
+        {
+          id: "receipt",
+          focusId: "receipt",
+          label: "Receipt",
+          value: "Package reopen",
+          status: "Review",
+          detail: "Confirm send order and handoff receipt",
+          focusLabel: "Deliver",
+          focusTarget: "deliver",
+          tone: "warn"
+        }
+      ]
+    },
+    onFocusExportPreflight(card) {
+      runs.push(`export:${card.id}`);
+    },
+    onFocusHandoffPackageCheck(card) {
+      runs.push(`handoff:${card.id}`);
+    },
+    onFocusRouteReadout() {
+      runs.push("route");
+    },
+    rows: createAudienceSessionSmokeSummary().rows
+  });
+
+  check(actions.length === 3, "Audience Session Proof Handoff palette smoke should create route, beginner, and producer actions");
+  check(actions.every((action) => action.group === "Project"), "Audience Session Proof Handoff palette actions should remain Project-group actions");
+
+  const routeAction = actions.find((action) => action.id === "audience-session-proof-handoff-readout-action");
+  const beginnerAction = actions.find((action) => action.id === "audience-session-proof-handoff-beginner-action");
+  const producerAction = actions.find((action) => action.id === "audience-session-proof-handoff-producer-action");
+  check(routeAction?.title === "Review Audience Session Proof Handoff", "Audience Session Proof Handoff palette should expose route readout title");
+  check(
+    beginnerAction?.title === "Open Session Proof First-time composer",
+    "Audience Session Proof Handoff palette should expose beginner proof title"
+  );
+  check(
+    producerAction?.title === "Open Session Proof Professional producer",
+    "Audience Session Proof Handoff palette should expose producer proof title"
+  );
+  check(beginnerAction?.resultTargetId === "beginner", "Audience Session Proof Handoff palette should keep beginner result target");
+  check(producerAction?.resultTargetId === "producer", "Audience Session Proof Handoff palette should keep producer result target");
+
+  const routeSearch = palette.filterQuickActions(actions, "audience session proof handoff", "all");
+  const beginnerSearch = palette.filterQuickActions(actions, "first-time composer session proof", "project");
+  const producerSearch = palette.filterQuickActions(actions, "professional producer session proof", "project");
+
+  check(routeSearch[0]?.id === "audience-session-proof-handoff-readout-action", "Audience Session Proof Handoff palette search should find route readout first");
+  check(
+    beginnerSearch.some((action) => action.id === "audience-session-proof-handoff-beginner-action"),
+    "Audience Session Proof Handoff palette search should find beginner proof lane"
+  );
+  check(
+    producerSearch.some((action) => action.id === "audience-session-proof-handoff-producer-action"),
+    "Audience Session Proof Handoff palette search should find producer proof lane"
+  );
+
+  const routeSearchResult = palette.createQuickActionSearchResult("audience session proof handoff", "all", actions);
+  check(routeSearchResult.tone === "good", "Audience Session Proof Handoff palette search result should be actionable");
+  check(
+    routeSearchResult.metricValue.includes("Review Audience Session Proof Handoff"),
+    "Audience Session Proof Handoff palette search result should target the route readout"
+  );
+
+  routeAction?.run();
+  beginnerAction?.run();
+  producerAction?.run();
+  check(runs.join(",") === "route,export:deliverables,handoff:receipt", "Audience Session Proof Handoff palette actions should run route and lane handlers");
+}
+
 installBrowserMocks();
 
 const server = await createServer({
@@ -1114,6 +1299,10 @@ try {
     await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
     await server.ssrLoadModule("/src/domain/workstation.ts")
   );
+  validateAudienceSessionProofHandoffQuickActionResults(
+    await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
+    await server.ssrLoadModule("/src/domain/workstation.ts")
+  );
   validateAudienceDeliveryProofQuickActionResults(
     await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
     await server.ssrLoadModule("/src/domain/workstation.ts")
@@ -1128,6 +1317,10 @@ try {
     await server.ssrLoadModule("/src/ui/workstationAppQuickActionPalette.ts")
   );
   validateAudienceCompletionQuickActionPalette(
+    await server.ssrLoadModule("/src/ui/workstationGuidancePanels.tsx"),
+    await server.ssrLoadModule("/src/ui/workstationAppQuickActionPalette.ts")
+  );
+  validateAudienceSessionProofHandoffQuickActionPalette(
     await server.ssrLoadModule("/src/ui/workstationGuidancePanels.tsx"),
     await server.ssrLoadModule("/src/ui/workstationAppQuickActionPalette.ts")
   );
@@ -1161,6 +1354,7 @@ try {
     console.log("- Audience Starter Command Reference: Build Starter Project creation row is searchable from the Guide command map");
     console.log("- Dual Audience Readiness palette: route readout plus both audience lanes are searchable and return focused route metrics");
     console.log("- Audience Completion Route palette: route readout plus both audience completion lanes are searchable and return focused route metrics");
+    console.log("- Audience Session Proof Handoff palette: route readout plus both proof handoff lanes are searchable and return focused proof metrics");
     console.log("- Audience Delivery Proof Bridge palette: route readout plus both proof lanes are searchable and return focused proof metrics");
     console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack, Delivery Bundle ZIP");
   }
