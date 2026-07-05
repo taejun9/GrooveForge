@@ -36,6 +36,8 @@ const releaseChannelApplyPrivateEnvProofCommand = "npm run release:channel-apply
 const releaseChannelApplyPrivateEnvProofRole =
   "run private env preflight, apply only after preflight readiness, strict proof, and completion readout as one value-free operator proof runner";
 const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
+const releaseChannelPrivateInputTemplateCommand = "npm run release:channel-private-input-template";
+const releaseCompletionSummaryRefreshCommand = "npm run release:completion-summary-refresh-smoke";
 const privateInputFileKey = "GROOVEFORGE_RELEASE_CHANNEL_INPUT_FILE";
 const defaultPrivateInputFileName = ".env.release-channel.local";
 const operatorPrivateInputFileDefaultPath = defaultPrivateInputFileName;
@@ -560,6 +562,92 @@ function operatorAliasRows(report) {
   }));
 }
 
+function koreanPrivateInputRows(rows) {
+  return objectRows(rows).map((row, index) => ({
+    order: index + 1,
+    key: textValue(row.key),
+    editTarget: `${defaultPrivateInputFileName}:${index + 6}`,
+    expectedShape: textValue(row.expectedShape),
+    preflightCommand: releaseChannelApplyPrivateEnvPreflightCommand,
+    applyCommand: releaseChannelApplyPrivateEnvCommand,
+    proofCommand: privateEditOperatorProofCommand,
+    valueRecorded: false
+  }));
+}
+
+function koreanOperatorHandoffRows(report) {
+  return [
+    {
+      order: 1,
+      label: "현재 완성도",
+      action: `완성 ${report.userFacingCompletion}, 남은 ${report.remainingCompletion}, 최신 완료 ${report.latestCompletedPlan}, 진행 ${report.latestTenPlanProgressLabel}`,
+      command: report.currentNextCommandAlias,
+      proof: "완성도와 현재 차단점을 먼저 확인",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      label: "비공개 입력 파일 준비",
+      action: `${defaultPrivateInputFileName}:6-9에 네 개 릴리스 채널 메타데이터 키 값을 운영자가 직접 입력`,
+      command: releaseChannelPrivateInputTemplateCommand,
+      proof: `${privateInputFileKey}로 다른 ignored 입력 파일을 선택할 수 있음`,
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      label: "입력값 사전 검증",
+      action: "실제 적용 전에 네 개 키가 placeholder가 아니고 기대 형상에 맞는지 확인",
+      command: releaseChannelApplyPrivateEnvPreflightCommand,
+      proof: "preflight가 준비됨을 보고하기 전에는 ignored local env를 쓰지 않음",
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      label: "로컬 배포 env 적용",
+      action: `${report.currentEnvEditTarget}의 릴리스 채널 행에 운영자 소유 값을 적용`,
+      command: releaseChannelApplyPrivateEnvCommand,
+      proof: "preflight 준비 후에만 실행",
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      label: "엄격 증거 체인",
+      action: "strict live check, post-edit proof, progress refresh, private-value leak audit를 실행",
+      command: privateEditOperatorProofCommand,
+      proof: "적용 이후에도 URL/channel/private 값은 리포트에 기록하지 않음",
+      valueRecorded: false
+    },
+    {
+      order: 6,
+      label: "차단점 새로고침",
+      action: "현재 차단점이 release-channel metadata에서 다음 외부 배포 항목으로 넘어갔는지 확인",
+      command: currentBlockerCommand,
+      proof: "현재 first blocker와 next command를 갱신",
+      valueRecorded: false
+    },
+    {
+      order: 7,
+      label: "완성도 리포트 갱신",
+      action: "작업 후 사용자에게 보고할 최신 완성도와 남은 차단점을 다시 생성",
+      command: releaseCompletionSummaryRefreshCommand,
+      proof: "완성도, 남은 비율, 10-plan 진행, operator brief를 함께 갱신",
+      valueRecorded: false
+    }
+  ];
+}
+
+function formatKoreanPrivateInputRows(rows) {
+  return rows
+    .map((row) => `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.editTarget)} | ${escapeCell(row.expectedShape)} | \`${escapeCell(row.preflightCommand)}\` | \`${escapeCell(row.applyCommand)}\` | \`${escapeCell(row.proofCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatKoreanOperatorHandoffRows(rows) {
+  return rows
+    .map((row) => `| ${row.order} | ${escapeCell(row.label)} | ${escapeCell(row.action)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.proof)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatOperatorAliasRows(rows) {
   return rows
     .map(
@@ -707,6 +795,18 @@ ${formatPrivateEnvProofRunnerRows(report.privateEnvProofRunnerRows)}
 | order | stage | action | label | proof command | evidence | source | value recorded |
 |---:|---|---|---|---|---|---|---:|
 ${formatNextActionRows(report.postClearanceNextActionRows)}
+
+## 한국어 운영자 핸드오프
+
+| 순서 | 항목 | 운영자 작업 | 명령 | 확인 기준 | value recorded |
+|---:|---|---|---|---|---:|
+${formatKoreanOperatorHandoffRows(report.koreanOperatorHandoffRows)}
+
+## 한국어 릴리스 채널 입력 행
+
+| 순서 | key | 입력 위치 | 기대 형상 | 사전 검증 | 적용 | 증거 체인 | value recorded |
+|---:|---|---|---|---|---|---|---:|
+${formatKoreanPrivateInputRows(report.koreanPrivateInputRows)}
 
 ## Non-Claiming Boundary
 
@@ -1050,6 +1150,26 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
   report.userFacingOperatorAliasRows = operatorAliasRows(report);
   report.userFacingOperatorAliasRowCount = report.userFacingOperatorAliasRows.length;
   report.userFacingOperatorAliasRowsValueFree = rowsValueFree(report.userFacingOperatorAliasRows);
+  report.koreanPrivateInputRows = koreanPrivateInputRows(preflightProcessEnvChecklistRows);
+  report.koreanPrivateInputRowCount = report.koreanPrivateInputRows.length;
+  report.koreanPrivateInputRowsValueFree = rowsValueFree(report.koreanPrivateInputRows);
+  report.koreanOperatorHandoffRows = koreanOperatorHandoffRows(report);
+  report.koreanOperatorHandoffRowCount = report.koreanOperatorHandoffRows.length;
+  report.koreanOperatorHandoffRowsValueFree = rowsValueFree(report.koreanOperatorHandoffRows);
+  report.koreanOperatorHandoffReady =
+    report.koreanPrivateInputRowCount === 4 &&
+    report.koreanPrivateInputRows.every((row, index) => row.editTarget === `${defaultPrivateInputFileName}:${index + 6}`) &&
+    report.koreanPrivateInputRows.every((row) => row.expectedShape !== "none") &&
+    report.koreanPrivateInputRowsValueFree === true &&
+    report.koreanOperatorHandoffRowCount === 7 &&
+    report.koreanOperatorHandoffRows[0]?.command === report.currentNextCommandAlias &&
+    report.koreanOperatorHandoffRows.some((row) => row.command === releaseChannelPrivateInputTemplateCommand) &&
+    report.koreanOperatorHandoffRows.some((row) => row.command === releaseChannelApplyPrivateEnvPreflightCommand) &&
+    report.koreanOperatorHandoffRows.some((row) => row.command === releaseChannelApplyPrivateEnvCommand) &&
+    report.koreanOperatorHandoffRows.some((row) => row.command === privateEditOperatorProofCommand) &&
+    report.koreanOperatorHandoffRows.some((row) => row.command === currentBlockerCommand) &&
+    report.koreanOperatorHandoffRows.some((row) => row.command === releaseCompletionSummaryRefreshCommand) &&
+    report.koreanOperatorHandoffRowsValueFree === true;
   return report;
 }
 
@@ -1236,6 +1356,33 @@ check(report.userFacingOperatorAliasRowCount === 7, "release operator completion
 check(report.userFacingOperatorAliasRows.length === report.userFacingOperatorAliasRowCount, "release operator completion brief user-facing operator alias row count should match rows");
 check(report.userFacingOperatorAliasRowsValueFree === true, "release operator completion brief user-facing operator alias rows should be value-free");
 check(rowsValueFree(report.userFacingOperatorAliasRows), "release operator completion brief user-facing operator alias rows should not record values");
+check(report.koreanOperatorHandoffReady === true, "release operator completion brief should include a ready Korean operator handoff");
+check(report.koreanOperatorHandoffRowCount === 7, "release operator completion brief Korean handoff should include seven operator rows");
+check(report.koreanOperatorHandoffRowsValueFree === true, "release operator completion brief Korean handoff rows should be value-free");
+check(rowsValueFree(report.koreanOperatorHandoffRows), "release operator completion brief Korean handoff rows should not record values");
+check(report.koreanPrivateInputRowCount === 4, "release operator completion brief Korean input section should include four private input rows");
+check(report.koreanPrivateInputRowsValueFree === true, "release operator completion brief Korean input rows should be value-free");
+check(rowsValueFree(report.koreanPrivateInputRows), "release operator completion brief Korean input rows should not record values");
+check(
+  report.koreanPrivateInputRows.every((row, index) => row.editTarget === `${defaultPrivateInputFileName}:${index + 6}`),
+  "release operator completion brief Korean input rows should expose default private input edit lines"
+);
+check(
+  report.koreanPrivateInputRows.every((row) => row.preflightCommand === releaseChannelApplyPrivateEnvPreflightCommand),
+  "release operator completion brief Korean input rows should keep preflight first"
+);
+check(
+  report.koreanPrivateInputRows.every((row) => row.applyCommand === releaseChannelApplyPrivateEnvCommand),
+  "release operator completion brief Korean input rows should expose apply command"
+);
+check(
+  report.koreanPrivateInputRows.every((row) => row.proofCommand === privateEditOperatorProofCommand),
+  "release operator completion brief Korean input rows should expose strict proof command"
+);
+check(
+  report.koreanOperatorHandoffRows.some((row) => row.command === releaseCompletionSummaryRefreshCommand),
+  "release operator completion brief Korean handoff should expose completion summary refresh command"
+);
 check(report.privateValuesRecorded === false, "release operator completion brief should not record private values");
 check(report.feedValueRecorded === false, "release operator completion brief should not record feed values");
 check(report.channelValueRecorded === false, "release operator completion brief should not record channel values");
@@ -1267,6 +1414,9 @@ check(markdown.includes("Current operator start command:"), "release operator co
 check(markdown.includes("Operator brief first command matches current operator start:"), "release operator completion brief Markdown should include brief/start-command match");
 check(markdown.includes("Current Private Edit Rows"), "release operator completion brief Markdown should include edit rows");
 check(markdown.includes("Post-Clearance Next Action Rows"), "release operator completion brief Markdown should include next action rows");
+check(markdown.includes("한국어 운영자 핸드오프"), "release operator completion brief Markdown should include Korean operator handoff");
+check(markdown.includes("한국어 릴리스 채널 입력 행"), "release operator completion brief Markdown should include Korean release-channel input rows");
+check(markdown.includes(".env.release-channel.local:6"), "release operator completion brief Markdown should include Korean private input edit line guidance");
 check(markdown.includes("External distribution claimed: no"), "release operator completion brief Markdown should include non-claiming posture");
 
 if (failures.length > 0) {
@@ -1323,6 +1473,9 @@ console.log(`- Preflight operator private input file default path: ${report.pref
 console.log(`- Preflight blocked-smoke private input file path: ${report.preflightPrivateInputFilePath}`);
 console.log(`- Preflight private input file loaded keys: ${report.preflightPrivateInputFileLoadedKeyCount}`);
 console.log(`- Preflight guided setup fallback command: ${report.preflightGuidedSetupFallbackCommand}`);
+console.log(`- Korean operator handoff ready: ${report.koreanOperatorHandoffReady ? "yes" : "no"}`);
+console.log(`- Korean operator handoff rows: ${report.koreanOperatorHandoffRowCount}`);
+console.log(`- Korean private input rows: ${report.koreanPrivateInputRowCount}`);
 console.log(`- Preflight operator receipt source ready: ${report.preflightOperatorReceiptSourceReady ? "yes" : "no"}`);
 console.log(`- Preflight operator receipt rows: ${report.preflightOperatorReceiptRowCount} (${report.preflightOperatorReceiptSummary})`);
 console.log(`- Preflight operator receipt first command: ${report.preflightOperatorReceiptFirstCommand}`);
