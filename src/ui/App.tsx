@@ -10216,11 +10216,54 @@ export function App(): ReactElement {
   return (
     <main className="app-shell">
       <header className="transport-band" data-testid="workflow-target-transport" ref={transportPanelRef}>
-        <div className="brand-lockup">
-          <Disc3 size={28} aria-hidden="true" />
-          <div>
-            <h1>GrooveForge</h1>
-            <span>{window.grooveforge?.appKind ?? "desktop"} workstation</span>
+        <div className="brand-start">
+          <div className="brand-lockup">
+            <Disc3 size={28} aria-hidden="true" />
+            <div>
+              <h1>GrooveForge</h1>
+              <span>{window.grooveforge?.appKind ?? "desktop"} workstation</span>
+            </div>
+          </div>
+          <div className="first-run-launchpad" data-testid="first-run-launchpad">
+            <div className="first-run-launchpad-heading">
+              <Sparkles size={15} aria-hidden="true" />
+              <span>Start here</span>
+            </div>
+            <strong>Make a beat now</strong>
+            <small>Choose a ready-to-edit local project. No samples or setup required.</small>
+            <button
+              className="first-run-launchpad-action primary"
+              data-testid="first-run-start-beat"
+              type="button"
+              onClick={() => createAudienceStarter("beginner")}
+            >
+              <Music2 size={15} aria-hidden="true" />
+              <span>
+                <strong>Start an 8-bar beat</strong>
+                <small>Guided · drums, bass, chords, melody</small>
+              </span>
+            </button>
+            <button
+              className="first-run-launchpad-action"
+              data-testid="first-run-producer-pass"
+              type="button"
+              onClick={() => createAudienceStarter("producer")}
+            >
+              <SlidersHorizontal size={15} aria-hidden="true" />
+              <span>
+                <strong>Start a studio pass</strong>
+                <small>Producer workflow · arrangement and delivery</small>
+              </span>
+            </button>
+            <button
+              className="first-run-launchpad-open"
+              data-testid="first-run-open-project"
+              type="button"
+              onClick={() => void handleOpenProject()}
+            >
+              <FolderOpen size={14} aria-hidden="true" />
+              <span>Open an existing project</span>
+            </button>
           </div>
         </div>
 
