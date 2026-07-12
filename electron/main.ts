@@ -114,6 +114,14 @@ type LaunchSmokeLayoutEvidence = {
   selectedBlockEditorPresent: boolean;
   stepGridAfterPatternLab: boolean;
   stepGridPresent: boolean;
+  workflowNavigatorBeforeWorkspace: boolean;
+  workflowNavigatorComposeJumpReady: boolean;
+  workflowNavigatorDeliverJumpReady: boolean;
+  workflowNavigatorOutsideGuidance: boolean;
+  workflowNavigatorPresent: boolean;
+  workflowNavigatorStageCount: number;
+  workflowNavigatorSticky: boolean;
+  workflowNavigatorVisible: boolean;
 };
 
 type LaunchSmokePaletteRouteEvidence = {
@@ -1130,6 +1138,11 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "pattern-tab-A",
         "pattern-lab",
         "workspace-feedback-anchor",
+        "workflow-navigator",
+        "workflow-jump-compose",
+        "workflow-jump-arrange",
+        "workflow-jump-mix",
+        "workflow-jump-deliver",
         "note-editor-panel",
         "capture-ideas",
         "instrument-direct-chords",
@@ -1259,6 +1272,9 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const deliveryStatusToggle = document.querySelector('[data-testid="handoff-status-toggle"]');
       const deliveryAudit = document.querySelector('[data-testid="handoff-audit-tools"]');
       const deliveryAuditToggle = document.querySelector('[data-testid="handoff-audit-toggle"]');
+      const workflowNavigator = document.querySelector('[data-testid="workflow-navigator"]');
+      const workspaceGrid = document.querySelector('.workspace-grid');
+      const workflowNavigatorStyle = workflowNavigator ? getComputedStyle(workflowNavigator) : null;
       const follows = (before, after) =>
         Boolean(before && after && (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING));
       const emptyRoute = {
@@ -1322,6 +1338,20 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         targetHasAudienceTargets: false,
         targetText: ""
       };
+      const workflowNavigatorJumpEvidence = (() => {
+        const deliverButton = document.querySelector('[data-testid="workflow-jump-deliver"]');
+        const deliverTarget = document.querySelector('[data-testid="handoff-pack"]');
+        const composeButton = document.querySelector('[data-testid="workflow-jump-compose"]');
+        const composeTarget = document.querySelector('[data-testid="workflow-target-compose"]');
+        deliverButton?.click();
+        const deliverRect = deliverTarget?.getBoundingClientRect() ?? null;
+        composeButton?.click();
+        const composeTop = composeTarget?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+        return {
+          composeReady: Math.abs(composeTop) <= 2,
+          deliverReady: Boolean(deliverRect && deliverRect.top < window.innerHeight && deliverRect.bottom > 0)
+        };
+      })();
       const bridge = window.grooveforge;
       return {
         appKind: bridge?.appKind ?? null,
@@ -1400,7 +1430,21 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           soundDesignToggleVisible: Boolean(soundDesignToggle && soundDesignToggle.getBoundingClientRect().height > 0),
           selectedBlockEditorPresent: Boolean(selectedBlockEditor),
           stepGridAfterPatternLab: follows(patternLab, stepGrid),
-          stepGridPresent: Boolean(stepGrid)
+          stepGridPresent: Boolean(stepGrid),
+          workflowNavigatorBeforeWorkspace: follows(workflowNavigator, workspaceGrid),
+          workflowNavigatorComposeJumpReady: workflowNavigatorJumpEvidence.composeReady,
+          workflowNavigatorDeliverJumpReady: workflowNavigatorJumpEvidence.deliverReady,
+          workflowNavigatorOutsideGuidance: Boolean(
+            workflowNavigator && guidanceCenter && !guidanceCenter.contains(workflowNavigator)
+          ),
+          workflowNavigatorPresent: Boolean(workflowNavigator),
+          workflowNavigatorStageCount: document.querySelectorAll('[data-testid^="workflow-jump-"]').length,
+          workflowNavigatorSticky: workflowNavigatorStyle?.position === "sticky" && workflowNavigatorStyle.top === "12px",
+          workflowNavigatorVisible: Boolean(
+            workflowNavigator &&
+            workflowNavigator.getBoundingClientRect().height > 0 &&
+            workflowNavigator.closest('details:not([open])') === null
+          )
         },
         missingText: expectedText.filter((text) => !bodyText.includes(text)),
         bridgeDirect: {

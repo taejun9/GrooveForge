@@ -56,13 +56,21 @@ function validateFirstRunRenderer(html) {
   const quickStartIndex = html.indexOf('data-testid="guide-quick-start"');
   const guidanceCenterIndex = html.indexOf('data-testid="guidance-center"');
   const feedbackAnchorIndex = html.indexOf('data-testid="workspace-feedback-anchor"');
+  const workflowNavigatorIndex = html.indexOf('data-testid="workflow-navigator"');
   const workspaceIndex = html.indexOf('class="workspace-grid"');
   check(
     quickStartIndex >= 0 &&
       guidanceCenterIndex > quickStartIndex &&
       feedbackAnchorIndex > guidanceCenterIndex &&
-      workspaceIndex > feedbackAnchorIndex,
-    "first-run hierarchy should keep Guide Quick Start, on-demand guidance, global feedback, and core workspace in order"
+      workflowNavigatorIndex > feedbackAnchorIndex &&
+      workspaceIndex > workflowNavigatorIndex,
+    "first-run hierarchy should keep Guide Quick Start, on-demand guidance, global feedback, visible workflow navigation, and core workspace in order"
+  );
+  check(
+    ['compose', 'arrange', 'mix', 'deliver'].every((zone) =>
+      html.includes(`data-testid="workflow-jump-${zone}"`)
+    ),
+    "Workflow Navigator should expose Compose, Arrange, Mix, and Deliver stage actions"
   );
   check(
     !html.includes('<details class="guidance-center" data-testid="guidance-center" open="">'),

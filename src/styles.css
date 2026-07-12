@@ -4249,6 +4249,20 @@ h2 {
   background: rgba(130, 215, 255, 0.04);
 }
 
+.app-shell > .workflow-navigator {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+
+@media (min-width: 1221px) {
+  .app-shell > .workflow-navigator {
+    position: sticky;
+    top: 12px;
+    z-index: 12;
+    backdrop-filter: blur(14px);
+    background: rgba(17, 16, 15, 0.9);
+  }
+}
+
 .workflow-navigator-heading {
   display: grid;
   gap: 4px;

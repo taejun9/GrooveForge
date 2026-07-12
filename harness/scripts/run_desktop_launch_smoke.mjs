@@ -62,6 +62,11 @@ const expectedLiveTestIds = [
   "pattern-tab-A",
   "pattern-lab",
   "workspace-feedback-anchor",
+  "workflow-navigator",
+  "workflow-jump-compose",
+  "workflow-jump-arrange",
+  "workflow-jump-mix",
+  "workflow-jump-deliver",
   "note-editor-panel",
   "capture-ideas",
   "instrument-direct-chords",
@@ -159,6 +164,17 @@ function checkResult(result) {
   check(
     evidence?.layout?.feedbackOutsideGuidance === true && evidence?.layout?.feedbackAfterGuidance === true,
     "live desktop global command feedback should remain outside and after optional guidance"
+  );
+  check(
+    evidence?.layout?.workflowNavigatorPresent === true &&
+      evidence?.layout?.workflowNavigatorVisible === true &&
+      evidence?.layout?.workflowNavigatorOutsideGuidance === true &&
+      evidence?.layout?.workflowNavigatorBeforeWorkspace === true &&
+      evidence?.layout?.workflowNavigatorComposeJumpReady === true &&
+      evidence?.layout?.workflowNavigatorDeliverJumpReady === true &&
+      evidence?.layout?.workflowNavigatorStageCount === 4 &&
+      evidence?.layout?.workflowNavigatorSticky === true,
+    `live desktop Workflow Navigator should be visible outside optional guidance, sticky before the workstation, expose four stage actions, and jump to Compose and Deliver (present ${evidence?.layout?.workflowNavigatorPresent}, visible ${evidence?.layout?.workflowNavigatorVisible}, outside ${evidence?.layout?.workflowNavigatorOutsideGuidance}, before ${evidence?.layout?.workflowNavigatorBeforeWorkspace}, sticky ${evidence?.layout?.workflowNavigatorSticky}, stages ${evidence?.layout?.workflowNavigatorStageCount}, compose jump ${evidence?.layout?.workflowNavigatorComposeJumpReady}, deliver jump ${evidence?.layout?.workflowNavigatorDeliverJumpReady})`
   );
   check(
     evidence?.layout?.patternLabToggleVisible === true &&
@@ -954,6 +970,9 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Compose-first layout: Guide ${result.evidence.layout.guidanceCenterOpen ? "open" : "collapsed"}, Pattern Lab ${result.evidence.layout.patternLabOpen ? "open" : "collapsed"}, feedback outside guide ${result.evidence.layout.feedbackOutsideGuidance ? "yes" : "no"}, step grid after lab ${result.evidence.layout.stepGridAfterPatternLab ? "yes" : "no"}`
+  );
+  console.log(
+    `- Workspace navigation: outside Guide ${result.evidence.layout.workflowNavigatorOutsideGuidance ? "yes" : "no"}, before workstation ${result.evidence.layout.workflowNavigatorBeforeWorkspace ? "yes" : "no"}, sticky ${result.evidence.layout.workflowNavigatorSticky ? "yes" : "no"}, Compose/Deliver jumps ${result.evidence.layout.workflowNavigatorComposeJumpReady && result.evidence.layout.workflowNavigatorDeliverJumpReady ? "yes" : "no"}, stages ${result.evidence.layout.workflowNavigatorStageCount}`
   );
   console.log(
     `- Note-editor-first layout: Capture & Ideas ${result.evidence.layout.captureIdeasOpen ? "open" : "collapsed"}, auto-reveal ${result.evidence.palette.captureIdeas.autoReveal ? "yes" : "no"}, note grids after capture ${result.evidence.layout.noteLanesAfterCaptureIdeas ? "yes" : "no"}`
