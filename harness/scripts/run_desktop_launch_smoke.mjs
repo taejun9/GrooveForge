@@ -62,6 +62,8 @@ const expectedLiveTestIds = [
   "pattern-tab-A",
   "pattern-lab",
   "workspace-feedback-anchor",
+  "note-editor-panel",
+  "capture-ideas",
   "export-stems",
   "export-midi",
   "export-handoff-sheet",
@@ -140,6 +142,19 @@ function checkResult(result) {
       evidence?.layout?.stepGridPresent === true &&
       evidence?.layout?.stepGridAfterPatternLab === true,
     "live desktop drum editor should expose a visible Pattern Lab toggle followed by the 16-step grid"
+  );
+  check(evidence?.layout?.captureIdeasOpen === false, "live desktop Capture & Ideas should start collapsed");
+  check(
+    evidence?.layout?.captureIdeasToggleVisible === true &&
+      evidence?.layout?.noteLanesPresent === true &&
+      evidence?.layout?.noteLanesAfterCaptureIdeas === true,
+    "live desktop note editor should expose a visible Capture & Ideas toggle followed by direct note grids"
+  );
+  check(
+    evidence?.palette?.captureIdeas?.initialOpen === false &&
+      evidence?.palette?.captureIdeas?.autoReveal === true &&
+      evidence?.palette?.captureIdeas?.resetOpen === false,
+    "live desktop Capture & Ideas should auto-reveal when keyboard capture is armed"
   );
 
   const missingTestIds = expectedLiveTestIds.filter((testId) => evidence?.testIds?.[testId] !== true);
@@ -790,6 +805,9 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Compose-first layout: Guide ${result.evidence.layout.guidanceCenterOpen ? "open" : "collapsed"}, Pattern Lab ${result.evidence.layout.patternLabOpen ? "open" : "collapsed"}, feedback outside guide ${result.evidence.layout.feedbackOutsideGuidance ? "yes" : "no"}, step grid after lab ${result.evidence.layout.stepGridAfterPatternLab ? "yes" : "no"}`
+  );
+  console.log(
+    `- Note-editor-first layout: Capture & Ideas ${result.evidence.layout.captureIdeasOpen ? "open" : "collapsed"}, auto-reveal ${result.evidence.palette.captureIdeas.autoReveal ? "yes" : "no"}, note grids after capture ${result.evidence.layout.noteLanesAfterCaptureIdeas ? "yes" : "no"}`
   );
   console.log(
     `- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors, ${result.evidence.visual.nonBackgroundSamples}/${result.evidence.visual.sampledPixels} non-background samples`

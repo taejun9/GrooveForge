@@ -56,11 +56,15 @@ type LaunchSmokeEvidence = {
 };
 
 type LaunchSmokeLayoutEvidence = {
+  captureIdeasOpen: boolean;
+  captureIdeasToggleVisible: boolean;
   feedbackAfterGuidance: boolean;
   feedbackOutsideGuidance: boolean;
   guidanceCenterOpen: boolean;
   patternLabOpen: boolean;
   patternLabToggleVisible: boolean;
+  noteLanesAfterCaptureIdeas: boolean;
+  noteLanesPresent: boolean;
   stepGridAfterPatternLab: boolean;
   stepGridPresent: boolean;
 };
@@ -135,6 +139,7 @@ type LaunchSmokeBridgeDirectEvidenceBundle = {
 };
 
 type LaunchSmokePaletteEvidence = {
+  captureIdeas: LaunchSmokeCaptureIdeasEvidence;
   completionBeginner: LaunchSmokePaletteRouteEvidence;
   completionProducer: LaunchSmokePaletteRouteEvidence;
   completionReadout: LaunchSmokePaletteRouteEvidence;
@@ -154,6 +159,12 @@ type LaunchSmokePaletteEvidence = {
   starterProducer: LaunchSmokeAudienceStarterEvidence;
   resultPresent: boolean;
   searchPresent: boolean;
+};
+
+type LaunchSmokeCaptureIdeasEvidence = {
+  autoReveal: boolean;
+  initialOpen: boolean;
+  resetOpen: boolean;
 };
 
 type LaunchSmokeVisualEvidence = {
@@ -542,12 +553,24 @@ function launchSmokeFailures(evidence: LaunchSmokeEvidence): string[] {
   if (!evidence.layout.patternLabToggleVisible || !evidence.layout.stepGridPresent || !evidence.layout.stepGridAfterPatternLab) {
     failures.push("drum editor should expose a visible Pattern Lab toggle followed by the direct 16-step grid");
   }
-
+  if (evidence.layout.captureIdeasOpen) {
+    failures.push("Capture & Ideas should be collapsed on first-run desktop launch");
+  }
+  if (
+    !evidence.layout.captureIdeasToggleVisible ||
+    !evidence.layout.noteLanesPresent ||
+    !evidence.layout.noteLanesAfterCaptureIdeas
+  ) {
+    failures.push("note editor should expose a visible Capture & Ideas toggle followed by direct 808 and Synth grids");
+  }
   return failures;
 }
 
 function launchSmokePaletteFailures(evidence: LaunchSmokePaletteEvidence): string[] {
   const failures: string[] = [];
+  if (evidence.captureIdeas.initialOpen || !evidence.captureIdeas.autoReveal || evidence.captureIdeas.resetOpen) {
+    failures.push("Capture & Ideas should start closed, reveal on keyboard arm, and reset closed after the live check");
+  }
   if (!evidence.opened || !evidence.searchPresent || !evidence.resultPresent) {
     failures.push(
       "live Quick Actions palette should open, accept Audience Session, Audience Route Bridge, Dual Audience Readiness, and Audience Completion Route searches, and leave an execution result"
@@ -1006,6 +1029,8 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "pattern-tab-A",
         "pattern-lab",
         "workspace-feedback-anchor",
+        "note-editor-panel",
+        "capture-ideas",
         "export-stems",
         "export-midi",
         "export-handoff-sheet",
@@ -1040,6 +1065,7 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "Mix Snapshot",
         "Pattern A",
         "Pattern Lab",
+        "Capture & Ideas",
         "Drums",
         "808",
         "Synth",
@@ -1061,6 +1087,9 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const patternLab = document.querySelector('[data-testid="pattern-lab"]');
       const patternLabToggle = document.querySelector('[data-testid="pattern-lab-toggle"]');
       const stepGrid = document.querySelector('.step-grid');
+      const captureIdeas = document.querySelector('[data-testid="capture-ideas"]');
+      const captureIdeasToggle = document.querySelector('[data-testid="capture-ideas-toggle"]');
+      const noteLanes = document.querySelector('.note-lanes');
       const follows = (before, after) =>
         Boolean(before && after && (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING));
       const emptyRoute = {
@@ -1135,11 +1164,15 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         hasSaveProject: typeof bridge?.saveProject === "function",
         location: window.location.href,
         layout: {
+          captureIdeasOpen: Boolean(captureIdeas?.open),
+          captureIdeasToggleVisible: Boolean(captureIdeasToggle && captureIdeasToggle.getBoundingClientRect().height > 0),
           feedbackAfterGuidance: follows(guidanceCenter, feedbackAnchor),
           feedbackOutsideGuidance: Boolean(guidanceCenter && feedbackAnchor && !guidanceCenter.contains(feedbackAnchor)),
           guidanceCenterOpen: Boolean(guidanceCenter?.open),
           patternLabOpen: Boolean(patternLab?.open),
           patternLabToggleVisible: Boolean(patternLabToggle && patternLabToggle.getBoundingClientRect().height > 0),
+          noteLanesAfterCaptureIdeas: follows(captureIdeas, noteLanes),
+          noteLanesPresent: Boolean(noteLanes),
           stepGridAfterPatternLab: follows(patternLab, stepGrid),
           stepGridPresent: Boolean(stepGrid)
         },
@@ -1149,6 +1182,11 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           readiness: emptyBridgeDirect
         },
         palette: {
+          captureIdeas: {
+            autoReveal: false,
+            initialOpen: true,
+            resetOpen: true
+          },
           completionBeginner: emptyRoute,
           completionProducer: emptyRoute,
           completionReadout: emptyRoute,

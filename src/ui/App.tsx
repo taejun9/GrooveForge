@@ -1110,6 +1110,7 @@ export function App(): ReactElement {
   const [selectedNote, setSelectedNote] = useState<SelectedNote | null>(null);
   const [noteClipboard, setNoteClipboard] = useState<NoteClipboard | null>(null);
   const [keyboardCaptureEnabled, setKeyboardCaptureEnabled] = useState(false);
+  const [captureIdeasOpen, setCaptureIdeasOpen] = useState(false);
   const [keyboardCaptureTarget, setKeyboardCaptureTarget] = useState<NoteTrack>("bass");
   const [keyboardCaptureDefaults, setKeyboardCaptureDefaults] = useState<Record<NoteTrack, KeyboardCaptureDefaults>>({
     bass: { octave: 1, length: 2, velocity: 0.82, glide: false },
@@ -2896,6 +2897,20 @@ export function App(): ReactElement {
         }
       };
     }, status);
+  }
+
+  function updateKeyboardCaptureEnabled(enabled: boolean): void {
+    if (enabled) {
+      setCaptureIdeasOpen(true);
+    }
+    setKeyboardCaptureEnabled(enabled);
+  }
+
+  function updateMidiCaptureArmed(armed: boolean): void {
+    if (armed) {
+      setCaptureIdeasOpen(true);
+    }
+    setMidiCaptureArmed(armed);
   }
 
   async function requestMidiInputAccess(): Promise<void> {
@@ -9382,11 +9397,11 @@ export function App(): ReactElement {
     onFocusDualAudienceReadinessRouteReadout: focusDualAudienceReadinessRouteReadout,
     onSwitchMode: switchProjectMode,
     onUsePatternInSelectedBlock: usePatternInSelectedBlockFromCompare,
-    onSetKeyboardCaptureEnabled: setKeyboardCaptureEnabled,
+    onSetKeyboardCaptureEnabled: updateKeyboardCaptureEnabled,
     onSetKeyboardCaptureStepMode: setKeyboardCaptureStepMode,
     onSetKeyboardCaptureTarget: setKeyboardCaptureTarget,
     onUpdateKeyboardCaptureDefaults: updateKeyboardCaptureDefaults,
-    onSetMidiCaptureArmed: setMidiCaptureArmed,
+    onSetMidiCaptureArmed: updateMidiCaptureArmed,
     onApplySessionBriefStarter: applySessionBriefStarterPad,
     onFocusSessionBriefCompass: focusSessionBriefCompassCard,
     onRunSelectedBlockEditPriority: runSelectedBlockEditPriorityAction,
@@ -10066,6 +10081,19 @@ export function App(): ReactElement {
     window.__grooveforgeLaunchSmoke = {
       ...(window.__grooveforgeLaunchSmoke ?? {}),
       collectAudienceSessionQuickActionEvidence: () => {
+        flushSync(() => {
+          setKeyboardCaptureEnabled(false);
+          setCaptureIdeasOpen(false);
+        });
+        const initialOpen = document.querySelector<HTMLDetailsElement>('[data-testid="capture-ideas"]')?.open ?? true;
+        flushSync(() => updateKeyboardCaptureEnabled(true));
+        const autoReveal = document.querySelector<HTMLDetailsElement>('[data-testid="capture-ideas"]')?.open ?? false;
+        flushSync(() => {
+          setKeyboardCaptureEnabled(false);
+          setCaptureIdeasOpen(false);
+        });
+        const resetOpen = document.querySelector<HTMLDetailsElement>('[data-testid="capture-ideas"]')?.open ?? true;
+        const captureIdeas = { autoReveal, initialOpen, resetOpen };
         markLaunchSmokePaletteStep("producer");
         const producer = quickActionEvidenceById("audience-session-enter-producer", projectRef.current, {
           ...projectRef.current,
@@ -10112,6 +10140,7 @@ export function App(): ReactElement {
         const starterProducer = runAudienceStarterRoute("producer");
         markLaunchSmokePaletteStep("returning");
         return {
+          captureIdeas,
           completionCheckpoints: readAudienceCompletionCheckpointEvidence(),
           completionBeginner,
           completionProducer,
@@ -11287,15 +11316,36 @@ export function App(): ReactElement {
           </div>
         </section>
 
-        <section className="panel piano-panel" aria-label="Bass and melody editor">
+        <section className="panel piano-panel" data-testid="note-editor-panel" aria-label="Bass and melody editor">
           <PanelTitle icon={<KeyboardMusic size={18} />} title="808 / Melody" meta="scale locked grid" />
+          <details
+            className="capture-ideas"
+            data-testid="capture-ideas"
+            open={captureIdeasOpen}
+            onToggle={(event) => setCaptureIdeasOpen(event.currentTarget.open)}
+          >
+            <summary className="capture-ideas-summary" data-testid="capture-ideas-toggle">
+              <span className="capture-ideas-icon" aria-hidden="true">
+                <KeyboardMusic size={16} />
+              </span>
+              <span className="capture-ideas-copy">
+                <strong>Capture &amp; Ideas</strong>
+                <small>Keyboard, MIDI, bass moves, and melody starters</small>
+              </span>
+              <span className="capture-ideas-context">
+                {keyboardCaptureTarget === "bass" ? "808" : "Synth"} · {keyboardCaptureEnabled ? "Keys armed" : "Keys off"} ·{" "}
+                {midiCaptureArmed ? "MIDI armed" : midiCaptureSummary.statusLabel}
+              </span>
+              <ArrowDown className="capture-ideas-chevron" size={16} aria-hidden="true" />
+            </summary>
+            <div className="capture-ideas-content" data-testid="capture-ideas-content">
           <KeyboardCapturePanel
             defaults={activeKeyboardCaptureDefaults}
             enabled={keyboardCaptureEnabled}
             keyMap={keyboardCaptureKeyMap}
             nextStep={keyboardCaptureNextStep}
             onDefaultsChange={updateKeyboardCaptureDefaults}
-            onEnabledChange={setKeyboardCaptureEnabled}
+            onEnabledChange={updateKeyboardCaptureEnabled}
             onStepModeChange={setKeyboardCaptureStepMode}
             onTargetChange={setKeyboardCaptureTarget}
             selectedNote={selectedNote}
@@ -11310,7 +11360,7 @@ export function App(): ReactElement {
             status={midiCaptureStatus}
             summary={midiCaptureSummary}
             target={keyboardCaptureTarget}
-            onArmChange={setMidiCaptureArmed}
+            onArmChange={updateMidiCaptureArmed}
             onInputChange={setMidiSelectedInputId}
             onRefresh={refreshMidiInputPorts}
             onRequestAccess={() => void requestMidiInputAccess()}
@@ -11326,6 +11376,8 @@ export function App(): ReactElement {
           <MelodyMotifPads motifs={melodyMotifOptions} onApply={applyMelodyMotif} />
           <MelodyAccentPads accents={melodyAccentOptions} onApply={applyMelodyAccent} />
           <MelodyContourPads contours={melodyContourOptions} onApply={applyMelodyContour} />
+            </div>
+          </details>
           <div className="note-lanes">
             <NoteEditor
               title="808"

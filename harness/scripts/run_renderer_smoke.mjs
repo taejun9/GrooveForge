@@ -79,6 +79,17 @@ function validateFirstRunRenderer(html) {
     !html.includes('<details class="pattern-lab" data-testid="pattern-lab" open="">'),
     "Pattern Lab should be collapsed by default so direct drum programming remains primary"
   );
+  const noteEditorIndex = html.indexOf('data-testid="note-editor-panel"');
+  const captureIdeasIndex = html.indexOf('data-testid="capture-ideas"');
+  const noteLanesIndex = html.indexOf('class="note-lanes"');
+  check(
+    noteEditorIndex >= 0 && captureIdeasIndex > noteEditorIndex && noteLanesIndex > captureIdeasIndex,
+    "note editor hierarchy should keep the Capture & Ideas disclosure immediately before the direct note grids"
+  );
+  check(
+    !html.includes('<details class="capture-ideas" data-testid="capture-ideas" open="">'),
+    "Capture & Ideas should be collapsed by default so direct 808 and melody editing remains primary"
+  );
 
   const checks = {
     "starter transport": [
@@ -149,6 +160,17 @@ function validateFirstRunRenderer(html) {
       "Pattern A",
       'class="step-grid"',
       'data-testid="drum-step-kick-0"'
+    ],
+    "note-editor-first composition": [
+      'data-testid="note-editor-panel"',
+      'data-testid="capture-ideas"',
+      'data-testid="capture-ideas-toggle"',
+      'data-testid="capture-ideas-content"',
+      "Capture &amp; Ideas",
+      "Keyboard, MIDI, bass moves, and melody starters",
+      "Keys off",
+      'class="note-lanes"',
+      "scale locked grid"
     ],
     "producer workflow": [
       "Professional producer",
