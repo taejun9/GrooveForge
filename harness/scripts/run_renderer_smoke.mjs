@@ -53,6 +53,17 @@ function installBrowserMocks() {
 
 function validateFirstRunRenderer(html) {
   check(html.length > 250000, `first-run renderer output should be substantial, got ${html.length} characters`);
+  const quickStartIndex = html.indexOf('data-testid="guide-quick-start"');
+  const guidanceCenterIndex = html.indexOf('data-testid="guidance-center"');
+  const workspaceIndex = html.indexOf('class="workspace-grid"');
+  check(
+    quickStartIndex >= 0 && guidanceCenterIndex > quickStartIndex && workspaceIndex > guidanceCenterIndex,
+    "first-run hierarchy should keep Guide Quick Start visible before the on-demand guidance center and core workspace"
+  );
+  check(
+    !html.includes('<details class="guidance-center" data-testid="guidance-center" open="">'),
+    "Guide & Review Center should be collapsed by default so the core workspace remains close to first-run controls"
+  );
 
   const checks = {
     "starter transport": [
@@ -66,6 +77,11 @@ function validateFirstRunRenderer(html) {
       "Make a beat now",
       "Start an 8-bar beat",
       "No samples or setup required",
+      'data-testid="guidance-center"',
+      'data-testid="guidance-center-toggle"',
+      'data-testid="guidance-center-content"',
+      "Guide &amp; Review Center",
+      "Open step-by-step guidance, beat checks, and delivery help",
       'value="Untitled Beat"',
       'value="145"',
       "F minor",

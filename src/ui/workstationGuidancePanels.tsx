@@ -2511,6 +2511,7 @@ export function GuideQuickStart({
   onFocusSessionPass,
   onJumpFirstBeatPath,
   onJumpWorkflowSpotlight,
+  onOpenGuideCenter,
   sessionPassSummary,
   workflowNavigatorItems
 }: {
@@ -2520,6 +2521,7 @@ export function GuideQuickStart({
   onJumpFirstBeatPath: (step: FirstBeatPathStep) => void;
   onFocusSessionPass: (card: SessionPassCard) => void;
   onJumpWorkflowSpotlight: (item: WorkflowNavigatorItem) => void;
+  onOpenGuideCenter?: () => void;
 }): ReactElement {
   const nextStep =
     firstBeatPathSummary.steps.find((step) => step.id === firstBeatPathSummary.nextStepId) ??
@@ -2647,6 +2649,7 @@ export function GuideQuickStart({
 
   function runGuideQuickStartPath(): void {
     if (nextStep) {
+      onOpenGuideCenter?.();
       setResult(createGuideQuickStartPathResult(nextStep, firstBeatPathSummary));
       onJumpFirstBeatPath(nextStep);
     }
@@ -2654,6 +2657,7 @@ export function GuideQuickStart({
 
   function runGuideQuickStartSession(): void {
     if (sessionCard) {
+      onOpenGuideCenter?.();
       setResult(createGuideQuickStartSessionResult(sessionCard, sessionPassSummary));
       onFocusSessionPass(sessionCard);
     }
@@ -2661,6 +2665,7 @@ export function GuideQuickStart({
 
   function runGuideQuickStartWorkflow(): void {
     if (workflowSpotlightItem) {
+      onOpenGuideCenter?.();
       setResult(createGuideQuickStartWorkflowResult(workflowSpotlight, workflowSpotlightItem));
       onJumpWorkflowSpotlight(workflowSpotlightItem);
     }

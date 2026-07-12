@@ -1134,6 +1134,7 @@ export function App(): ReactElement {
   const [snapshotNameDrafts, setSnapshotNameDrafts] = useState<Record<string, string>>({});
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [commandReferenceOpen, setCommandReferenceOpen] = useState(false);
+  const [guidanceCenterOpen, setGuidanceCenterOpen] = useState(false);
   const [quickActionQuery, setQuickActionQuery] = useState("");
   const [quickActionSearchHintResult, setQuickActionSearchHintResult] = useState<QuickActionSearchHintResult | null>(null);
   const [quickActionSearchResult, setQuickActionSearchResult] = useState<QuickActionSearchResult | null>(null);
@@ -8648,6 +8649,9 @@ export function App(): ReactElement {
     if (action.disabled) {
       return;
     }
+    if (action.group === "Project" || action.group === "Export") {
+      setGuidanceCenterOpen(true);
+    }
     const beforeProject = projectRef.current;
     const inputSetupResult = createQuickActionInputSetupResultState(action, {
       keyboardCaptureEnabled,
@@ -10606,8 +10610,33 @@ export function App(): ReactElement {
         onJumpFirstBeatPath={jumpToFirstBeatPathStep}
         onFocusSessionPass={focusSessionPassCard}
         onJumpWorkflowSpotlight={jumpToWorkflowNavigatorItem}
+        onOpenGuideCenter={() => setGuidanceCenterOpen(true)}
       />
 
+      <details
+        className="guidance-center"
+        data-testid="guidance-center"
+        open={guidanceCenterOpen}
+        onToggle={(event) => setGuidanceCenterOpen(event.currentTarget.open)}
+      >
+        <summary className="guidance-center-summary" data-testid="guidance-center-toggle">
+          <span className="guidance-center-icon" aria-hidden="true">
+            <CircleHelp size={18} />
+          </span>
+          <span className="guidance-center-copy">
+            <strong>Guide &amp; Review Center</strong>
+            <small>
+              {project.mode === "guided"
+                ? "Open step-by-step guidance, beat checks, and delivery help"
+                : "Open production diagnostics, review tools, and handoff checks"}
+            </small>
+          </span>
+          <span className="guidance-center-context">
+            {project.mode === "guided" ? "Guided" : "Studio"} · {guidanceCenterOpen ? "Open" : "On demand"}
+          </span>
+          <ArrowDown className="guidance-center-chevron" size={17} aria-hidden="true" />
+        </summary>
+        <div className="guidance-center-content" data-testid="guidance-center-content">
       <AudienceSessionReadout
         result={audienceSessionActionResult}
         starterResult={audienceStarterResult}
@@ -10911,6 +10940,8 @@ export function App(): ReactElement {
         result={snapshotCompareResult}
         summary={snapshotCompareSummary}
       />
+        </div>
+      </details>
 
       <section className="workspace-grid">
         <section className="panel pattern-panel" data-testid="workflow-target-compose" aria-label="Pattern editor" ref={composePanelRef}>
