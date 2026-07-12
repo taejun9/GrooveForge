@@ -1138,6 +1138,8 @@ export function App(): ReactElement {
   const [channelProcessingOpen, setChannelProcessingOpen] = useState<Record<string, boolean>>({});
   const [masterPolishOpen, setMasterPolishOpen] = useState(false);
   const [masterReviewOpen, setMasterReviewOpen] = useState(false);
+  const [transportSessionOpen, setTransportSessionOpen] = useState(false);
+  const [transportExportsOpen, setTransportExportsOpen] = useState(false);
   const [deliveryStatusOpen, setDeliveryStatusOpen] = useState(false);
   const [deliveryAuditOpen, setDeliveryAuditOpen] = useState(false);
   const [masterCeilingDraft, setMasterCeilingDraft] = useState(() => starterProject.masterCeilingDb.toFixed(1));
@@ -2946,6 +2948,8 @@ export function App(): ReactElement {
     setMixReviewOpen(advancedOpen);
     setMasterPolishOpen(advancedOpen);
     setMasterReviewOpen(advancedOpen);
+    setTransportSessionOpen(advancedOpen);
+    setTransportExportsOpen(advancedOpen);
     setDeliveryStatusOpen(advancedOpen);
     setDeliveryAuditOpen(advancedOpen);
     setChannelProcessingOpen(
@@ -10233,6 +10237,8 @@ export function App(): ReactElement {
         const guidedMasterReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? true;
         const guidedDeliveryStatusOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-status-tools"]')?.open ?? true;
         const guidedDeliveryAuditOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-audit-tools"]')?.open ?? true;
+        const guidedTransportSessionOpen = document.querySelector<HTMLDetailsElement>('[data-testid="transport-session-tools"]')?.open ?? true;
+        const guidedTransportExportsOpen = document.querySelector<HTMLDetailsElement>('[data-testid="transport-export-tools"]')?.open ?? true;
         flushSync(() => updateModeAwareToolPanels("studio"));
         const studioSoundOpen = document.querySelector<HTMLDetailsElement>('[data-testid="sound-design-tools"]')?.open ?? false;
         const studioHarmonyOpen = document.querySelector<HTMLDetailsElement>('[data-testid="harmony-moves"]')?.open ?? false;
@@ -10245,6 +10251,8 @@ export function App(): ReactElement {
         const studioMasterReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? false;
         const studioDeliveryStatusOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-status-tools"]')?.open ?? false;
         const studioDeliveryAuditOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-audit-tools"]')?.open ?? false;
+        const studioTransportSessionOpen = document.querySelector<HTMLDetailsElement>('[data-testid="transport-session-tools"]')?.open ?? false;
+        const studioTransportExportsOpen = document.querySelector<HTMLDetailsElement>('[data-testid="transport-export-tools"]')?.open ?? false;
         const studioBlockMovesElement = document.querySelector<HTMLDetailsElement>('[data-testid="block-moves"]');
         const studioBlockMovesStyle = studioBlockMovesElement ? getComputedStyle(studioBlockMovesElement) : null;
         const studioBlockMovesFullWidth =
@@ -10261,6 +10269,8 @@ export function App(): ReactElement {
         const resetMasterReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? true;
         const resetDeliveryStatusOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-status-tools"]')?.open ?? true;
         const resetDeliveryAuditOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-audit-tools"]')?.open ?? true;
+        const resetTransportSessionOpen = document.querySelector<HTMLDetailsElement>('[data-testid="transport-session-tools"]')?.open ?? true;
+        const resetTransportExportsOpen = document.querySelector<HTMLDetailsElement>('[data-testid="transport-export-tools"]')?.open ?? true;
         const arrangementTools = {
           guidedArrangementOpen,
           guidedBlockMovesOpen,
@@ -10304,6 +10314,14 @@ export function App(): ReactElement {
           resetStatusOpen: resetDeliveryStatusOpen,
           studioAuditOpen: studioDeliveryAuditOpen,
           studioStatusOpen: studioDeliveryStatusOpen
+        };
+        const transportTools = {
+          guidedExportsOpen: guidedTransportExportsOpen,
+          guidedSessionOpen: guidedTransportSessionOpen,
+          resetExportsOpen: resetTransportExportsOpen,
+          resetSessionOpen: resetTransportSessionOpen,
+          studioExportsOpen: studioTransportExportsOpen,
+          studioSessionOpen: studioTransportSessionOpen
         };
         markLaunchSmokePaletteStep("producer");
         const producer = quickActionEvidenceById("audience-session-enter-producer", projectRef.current, {
@@ -10370,6 +10388,7 @@ export function App(): ReactElement {
           instrumentTools,
           mixerTools,
           masterTools,
+          transportTools,
           nextStepRail: readAudienceNextStepRailEvidence(),
           opened: true,
           producer,
@@ -10574,6 +10593,7 @@ export function App(): ReactElement {
         </div>
 
         <div className="command-strip">
+          <div className="transport-status-controls" data-testid="transport-status-controls">
           <div className="transport-status" aria-live="polite">
             <strong>{transportPrimary}</strong>
             <span>{transportSecondary}</span>
@@ -10587,43 +10607,8 @@ export function App(): ReactElement {
             <strong data-testid="transport-position-label">{transportPositionReadout.roleLabel}</strong>
             <small data-testid="transport-position-detail">{transportPositionReadout.detailLabel}</small>
           </div>
-          <button
-            className="icon-button tap-tempo-button"
-            data-testid="tap-tempo-button"
-            type="button"
-            title="Tap repeatedly to set the project BPM"
-            onClick={tapProjectTempo}
-          >
-            <Gauge size={18} aria-hidden="true" />
-            <span>Tap</span>
-          </button>
-          <div
-            className={`tap-tempo-readout ${tapTempoReadout.tone}`}
-            data-testid="tap-tempo-readout"
-            title={tapTempoReadout.detailTitle}
-          >
-            <span data-testid="tap-tempo-status">{tapTempoReadout.statusLabel}</span>
-            <strong data-testid="tap-tempo-label">{tapTempoReadout.roleLabel}</strong>
-            <small data-testid="tap-tempo-detail">{tapTempoReadout.detailLabel}</small>
           </div>
-          <div
-            className={`edit-history-readout ${editHistoryReadout.tone}`}
-            data-testid="edit-history-readout"
-            title={editHistoryReadout.detailTitle}
-          >
-            <span data-testid="edit-history-status">{editHistoryReadout.statusLabel}</span>
-            <strong data-testid="edit-history-label">{editHistoryReadout.roleLabel}</strong>
-            <small data-testid="edit-history-detail">{editHistoryReadout.detailLabel}</small>
-          </div>
-          <div
-            className={`keyboard-capture-posture ${keyboardCapturePosture.tone}`}
-            data-testid="keyboard-capture-posture"
-            title={keyboardCapturePosture.detailTitle}
-          >
-            <span data-testid="keyboard-capture-posture-status">{keyboardCapturePosture.statusLabel}</span>
-            <strong data-testid="keyboard-capture-posture-label">{keyboardCapturePosture.roleLabel}</strong>
-            <small data-testid="keyboard-capture-posture-detail">{keyboardCapturePosture.detailLabel}</small>
-          </div>
+          <div className="transport-essential-controls" data-testid="transport-essential-controls">
           <div className="segmented playback-mode-row" aria-label="Transport loop">
             <button
               className={transportLoopScope === "arrangement" ? "selected" : ""}
@@ -10695,10 +10680,12 @@ export function App(): ReactElement {
             <CircleHelp size={18} aria-hidden="true" />
             <span>Help</span>
           </button>
-          <button className="icon-button primary" type="button" title={`Play ${transportLoopLabel(transportLoopScope).toLowerCase()} loop`} onClick={togglePlayback}>
+          <button className="icon-button primary" data-testid="transport-play" type="button" title={`Play ${transportLoopLabel(transportLoopScope).toLowerCase()} loop`} onClick={togglePlayback}>
             {isPlaying ? <CircleStop size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
             <span>{isPlaying ? "Stop" : "Play"}</span>
           </button>
+          </div>
+          <div className="project-essential-controls" data-testid="project-essential-controls">
           <button
             className="icon-button"
             data-testid="undo-button"
@@ -10721,15 +10708,87 @@ export function App(): ReactElement {
             <Redo2 size={18} aria-hidden="true" />
             <span>Redo</span>
           </button>
-          <button className="icon-button" type="button" title="Open project" onClick={() => void handleOpenProject()}>
+          <button className="icon-button" data-testid="project-open" type="button" title="Open project" onClick={() => void handleOpenProject()}>
             <FolderOpen size={18} aria-hidden="true" />
             <span>Open</span>
           </button>
-          <button className="icon-button" type="button" title="Save project" onClick={() => void handleSaveProject()}>
+          <button className="icon-button" data-testid="project-save" type="button" title="Save project" onClick={() => void handleSaveProject()}>
             <Save size={18} aria-hidden="true" />
             <span>Save</span>
           </button>
-          <button className="icon-button" type="button" title="Export WAV" onClick={handleExportWav}>
+          </div>
+          <details className="transport-session-tools" data-testid="transport-session-tools" open={transportSessionOpen}>
+            <summary
+              data-testid="transport-session-toggle"
+              onClick={(event) => {
+                event.preventDefault();
+                setTransportSessionOpen((open) => !open);
+              }}
+            >
+              <Gauge size={16} aria-hidden="true" />
+              <span>
+                <strong>Session Context</strong>
+                <small>Tempo, edit history, and input posture</small>
+              </span>
+              <ArrowDown size={14} aria-hidden="true" />
+            </summary>
+            <div className="transport-tools-content" data-testid="transport-session-content">
+              <button
+                className="icon-button tap-tempo-button"
+                data-testid="tap-tempo-button"
+                type="button"
+                title="Tap repeatedly to set the project BPM"
+                onClick={tapProjectTempo}
+              >
+                <Gauge size={18} aria-hidden="true" />
+                <span>Tap</span>
+              </button>
+              <div
+                className={`tap-tempo-readout ${tapTempoReadout.tone}`}
+                data-testid="tap-tempo-readout"
+                title={tapTempoReadout.detailTitle}
+              >
+                <span data-testid="tap-tempo-status">{tapTempoReadout.statusLabel}</span>
+                <strong data-testid="tap-tempo-label">{tapTempoReadout.roleLabel}</strong>
+                <small data-testid="tap-tempo-detail">{tapTempoReadout.detailLabel}</small>
+              </div>
+              <div
+                className={`edit-history-readout ${editHistoryReadout.tone}`}
+                data-testid="edit-history-readout"
+                title={editHistoryReadout.detailTitle}
+              >
+                <span data-testid="edit-history-status">{editHistoryReadout.statusLabel}</span>
+                <strong data-testid="edit-history-label">{editHistoryReadout.roleLabel}</strong>
+                <small data-testid="edit-history-detail">{editHistoryReadout.detailLabel}</small>
+              </div>
+              <div
+                className={`keyboard-capture-posture ${keyboardCapturePosture.tone}`}
+                data-testid="keyboard-capture-posture"
+                title={keyboardCapturePosture.detailTitle}
+              >
+                <span data-testid="keyboard-capture-posture-status">{keyboardCapturePosture.statusLabel}</span>
+                <strong data-testid="keyboard-capture-posture-label">{keyboardCapturePosture.roleLabel}</strong>
+                <small data-testid="keyboard-capture-posture-detail">{keyboardCapturePosture.detailLabel}</small>
+              </div>
+            </div>
+          </details>
+          <details className="transport-export-tools" data-testid="transport-export-tools" open={transportExportsOpen}>
+            <summary
+              data-testid="transport-export-toggle"
+              onClick={(event) => {
+                event.preventDefault();
+                setTransportExportsOpen((open) => !open);
+              }}
+            >
+              <Download size={16} aria-hidden="true" />
+              <span>
+                <strong>Exports</strong>
+                <small>WAV, stems, MIDI, sheet, and bundle</small>
+              </span>
+              <ArrowDown size={14} aria-hidden="true" />
+            </summary>
+            <div className="transport-tools-content" data-testid="transport-export-content">
+          <button className="icon-button" data-testid="export-wav" type="button" title="Export WAV" onClick={handleExportWav}>
             <Download size={18} aria-hidden="true" />
             <span>WAV</span>
           </button>
@@ -10749,6 +10808,8 @@ export function App(): ReactElement {
             <Download size={18} aria-hidden="true" />
             <span>Bundle</span>
           </button>
+            </div>
+          </details>
         </div>
       </header>
 

@@ -114,6 +114,17 @@ type LaunchSmokeLayoutEvidence = {
   selectedBlockEditorPresent: boolean;
   stepGridAfterPatternLab: boolean;
   stepGridPresent: boolean;
+  transportEssentialsBeforeProject: boolean;
+  transportExportsContainWav: boolean;
+  transportExportsOpen: boolean;
+  transportExportsToggleVisible: boolean;
+  transportPlayDirectVisible: boolean;
+  transportProjectBeforeSession: boolean;
+  transportSaveDirectVisible: boolean;
+  transportSessionBeforeExports: boolean;
+  transportSessionOpen: boolean;
+  transportSessionToggleVisible: boolean;
+  transportStatusBeforeEssentials: boolean;
   workflowNavigatorBeforeWorkspace: boolean;
   workflowNavigatorComposeJumpReady: boolean;
   workflowNavigatorDeliverJumpReady: boolean;
@@ -206,6 +217,7 @@ type LaunchSmokePaletteEvidence = {
   instrumentTools: LaunchSmokeInstrumentToolsEvidence;
   mixerTools: LaunchSmokeMixerToolsEvidence;
   masterTools: LaunchSmokeMasterToolsEvidence;
+  transportTools: LaunchSmokeTransportToolsEvidence;
   deliveryTools: LaunchSmokeDeliveryToolsEvidence;
   opened: boolean;
   producer: LaunchSmokePaletteRouteEvidence;
@@ -274,6 +286,15 @@ type LaunchSmokeDeliveryToolsEvidence = {
   resetStatusOpen: boolean;
   studioAuditOpen: boolean;
   studioStatusOpen: boolean;
+};
+
+type LaunchSmokeTransportToolsEvidence = {
+  guidedExportsOpen: boolean;
+  guidedSessionOpen: boolean;
+  resetExportsOpen: boolean;
+  resetSessionOpen: boolean;
+  studioExportsOpen: boolean;
+  studioSessionOpen: boolean;
 };
 
 type LaunchSmokeVisualEvidence = {
@@ -1138,6 +1159,17 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "pattern-tab-A",
         "pattern-lab",
         "workspace-feedback-anchor",
+        "transport-status-controls",
+        "transport-essential-controls",
+        "transport-play",
+        "project-essential-controls",
+        "project-open",
+        "project-save",
+        "transport-session-tools",
+        "transport-session-toggle",
+        "transport-export-tools",
+        "transport-export-toggle",
+        "export-wav",
         "workflow-navigator",
         "workflow-jump-compose",
         "workflow-jump-arrange",
@@ -1275,6 +1307,16 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const workflowNavigator = document.querySelector('[data-testid="workflow-navigator"]');
       const workspaceGrid = document.querySelector('.workspace-grid');
       const workflowNavigatorStyle = workflowNavigator ? getComputedStyle(workflowNavigator) : null;
+      const transportStatusControls = document.querySelector('[data-testid="transport-status-controls"]');
+      const transportEssentialControls = document.querySelector('[data-testid="transport-essential-controls"]');
+      const transportPlay = document.querySelector('[data-testid="transport-play"]');
+      const projectEssentialControls = document.querySelector('[data-testid="project-essential-controls"]');
+      const projectSave = document.querySelector('[data-testid="project-save"]');
+      const transportSession = document.querySelector('[data-testid="transport-session-tools"]');
+      const transportSessionToggle = document.querySelector('[data-testid="transport-session-toggle"]');
+      const transportExports = document.querySelector('[data-testid="transport-export-tools"]');
+      const transportExportToggle = document.querySelector('[data-testid="transport-export-toggle"]');
+      const exportWav = document.querySelector('[data-testid="export-wav"]');
       const follows = (before, after) =>
         Boolean(before && after && (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING));
       const emptyRoute = {
@@ -1431,6 +1473,25 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           selectedBlockEditorPresent: Boolean(selectedBlockEditor),
           stepGridAfterPatternLab: follows(patternLab, stepGrid),
           stepGridPresent: Boolean(stepGrid),
+          transportEssentialsBeforeProject: follows(transportEssentialControls, projectEssentialControls),
+          transportExportsContainWav: Boolean(transportExports && exportWav && transportExports.contains(exportWav)),
+          transportExportsOpen: Boolean(transportExports?.open),
+          transportExportsToggleVisible: Boolean(transportExportToggle && transportExportToggle.getBoundingClientRect().height > 0),
+          transportPlayDirectVisible: Boolean(
+            transportPlay &&
+            transportPlay.getBoundingClientRect().height > 0 &&
+            transportPlay.closest('details:not([open])') === null
+          ),
+          transportProjectBeforeSession: follows(projectEssentialControls, transportSession),
+          transportSaveDirectVisible: Boolean(
+            projectSave &&
+            projectSave.getBoundingClientRect().height > 0 &&
+            projectSave.closest('details:not([open])') === null
+          ),
+          transportSessionBeforeExports: follows(transportSession, transportExports),
+          transportSessionOpen: Boolean(transportSession?.open),
+          transportSessionToggleVisible: Boolean(transportSessionToggle && transportSessionToggle.getBoundingClientRect().height > 0),
+          transportStatusBeforeEssentials: follows(transportStatusControls, transportEssentialControls),
           workflowNavigatorBeforeWorkspace: follows(workflowNavigator, workspaceGrid),
           workflowNavigatorComposeJumpReady: workflowNavigatorJumpEvidence.composeReady,
           workflowNavigatorDeliverJumpReady: workflowNavigatorJumpEvidence.deliverReady,
@@ -1500,6 +1561,14 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
             resetStatusOpen: true,
             studioAuditOpen: false,
             studioStatusOpen: false
+          },
+          transportTools: {
+            guidedExportsOpen: true,
+            guidedSessionOpen: true,
+            resetExportsOpen: true,
+            resetSessionOpen: true,
+            studioExportsOpen: false,
+            studioSessionOpen: false
           },
           completionBeginner: emptyRoute,
           completionProducer: emptyRoute,
