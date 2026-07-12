@@ -186,6 +186,15 @@ function checkResult(result) {
     `live desktop Guide Quick Start should keep its decision direct and progress/routes compact with native open-close behavior (decision ${evidence?.layout?.guideQuickStartDecisionVisible}, open ${evidence?.layout?.guideQuickStartDetailsOpen}, toggle ${evidence?.layout?.guideQuickStartDetailsToggleVisible}, hidden ${evidence?.layout?.guideQuickStartDetailsContentHidden}, interaction ${evidence?.layout?.guideQuickStartDetailsInteractionReady})`
   );
   check(
+    evidence?.layout?.audienceSessionActionsDirectVisible === true &&
+      evidence?.layout?.audienceSessionProofOpen === false &&
+      evidence?.layout?.audienceSessionProofToggleVisible === true &&
+      evidence?.layout?.audienceSessionProofContentHidden === true &&
+      evidence?.layout?.audienceSessionProofInteractionReady === true &&
+      evidence?.layout?.audienceSessionProofRowsPreserved === true,
+    `live desktop Audience Session should keep actions direct and proof compact with native open-close behavior (actions ${evidence?.layout?.audienceSessionActionsDirectVisible}, open ${evidence?.layout?.audienceSessionProofOpen}, toggle ${evidence?.layout?.audienceSessionProofToggleVisible}, hidden ${evidence?.layout?.audienceSessionProofContentHidden}, interaction ${evidence?.layout?.audienceSessionProofInteractionReady}, rows ${evidence?.layout?.audienceSessionProofRowsPreserved})`
+  );
+  check(
     evidence?.layout?.launchpadOpen === true &&
       evidence?.layout?.launchpadToggleVisible === true &&
       evidence?.layout?.launchpadContentVisible === true &&
@@ -1071,6 +1080,9 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Guide Quick Start: decision direct ${result.evidence.layout.guideQuickStartDecisionVisible ? "yes" : "no"}, progress compact ${!result.evidence.layout.guideQuickStartDetailsOpen && result.evidence.layout.guideQuickStartDetailsContentHidden ? "yes" : "no"}, native open/close ${result.evidence.layout.guideQuickStartDetailsInteractionReady ? "yes" : "no"}`
+  );
+  console.log(
+    `- Audience Session: actions direct ${result.evidence.layout.audienceSessionActionsDirectVisible ? "yes" : "no"}, proof compact ${!result.evidence.layout.audienceSessionProofOpen && result.evidence.layout.audienceSessionProofContentHidden ? "yes" : "no"}, native open/close ${result.evidence.layout.audienceSessionProofInteractionReady ? "yes" : "no"}, proof rows ${result.evidence.layout.audienceSessionProofRowsPreserved ? "10/10" : "missing"}`
   );
   console.log(
     `- Workspace navigation: outside Guide ${result.evidence.layout.workflowNavigatorOutsideGuidance ? "yes" : "no"}, before workstation ${result.evidence.layout.workflowNavigatorBeforeWorkspace ? "yes" : "no"}, sticky ${result.evidence.layout.workflowNavigatorSticky ? "yes" : "no"}, Compose/Deliver jumps ${result.evidence.layout.workflowNavigatorComposeJumpReady && result.evidence.layout.workflowNavigatorDeliverJumpReady ? "yes" : "no"}, stages ${result.evidence.layout.workflowNavigatorStageCount}`

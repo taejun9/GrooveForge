@@ -788,11 +788,25 @@ export function AudienceSessionReadout({
         <em data-testid="audience-session-next-check">{summary.nextCheck}</em>
       </div>
       <AudienceNextStepRail rows={summary.rows} summary={summary} onSelectAudience={onSelectAudience} />
-      <AudienceSessionAcceptance rows={summary.rows} summary={summary} />
-      <AudienceSessionProofHandoff rows={summary.rows} summary={summary} />
-      <AudienceCompletionCheckpoints rows={summary.rows} summary={summary} />
-      <AudienceDeliverySnapshot rows={summary.rows} summary={summary} />
-      <AudienceDeliveryProofBridge rows={summary.rows} summary={summary} />
+      <details className="audience-session-proof-details" data-testid="audience-session-proof-details">
+        <summary className="audience-session-proof-summary" data-testid="audience-session-proof-toggle">
+          <span className="audience-session-proof-copy">
+            <strong>Session proof</strong>
+            <small>Acceptance, completion, and delivery evidence for both lanes</small>
+          </span>
+          <span className="audience-session-proof-context">
+            {summary.rows.length} lanes · {summary.activeAudienceLabel} · {summary.readinessLabel}
+          </span>
+          <ArrowDown className="audience-session-proof-chevron" size={15} aria-hidden="true" />
+        </summary>
+        <div className="audience-session-proof-content" data-testid="audience-session-proof-content">
+          <AudienceSessionAcceptance rows={summary.rows} summary={summary} />
+          <AudienceSessionProofHandoff rows={summary.rows} summary={summary} />
+          <AudienceCompletionCheckpoints rows={summary.rows} summary={summary} />
+          <AudienceDeliverySnapshot rows={summary.rows} summary={summary} />
+          <AudienceDeliveryProofBridge rows={summary.rows} summary={summary} />
+        </div>
+      </details>
       <div className="audience-session-grid" data-testid="audience-session-grid">
         {summary.rows.map((row) => (
           <div

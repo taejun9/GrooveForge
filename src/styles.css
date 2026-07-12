@@ -1478,6 +1478,102 @@ h2 {
   background: rgba(255, 122, 79, 0.05);
 }
 
+.audience-session-proof-details {
+  grid-column: 1 / -1;
+  min-width: 0;
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.035);
+  overflow: hidden;
+}
+
+.audience-session-proof-summary {
+  display: grid;
+  grid-template-columns: minmax(180px, auto) minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  min-height: 42px;
+  padding: 7px 9px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.audience-session-proof-summary::-webkit-details-marker {
+  display: none;
+}
+
+.audience-session-proof-summary:hover {
+  background: rgba(120, 240, 200, 0.055);
+}
+
+.audience-session-proof-summary:focus-visible {
+  outline: 2px solid rgba(120, 240, 200, 0.7);
+  outline-offset: -2px;
+}
+
+.audience-session-proof-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.audience-session-proof-copy strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.audience-session-proof-copy small,
+.audience-session-proof-context {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 9px;
+}
+
+.audience-session-proof-copy strong,
+.audience-session-proof-copy small,
+.audience-session-proof-context {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audience-session-proof-context {
+  justify-self: end;
+  text-align: end;
+}
+
+.audience-session-proof-chevron {
+  color: rgba(244, 239, 231, 0.5);
+  transition: transform 160ms ease;
+}
+
+.audience-session-proof-details[open] .audience-session-proof-chevron {
+  transform: rotate(180deg);
+}
+
+.audience-session-proof-content {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid rgba(244, 239, 231, 0.08);
+}
+
+.audience-session-proof-details:not([open]) > .audience-session-proof-content {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .audience-session-proof-summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .audience-session-proof-context {
+    grid-column: 1 / -1;
+    justify-self: start;
+    text-align: start;
+  }
+}
+
 .audience-session-heading,
 .audience-session-focus,
 .audience-session-card {

@@ -66,6 +66,12 @@ type LaunchSmokeLayoutEvidence = {
   arrangementTimelinePresent: boolean;
   arrangementToolsOpen: boolean;
   arrangementToolsToggleVisible: boolean;
+  audienceSessionActionsDirectVisible: boolean;
+  audienceSessionProofContentHidden: boolean;
+  audienceSessionProofInteractionReady: boolean;
+  audienceSessionProofOpen: boolean;
+  audienceSessionProofRowsPreserved: boolean;
+  audienceSessionProofToggleVisible: boolean;
   blockMovesBeforeArrangementTools: boolean;
   blockMovesOpen: boolean;
   blockMovesToggleVisible: boolean;
@@ -1322,6 +1328,11 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const guideQuickStartDetails = document.querySelector('[data-testid="guide-quick-start-details"]');
       const guideQuickStartDetailsToggle = document.querySelector('[data-testid="guide-quick-start-details-toggle"]');
       const guideQuickStartDetailsContent = document.querySelector('[data-testid="guide-quick-start-details-content"]');
+      const audienceNextStepRail = document.querySelector('[data-testid="audience-next-step-rail"]');
+      const audienceSessionGrid = document.querySelector('[data-testid="audience-session-grid"]');
+      const audienceSessionProofDetails = document.querySelector('[data-testid="audience-session-proof-details"]');
+      const audienceSessionProofToggle = document.querySelector('[data-testid="audience-session-proof-toggle"]');
+      const audienceSessionProofContent = document.querySelector('[data-testid="audience-session-proof-content"]');
       const feedbackAnchor = document.querySelector('[data-testid="workspace-feedback-anchor"]');
       const patternLab = document.querySelector('[data-testid="pattern-lab"]');
       const patternLabToggle = document.querySelector('[data-testid="pattern-lab-toggle"]');
@@ -1404,6 +1415,42 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const guideQuickStartDetailsOpened = Boolean(guideQuickStartDetails?.open);
       guideQuickStartDetailsToggle?.click();
       const guideQuickStartDetailsClosedAgain = !Boolean(guideQuickStartDetails?.open);
+      const guidanceCenterInitiallyOpen = Boolean(guidanceCenter?.open);
+      if (guidanceCenter && !guidanceCenter.open) {
+        guidanceCenter.open = true;
+      }
+      const audienceSessionProofInitiallyOpen = Boolean(audienceSessionProofDetails?.open);
+      const audienceSessionProofToggleVisible = Boolean(
+        audienceSessionProofToggle && audienceSessionProofToggle.getBoundingClientRect().height > 0
+      );
+      const audienceSessionActionsDirectVisible = Boolean(
+        audienceNextStepRail &&
+        audienceNextStepRail.getBoundingClientRect().height > 0 &&
+        audienceSessionGrid &&
+        audienceSessionGrid.getBoundingClientRect().height > 0
+      );
+      const audienceSessionProofInitiallyHidden = Boolean(
+        audienceSessionProofContent && audienceSessionProofContent.getBoundingClientRect().height === 0
+      );
+      audienceSessionProofToggle?.click();
+      const audienceSessionProofOpened = Boolean(audienceSessionProofDetails?.open);
+      const audienceSessionProofContentVisible = Boolean(
+        audienceSessionProofContent && audienceSessionProofContent.getBoundingClientRect().height > 0
+      );
+      const audienceSessionProofRows = Array.from(document.querySelectorAll(
+        '[data-audience-session-acceptance-row], [data-audience-session-proof-handoff-row], [data-audience-completion-checkpoint-row], [data-audience-delivery-snapshot-row], [data-audience-delivery-proof-bridge-row]'
+      ));
+      const audienceSessionProofRowsPreserved =
+        audienceSessionProofRows.length === 10 &&
+        audienceSessionProofRows.every((row) => row.getBoundingClientRect().height > 0);
+      audienceSessionProofToggle?.click();
+      const audienceSessionProofClosedAgain = !Boolean(audienceSessionProofDetails?.open);
+      const audienceSessionProofHiddenAgain = Boolean(
+        audienceSessionProofContent && audienceSessionProofContent.getBoundingClientRect().height === 0
+      );
+      if (guidanceCenter && !guidanceCenterInitiallyOpen) {
+        guidanceCenter.open = false;
+      }
       const emptyRoute = {
         actionPresent: false,
         countText: "",
@@ -1506,6 +1553,16 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           arrangementTimelinePresent: Boolean(arrangementTimeline),
           arrangementToolsOpen: Boolean(arrangementTools?.open),
           arrangementToolsToggleVisible: Boolean(arrangementToolsToggle && arrangementToolsToggle.getBoundingClientRect().height > 0),
+          audienceSessionActionsDirectVisible,
+          audienceSessionProofContentHidden: audienceSessionProofInitiallyHidden && audienceSessionProofHiddenAgain,
+          audienceSessionProofInteractionReady:
+            !audienceSessionProofInitiallyOpen &&
+            audienceSessionProofOpened &&
+            audienceSessionProofContentVisible &&
+            audienceSessionProofClosedAgain,
+          audienceSessionProofOpen: Boolean(audienceSessionProofDetails?.open),
+          audienceSessionProofRowsPreserved,
+          audienceSessionProofToggleVisible,
           blockMovesBeforeArrangementTools: follows(blockMoves, arrangementTools),
           blockMovesOpen: Boolean(blockMoves?.open),
           blockMovesToggleVisible: Boolean(blockMovesToggle && blockMovesToggle.getBoundingClientRect().height > 0),

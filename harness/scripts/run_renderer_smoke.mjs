@@ -130,6 +130,32 @@ function validateFirstRunRenderer(html) {
       styles.includes(".guide-quick-start-details-content"),
     "Guide Quick Start disclosure should retain keyboard focus, open-state, and content styling"
   );
+  const audienceNextStepIndex = html.indexOf('data-testid="audience-next-step-rail"');
+  const audienceProofDetailsIndex = html.indexOf('data-testid="audience-session-proof-details"');
+  const audienceSessionAcceptanceIndex = html.indexOf('data-testid="audience-session-acceptance"');
+  const audienceSessionGridIndex = html.indexOf('data-testid="audience-session-grid"');
+  check(
+    audienceNextStepIndex >= 0 &&
+      audienceProofDetailsIndex > audienceNextStepIndex &&
+      audienceSessionAcceptanceIndex > audienceProofDetailsIndex &&
+      audienceSessionGridIndex > audienceSessionAcceptanceIndex,
+    "Audience Session should keep Next Step direct, proof diagnostics on demand, and audience action/starter cards direct"
+  );
+  check(
+    !html.includes('<details class="audience-session-proof-details" data-testid="audience-session-proof-details" open="">') &&
+      html.includes('data-testid="audience-session-proof-toggle"') &&
+      html.includes('data-testid="audience-session-proof-content"') &&
+      html.includes("Session proof") &&
+      html.includes("Acceptance, completion, and delivery evidence for both lanes"),
+    "Audience Session acceptance and delivery proof should start compact behind an informative native disclosure"
+  );
+  check(
+    styles.includes(".audience-session-proof-summary:focus-visible") &&
+      styles.includes(".audience-session-proof-details[open] .audience-session-proof-chevron") &&
+      styles.includes(".audience-session-proof-details:not([open]) > .audience-session-proof-content") &&
+      styles.includes(".audience-session-proof-content"),
+    "Audience Session proof disclosure should retain keyboard focus, open-state, and explicit closed-content styling"
+  );
   check(
     html.includes('<details class="first-run-launchpad" data-testid="first-run-launchpad" open="">') &&
       html.includes('data-testid="first-run-launchpad-toggle"') &&
