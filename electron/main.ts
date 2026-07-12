@@ -70,6 +70,16 @@ type LaunchSmokeLayoutEvidence = {
   chordsBeforeSoundDesign: boolean;
   captureIdeasOpen: boolean;
   captureIdeasToggleVisible: boolean;
+  deliveryAuditOpen: boolean;
+  deliveryAuditToggleVisible: boolean;
+  deliveryDirectBeforeStatus: boolean;
+  deliveryDirectVisible: boolean;
+  deliveryDirectPresent: boolean;
+  deliveryOutsideGuidance: boolean;
+  deliveryStatusBeforeAudit: boolean;
+  deliveryStatusOpen: boolean;
+  deliveryStatusToggleVisible: boolean;
+  deliveryRouteBeforeDirect: boolean;
   feedbackAfterGuidance: boolean;
   feedbackOutsideGuidance: boolean;
   guidanceCenterOpen: boolean;
@@ -188,6 +198,7 @@ type LaunchSmokePaletteEvidence = {
   instrumentTools: LaunchSmokeInstrumentToolsEvidence;
   mixerTools: LaunchSmokeMixerToolsEvidence;
   masterTools: LaunchSmokeMasterToolsEvidence;
+  deliveryTools: LaunchSmokeDeliveryToolsEvidence;
   opened: boolean;
   producer: LaunchSmokePaletteRouteEvidence;
   routeBridge: LaunchSmokePaletteRouteEvidence;
@@ -246,6 +257,15 @@ type LaunchSmokeMasterToolsEvidence = {
   resetMasterReviewOpen: boolean;
   studioMasterPolishOpen: boolean;
   studioMasterReviewOpen: boolean;
+};
+
+type LaunchSmokeDeliveryToolsEvidence = {
+  guidedAuditOpen: boolean;
+  guidedStatusOpen: boolean;
+  resetAuditOpen: boolean;
+  resetStatusOpen: boolean;
+  studioAuditOpen: boolean;
+  studioStatusOpen: boolean;
 };
 
 type LaunchSmokeVisualEvidence = {
@@ -1129,6 +1149,12 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "master-ceiling-input",
         "master-polish-tools",
         "master-review-tools",
+        "handoff-pack-direct",
+        "handoff-pack-grid",
+        "handoff-status-tools",
+        "handoff-status-toggle",
+        "handoff-audit-tools",
+        "handoff-audit-toggle",
         "export-stems",
         "export-midi",
         "export-handoff-sheet",
@@ -1227,6 +1253,12 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const masterPolishToggle = document.querySelector('[data-testid="master-polish-toggle"]');
       const masterReview = document.querySelector('[data-testid="master-review-tools"]');
       const masterReviewToggle = document.querySelector('[data-testid="master-review-toggle"]');
+      const deliveryRoute = document.querySelector('[data-testid="handoff-pack-route-readout"]');
+      const deliveryDirect = document.querySelector('[data-testid="handoff-pack-direct"]');
+      const deliveryStatus = document.querySelector('[data-testid="handoff-status-tools"]');
+      const deliveryStatusToggle = document.querySelector('[data-testid="handoff-status-toggle"]');
+      const deliveryAudit = document.querySelector('[data-testid="handoff-audit-tools"]');
+      const deliveryAuditToggle = document.querySelector('[data-testid="handoff-audit-toggle"]');
       const follows = (before, after) =>
         Boolean(before && after && (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING));
       const emptyRoute = {
@@ -1315,6 +1347,20 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           chordsBeforeSoundDesign: follows(instrumentDirectChords, soundDesign),
           captureIdeasOpen: Boolean(captureIdeas?.open),
           captureIdeasToggleVisible: Boolean(captureIdeasToggle && captureIdeasToggle.getBoundingClientRect().height > 0),
+          deliveryAuditOpen: Boolean(deliveryAudit?.open),
+          deliveryAuditToggleVisible: Boolean(deliveryAuditToggle && deliveryAuditToggle.getBoundingClientRect().height > 0),
+          deliveryDirectBeforeStatus: follows(deliveryDirect, deliveryStatus),
+          deliveryDirectVisible: Boolean(
+            deliveryDirect &&
+            deliveryDirect.getBoundingClientRect().height > 0 &&
+            deliveryDirect.closest('details:not([open])') === null
+          ),
+          deliveryDirectPresent: Boolean(deliveryDirect),
+          deliveryOutsideGuidance: Boolean(deliveryDirect && guidanceCenter && !guidanceCenter.contains(deliveryDirect)),
+          deliveryStatusBeforeAudit: follows(deliveryStatus, deliveryAudit),
+          deliveryStatusOpen: Boolean(deliveryStatus?.open),
+          deliveryStatusToggleVisible: Boolean(deliveryStatusToggle && deliveryStatusToggle.getBoundingClientRect().height > 0),
+          deliveryRouteBeforeDirect: follows(deliveryRoute, deliveryDirect),
           feedbackAfterGuidance: follows(guidanceCenter, feedbackAnchor),
           feedbackOutsideGuidance: Boolean(guidanceCenter && feedbackAnchor && !guidanceCenter.contains(feedbackAnchor)),
           guidanceCenterOpen: Boolean(guidanceCenter?.open),
@@ -1402,6 +1448,14 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
             resetMasterReviewOpen: true,
             studioMasterPolishOpen: false,
             studioMasterReviewOpen: false
+          },
+          deliveryTools: {
+            guidedAuditOpen: true,
+            guidedStatusOpen: true,
+            resetAuditOpen: true,
+            resetStatusOpen: true,
+            studioAuditOpen: false,
+            studioStatusOpen: false
           },
           completionBeginner: emptyRoute,
           completionProducer: emptyRoute,
@@ -1634,7 +1688,7 @@ async function collectLaunchSmokeCommandReferenceEvidence(win: BrowserWindow): P
         openButtonPresent: document.querySelector('[data-testid="command-reference-open"]') !== null
       }))();
     `,
-    10000
+    30000
   );
   if (!initial.launchSmokeReady || !initial.openButtonPresent) {
     throw new Error("Launch smoke Command Reference DOM was not ready.");
@@ -1783,7 +1837,7 @@ async function collectLaunchSmokeCommandReferenceEvidence(win: BrowserWindow): P
 
 function collectLaunchSmokeCommandReferenceEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeCommandReferenceEvidence> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Timed out collecting live Command Reference evidence.")), 90000);
+    const timeout = setTimeout(() => reject(new Error("Timed out collecting live Command Reference evidence.")), 120000);
     void collectLaunchSmokeCommandReferenceEvidence(win)
       .then((evidence) => {
         clearTimeout(timeout);

@@ -1138,6 +1138,8 @@ export function App(): ReactElement {
   const [channelProcessingOpen, setChannelProcessingOpen] = useState<Record<string, boolean>>({});
   const [masterPolishOpen, setMasterPolishOpen] = useState(false);
   const [masterReviewOpen, setMasterReviewOpen] = useState(false);
+  const [deliveryStatusOpen, setDeliveryStatusOpen] = useState(false);
+  const [deliveryAuditOpen, setDeliveryAuditOpen] = useState(false);
   const [masterCeilingDraft, setMasterCeilingDraft] = useState(() => starterProject.masterCeilingDb.toFixed(1));
   const [masterCeilingEditing, setMasterCeilingEditing] = useState(false);
   const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
@@ -2944,6 +2946,8 @@ export function App(): ReactElement {
     setMixReviewOpen(advancedOpen);
     setMasterPolishOpen(advancedOpen);
     setMasterReviewOpen(advancedOpen);
+    setDeliveryStatusOpen(advancedOpen);
+    setDeliveryAuditOpen(advancedOpen);
     setChannelProcessingOpen(
       Object.fromEntries(projectRef.current.mixer.map((channel) => [channel.id, advancedOpen]))
     );
@@ -6797,6 +6801,7 @@ export function App(): ReactElement {
   }
 
   function recordHandoffExportReceipt(receipt: HandoffExportReceipt): void {
+    setDeliveryStatusOpen(true);
     setHandoffExportFormatResult(null);
     setHandoffPackageCheckResult(null);
     handoffExportReceiptRef.current = receipt;
@@ -8507,6 +8512,7 @@ export function App(): ReactElement {
   }
 
   function focusHandoffNextExportReadout(): void {
+    setDeliveryStatusOpen(true);
     const currentItems = createHandoffPackItems({
       analysis: exportAnalysis,
       project,
@@ -8530,6 +8536,7 @@ export function App(): ReactElement {
   }
 
   function focusHandoffPackageCheckCard(card: HandoffPackageCheckCard): void {
+    setDeliveryAuditOpen(true);
     setHandoffPackageCheckFocusId(card.focusId);
     deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setHandoffPackageCheckResult(createHandoffPackageCheckFocusResult(card, handoffPackageCheckSummary));
@@ -8537,6 +8544,7 @@ export function App(): ReactElement {
   }
 
   function focusHandoffManifestAudit(): void {
+    setDeliveryAuditOpen(true);
     const currentItems = createHandoffPackItems({
       analysis: exportAnalysis,
       project,
@@ -8556,6 +8564,7 @@ export function App(): ReactElement {
   }
 
   function focusHandoffExportFormatMetric(metric: HandoffExportFormatMetric): void {
+    setDeliveryAuditOpen(true);
     const currentItems = createHandoffPackItems({
       analysis: exportAnalysis,
       project,
@@ -10222,6 +10231,8 @@ export function App(): ReactElement {
         const guidedProcessingOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mixer-processing-drum_rack"]')?.open ?? true;
         const guidedMasterPolishOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-polish-tools"]')?.open ?? true;
         const guidedMasterReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? true;
+        const guidedDeliveryStatusOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-status-tools"]')?.open ?? true;
+        const guidedDeliveryAuditOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-audit-tools"]')?.open ?? true;
         flushSync(() => updateModeAwareToolPanels("studio"));
         const studioSoundOpen = document.querySelector<HTMLDetailsElement>('[data-testid="sound-design-tools"]')?.open ?? false;
         const studioHarmonyOpen = document.querySelector<HTMLDetailsElement>('[data-testid="harmony-moves"]')?.open ?? false;
@@ -10232,6 +10243,8 @@ export function App(): ReactElement {
         const studioProcessingOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mixer-processing-drum_rack"]')?.open ?? false;
         const studioMasterPolishOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-polish-tools"]')?.open ?? false;
         const studioMasterReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? false;
+        const studioDeliveryStatusOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-status-tools"]')?.open ?? false;
+        const studioDeliveryAuditOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-audit-tools"]')?.open ?? false;
         const studioBlockMovesElement = document.querySelector<HTMLDetailsElement>('[data-testid="block-moves"]');
         const studioBlockMovesStyle = studioBlockMovesElement ? getComputedStyle(studioBlockMovesElement) : null;
         const studioBlockMovesFullWidth =
@@ -10246,6 +10259,8 @@ export function App(): ReactElement {
         const resetProcessingOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mixer-processing-drum_rack"]')?.open ?? true;
         const resetMasterPolishOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-polish-tools"]')?.open ?? true;
         const resetMasterReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? true;
+        const resetDeliveryStatusOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-status-tools"]')?.open ?? true;
+        const resetDeliveryAuditOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-audit-tools"]')?.open ?? true;
         const arrangementTools = {
           guidedArrangementOpen,
           guidedBlockMovesOpen,
@@ -10281,6 +10296,14 @@ export function App(): ReactElement {
           resetMasterReviewOpen,
           studioMasterPolishOpen,
           studioMasterReviewOpen
+        };
+        const deliveryTools = {
+          guidedAuditOpen: guidedDeliveryAuditOpen,
+          guidedStatusOpen: guidedDeliveryStatusOpen,
+          resetAuditOpen: resetDeliveryAuditOpen,
+          resetStatusOpen: resetDeliveryStatusOpen,
+          studioAuditOpen: studioDeliveryAuditOpen,
+          studioStatusOpen: studioDeliveryStatusOpen
         };
         markLaunchSmokePaletteStep("producer");
         const producer = quickActionEvidenceById("audience-session-enter-producer", projectRef.current, {
@@ -10339,6 +10362,7 @@ export function App(): ReactElement {
           deliveryProofProducer,
           deliveryProofReadout,
           deliverySnapshot: readAudienceDeliverySnapshotEvidence(),
+          deliveryTools,
           dualBeginner,
           dualProducer,
           dualReadout,
@@ -11047,27 +11071,7 @@ export function App(): ReactElement {
         focusedCardId={exportPreflightFocusId}
         result={exportPreflightResult}
         onFocus={focusExportPreflightCard}
-        sectionRef={deliverPanelRef}
         summary={exportPreflightSummary}
-      />
-
-      <HandoffPack
-        analysis={exportAnalysis}
-        exportReceipt={handoffExportReceipt}
-        exportFormatResult={handoffExportFormatResult}
-        focusedExportFormatId={handoffExportFormatFocusId}
-        focusedPackageCheckId={handoffPackageCheckFocusId}
-        packageCheckSummary={handoffPackageCheckSummary}
-        packageCheckResult={handoffPackageCheckResult}
-        project={project}
-        stemAnalyses={stemAnalyses}
-        onExportDeliveryBundle={handleExportDeliveryBundle}
-        onExportHandoffSheet={handleExportHandoffSheet}
-        onExportMidi={handleExportMidi}
-        onExportStems={handleExportStems}
-        onExportWav={handleExportWav}
-        onFocusExportFormat={focusHandoffExportFormatMetric}
-        onFocusPackageCheck={focusHandoffPackageCheckCard}
       />
 
       <BeatReadiness
@@ -12721,6 +12725,30 @@ export function App(): ReactElement {
           </details>
         </section>
       </section>
+
+      <HandoffPack
+        analysis={exportAnalysis}
+        auditOpen={deliveryAuditOpen}
+        exportReceipt={handoffExportReceipt}
+        exportFormatResult={handoffExportFormatResult}
+        focusedExportFormatId={handoffExportFormatFocusId}
+        focusedPackageCheckId={handoffPackageCheckFocusId}
+        packageCheckSummary={handoffPackageCheckSummary}
+        packageCheckResult={handoffPackageCheckResult}
+        project={project}
+        sectionRef={deliverPanelRef}
+        statusOpen={deliveryStatusOpen}
+        stemAnalyses={stemAnalyses}
+        onExportDeliveryBundle={handleExportDeliveryBundle}
+        onExportHandoffSheet={handleExportHandoffSheet}
+        onExportMidi={handleExportMidi}
+        onExportStems={handleExportStems}
+        onExportWav={handleExportWav}
+        onFocusExportFormat={focusHandoffExportFormatMetric}
+        onFocusPackageCheck={focusHandoffPackageCheckCard}
+        onToggleAudit={() => setDeliveryAuditOpen((open) => !open)}
+        onToggleStatus={() => setDeliveryStatusOpen((open) => !open)}
+      />
     </main>
   );
 }

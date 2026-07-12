@@ -179,6 +179,31 @@ function validateFirstRunRenderer(html) {
       !html.includes('<details class="master-review-tools" data-testid="master-review-tools" open="">'),
     "Guided first render should keep Polish & Automation and Review & Export collapsed"
   );
+  const handoffPackIndex = html.indexOf('data-testid="handoff-pack"');
+  const handoffRouteIndex = html.indexOf('data-testid="handoff-pack-route-readout"');
+  const handoffDirectIndex = html.indexOf('data-testid="handoff-pack-direct"');
+  const handoffGridIndex = html.indexOf('data-testid="handoff-pack-grid"');
+  const handoffWavActionIndex = html.indexOf('data-testid="handoff-pack-action-wav"');
+  const handoffStatusIndex = html.indexOf('data-testid="handoff-status-tools"');
+  const handoffAuditIndex = html.indexOf('data-testid="handoff-audit-tools"');
+  const handoffManifestIndex = html.indexOf('data-testid="handoff-manifest-audit"');
+  check(
+    handoffPackIndex >= 0 &&
+      handoffPackIndex > workspaceIndex &&
+      handoffRouteIndex > handoffPackIndex &&
+      handoffDirectIndex > handoffRouteIndex &&
+      handoffGridIndex > handoffDirectIndex &&
+      handoffWavActionIndex > handoffGridIndex &&
+      handoffStatusIndex > handoffWavActionIndex &&
+      handoffAuditIndex > handoffStatusIndex &&
+      handoffManifestIndex > handoffAuditIndex,
+    "Delivery hierarchy should stay outside optional guidance after the workspace and keep route, direct exports, delivery status, and package proof in order"
+  );
+  check(
+    !html.includes('<details class="handoff-status-tools" data-testid="handoff-status-tools" open="">') &&
+      !html.includes('<details class="handoff-audit-tools" data-testid="handoff-audit-tools" open="">'),
+    "Guided first render should keep Delivery Status & Receipt and Format & Package Proof collapsed"
+  );
 
   const checks = {
     "starter transport": [
@@ -323,6 +348,23 @@ function validateFirstRunRenderer(html) {
       "Output preset",
       "Polish &amp; Automation",
       "Review &amp; Export"
+    ],
+    "delivery actions first": [
+      'data-testid="handoff-pack-direct"',
+      'data-testid="handoff-pack-grid"',
+      'data-testid="handoff-pack-action-wav"',
+      'data-testid="handoff-pack-action-stems"',
+      'data-testid="handoff-pack-action-midi"',
+      'data-testid="handoff-pack-action-sheet"',
+      'data-testid="handoff-pack-action-bundle"',
+      'data-testid="handoff-status-tools"',
+      'data-testid="handoff-status-toggle"',
+      'data-testid="handoff-audit-tools"',
+      'data-testid="handoff-audit-toggle"',
+      "Choose a deliverable",
+      "Export directly",
+      "Delivery Status &amp; Receipt",
+      "Format &amp; Package Proof"
     ],
     "producer workflow": [
       "Professional producer",

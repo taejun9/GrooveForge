@@ -81,6 +81,12 @@ const expectedLiveTestIds = [
   "master-ceiling-input",
   "master-polish-tools",
   "master-review-tools",
+  "handoff-pack-direct",
+  "handoff-pack-grid",
+  "handoff-status-tools",
+  "handoff-status-toggle",
+  "handoff-audit-tools",
+  "handoff-audit-toggle",
   "export-stems",
   "export-midi",
   "export-handoff-sheet",
@@ -273,6 +279,31 @@ function checkResult(result) {
       evidence?.palette?.masterTools?.resetMasterPolishOpen === false &&
       evidence?.palette?.masterTools?.resetMasterReviewOpen === false,
     "live desktop Master tools should expand for Studio and reset compactly for Guided through the shared mode handler"
+  );
+  check(
+    evidence?.layout?.deliveryDirectPresent === true &&
+      evidence?.layout?.deliveryDirectVisible === true &&
+      evidence?.layout?.deliveryOutsideGuidance === true &&
+      evidence?.layout?.deliveryRouteBeforeDirect === true &&
+      evidence?.layout?.deliveryDirectBeforeStatus === true &&
+      evidence?.layout?.deliveryStatusBeforeAudit === true,
+    "live desktop Delivery hierarchy should stay visible outside optional guidance and keep route, direct exports, delivery status, and package proof in order"
+  );
+  check(
+    evidence?.layout?.deliveryStatusOpen === false &&
+      evidence?.layout?.deliveryAuditOpen === false &&
+      evidence?.layout?.deliveryStatusToggleVisible === true &&
+      evidence?.layout?.deliveryAuditToggleVisible === true,
+    "live desktop Guided mode should show compact Delivery Status & Receipt and Format & Package Proof toggles"
+  );
+  check(
+    evidence?.palette?.deliveryTools?.guidedStatusOpen === false &&
+      evidence?.palette?.deliveryTools?.guidedAuditOpen === false &&
+      evidence?.palette?.deliveryTools?.studioStatusOpen === true &&
+      evidence?.palette?.deliveryTools?.studioAuditOpen === true &&
+      evidence?.palette?.deliveryTools?.resetStatusOpen === false &&
+      evidence?.palette?.deliveryTools?.resetAuditOpen === false,
+    "live desktop Delivery proof tools should expand for Studio and reset compactly for Guided through the shared mode handler"
   );
 
   const missingTestIds = expectedLiveTestIds.filter((testId) => evidence?.testIds?.[testId] !== true);
@@ -938,6 +969,9 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Master-first layout: output before helpers ${result.evidence.layout.masterControlsBeforePolish ? "yes" : "no"}, precise ceiling bounds ${result.evidence.layout.masterCeilingBoundsReady ? "yes" : "no"}, Guided tools ${result.evidence.layout.masterPolishOpen || result.evidence.layout.masterReviewOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.masterTools.studioMasterPolishOpen && result.evidence.palette.masterTools.studioMasterReviewOpen ? "yes" : "no"}`
+  );
+  console.log(
+    `- Delivery-first layout: visible outside Guide ${result.evidence.layout.deliveryOutsideGuidance && result.evidence.layout.deliveryDirectVisible ? "yes" : "no"}, direct actions before proof ${result.evidence.layout.deliveryDirectBeforeStatus ? "yes" : "no"}, Guided proof ${result.evidence.layout.deliveryStatusOpen || result.evidence.layout.deliveryAuditOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.deliveryTools.studioStatusOpen && result.evidence.palette.deliveryTools.studioAuditOpen ? "yes" : "no"}`
   );
   console.log(
     `- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors, ${result.evidence.visual.nonBackgroundSamples}/${result.evidence.visual.sampledPixels} non-background samples`

@@ -6770,6 +6770,9 @@ export function HandoffPack({
   packageCheckSummary,
   packageCheckResult,
   project,
+  sectionRef,
+  statusOpen,
+  auditOpen,
   stemAnalyses,
   onExportDeliveryBundle,
   onExportHandoffSheet,
@@ -6777,7 +6780,9 @@ export function HandoffPack({
   onExportStems,
   onExportWav,
   onFocusExportFormat,
-  onFocusPackageCheck
+  onFocusPackageCheck,
+  onToggleStatus,
+  onToggleAudit
 }: {
   analysis: ExportAnalysis;
   exportReceipt: HandoffExportReceipt | null;
@@ -6787,6 +6792,9 @@ export function HandoffPack({
   packageCheckSummary: HandoffPackageCheckSummary;
   packageCheckResult: HandoffPackageCheckFocusResult | null;
   project: ProjectState;
+  sectionRef?: Ref<HTMLElement>;
+  statusOpen: boolean;
+  auditOpen: boolean;
   stemAnalyses: StemExportAnalyses;
   onExportDeliveryBundle: () => void;
   onExportHandoffSheet: () => void;
@@ -6795,6 +6803,8 @@ export function HandoffPack({
   onExportWav: () => void;
   onFocusExportFormat: (metric: HandoffExportFormatMetric) => void;
   onFocusPackageCheck: (card: HandoffPackageCheckCard) => void;
+  onToggleStatus: () => void;
+  onToggleAudit: () => void;
 }): ReactElement {
   const items = createHandoffPackItems({
     analysis,
@@ -6823,7 +6833,7 @@ export function HandoffPack({
   const packagePriorityActionDisabled = packagePriorityCard === null;
 
   return (
-    <section className={`handoff-pack ${tone}`} data-testid="handoff-pack" aria-label="Handoff pack">
+    <section className={`handoff-pack ${tone}`} data-testid="handoff-pack" aria-label="Handoff pack" ref={sectionRef}>
       <div className="handoff-pack-heading">
         <div>
           <Download size={17} aria-hidden="true" />
@@ -6847,6 +6857,50 @@ export function HandoffPack({
           <small data-testid="handoff-pack-route-file">{routeSummary.fileLabel}</small>
         </div>
       </div>
+      <div className="handoff-pack-direct" data-testid="handoff-pack-direct">
+        <div className="handoff-pack-direct-heading">
+          <span>Choose a deliverable</span>
+          <strong>Export directly</strong>
+          <small>WAV is the finished mix. Stems and MIDI keep the session editable; Sheet and Bundle package the handoff.</small>
+        </div>
+        <div className="handoff-pack-grid" data-testid="handoff-pack-grid">
+          {items.map((item) => (
+            <div className={`handoff-pack-card ${item.tone}`} data-testid={`handoff-pack-${item.id}`} key={item.id}>
+              <div>
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+                <small>{item.detail}</small>
+              </div>
+              <button
+                className={item.tone}
+                data-testid={`handoff-pack-action-${item.id}`}
+                onClick={item.run}
+                title={item.detail}
+                type="button"
+              >
+                <Download size={14} aria-hidden="true" />
+                <span>{item.buttonLabel}</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+      <details className="handoff-status-tools" data-testid="handoff-status-tools" open={statusOpen}>
+        <summary
+          data-testid="handoff-status-toggle"
+          onClick={(event) => {
+            event.preventDefault();
+            onToggleStatus();
+          }}
+        >
+          <span>
+            <strong>Delivery Status &amp; Receipt</strong>
+            <small>Next send item and the latest explicit export result</small>
+          </span>
+          <em>{receiptSummary.statusLabel} · {project.mode === "studio" ? "Studio" : "Guided"}</em>
+          <ArrowDown size={15} aria-hidden="true" />
+        </summary>
+        <div className="handoff-tools-content" data-testid="handoff-status-content">
       <div
         aria-label={sendOrderSummary.detailTitle}
         className={`handoff-pack-send-order ${sendOrderSummary.tone}`}
@@ -6871,6 +6925,24 @@ export function HandoffPack({
         <small data-testid="handoff-export-receipt-detail">{receiptSummary.detailLabel}</small>
         <small data-testid="handoff-export-receipt-next">{receiptSummary.nextLabel}</small>
       </div>
+        </div>
+      </details>
+      <details className="handoff-audit-tools" data-testid="handoff-audit-tools" open={auditOpen}>
+        <summary
+          data-testid="handoff-audit-toggle"
+          onClick={(event) => {
+            event.preventDefault();
+            onToggleAudit();
+          }}
+        >
+          <span>
+            <strong>Format &amp; Package Proof</strong>
+            <small>Manifest, deliverable metrics, package checks, and planned filenames</small>
+          </span>
+          <em>{manifestAudit.statusLabel} · {packageCheckSummary.headline}</em>
+          <ArrowDown size={15} aria-hidden="true" />
+        </summary>
+        <div className="handoff-tools-content" data-testid="handoff-audit-content">
       <div
         aria-label={manifestAudit.detailTitle}
         className={`handoff-manifest-audit ${manifestAudit.tone}`}
@@ -7046,27 +7118,6 @@ export function HandoffPack({
           })}
         </div>
       </div>
-      <div className="handoff-pack-grid" data-testid="handoff-pack-grid">
-        {items.map((item) => (
-          <div className={`handoff-pack-card ${item.tone}`} data-testid={`handoff-pack-${item.id}`} key={item.id}>
-            <div>
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-              <small>{item.detail}</small>
-            </div>
-            <button
-              className={item.tone}
-              data-testid={`handoff-pack-action-${item.id}`}
-              onClick={item.run}
-              title={item.detail}
-              type="button"
-            >
-              <Download size={14} aria-hidden="true" />
-              <span>{item.buttonLabel}</span>
-            </button>
-          </div>
-        ))}
-      </div>
       <div className="handoff-pack-file-manifest" data-testid="handoff-pack-file-manifest" aria-label="Handoff file manifest">
         {fileManifest.map((item) => (
           <div className={`handoff-pack-file ${item.tone}`} data-testid={`handoff-pack-file-${item.id}`} key={item.id} title={item.fileLabel}>
@@ -7076,6 +7127,8 @@ export function HandoffPack({
           </div>
         ))}
       </div>
+        </div>
+      </details>
     </section>
   );
 }
