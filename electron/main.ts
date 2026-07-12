@@ -66,7 +66,12 @@ type LaunchSmokeLayoutEvidence = {
   blockMovesBeforeArrangementTools: boolean;
   blockMovesOpen: boolean;
   blockMovesToggleVisible: boolean;
+  chordCardCount: number;
+  chordCompactCardCount: number;
+  chordCompactEditorsHidden: boolean;
   chordEventsBeforeHarmonyMoves: boolean;
+  chordExpandedCardCount: number;
+  chordSelectedEditorVisible: boolean;
   chordsBeforeSoundDesign: boolean;
   captureIdeasOpen: boolean;
   captureIdeasToggleVisible: boolean;
@@ -211,6 +216,7 @@ type LaunchSmokeBridgeDirectEvidenceBundle = {
 type LaunchSmokePaletteEvidence = {
   arrangementTools: LaunchSmokeArrangementToolsEvidence;
   captureIdeas: LaunchSmokeCaptureIdeasEvidence;
+  chordCards: LaunchSmokeChordCardEvidence;
   completionBeginner: LaunchSmokePaletteRouteEvidence;
   completionProducer: LaunchSmokePaletteRouteEvidence;
   completionReadout: LaunchSmokePaletteRouteEvidence;
@@ -236,6 +242,11 @@ type LaunchSmokePaletteEvidence = {
   starterProducer: LaunchSmokeAudienceStarterEvidence;
   resultPresent: boolean;
   searchPresent: boolean;
+};
+
+type LaunchSmokeChordCardEvidence = {
+  restoreReady: boolean;
+  selectionReady: boolean;
 };
 
 type LaunchSmokeCaptureIdeasEvidence = {
@@ -1292,6 +1303,10 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const noteLanes = document.querySelector('.note-lanes');
       const instrumentDirectChords = document.querySelector('[data-testid="instrument-direct-chords"]');
       const chordEventGrid = document.querySelector('[data-testid="chord-event-grid"]');
+      const chordCards = [...document.querySelectorAll('[data-testid^="chord-slot-"]')];
+      const chordEditors = [...document.querySelectorAll('[data-testid^="chord-event-editor-"]')];
+      const expandedChordCards = chordCards.filter((card) => card.dataset.editorOpen === "true");
+      const compactChordCards = chordCards.filter((card) => card.dataset.editorOpen === "false");
       const harmonyMoves = document.querySelector('[data-testid="harmony-moves"]');
       const harmonyMovesToggle = document.querySelector('[data-testid="harmony-moves-toggle"]');
       const soundDesign = document.querySelector('[data-testid="sound-design-tools"]');
@@ -1439,7 +1454,16 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           blockMovesBeforeArrangementTools: follows(blockMoves, arrangementTools),
           blockMovesOpen: Boolean(blockMoves?.open),
           blockMovesToggleVisible: Boolean(blockMovesToggle && blockMovesToggle.getBoundingClientRect().height > 0),
+          chordCardCount: chordCards.length,
+          chordCompactCardCount: compactChordCards.length,
+          chordCompactEditorsHidden: chordEditors
+            .filter((_editor, index) => chordCards[index]?.dataset.editorOpen === "false")
+            .every((editor) => editor.getBoundingClientRect().height === 0),
           chordEventsBeforeHarmonyMoves: follows(chordEventGrid, harmonyMoves),
+          chordExpandedCardCount: expandedChordCards.length,
+          chordSelectedEditorVisible: chordEditors.some(
+            (editor, index) => chordCards[index]?.dataset.editorOpen === "true" && editor.getBoundingClientRect().height > 0
+          ),
           chordsBeforeSoundDesign: follows(instrumentDirectChords, soundDesign),
           captureIdeasOpen: Boolean(captureIdeas?.open),
           captureIdeasToggleVisible: Boolean(captureIdeasToggle && captureIdeasToggle.getBoundingClientRect().height > 0),
@@ -1556,6 +1580,10 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
             autoReveal: false,
             initialOpen: true,
             resetOpen: true
+          },
+          chordCards: {
+            restoreReady: false,
+            selectionReady: false
           },
           instrumentTools: {
             guidedHarmonyOpen: true,

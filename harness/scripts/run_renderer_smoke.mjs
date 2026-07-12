@@ -151,6 +151,17 @@ function validateFirstRunRenderer(html) {
       !html.includes('<details class="instrument-tools" data-testid="sound-design-tools" open="">'),
     "Guided first render should keep Harmony Moves and Sound Design collapsed"
   );
+  const expandedChordCardCount = html.match(/data-editor-open="true"/g)?.length ?? 0;
+  const compactChordCardCount = html.match(/data-editor-open="false"/g)?.length ?? 0;
+  check(
+    expandedChordCardCount === 1 &&
+      compactChordCardCount >= 1 &&
+      html.includes('data-testid="chord-summary-0"') &&
+      html.includes('data-testid="chord-event-editor-0"') &&
+      html.includes("Select to edit") &&
+      html.includes("Editing"),
+    "Chord event cards should keep exactly one selected editor expanded while peers remain compact and scannable"
+  );
   const arrangementPanelIndex = html.indexOf('data-testid="workflow-target-arrange"');
   const arrangementPlaybackIndex = html.indexOf('data-testid="arrangement-playback-readout"');
   const arrangementTimelineIndex = html.indexOf('data-testid="arrangement-timeline"');
@@ -333,6 +344,12 @@ function validateFirstRunRenderer(html) {
       'data-testid="instrument-direct-chords"',
       'data-testid="chord-primary-actions"',
       'data-testid="chord-event-grid"',
+      'data-testid="chord-summary-0"',
+      'data-testid="chord-event-editor-0"',
+      'data-editor-open="true"',
+      'data-editor-open="false"',
+      "Select to edit",
+      "Editing",
       'data-testid="harmony-moves"',
       'data-testid="harmony-moves-toggle"',
       'data-testid="harmony-moves-content"',

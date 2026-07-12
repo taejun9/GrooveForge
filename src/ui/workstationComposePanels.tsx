@@ -2749,12 +2749,21 @@ export function ChordEditor({
               aria-label={`Chord ${index + 1} ${chord.root}${chord.quality} step ${chord.step + 1} ${chordVelocityPercent}% velocity length ${
                 chord.length
               }${chordProbability < 1 ? ` ${chanceBadgeLabel(chordProbability)} chance` : ""}`}
+              aria-controls={`chord-event-editor-${index}`}
+              aria-expanded={selected}
               className={["chord-slot", selected ? "selected" : "", playing ? "playing" : ""].filter(Boolean).join(" ")}
+              data-editor-open={selected ? "true" : "false"}
               data-playing={playing ? "true" : "false"}
               data-testid={`chord-slot-${index}`}
               key={`${chord.step}-${index}`}
               onClick={() => onSelect(index)}
               onFocusCapture={() => onSelect(index)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelect(index);
+                }
+              }}
               onPointerDownCapture={() => onSelect(index)}
               role="group"
               tabIndex={0}
@@ -2789,18 +2798,41 @@ export function ChordEditor({
                   {chordVelocityPercent}
                 </strong>
               </div>
-              <label>
-                <span>Step</span>
-                <input
-                  data-testid={`chord-step-${index}`}
-                  max={16}
-                  min={1}
-                  onChange={(event) => onChange(index, { step: clampStepStart(Number(event.target.value) - 1) })}
-                  step={1}
-                  type="number"
-                  value={chord.step + 1}
-                />
-              </label>
+              <div className="chord-slot-summary" data-testid={`chord-summary-${index}`}>
+                <span>
+                  <small>Length</small>
+                  <strong>{chord.length}</strong>
+                </span>
+                <span>
+                  <small>Velocity</small>
+                  <strong>{chordVelocityPercent}%</strong>
+                </span>
+                <span>
+                  <small>Chance</small>
+                  <strong>{percentLabel(chordProbability)}</strong>
+                </span>
+                <small className="chord-slot-edit-state" data-testid={`chord-edit-state-${index}`}>
+                  {selected ? "Editing" : "Select to edit"}
+                </small>
+              </div>
+              <div
+                aria-hidden={!selected}
+                className="chord-slot-editor"
+                data-testid={`chord-event-editor-${index}`}
+                id={`chord-event-editor-${index}`}
+              >
+                <label>
+                  <span>Step</span>
+                  <input
+                    data-testid={`chord-step-${index}`}
+                    max={16}
+                    min={1}
+                    onChange={(event) => onChange(index, { step: clampStepStart(Number(event.target.value) - 1) })}
+                    step={1}
+                    type="number"
+                    value={chord.step + 1}
+                  />
+                </label>
               <label>
                 <span>Root</span>
                 <select
@@ -2918,6 +2950,7 @@ export function ChordEditor({
                   />
                 </div>
               </label>
+              </div>
             </div>
           );
         })}

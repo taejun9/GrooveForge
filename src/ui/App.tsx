@@ -10215,7 +10215,41 @@ export function App(): ReactElement {
 
     window.__grooveforgeLaunchSmoke = {
       ...(window.__grooveforgeLaunchSmoke ?? {}),
+      collectChordCardKeyboardEvidence: () => {
+        const cards = [...document.querySelectorAll<HTMLElement>('[data-testid^="chord-slot-"]')];
+        const initial = cards.find((card) => card.dataset.editorOpen === "true");
+        const target = cards.find((card) => card.dataset.editorOpen === "false");
+        if (!initial || !target) {
+          return { restoreReady: false, selectionReady: false };
+        }
+        const initialTestId = initial.dataset.testid;
+        const targetTestId = target.dataset.testid;
+        flushSync(() => {
+          target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+        });
+        const currentTarget = document.querySelector<HTMLElement>('[data-testid="' + targetTestId + '"]');
+        const currentTargetEditor = document.querySelector<HTMLElement>(
+          '[data-testid="' + targetTestId?.replace("chord-slot-", "chord-event-editor-") + '"]'
+        );
+        const selectionReady =
+          currentTarget?.dataset.editorOpen === "true" &&
+          (currentTargetEditor?.getBoundingClientRect().height ?? 0) > 0;
+        flushSync(() => {
+          document
+            .querySelector<HTMLElement>('[data-testid="' + initialTestId + '"]')
+            ?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: " " }));
+        });
+        return {
+          restoreReady:
+            document.querySelector<HTMLElement>('[data-testid="' + initialTestId + '"]')?.dataset.editorOpen === "true",
+          selectionReady
+        };
+      },
       collectAudienceSessionQuickActionEvidence: () => {
+        const chordCards = window.__grooveforgeLaunchSmoke?.collectChordCardKeyboardEvidence?.() ?? {
+          restoreReady: false,
+          selectionReady: false
+        };
         const initialLaunchpadOpen = document.querySelector<HTMLDetailsElement>('[data-testid="first-run-launchpad"]')?.open ?? false;
         flushSync(() => {
           setKeyboardCaptureEnabled(false);
@@ -10401,6 +10435,7 @@ export function App(): ReactElement {
         return {
           arrangementTools,
           captureIdeas,
+          chordCards,
           completionCheckpoints: readAudienceCompletionCheckpointEvidence(),
           completionBeginner,
           completionProducer,
@@ -10492,6 +10527,7 @@ export function App(): ReactElement {
         return;
       }
       delete current.collectAudienceSessionQuickActionEvidence;
+      delete current.collectChordCardKeyboardEvidence;
       if (!current.collectAudienceRouteBridgeDirectEvidence) {
         delete window.__grooveforgeLaunchSmoke;
       }

@@ -179,6 +179,7 @@ type GrooveforgeLaunchSmokeAudienceDeliveryProofBridgeEvidence = {
 type GrooveforgeLaunchSmokePaletteEvidence = {
   arrangementTools: GrooveforgeLaunchSmokeArrangementToolsEvidence;
   captureIdeas: GrooveforgeLaunchSmokeCaptureIdeasEvidence;
+  chordCards: GrooveforgeLaunchSmokeChordCardEvidence;
   completionCheckpoints: GrooveforgeLaunchSmokeAudienceCompletionCheckpointEvidence;
   completionBeginner: GrooveforgeLaunchSmokeRouteEvidence;
   completionProducer: GrooveforgeLaunchSmokeRouteEvidence;
@@ -304,6 +305,11 @@ type GrooveforgeLaunchSmokeLaunchpadEvidence = {
   sameStarterCollapse: boolean;
 };
 
+type GrooveforgeLaunchSmokeChordCardEvidence = {
+  restoreReady: boolean;
+  selectionReady: boolean;
+};
+
 interface Window {
   grooveforge?: {
     platform: NodeJS.Platform;
@@ -318,6 +324,7 @@ interface Window {
       | GrooveforgeLaunchSmokeBridgeDirectEvidenceBundle
       | Promise<GrooveforgeLaunchSmokeBridgeDirectEvidenceBundle>;
     collectAudienceSessionQuickActionEvidence?: () => GrooveforgeLaunchSmokePaletteEvidence | Promise<GrooveforgeLaunchSmokePaletteEvidence>;
+    collectChordCardKeyboardEvidence?: () => GrooveforgeLaunchSmokeChordCardEvidence;
   };
   __grooveforgeLaunchSmokePaletteStep?: string;
   webkitAudioContext?: typeof AudioContext;

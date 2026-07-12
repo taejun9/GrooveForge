@@ -22953,6 +22953,7 @@ input[type="range"] {
 }
 
 .chord-slot.selected {
+  grid-column: 1 / -1;
   border-color: rgba(120, 240, 200, 0.62);
   box-shadow: inset 0 0 0 1px rgba(120, 240, 200, 0.28);
   background: rgba(120, 240, 200, 0.08);
@@ -23061,14 +23062,68 @@ input[type="range"] {
   white-space: nowrap;
 }
 
-.chord-slot label {
+.chord-slot-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.chord-slot-summary > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.chord-slot-summary small {
+  overflow: hidden;
+  color: rgba(244, 239, 231, 0.5);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chord-slot-summary strong {
+  overflow: hidden;
+  color: #f4efe7;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chord-slot-edit-state {
+  border: 1px solid rgba(244, 239, 231, 0.14);
+  border-radius: 999px;
+  padding: 4px 7px;
+}
+
+.chord-slot.selected .chord-slot-edit-state {
+  border-color: rgba(120, 240, 200, 0.35);
+  color: #78f0c8;
+  background: rgba(120, 240, 200, 0.08);
+}
+
+.chord-slot-editor {
+  display: none;
+}
+
+.chord-slot.selected .chord-slot-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  border-block-start: 1px solid rgba(120, 240, 200, 0.16);
+  padding-block-start: 9px;
+}
+
+.chord-slot-editor label {
   display: grid;
   gap: 5px;
   min-width: 0;
 }
 
-.chord-slot select,
-.chord-slot input[type="number"] {
+.chord-slot-editor select,
+.chord-slot-editor input[type="number"] {
   min-height: 32px;
   border: 1px solid rgba(244, 239, 231, 0.13);
   border-radius: 6px;
@@ -31913,6 +31968,19 @@ input[type="range"] {
 
   .chord-primary-tools button {
     inline-size: 100%;
+  }
+
+  .chord-slot-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .chord-slot-edit-state {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .chord-slot.selected .chord-slot-editor {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -260,6 +260,16 @@ function checkResult(result) {
     "live desktop Instrument panel should put direct chord events before Harmony Moves and Sound Design"
   );
   check(
+    evidence?.layout?.chordCardCount >= 2 &&
+      evidence?.layout?.chordExpandedCardCount === 1 &&
+      evidence?.layout?.chordCompactCardCount === evidence?.layout?.chordCardCount - 1 &&
+      evidence?.layout?.chordSelectedEditorVisible === true &&
+      evidence?.layout?.chordCompactEditorsHidden === true &&
+      evidence?.palette?.chordCards?.selectionReady === true &&
+      evidence?.palette?.chordCards?.restoreReady === true,
+    `live desktop chord grid should show one expanded selected editor, compact peers, and keyboard-driven editor switching (cards ${evidence?.layout?.chordCardCount}, expanded ${evidence?.layout?.chordExpandedCardCount}, compact ${evidence?.layout?.chordCompactCardCount}, selected visible ${evidence?.layout?.chordSelectedEditorVisible}, compact hidden ${evidence?.layout?.chordCompactEditorsHidden}, keyboard selection ${evidence?.palette?.chordCards?.selectionReady}, keyboard restore ${evidence?.palette?.chordCards?.restoreReady})`
+  );
+  check(
     evidence?.layout?.harmonyMovesOpen === false &&
       evidence?.layout?.soundDesignOpen === false &&
       evidence?.layout?.harmonyMovesToggleVisible === true &&
@@ -1042,7 +1052,7 @@ child.on("exit", (code, signal) => {
     `- Note-editor-first layout: Capture & Ideas ${result.evidence.layout.captureIdeasOpen ? "open" : "collapsed"}, auto-reveal ${result.evidence.palette.captureIdeas.autoReveal ? "yes" : "no"}, note grids after capture ${result.evidence.layout.noteLanesAfterCaptureIdeas ? "yes" : "no"}`
   );
   console.log(
-    `- Instrument-first layout: chord events before harmony ${result.evidence.layout.chordEventsBeforeHarmonyMoves ? "yes" : "no"}, Guided tools ${result.evidence.layout.harmonyMovesOpen || result.evidence.layout.soundDesignOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.instrumentTools.studioHarmonyOpen && result.evidence.palette.instrumentTools.studioSoundOpen ? "yes" : "no"}`
+    `- Instrument-first layout: chord events before harmony ${result.evidence.layout.chordEventsBeforeHarmonyMoves ? "yes" : "no"}, selected editor ${result.evidence.layout.chordExpandedCardCount}/${result.evidence.layout.chordCardCount} open, compact peers ${result.evidence.layout.chordCompactCardCount}, Guided tools ${result.evidence.layout.harmonyMovesOpen || result.evidence.layout.soundDesignOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.instrumentTools.studioHarmonyOpen && result.evidence.palette.instrumentTools.studioSoundOpen ? "yes" : "no"}`
   );
   console.log(
     `- Arrangement-first layout: timeline before editor ${result.evidence.layout.arrangementTimelineBeforeEditor ? "yes" : "no"}, essential edits before moves ${result.evidence.layout.arrangementEssentialBeforeBlockMoves ? "yes" : "no"}, Guided tools ${result.evidence.layout.blockMovesOpen || result.evidence.layout.arrangementToolsOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.arrangementTools.studioBlockMovesOpen && result.evidence.palette.arrangementTools.studioArrangementOpen ? "yes" : "no"}`
