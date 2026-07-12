@@ -188,6 +188,7 @@ type GrooveforgeLaunchSmokePaletteEvidence = {
   deliveryProofProducer: GrooveforgeLaunchSmokeRouteEvidence;
   deliveryProofReadout: GrooveforgeLaunchSmokeRouteEvidence;
   deliverySnapshot: GrooveforgeLaunchSmokeAudienceDeliverySnapshotEvidence;
+  deliveryTools: GrooveforgeLaunchSmokeDeliveryToolsEvidence;
   dualBeginner: GrooveforgeLaunchSmokeRouteEvidence;
   dualProducer: GrooveforgeLaunchSmokeRouteEvidence;
   dualReadout: GrooveforgeLaunchSmokeRouteEvidence;
@@ -273,6 +274,15 @@ type GrooveforgeLaunchSmokeMasterToolsEvidence = {
   resetMasterReviewOpen: boolean;
   studioMasterPolishOpen: boolean;
   studioMasterReviewOpen: boolean;
+};
+
+type GrooveforgeLaunchSmokeDeliveryToolsEvidence = {
+  guidedAuditOpen: boolean;
+  guidedStatusOpen: boolean;
+  resetAuditOpen: boolean;
+  resetStatusOpen: boolean;
+  studioAuditOpen: boolean;
+  studioStatusOpen: boolean;
 };
 
 interface Window {
