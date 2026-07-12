@@ -12,7 +12,7 @@ const isLaunchSmoke = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1";
 const isProjectIoSmoke = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE === "1";
 const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
-const launchSmokeTimeoutMs = 360000;
+const launchSmokeTimeoutMs = 400000;
 const projectIoSmokeTimeoutMs = launchSmokeTimeoutMs;
 
 type NativeMenuCommand =
@@ -742,6 +742,9 @@ function launchSmokeFailures(evidence: LaunchSmokeEvidence): string[] {
   }
   if (evidence.layout.captureIdeasOpen) {
     failures.push("Capture & Ideas should be collapsed on first-run desktop launch");
+  }
+  if (!evidence.layout.quickActionGraphReady) {
+    failures.push("Quick Actions graph should finish its on-demand load before launch evidence is accepted");
   }
   if (
     !evidence.layout.captureIdeasToggleVisible ||

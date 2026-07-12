@@ -2485,10 +2485,12 @@ function createLayerStarterPrioritySummary(options: LayerStarterOption[]): Layer
 export function LocalDraftRecoveryBanner({
   draft,
   onClear,
+  onDefer,
   onRestore
 }: {
   draft: LocalDraftRecovery;
   onClear: () => void;
+  onDefer: () => void;
   onRestore: () => void;
 }): ReactElement {
   const bars = arrangementTotalBars(draft.project);
@@ -2505,6 +2507,16 @@ export function LocalDraftRecoveryBanner({
         <button className="icon-button primary" data-testid="restore-local-draft" onClick={onRestore} title="Restore local draft" type="button">
           <Undo2 size={16} aria-hidden="true" />
           <span>Restore Draft</span>
+        </button>
+        <button
+          className="icon-button local-draft-defer"
+          data-testid="defer-local-draft"
+          onClick={onDefer}
+          title="Keep the current project and set this recovery copy aside for the session"
+          type="button"
+        >
+          <X size={16} aria-hidden="true" />
+          <span>Not now</span>
         </button>
         <button className="icon-button" data-testid="clear-local-draft" onClick={onClear} title="Clear local draft recovery" type="button">
           <Trash2 size={16} aria-hidden="true" />

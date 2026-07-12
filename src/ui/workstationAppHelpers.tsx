@@ -10267,6 +10267,7 @@ export function createTapTempoReadoutSummary(currentBpm: number, tapTempo: TapTe
 
 export function createProjectSafetyReadoutSummary(
   recovery: LocalDraftRecovery | null,
+  recoveryDeferred: boolean,
   localDraftSavedAt: string | null,
   projectStatus: string,
   projectFileLabel: string | null,
@@ -10274,6 +10275,17 @@ export function createProjectSafetyReadoutSummary(
 ): ProjectSafetyReadoutSummary {
   const trimmedStatus = projectStatus.trim();
   const fileLabel = projectFileLabel?.trim() || null;
+
+  if (recovery && recoveryDeferred) {
+    const savedLabel = formatLocalDraftSavedAt(recovery.savedAt);
+    return {
+      roleLabel: "Current project kept",
+      statusLabel: "Recovery set aside",
+      detailLabel: `${savedLabel} / available in Actions`,
+      detailTitle: `Recovery copy set aside for this session / ${savedLabel} / Current project unchanged / Restore Draft or Clear Draft remains available in Actions`,
+      tone: "warn"
+    };
+  }
 
   if (recovery) {
     const savedLabel = formatLocalDraftSavedAt(recovery.savedAt);

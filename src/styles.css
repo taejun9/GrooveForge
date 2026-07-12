@@ -131,6 +131,12 @@ button {
   flex-wrap: wrap;
 }
 
+.local-draft-actions .local-draft-defer {
+  border-color: rgba(244, 239, 231, 0.2);
+  color: rgba(244, 239, 231, 0.82);
+  background: rgba(244, 239, 231, 0.035);
+}
+
 .brand-lockup,
 .transport-controls,
 .command-strip,

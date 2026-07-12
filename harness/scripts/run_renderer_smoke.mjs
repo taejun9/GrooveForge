@@ -84,13 +84,94 @@ const graphSharedHelperNames = [
 
 function printNamedFunction(source, fileName, functionName) {
   const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const declaration = sourceFile.statements.find(
-    (statement) => ts.isFunctionDeclaration(statement) && statement.name?.text === functionName
-  );
+  let declaration;
+  const visit = (node) => {
+    if (ts.isFunctionDeclaration(node) && node.name?.text === functionName) {
+      declaration = node;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
   check(Boolean(declaration), `${fileName} should declare ${functionName}`);
   return declaration
     ? ts.createPrinter({ removeComments: true }).printNode(ts.EmitHint.Unspecified, declaration, sourceFile)
     : "";
+}
+
+function validateLocalDraftRecoveryDeferral(shell, helpers, workstation) {
+  const recovery = {
+    savedAt: "2026-07-13T00:00:00.000Z",
+    project: workstation.starterProject,
+    contents: "local recovery"
+  };
+  let deferCalls = 0;
+  const bannerHtml = renderToStaticMarkup(
+    React.createElement(shell.LocalDraftRecoveryBanner, {
+      draft: recovery,
+      onClear() {},
+      onDefer() {
+        deferCalls += 1;
+      },
+      onRestore() {}
+    })
+  );
+  const deferredSummary = helpers.createProjectSafetyReadoutSummary(
+    recovery,
+    true,
+    recovery.savedAt,
+    "Demo project",
+    null,
+    false
+  );
+  const activeSummary = helpers.createProjectSafetyReadoutSummary(
+    recovery,
+    false,
+    recovery.savedAt,
+    "Demo project",
+    null,
+    false
+  );
+  const deferHandlerSource = printNamedFunction(appSource, "App.tsx", "deferLocalDraftRecovery");
+
+  check(
+    bannerHtml.includes('data-testid="defer-local-draft"') &&
+      bannerHtml.includes("Not now") &&
+      bannerHtml.includes("set this recovery copy aside for the session"),
+    "local draft recovery should offer a clearly session-scoped Not now action"
+  );
+  check(deferCalls === 0, "rendering local draft recovery should not invoke the defer action");
+  check(
+      deferredSummary.statusLabel === "Recovery set aside" &&
+      deferredSummary.roleLabel === "Current project kept" &&
+      deferredSummary.detailLabel.includes("available in Actions") &&
+      deferredSummary.tone === "warn",
+    "deferred recovery should confirm the current project is unchanged, keep recovery discoverable, and retain a safety warning"
+  );
+  check(
+    activeSummary.statusLabel === "Draft found" && activeSummary.roleLabel === "Restore or clear",
+    "active recovery should preserve the explicit Restore or Clear decision"
+  );
+  check(
+    deferHandlerSource.includes("setLocalDraftRecoveryDeferred(true)") &&
+      !deferHandlerSource.includes("writeLocalDraft") &&
+      !deferHandlerSource.includes("clearLocalDraftStorage") &&
+      !deferHandlerSource.includes("setLocalDraftRecovery(null)"),
+    "Not now should remain session-only without writing, clearing, or dropping the recovery record"
+  );
+  check(
+    /const savedAt = writeLocalDraft\(project\);\s*if \(savedAt\) {\s*setLocalDraftSavedAt\(savedAt\);\s*setLocalDraftRecovery\(null\);\s*setLocalDraftRecoveryDeferred\(false\);\s*}/.test(
+      appSource
+    ),
+    "a successful current-project draft write should drop the replaced stale recovery target"
+  );
+  check(
+    appSource.includes("    localDraftRecovery,") &&
+      graphSource.includes('id: "restore-local-draft"') &&
+      graphSource.includes('id: "clear-local-draft"') &&
+      graphSource.includes("disabled: !localDraftRecovery"),
+    "deferred recovery should remain wired to explicit Restore Draft and Clear Draft Quick Actions"
+  );
 }
 
 function validateLazyQuickActionGraphSource(graph) {
@@ -2136,6 +2217,11 @@ try {
   validateDemandMaterialization(await server.ssrLoadModule("/src/ui/workstationAppQuickActionPalette.ts"));
   validateLazyQuickActionGraphSource(await server.ssrLoadModule("/src/ui/workstationAppQuickActionGraph.ts"));
   validateQuickActionLoadStates(await server.ssrLoadModule("/src/ui/workstationShellPanels.tsx"));
+  validateLocalDraftRecoveryDeferral(
+    await server.ssrLoadModule("/src/ui/workstationShellPanels.tsx"),
+    await server.ssrLoadModule("/src/ui/workstationAppHelpers.tsx"),
+    await server.ssrLoadModule("/src/domain/workstation.ts")
+  );
   validateAudienceSessionQuickActionResults(
     await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
     await server.ssrLoadModule("/src/domain/workstation.ts")
@@ -2219,6 +2305,7 @@ try {
     console.log("- Audience Session Proof Handoff palette: route readout plus both proof handoff lanes are searchable and return focused proof metrics");
     console.log("- Audience Delivery Proof Bridge palette: route readout plus both proof lanes are searchable and return focused proof metrics");
     console.log("- Quick Actions lifecycle: graph module loads on demand with explicit wait/retry UI; one open session reuses its complete graph; reopen builds a fresh graph");
+    console.log("- Local draft recovery: Not now is session-only; Project Safety keeps recovery discoverable; successful replacement drops stale restore state");
     console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack, Delivery Bundle ZIP");
   }
 } finally {

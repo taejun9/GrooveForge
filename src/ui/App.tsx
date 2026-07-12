@@ -1290,6 +1290,7 @@ export function App(): ReactElement {
   const [localDraftRecoveryResult, setLocalDraftRecoveryResult] = useState<LocalDraftRecoveryResult | null>(null);
   const [tapTempo, setTapTempo] = useState<TapTempoState>({ taps: 0, bpm: null, applied: true });
   const [localDraftRecovery, setLocalDraftRecovery] = useState<LocalDraftRecovery | null>(() => readLocalDraftRecovery());
+  const [localDraftRecoveryDeferred, setLocalDraftRecoveryDeferred] = useState(false);
   const [localDraftSavedAt, setLocalDraftSavedAt] = useState<string | null>(localDraftRecovery?.savedAt ?? null);
   const [localDraftWriteArmed, setLocalDraftWriteArmed] = useState(false);
   const projectRef = useRef<ProjectState>(starterProject);
@@ -1625,6 +1626,7 @@ export function App(): ReactElement {
   const localDraftStatusLabel = localDraftSavedAt ? `Draft ${formatLocalDraftSavedAt(localDraftSavedAt)}` : "Draft local";
   const projectSafetyReadout = createProjectSafetyReadoutSummary(
     localDraftRecovery,
+    localDraftRecoveryDeferred,
     localDraftSavedAt,
     projectStatus,
     projectFileLabel,
@@ -2043,6 +2045,8 @@ export function App(): ReactElement {
     const savedAt = writeLocalDraft(project);
     if (savedAt) {
       setLocalDraftSavedAt(savedAt);
+      setLocalDraftRecovery(null);
+      setLocalDraftRecoveryDeferred(false);
     }
   }, [localDraftWriteArmed, project]);
 
@@ -2821,7 +2825,17 @@ export function App(): ReactElement {
   function clearLocalDraftState(): void {
     clearLocalDraftStorage();
     setLocalDraftRecovery(null);
+    setLocalDraftRecoveryDeferred(false);
     setLocalDraftSavedAt(null);
+  }
+
+  function deferLocalDraftRecovery(): void {
+    if (!localDraftRecovery) {
+      return;
+    }
+
+    setLocalDraftRecoveryDeferred(true);
+    setProjectStatus("Kept current project; recovery remains available in Actions");
   }
 
   function restoreLocalDraft(): void {
@@ -11083,10 +11097,11 @@ export function App(): ReactElement {
         onOpenQuickActions={openQuickActions}
       />
 
-      {localDraftRecovery && (
+      {localDraftRecovery && !localDraftRecoveryDeferred && (
         <LocalDraftRecoveryBanner
           draft={localDraftRecovery}
           onClear={clearLocalDraftRecovery}
+          onDefer={deferLocalDraftRecovery}
           onRestore={restoreLocalDraft}
         />
       )}
