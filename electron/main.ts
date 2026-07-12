@@ -39,6 +39,7 @@ type LaunchSmokeEvidence = {
   hasRoot: boolean;
   hasSaveProject: boolean;
   location: string;
+  layout: LaunchSmokeLayoutEvidence;
   bridgeDirect: LaunchSmokeBridgeDirectEvidenceBundle;
   palette: LaunchSmokePaletteEvidence;
   missingText: string[];
@@ -52,6 +53,16 @@ type LaunchSmokeEvidence = {
     height: number;
     width: number;
   };
+};
+
+type LaunchSmokeLayoutEvidence = {
+  feedbackAfterGuidance: boolean;
+  feedbackOutsideGuidance: boolean;
+  guidanceCenterOpen: boolean;
+  patternLabOpen: boolean;
+  patternLabToggleVisible: boolean;
+  stepGridAfterPatternLab: boolean;
+  stepGridPresent: boolean;
 };
 
 type LaunchSmokePaletteRouteEvidence = {
@@ -519,6 +530,18 @@ function launchSmokeFailures(evidence: LaunchSmokeEvidence): string[] {
   if (evidence.viewport.width < 1180 || evidence.viewport.height < 760) {
     failures.push(`viewport should respect desktop minimums, got ${evidence.viewport.width}x${evidence.viewport.height}`);
   }
+  if (evidence.layout.guidanceCenterOpen) {
+    failures.push("Guide & Review Center should be collapsed on first-run desktop launch");
+  }
+  if (evidence.layout.patternLabOpen) {
+    failures.push("Pattern Lab should be collapsed on first-run desktop launch");
+  }
+  if (!evidence.layout.feedbackOutsideGuidance || !evidence.layout.feedbackAfterGuidance) {
+    failures.push("global command feedback should remain outside and after the optional guidance center");
+  }
+  if (!evidence.layout.patternLabToggleVisible || !evidence.layout.stepGridPresent || !evidence.layout.stepGridAfterPatternLab) {
+    failures.push("drum editor should expose a visible Pattern Lab toggle followed by the direct 16-step grid");
+  }
 
   return failures;
 }
@@ -981,6 +1004,8 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "command-reference-open",
         "style-select",
         "pattern-tab-A",
+        "pattern-lab",
+        "workspace-feedback-anchor",
         "export-stems",
         "export-midi",
         "export-handoff-sheet",
@@ -1014,6 +1039,7 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "Sound Snapshot",
         "Mix Snapshot",
         "Pattern A",
+        "Pattern Lab",
         "Drums",
         "808",
         "Synth",
@@ -1030,6 +1056,13 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const testIds = Object.fromEntries(
         expectedTestIds.map((testId) => [testId, document.querySelector(\`[data-testid="\${testId}"]\`) !== null])
       );
+      const guidanceCenter = document.querySelector('[data-testid="guidance-center"]');
+      const feedbackAnchor = document.querySelector('[data-testid="workspace-feedback-anchor"]');
+      const patternLab = document.querySelector('[data-testid="pattern-lab"]');
+      const patternLabToggle = document.querySelector('[data-testid="pattern-lab-toggle"]');
+      const stepGrid = document.querySelector('.step-grid');
+      const follows = (before, after) =>
+        Boolean(before && after && (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING));
       const emptyRoute = {
         actionPresent: false,
         countText: "",
@@ -1101,6 +1134,15 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         hasRoot: Boolean(document.querySelector("#root")),
         hasSaveProject: typeof bridge?.saveProject === "function",
         location: window.location.href,
+        layout: {
+          feedbackAfterGuidance: follows(guidanceCenter, feedbackAnchor),
+          feedbackOutsideGuidance: Boolean(guidanceCenter && feedbackAnchor && !guidanceCenter.contains(feedbackAnchor)),
+          guidanceCenterOpen: Boolean(guidanceCenter?.open),
+          patternLabOpen: Boolean(patternLab?.open),
+          patternLabToggleVisible: Boolean(patternLabToggle && patternLabToggle.getBoundingClientRect().height > 0),
+          stepGridAfterPatternLab: follows(patternLab, stepGrid),
+          stepGridPresent: Boolean(stepGrid)
+        },
         missingText: expectedText.filter((text) => !bodyText.includes(text)),
         bridgeDirect: {
           completion: emptyBridgeDirect,

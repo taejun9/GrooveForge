@@ -60,6 +60,8 @@ const expectedLiveTestIds = [
   "command-reference-open",
   "style-select",
   "pattern-tab-A",
+  "pattern-lab",
+  "workspace-feedback-anchor",
   "export-stems",
   "export-midi",
   "export-handoff-sheet",
@@ -127,6 +129,18 @@ function checkResult(result) {
   check(evidence?.bodyTextLength > 20000, "live desktop renderer should expose a substantial workstation surface");
   check(Array.isArray(evidence?.missingText) && evidence.missingText.length === 0, "live desktop renderer should contain all expected beginner/pro text");
   check(evidence?.samplingTextPresent === false, "live desktop first-run surface should not expose sampling-first language");
+  check(evidence?.layout?.guidanceCenterOpen === false, "live desktop Guide & Review Center should start collapsed");
+  check(evidence?.layout?.patternLabOpen === false, "live desktop Pattern Lab should start collapsed");
+  check(
+    evidence?.layout?.feedbackOutsideGuidance === true && evidence?.layout?.feedbackAfterGuidance === true,
+    "live desktop global command feedback should remain outside and after optional guidance"
+  );
+  check(
+    evidence?.layout?.patternLabToggleVisible === true &&
+      evidence?.layout?.stepGridPresent === true &&
+      evidence?.layout?.stepGridAfterPatternLab === true,
+    "live desktop drum editor should expose a visible Pattern Lab toggle followed by the 16-step grid"
+  );
 
   const missingTestIds = expectedLiveTestIds.filter((testId) => evidence?.testIds?.[testId] !== true);
   check(missingTestIds.length === 0, `live desktop renderer is missing test ids: ${missingTestIds.join(", ")}`);
@@ -773,6 +787,9 @@ child.on("exit", (code, signal) => {
     `- Renderer: ${result.evidence.title}, ${result.evidence.viewport.width}x${result.evidence.viewport.height}, ${result.evidence.bodyTextLength} text characters, ${Object.keys(
       result.evidence.testIds
     ).length} required test ids`
+  );
+  console.log(
+    `- Compose-first layout: Guide ${result.evidence.layout.guidanceCenterOpen ? "open" : "collapsed"}, Pattern Lab ${result.evidence.layout.patternLabOpen ? "open" : "collapsed"}, feedback outside guide ${result.evidence.layout.feedbackOutsideGuidance ? "yes" : "no"}, step grid after lab ${result.evidence.layout.stepGridAfterPatternLab ? "yes" : "no"}`
   );
   console.log(
     `- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors, ${result.evidence.visual.nonBackgroundSamples}/${result.evidence.visual.sampledPixels} non-background samples`

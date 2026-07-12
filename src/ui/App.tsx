@@ -10711,9 +10711,6 @@ export function App(): ReactElement {
         onJump={jumpToWorkflowNavigatorItem}
       />
 
-      {undoRedoResult && <UndoRedoResultStrip result={undoRedoResult} />}
-      {quickActionResult && <QuickActionResultStrip result={quickActionResult} />}
-
       <StyleInspector
         composerActionsSummary={composerActionsSummary}
         composerActionResult={composerActionResult}
@@ -10943,6 +10940,11 @@ export function App(): ReactElement {
         </div>
       </details>
 
+      <div className="workspace-feedback-anchor" data-testid="workspace-feedback-anchor">
+        {undoRedoResult && <UndoRedoResultStrip result={undoRedoResult} />}
+        {quickActionResult && <QuickActionResultStrip result={quickActionResult} />}
+      </div>
+
       <section className="workspace-grid">
         <section className="panel pattern-panel" data-testid="workflow-target-compose" aria-label="Pattern editor" ref={composePanelRef}>
           <PanelTitle icon={<Drum size={18} />} title="Drums" meta="16 step rack" />
@@ -10999,6 +11001,21 @@ export function App(): ReactElement {
               <span>{audiblePatternFollowTarget ? `Edit ${audiblePatternFollowTarget}` : playingPattern ? "In sync" : "Idle"}</span>
             </button>
           </div>
+          <details className="pattern-lab" data-testid="pattern-lab">
+            <summary className="pattern-lab-summary" data-testid="pattern-lab-toggle">
+              <span className="pattern-lab-icon" aria-hidden="true">
+                <Sparkles size={16} />
+              </span>
+              <span className="pattern-lab-copy">
+                <strong>Pattern Lab</strong>
+                <small>Compare, generate, clone, vary, stack, and add fills</small>
+              </span>
+              <span className="pattern-lab-context">
+                Pattern {project.selectedPattern} · {patternEventCount(currentPattern)} events
+              </span>
+              <ArrowDown className="pattern-lab-chevron" size={16} aria-hidden="true" />
+            </summary>
+            <div className="pattern-lab-content" data-testid="pattern-lab-content">
           <PatternCompareDecision summary={patternCompareDecisionSummary} onRun={runPatternCompareDecision} />
           <PatternCompareStrip
             playbackMode={playbackMode}
@@ -11116,6 +11133,8 @@ export function App(): ReactElement {
             })}
           </div>
           {patternFillResult && <PatternFillResultStrip result={patternFillResult} />}
+            </div>
+          </details>
           <div className="step-grid">
             {(Object.keys(drumLabels) as DrumLane[]).map((lane) => (
               <div className="step-row" key={lane}>
