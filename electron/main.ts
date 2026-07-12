@@ -86,6 +86,15 @@ type LaunchSmokeLayoutEvidence = {
   mixMovesToggleVisible: boolean;
   mixReviewOpen: boolean;
   mixReviewToggleVisible: boolean;
+  masterCeilingBoundsReady: boolean;
+  masterControlsBeforePolish: boolean;
+  masterOutputControlsPresent: boolean;
+  masterPolishBeforeReview: boolean;
+  masterPolishOpen: boolean;
+  masterPolishToggleVisible: boolean;
+  masterReviewOpen: boolean;
+  masterReviewToggleVisible: boolean;
+  masterRoleBeforeControls: boolean;
   patternLabOpen: boolean;
   patternLabToggleVisible: boolean;
   noteLanesAfterCaptureIdeas: boolean;
@@ -178,6 +187,7 @@ type LaunchSmokePaletteEvidence = {
   guided: LaunchSmokePaletteRouteEvidence;
   instrumentTools: LaunchSmokeInstrumentToolsEvidence;
   mixerTools: LaunchSmokeMixerToolsEvidence;
+  masterTools: LaunchSmokeMasterToolsEvidence;
   opened: boolean;
   producer: LaunchSmokePaletteRouteEvidence;
   routeBridge: LaunchSmokePaletteRouteEvidence;
@@ -227,6 +237,15 @@ type LaunchSmokeMixerToolsEvidence = {
   studioMixMovesOpen: boolean;
   studioMixReviewOpen: boolean;
   studioProcessingOpen: boolean;
+};
+
+type LaunchSmokeMasterToolsEvidence = {
+  guidedMasterPolishOpen: boolean;
+  guidedMasterReviewOpen: boolean;
+  resetMasterPolishOpen: boolean;
+  resetMasterReviewOpen: boolean;
+  studioMasterPolishOpen: boolean;
+  studioMasterReviewOpen: boolean;
 };
 
 type LaunchSmokeVisualEvidence = {
@@ -1106,6 +1125,10 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "mixer-processing-drum_rack",
         "mix-moves",
         "mix-review-tools",
+        "master-output-controls",
+        "master-ceiling-input",
+        "master-polish-tools",
+        "master-review-tools",
         "export-stems",
         "export-midi",
         "export-handoff-sheet",
@@ -1148,6 +1171,9 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "Tone & Space",
         "Mix Moves",
         "Audition & Compare",
+        "Limiter ceiling",
+        "Polish & Automation",
+        "Review & Export",
         "Drums",
         "808",
         "Synth",
@@ -1194,6 +1220,13 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const mixMovesToggle = document.querySelector('[data-testid="mix-moves-toggle"]');
       const mixReview = document.querySelector('[data-testid="mix-review-tools"]');
       const mixReviewToggle = document.querySelector('[data-testid="mix-review-toggle"]');
+      const masterRole = document.querySelector('[data-testid="master-output-role-readout"]');
+      const masterOutputControls = document.querySelector('[data-testid="master-output-controls"]');
+      const masterCeilingInput = document.querySelector('[data-testid="master-ceiling-input"]');
+      const masterPolish = document.querySelector('[data-testid="master-polish-tools"]');
+      const masterPolishToggle = document.querySelector('[data-testid="master-polish-toggle"]');
+      const masterReview = document.querySelector('[data-testid="master-review-tools"]');
+      const masterReviewToggle = document.querySelector('[data-testid="master-review-toggle"]');
       const follows = (before, after) =>
         Boolean(before && after && (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING));
       const emptyRoute = {
@@ -1298,6 +1331,21 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           mixMovesToggleVisible: Boolean(mixMovesToggle && mixMovesToggle.getBoundingClientRect().height > 0),
           mixReviewOpen: Boolean(mixReview?.open),
           mixReviewToggleVisible: Boolean(mixReviewToggle && mixReviewToggle.getBoundingClientRect().height > 0),
+          masterCeilingBoundsReady: Boolean(
+            masterCeilingInput &&
+            masterCeilingInput.getAttribute("type") === "number" &&
+            masterCeilingInput.getAttribute("min") === "-6" &&
+            masterCeilingInput.getAttribute("max") === "0" &&
+            masterCeilingInput.getAttribute("step") === "0.1"
+          ),
+          masterControlsBeforePolish: follows(masterOutputControls, masterPolish),
+          masterOutputControlsPresent: Boolean(masterOutputControls),
+          masterPolishBeforeReview: follows(masterPolish, masterReview),
+          masterPolishOpen: Boolean(masterPolish?.open),
+          masterPolishToggleVisible: Boolean(masterPolishToggle && masterPolishToggle.getBoundingClientRect().height > 0),
+          masterReviewOpen: Boolean(masterReview?.open),
+          masterReviewToggleVisible: Boolean(masterReviewToggle && masterReviewToggle.getBoundingClientRect().height > 0),
+          masterRoleBeforeControls: follows(masterRole, masterOutputControls),
           patternLabOpen: Boolean(patternLab?.open),
           patternLabToggleVisible: Boolean(patternLabToggle && patternLabToggle.getBoundingClientRect().height > 0),
           noteLanesAfterCaptureIdeas: follows(captureIdeas, noteLanes),
@@ -1346,6 +1394,14 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
             studioMixMovesOpen: false,
             studioMixReviewOpen: false,
             studioProcessingOpen: false
+          },
+          masterTools: {
+            guidedMasterPolishOpen: true,
+            guidedMasterReviewOpen: true,
+            resetMasterPolishOpen: true,
+            resetMasterReviewOpen: true,
+            studioMasterPolishOpen: false,
+            studioMasterReviewOpen: false
           },
           completionBeginner: emptyRoute,
           completionProducer: emptyRoute,

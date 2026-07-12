@@ -1136,6 +1136,10 @@ export function App(): ReactElement {
   const [mixMovesOpen, setMixMovesOpen] = useState(false);
   const [mixReviewOpen, setMixReviewOpen] = useState(false);
   const [channelProcessingOpen, setChannelProcessingOpen] = useState<Record<string, boolean>>({});
+  const [masterPolishOpen, setMasterPolishOpen] = useState(false);
+  const [masterReviewOpen, setMasterReviewOpen] = useState(false);
+  const [masterCeilingDraft, setMasterCeilingDraft] = useState(() => starterProject.masterCeilingDb.toFixed(1));
+  const [masterCeilingEditing, setMasterCeilingEditing] = useState(false);
   const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
   const [arrangementBlockClipboard, setArrangementBlockClipboard] = useState<ArrangementBlockClipboard | null>(null);
   const [splitAfterBars, setSplitAfterBars] = useState(1);
@@ -2050,6 +2054,12 @@ export function App(): ReactElement {
   }, [project.mode]);
 
   useEffect(() => {
+    if (!masterCeilingEditing) {
+      setMasterCeilingDraft(project.masterCeilingDb.toFixed(1));
+    }
+  }, [masterCeilingEditing, project.masterCeilingDb]);
+
+  useEffect(() => {
     const snapshotIds = new Set(project.snapshots.map((snapshot) => snapshot.id));
     setSnapshotNameDrafts((current) => {
       const nextDrafts = Object.fromEntries(Object.entries(current).filter(([snapshotId]) => snapshotIds.has(snapshotId)));
@@ -2932,6 +2942,8 @@ export function App(): ReactElement {
     setBlockMovesOpen(advancedOpen);
     setMixMovesOpen(advancedOpen);
     setMixReviewOpen(advancedOpen);
+    setMasterPolishOpen(advancedOpen);
+    setMasterReviewOpen(advancedOpen);
     setChannelProcessingOpen(
       Object.fromEntries(projectRef.current.mixer.map((channel) => [channel.id, advancedOpen]))
     );
@@ -4034,7 +4046,25 @@ export function App(): ReactElement {
     }));
   }
 
+  function normalizeMasterCeilingDb(value: number): number {
+    return Number.isFinite(value) ? Math.min(0, Math.max(-6, Math.round(value * 10) / 10)) : projectRef.current.masterCeilingDb;
+  }
+
+  function updateMasterCeilingDb(value: number): void {
+    const normalized = normalizeMasterCeilingDb(value);
+    updateProject((current) => ({ ...current, masterCeilingDb: normalized }));
+  }
+
+  function commitMasterCeilingDraft(): void {
+    const trimmed = masterCeilingDraft.trim();
+    const normalized = normalizeMasterCeilingDb(trimmed === "" ? projectRef.current.masterCeilingDb : Number(trimmed));
+    setMasterCeilingEditing(false);
+    setMasterCeilingDraft(normalized.toFixed(1));
+    updateMasterCeilingDb(normalized);
+  }
+
   function applyMasterFinishPad(padId: MasterFinishPadId, options: { showResult?: boolean } = {}): void {
+    setMasterPolishOpen(true);
     const pad = masterFinishPadDefinitions.find((definition) => definition.id === padId);
     if (!pad) {
       setMasterFinishResult(null);
@@ -4060,6 +4090,7 @@ export function App(): ReactElement {
   }
 
   function applyMasterAutomationPad(padId: MasterAutomationPadId): void {
+    setMasterPolishOpen(true);
     const pad = masterAutomationPadDefinitions.find((definition) => definition.id === padId);
     if (!pad) {
       setMasterAutomationResult(null);
@@ -4081,6 +4112,7 @@ export function App(): ReactElement {
   }
 
   function applyMixFixPreset(preset: MixFixPreset): void {
+    setMasterReviewOpen(true);
     const beforeProject = projectRef.current;
     const beforeAnalysis = analyzeExport(beforeProject);
     const beforeStemAnalyses = analyzeStemExports(beforeProject);
@@ -7460,6 +7492,7 @@ export function App(): ReactElement {
   }
 
   function focusMixCoachCheck(check: MixCoachCheck): void {
+    setMasterReviewOpen(true);
     const currentChecks = createMixCoachChecks(exportAnalysis, stemAnalyses);
     const currentCheck = currentChecks.find((candidate) => candidate.id === check.id) ?? check;
     setMixCoachFocusId(check.id);
@@ -7469,6 +7502,7 @@ export function App(): ReactElement {
   }
 
   function focusMixCoach(): MixCoachCheck | null {
+    setMasterReviewOpen(true);
     const check = mixCoachFocusCheck(createMixCoachChecks(exportAnalysis, stemAnalyses));
     if (check) {
       focusMixCoachCheck(check);
@@ -7677,6 +7711,7 @@ export function App(): ReactElement {
   }
 
   function focusExportMeter(): void {
+    setMasterReviewOpen(true);
     const currentProject = projectRef.current;
     const analysis = analyzeExport(currentProject);
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
@@ -8369,6 +8404,7 @@ export function App(): ReactElement {
   }
 
   function focusFinishChecklistCard(card: FinishChecklistCard): void {
+    setMasterReviewOpen(true);
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
       arrange: arrangePanelRef.current,
@@ -8384,6 +8420,7 @@ export function App(): ReactElement {
   }
 
   function focusFinishChecklistRouteReadout(): void {
+    setMasterReviewOpen(true);
     const card = activeFinishChecklistQuickActionCard(finishChecklistSummary);
     finishChecklistPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8537,6 +8574,7 @@ export function App(): ReactElement {
   }
 
   function focusReviewQueueItem(item: ReviewQueueItem): void {
+    setMasterReviewOpen(true);
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
       arrange: arrangePanelRef.current,
@@ -8556,6 +8594,7 @@ export function App(): ReactElement {
   }
 
   function focusReviewQueueRouteReadout(): void {
+    setMasterReviewOpen(true);
     const item = reviewQueueSummary.items[0] ?? null;
     reviewQueuePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8566,6 +8605,7 @@ export function App(): ReactElement {
   }
 
   function applyReviewFix(item?: ReviewQueueItem): void {
+    setMasterReviewOpen(true);
     const beforeProject = projectRef.current;
     const beforeAnalysis = analyzeExport(beforeProject);
     const beforeStemAnalyses = analyzeStemExports(beforeProject);
@@ -10180,6 +10220,8 @@ export function App(): ReactElement {
         const guidedMixMovesOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mix-moves"]')?.open ?? true;
         const guidedMixReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mix-review-tools"]')?.open ?? true;
         const guidedProcessingOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mixer-processing-drum_rack"]')?.open ?? true;
+        const guidedMasterPolishOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-polish-tools"]')?.open ?? true;
+        const guidedMasterReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? true;
         flushSync(() => updateModeAwareToolPanels("studio"));
         const studioSoundOpen = document.querySelector<HTMLDetailsElement>('[data-testid="sound-design-tools"]')?.open ?? false;
         const studioHarmonyOpen = document.querySelector<HTMLDetailsElement>('[data-testid="harmony-moves"]')?.open ?? false;
@@ -10188,6 +10230,8 @@ export function App(): ReactElement {
         const studioMixMovesOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mix-moves"]')?.open ?? false;
         const studioMixReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mix-review-tools"]')?.open ?? false;
         const studioProcessingOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mixer-processing-drum_rack"]')?.open ?? false;
+        const studioMasterPolishOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-polish-tools"]')?.open ?? false;
+        const studioMasterReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? false;
         const studioBlockMovesElement = document.querySelector<HTMLDetailsElement>('[data-testid="block-moves"]');
         const studioBlockMovesStyle = studioBlockMovesElement ? getComputedStyle(studioBlockMovesElement) : null;
         const studioBlockMovesFullWidth =
@@ -10200,6 +10244,8 @@ export function App(): ReactElement {
         const resetMixMovesOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mix-moves"]')?.open ?? true;
         const resetMixReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mix-review-tools"]')?.open ?? true;
         const resetProcessingOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mixer-processing-drum_rack"]')?.open ?? true;
+        const resetMasterPolishOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-polish-tools"]')?.open ?? true;
+        const resetMasterReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? true;
         const arrangementTools = {
           guidedArrangementOpen,
           guidedBlockMovesOpen,
@@ -10227,6 +10273,14 @@ export function App(): ReactElement {
           studioMixMovesOpen,
           studioMixReviewOpen,
           studioProcessingOpen
+        };
+        const masterTools = {
+          guidedMasterPolishOpen,
+          guidedMasterReviewOpen,
+          resetMasterPolishOpen,
+          resetMasterReviewOpen,
+          studioMasterPolishOpen,
+          studioMasterReviewOpen
         };
         markLaunchSmokePaletteStep("producer");
         const producer = quickActionEvidenceById("audience-session-enter-producer", projectRef.current, {
@@ -10291,6 +10345,7 @@ export function App(): ReactElement {
           guided,
           instrumentTools,
           mixerTools,
+          masterTools,
           nextStepRail: readAudienceNextStepRailEvidence(),
           opened: true,
           producer,
@@ -12527,74 +12582,143 @@ export function App(): ReactElement {
             <small data-testid="master-output-role-level">{masterOutputRoleSummary.levelLabel}</small>
             <small data-testid="master-output-role-detail">{masterOutputRoleSummary.detailLabel}</small>
           </div>
-          <FinishChecklist
-            summary={finishChecklistSummary}
-            focusedCardId={finishChecklistFocusId}
-            result={finishChecklistResult}
-            sectionRef={finishChecklistPanelRef}
-            onFocus={focusFinishChecklistCard}
-          />
-          <ReviewQueue
-            summary={reviewQueueSummary}
-            focusedItemId={reviewQueueFocusId}
-            result={reviewQueueResult}
-            fixResult={reviewFixResult}
-            project={project}
-            sectionRef={reviewQueuePanelRef}
-            onFix={applyReviewFix}
-            onFocus={focusReviewQueueItem}
-          />
-          <ExportMeter analysis={exportAnalysis} />
-          <MixCoach
-            checks={mixCoachChecks}
-            focusedCheckId={mixCoachFocusId}
-            focusSummary={mixCoachFocusSummary}
-            focusResult={mixCoachResult}
-            fixPreview={mixFixPreviewSummary}
-            fixes={mixFixActions}
-            result={mixFixResult}
-            onApplyFix={applyMixFixPreset}
-            onFocusCheck={focusMixCoachCheck}
-          />
-          <MasterFinishPads
-            pads={masterFinishPadOptions}
-            preview={masterFinishPreviewSummary}
-            result={masterFinishResult}
-            onApply={(pad) => applyMasterFinishPad(pad, { showResult: true })}
-          />
-          <MasterAutomationPads
-            pads={masterAutomationPadOptions}
-            preview={masterAutomationPreviewSummary}
-            result={masterAutomationResult}
-            onApply={applyMasterAutomationPad}
-          />
-          <label>
-            <span>Ceiling</span>
-            <input
-              data-testid="master-ceiling"
-              type="range"
-              min={-6}
-              max={0}
-              step={0.1}
-              value={project.masterCeilingDb}
-              onChange={(event) =>
-                updateProject((current) => ({ ...current, masterCeilingDb: Number(event.target.value) }))
-              }
-            />
-          </label>
-          <div className="preset-row">
-            {masterPresets.map((preset) => (
-              <button
-                key={preset}
-                className={project.masterPreset === preset ? "selected" : ""}
-                data-testid={`master-preset-${preset}`}
-                type="button"
-                onClick={() => applyMasterPreset(preset)}
-              >
-                {preset}
-              </button>
-            ))}
+          <div className="master-output-controls" data-testid="master-output-controls">
+            <div className="master-ceiling-control">
+              <label>
+                <span>Limiter ceiling</span>
+                <strong>{project.masterCeilingDb.toFixed(1)} dB</strong>
+              </label>
+              <div className="master-ceiling-inputs">
+                <input
+                  aria-label="Master limiter ceiling"
+                  data-testid="master-ceiling"
+                  type="range"
+                  min={-6}
+                  max={0}
+                  step={0.1}
+                  value={masterCeilingDraft}
+                  onBlur={commitMasterCeilingDraft}
+                  onChange={(event) => setMasterCeilingDraft(event.target.value)}
+                  onFocus={() => setMasterCeilingEditing(true)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.currentTarget.blur();
+                    }
+                  }}
+                />
+                <input
+                  aria-label="Master limiter ceiling decibels"
+                  data-testid="master-ceiling-input"
+                  type="number"
+                  min={-6}
+                  max={0}
+                  step={0.1}
+                  value={project.masterCeilingDb}
+                  onChange={(event) => updateMasterCeilingDb(Number(event.target.value))}
+                />
+              </div>
+              <small>Lower values leave more headroom before export.</small>
+            </div>
+            <div className="master-preset-control">
+              <span>Output preset</span>
+              <div className="preset-row">
+                {masterPresets.map((preset) => (
+                  <button
+                    key={preset}
+                    className={project.masterPreset === preset ? "selected" : ""}
+                    data-testid={`master-preset-${preset}`}
+                    type="button"
+                    onClick={() => applyMasterPreset(preset)}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
+          <details className="master-polish-tools" data-testid="master-polish-tools" open={masterPolishOpen}>
+            <summary
+              className="master-tools-summary"
+              data-testid="master-polish-toggle"
+              onClick={(event) => {
+                event.preventDefault();
+                setMasterPolishOpen((open) => !open);
+              }}
+            >
+              <span className="master-tools-copy">
+                <strong>Polish &amp; Automation</strong>
+                <small>Finish presets and master automation moves</small>
+              </span>
+              <span className="master-tools-context">
+                {masterFinishPreviewSummary.statusLabel} · {masterAutomationPreviewSummary.statusLabel} · {project.mode === "studio" ? "Studio" : "Guided"}
+              </span>
+              <ArrowDown className="master-tools-chevron" size={16} aria-hidden="true" />
+            </summary>
+            <div className="master-tools-content" data-testid="master-polish-content">
+              <MasterFinishPads
+                pads={masterFinishPadOptions}
+                preview={masterFinishPreviewSummary}
+                result={masterFinishResult}
+                onApply={(pad) => applyMasterFinishPad(pad, { showResult: true })}
+              />
+              <MasterAutomationPads
+                pads={masterAutomationPadOptions}
+                preview={masterAutomationPreviewSummary}
+                result={masterAutomationResult}
+                onApply={applyMasterAutomationPad}
+              />
+            </div>
+          </details>
+          <details className="master-review-tools" data-testid="master-review-tools" open={masterReviewOpen}>
+            <summary
+              className="master-tools-summary"
+              data-testid="master-review-toggle"
+              onClick={(event) => {
+                event.preventDefault();
+                setMasterReviewOpen((open) => !open);
+              }}
+            >
+              <span className="master-tools-copy">
+                <strong>Review &amp; Export</strong>
+                <small>Finish checks, review queue, export meter, and Mix Coach</small>
+              </span>
+              <span className="master-tools-context">
+                {finishChecklistSummary.headline} · {exportAnalysis.status} · {project.mode === "studio" ? "Studio" : "Guided"}
+              </span>
+              <ArrowDown className="master-tools-chevron" size={16} aria-hidden="true" />
+            </summary>
+            <div className="master-tools-content" data-testid="master-review-content">
+              <FinishChecklist
+                summary={finishChecklistSummary}
+                focusedCardId={finishChecklistFocusId}
+                result={finishChecklistResult}
+                sectionRef={finishChecklistPanelRef}
+                onFocus={focusFinishChecklistCard}
+              />
+              <ReviewQueue
+                summary={reviewQueueSummary}
+                focusedItemId={reviewQueueFocusId}
+                result={reviewQueueResult}
+                fixResult={reviewFixResult}
+                project={project}
+                sectionRef={reviewQueuePanelRef}
+                onFix={applyReviewFix}
+                onFocus={focusReviewQueueItem}
+              />
+              <ExportMeter analysis={exportAnalysis} />
+              <MixCoach
+                checks={mixCoachChecks}
+                focusedCheckId={mixCoachFocusId}
+                focusSummary={mixCoachFocusSummary}
+                focusResult={mixCoachResult}
+                fixPreview={mixFixPreviewSummary}
+                fixes={mixFixActions}
+                result={mixFixResult}
+                onApplyFix={applyMixFixPreset}
+                onFocusCheck={focusMixCoachCheck}
+              />
+            </div>
+          </details>
         </section>
       </section>
     </main>

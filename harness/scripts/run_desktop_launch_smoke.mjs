@@ -77,6 +77,10 @@ const expectedLiveTestIds = [
   "mixer-processing-drum_rack",
   "mix-moves",
   "mix-review-tools",
+  "master-output-controls",
+  "master-ceiling-input",
+  "master-polish-tools",
+  "master-review-tools",
   "export-stems",
   "export-midi",
   "export-handoff-sheet",
@@ -245,6 +249,30 @@ function checkResult(result) {
       evidence?.palette?.mixerTools?.resetMixReviewOpen === false &&
       evidence?.palette?.mixerTools?.resetProcessingOpen === false,
     "live desktop Mixer tools should expand for Studio and reset compactly for Guided through the shared mode handler"
+  );
+  check(
+    evidence?.layout?.masterOutputControlsPresent === true &&
+      evidence?.layout?.masterRoleBeforeControls === true &&
+      evidence?.layout?.masterControlsBeforePolish === true &&
+      evidence?.layout?.masterPolishBeforeReview === true &&
+      evidence?.layout?.masterCeilingBoundsReady === true,
+    "live desktop Master should put bounded precise output controls before Polish & Automation and Review & Export"
+  );
+  check(
+    evidence?.layout?.masterPolishOpen === false &&
+      evidence?.layout?.masterReviewOpen === false &&
+      evidence?.layout?.masterPolishToggleVisible === true &&
+      evidence?.layout?.masterReviewToggleVisible === true,
+    "live desktop Guided mode should show compact Polish & Automation and Review & Export toggles"
+  );
+  check(
+    evidence?.palette?.masterTools?.guidedMasterPolishOpen === false &&
+      evidence?.palette?.masterTools?.guidedMasterReviewOpen === false &&
+      evidence?.palette?.masterTools?.studioMasterPolishOpen === true &&
+      evidence?.palette?.masterTools?.studioMasterReviewOpen === true &&
+      evidence?.palette?.masterTools?.resetMasterPolishOpen === false &&
+      evidence?.palette?.masterTools?.resetMasterReviewOpen === false,
+    "live desktop Master tools should expand for Studio and reset compactly for Guided through the shared mode handler"
   );
 
   const missingTestIds = expectedLiveTestIds.filter((testId) => evidence?.testIds?.[testId] !== true);
@@ -907,6 +935,9 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Mixer-first layout: strips before moves ${result.evidence.layout.mixerStripsBeforeMixMoves ? "yes" : "no"}, basic balance before processing ${result.evidence.layout.mixerBasicBalanceBeforeProcessing ? "yes" : "no"}, Guided tools ${result.evidence.layout.mixerProcessingOpen || result.evidence.layout.mixMovesOpen || result.evidence.layout.mixReviewOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.mixerTools.studioProcessingOpen && result.evidence.palette.mixerTools.studioMixMovesOpen && result.evidence.palette.mixerTools.studioMixReviewOpen ? "yes" : "no"}`
+  );
+  console.log(
+    `- Master-first layout: output before helpers ${result.evidence.layout.masterControlsBeforePolish ? "yes" : "no"}, precise ceiling bounds ${result.evidence.layout.masterCeilingBoundsReady ? "yes" : "no"}, Guided tools ${result.evidence.layout.masterPolishOpen || result.evidence.layout.masterReviewOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.masterTools.studioMasterPolishOpen && result.evidence.palette.masterTools.studioMasterReviewOpen ? "yes" : "no"}`
   );
   console.log(
     `- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors, ${result.evidence.visual.nonBackgroundSamples}/${result.evidence.visual.sampledPixels} non-background samples`
