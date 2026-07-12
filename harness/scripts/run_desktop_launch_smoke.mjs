@@ -73,6 +73,10 @@ const expectedLiveTestIds = [
   "selected-block-editor",
   "block-moves",
   "arrangement-tools",
+  "mixer-channel-strips",
+  "mixer-processing-drum_rack",
+  "mix-moves",
+  "mix-review-tools",
   "export-stems",
   "export-midi",
   "export-handoff-sheet",
@@ -213,6 +217,34 @@ function checkResult(result) {
       evidence?.palette?.arrangementTools?.resetArrangementOpen === false &&
       evidence?.palette?.arrangementTools?.resetBlockMovesOpen === false,
     "live desktop Arrangement tools should expand for Studio and reset compactly for Guided through the shared mode handler"
+  );
+  check(
+    evidence?.layout?.mixerStripsPresent === true &&
+      evidence?.layout?.mixerBasicBalanceBeforeProcessing === true &&
+      evidence?.layout?.mixerStripsBeforeMixMoves === true &&
+      evidence?.layout?.mixMovesBeforeReview === true,
+    "live desktop Mixer should put direct strip balance before Processing, Mix Moves, and Audition & Compare"
+  );
+  check(
+    evidence?.layout?.mixerProcessingOpen === false &&
+      evidence?.layout?.mixMovesOpen === false &&
+      evidence?.layout?.mixReviewOpen === false &&
+      evidence?.layout?.mixerProcessingToggleVisible === true &&
+      evidence?.layout?.mixMovesToggleVisible === true &&
+      evidence?.layout?.mixReviewToggleVisible === true,
+    "live desktop Guided mode should show compact channel Processing, Mix Moves, and Audition & Compare toggles"
+  );
+  check(
+    evidence?.palette?.mixerTools?.guidedMixMovesOpen === false &&
+      evidence?.palette?.mixerTools?.guidedMixReviewOpen === false &&
+      evidence?.palette?.mixerTools?.guidedProcessingOpen === false &&
+      evidence?.palette?.mixerTools?.studioMixMovesOpen === true &&
+      evidence?.palette?.mixerTools?.studioMixReviewOpen === true &&
+      evidence?.palette?.mixerTools?.studioProcessingOpen === true &&
+      evidence?.palette?.mixerTools?.resetMixMovesOpen === false &&
+      evidence?.palette?.mixerTools?.resetMixReviewOpen === false &&
+      evidence?.palette?.mixerTools?.resetProcessingOpen === false,
+    "live desktop Mixer tools should expand for Studio and reset compactly for Guided through the shared mode handler"
   );
 
   const missingTestIds = expectedLiveTestIds.filter((testId) => evidence?.testIds?.[testId] !== true);
@@ -872,6 +904,9 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Arrangement-first layout: timeline before editor ${result.evidence.layout.arrangementTimelineBeforeEditor ? "yes" : "no"}, essential edits before moves ${result.evidence.layout.arrangementEssentialBeforeBlockMoves ? "yes" : "no"}, Guided tools ${result.evidence.layout.blockMovesOpen || result.evidence.layout.arrangementToolsOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.arrangementTools.studioBlockMovesOpen && result.evidence.palette.arrangementTools.studioArrangementOpen ? "yes" : "no"}`
+  );
+  console.log(
+    `- Mixer-first layout: strips before moves ${result.evidence.layout.mixerStripsBeforeMixMoves ? "yes" : "no"}, basic balance before processing ${result.evidence.layout.mixerBasicBalanceBeforeProcessing ? "yes" : "no"}, Guided tools ${result.evidence.layout.mixerProcessingOpen || result.evidence.layout.mixMovesOpen || result.evidence.layout.mixReviewOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.mixerTools.studioProcessingOpen && result.evidence.palette.mixerTools.studioMixMovesOpen && result.evidence.palette.mixerTools.studioMixReviewOpen ? "yes" : "no"}`
   );
   console.log(
     `- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors, ${result.evidence.visual.nonBackgroundSamples}/${result.evidence.visual.sampledPixels} non-background samples`

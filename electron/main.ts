@@ -76,6 +76,16 @@ type LaunchSmokeLayoutEvidence = {
   harmonyMovesOpen: boolean;
   harmonyMovesToggleVisible: boolean;
   instrumentDirectChordsPresent: boolean;
+  mixerBasicBalanceBeforeProcessing: boolean;
+  mixerProcessingOpen: boolean;
+  mixerProcessingToggleVisible: boolean;
+  mixerStripsBeforeMixMoves: boolean;
+  mixerStripsPresent: boolean;
+  mixMovesBeforeReview: boolean;
+  mixMovesOpen: boolean;
+  mixMovesToggleVisible: boolean;
+  mixReviewOpen: boolean;
+  mixReviewToggleVisible: boolean;
   patternLabOpen: boolean;
   patternLabToggleVisible: boolean;
   noteLanesAfterCaptureIdeas: boolean;
@@ -167,6 +177,7 @@ type LaunchSmokePaletteEvidence = {
   dualReadout: LaunchSmokePaletteRouteEvidence;
   guided: LaunchSmokePaletteRouteEvidence;
   instrumentTools: LaunchSmokeInstrumentToolsEvidence;
+  mixerTools: LaunchSmokeMixerToolsEvidence;
   opened: boolean;
   producer: LaunchSmokePaletteRouteEvidence;
   routeBridge: LaunchSmokePaletteRouteEvidence;
@@ -204,6 +215,18 @@ type LaunchSmokeArrangementToolsEvidence = {
   studioArrangementOpen: boolean;
   studioBlockMovesFullWidth: boolean;
   studioBlockMovesOpen: boolean;
+};
+
+type LaunchSmokeMixerToolsEvidence = {
+  guidedMixMovesOpen: boolean;
+  guidedMixReviewOpen: boolean;
+  guidedProcessingOpen: boolean;
+  resetMixMovesOpen: boolean;
+  resetMixReviewOpen: boolean;
+  resetProcessingOpen: boolean;
+  studioMixMovesOpen: boolean;
+  studioMixReviewOpen: boolean;
+  studioProcessingOpen: boolean;
 };
 
 type LaunchSmokeVisualEvidence = {
@@ -1079,6 +1102,10 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "selected-block-editor",
         "block-moves",
         "arrangement-tools",
+        "mixer-channel-strips",
+        "mixer-processing-drum_rack",
+        "mix-moves",
+        "mix-review-tools",
         "export-stems",
         "export-midi",
         "export-handoff-sheet",
@@ -1118,6 +1145,9 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "Sound Design",
         "Block Moves",
         "Arrangement Tools",
+        "Tone & Space",
+        "Mix Moves",
+        "Audition & Compare",
         "Drums",
         "808",
         "Synth",
@@ -1156,6 +1186,14 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const blockMovesToggle = document.querySelector('[data-testid="block-moves-toggle"]');
       const arrangementTools = document.querySelector('[data-testid="arrangement-tools"]');
       const arrangementToolsToggle = document.querySelector('[data-testid="arrangement-tools-toggle"]');
+      const mixerStrips = document.querySelector('[data-testid="mixer-channel-strips"]');
+      const mixerVolume = document.querySelector('[data-testid="mixer-volume-drum_rack"]');
+      const mixerProcessing = document.querySelector('[data-testid="mixer-processing-drum_rack"]');
+      const mixerProcessingToggle = document.querySelector('[data-testid="mixer-processing-toggle-drum_rack"]');
+      const mixMoves = document.querySelector('[data-testid="mix-moves"]');
+      const mixMovesToggle = document.querySelector('[data-testid="mix-moves-toggle"]');
+      const mixReview = document.querySelector('[data-testid="mix-review-tools"]');
+      const mixReviewToggle = document.querySelector('[data-testid="mix-review-toggle"]');
       const follows = (before, after) =>
         Boolean(before && after && (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING));
       const emptyRoute = {
@@ -1250,6 +1288,16 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           harmonyMovesOpen: Boolean(harmonyMoves?.open),
           harmonyMovesToggleVisible: Boolean(harmonyMovesToggle && harmonyMovesToggle.getBoundingClientRect().height > 0),
           instrumentDirectChordsPresent: Boolean(instrumentDirectChords),
+          mixerBasicBalanceBeforeProcessing: follows(mixerVolume, mixerProcessing),
+          mixerProcessingOpen: Boolean(mixerProcessing?.open),
+          mixerProcessingToggleVisible: Boolean(mixerProcessingToggle && mixerProcessingToggle.getBoundingClientRect().height > 0),
+          mixerStripsBeforeMixMoves: follows(mixerStrips, mixMoves),
+          mixerStripsPresent: Boolean(mixerStrips),
+          mixMovesBeforeReview: follows(mixMoves, mixReview),
+          mixMovesOpen: Boolean(mixMoves?.open),
+          mixMovesToggleVisible: Boolean(mixMovesToggle && mixMovesToggle.getBoundingClientRect().height > 0),
+          mixReviewOpen: Boolean(mixReview?.open),
+          mixReviewToggleVisible: Boolean(mixReviewToggle && mixReviewToggle.getBoundingClientRect().height > 0),
           patternLabOpen: Boolean(patternLab?.open),
           patternLabToggleVisible: Boolean(patternLabToggle && patternLabToggle.getBoundingClientRect().height > 0),
           noteLanesAfterCaptureIdeas: follows(captureIdeas, noteLanes),
@@ -1287,6 +1335,17 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
             resetSoundOpen: true,
             studioHarmonyOpen: false,
             studioSoundOpen: false
+          },
+          mixerTools: {
+            guidedMixMovesOpen: true,
+            guidedMixReviewOpen: true,
+            guidedProcessingOpen: true,
+            resetMixMovesOpen: true,
+            resetMixReviewOpen: true,
+            resetProcessingOpen: true,
+            studioMixMovesOpen: false,
+            studioMixReviewOpen: false,
+            studioProcessingOpen: false
           },
           completionBeginner: emptyRoute,
           completionProducer: emptyRoute,
