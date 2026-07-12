@@ -289,11 +289,14 @@ function checkResult(result) {
     evidence?.layout?.arrangementPlaybackPresent === true &&
       evidence?.layout?.arrangementTimelinePresent === true &&
       evidence?.layout?.selectedBlockEditorPresent === true &&
+      evidence?.layout?.arrangementPatternControlsVisible === true &&
+      evidence?.layout?.arrangementTrackStateControlsVisible === true &&
+      evidence?.layout?.arrangementShapeControlsVisible === true &&
       evidence?.layout?.arrangementPlaybackBeforeTimeline === true &&
       evidence?.layout?.arrangementTimelineBeforeEditor === true &&
       evidence?.layout?.arrangementEssentialBeforeBlockMoves === true &&
       evidence?.layout?.blockMovesBeforeArrangementTools === true,
-    "live desktop Arrangement panel should put playback, timeline, and essential block editing before optional tools"
+    "live desktop Arrangement panel should put playback, timeline, labeled Pattern/Track state/Block shape editing, and essential controls before optional tools"
   );
   check(
     evidence?.layout?.blockMovesOpen === false &&
@@ -1055,7 +1058,7 @@ child.on("exit", (code, signal) => {
     `- Instrument-first layout: chord events before harmony ${result.evidence.layout.chordEventsBeforeHarmonyMoves ? "yes" : "no"}, selected editor ${result.evidence.layout.chordExpandedCardCount}/${result.evidence.layout.chordCardCount} open, compact peers ${result.evidence.layout.chordCompactCardCount}, Guided tools ${result.evidence.layout.harmonyMovesOpen || result.evidence.layout.soundDesignOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.instrumentTools.studioHarmonyOpen && result.evidence.palette.instrumentTools.studioSoundOpen ? "yes" : "no"}`
   );
   console.log(
-    `- Arrangement-first layout: timeline before editor ${result.evidence.layout.arrangementTimelineBeforeEditor ? "yes" : "no"}, essential edits before moves ${result.evidence.layout.arrangementEssentialBeforeBlockMoves ? "yes" : "no"}, Guided tools ${result.evidence.layout.blockMovesOpen || result.evidence.layout.arrangementToolsOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.arrangementTools.studioBlockMovesOpen && result.evidence.palette.arrangementTools.studioArrangementOpen ? "yes" : "no"}`
+    `- Arrangement-first layout: timeline before editor ${result.evidence.layout.arrangementTimelineBeforeEditor ? "yes" : "no"}, labeled block groups ${result.evidence.layout.arrangementPatternControlsVisible && result.evidence.layout.arrangementTrackStateControlsVisible && result.evidence.layout.arrangementShapeControlsVisible ? "yes" : "no"}, essential edits before moves ${result.evidence.layout.arrangementEssentialBeforeBlockMoves ? "yes" : "no"}, Guided tools ${result.evidence.layout.blockMovesOpen || result.evidence.layout.arrangementToolsOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.arrangementTools.studioBlockMovesOpen && result.evidence.palette.arrangementTools.studioArrangementOpen ? "yes" : "no"}`
   );
   console.log(
     `- Mixer-first layout: strips before moves ${result.evidence.layout.mixerStripsBeforeMixMoves ? "yes" : "no"}, basic balance before processing ${result.evidence.layout.mixerBasicBalanceBeforeProcessing ? "yes" : "no"}, Guided tools ${result.evidence.layout.mixerProcessingOpen || result.evidence.layout.mixMovesOpen || result.evidence.layout.mixReviewOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.mixerTools.studioProcessingOpen && result.evidence.palette.mixerTools.studioMixMovesOpen && result.evidence.palette.mixerTools.studioMixReviewOpen ? "yes" : "no"}`

@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
 
 const failures = [];
+const styles = readFileSync(new URL("../../src/styles.css", import.meta.url), "utf8");
 
 function check(condition, message) {
   if (!condition) {
@@ -166,6 +168,9 @@ function validateFirstRunRenderer(html) {
   const arrangementPlaybackIndex = html.indexOf('data-testid="arrangement-playback-readout"');
   const arrangementTimelineIndex = html.indexOf('data-testid="arrangement-timeline"');
   const selectedBlockEditorIndex = html.indexOf('data-testid="selected-block-editor"');
+  const arrangementPatternControlsIndex = html.indexOf('data-testid="arrangement-pattern-controls"');
+  const arrangementTrackStateControlsIndex = html.indexOf('data-testid="arrangement-track-state-controls"');
+  const arrangementShapeControlsIndex = html.indexOf('data-testid="arrangement-shape-controls"');
   const arrangementBarsIndex = html.indexOf('data-testid="arrangement-bars-input"');
   const blockMovesIndex = html.indexOf('data-testid="block-moves"');
   const arrangementToolsIndex = html.indexOf('data-testid="arrangement-tools"');
@@ -178,6 +183,31 @@ function validateFirstRunRenderer(html) {
       blockMovesIndex > arrangementBarsIndex &&
       arrangementToolsIndex > blockMovesIndex,
     "Arrangement hierarchy should keep playback, timeline, essential block editing, Block Moves, and Arrangement Tools in order"
+  );
+  check(
+    arrangementPatternControlsIndex > selectedBlockEditorIndex &&
+      arrangementTrackStateControlsIndex > arrangementPatternControlsIndex &&
+      arrangementShapeControlsIndex > arrangementTrackStateControlsIndex &&
+      arrangementBarsIndex > arrangementShapeControlsIndex &&
+      html.includes("Pattern") &&
+      html.includes("Track state") &&
+      html.includes("All playing") &&
+      html.includes("Block shape") &&
+      html.includes("Split ready"),
+    "Selected arrangement editor should visibly group Pattern, Track state, and Block shape controls in editing order"
+  );
+  const mobileStylesStart = styles.indexOf("@media (max-width: 620px)");
+  const mobileStylesEnd = styles.indexOf("@media", mobileStylesStart + 1);
+  const mobileStyles = styles.slice(mobileStylesStart, mobileStylesEnd);
+  check(
+    mobileStylesStart >= 0 &&
+      mobileStyles.includes(".arrangement-editor,") &&
+      mobileStyles.includes(".arrangement-shape-controls,") &&
+      mobileStyles.includes(".arrangement-block-role-readout") &&
+      mobileStyles.includes("grid-template-columns: 1fr;") &&
+      mobileStyles.includes(".arrangement-actions") &&
+      mobileStyles.includes("grid-template-columns: repeat(2, minmax(0, 1fr));"),
+    "Selected arrangement editor should use one-column fields and two-column structure actions at 620px and below"
   );
   check(
     !html.includes('<details class="block-moves" data-testid="block-moves" open="">') &&
@@ -365,6 +395,13 @@ function validateFirstRunRenderer(html) {
       'data-testid="arrangement-playback-readout"',
       'data-testid="arrangement-timeline"',
       'data-testid="selected-block-editor"',
+      'data-testid="arrangement-pattern-controls"',
+      'data-testid="arrangement-track-state-controls"',
+      'data-testid="arrangement-shape-controls"',
+      "Track state",
+      "All playing",
+      "Block shape",
+      "Split ready",
       'data-testid="block-moves"',
       'data-testid="block-moves-toggle"',
       'data-testid="block-moves-content"',

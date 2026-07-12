@@ -59,6 +59,9 @@ type LaunchSmokeLayoutEvidence = {
   arrangementEssentialBeforeBlockMoves: boolean;
   arrangementPlaybackBeforeTimeline: boolean;
   arrangementPlaybackPresent: boolean;
+  arrangementPatternControlsVisible: boolean;
+  arrangementShapeControlsVisible: boolean;
+  arrangementTrackStateControlsVisible: boolean;
   arrangementTimelineBeforeEditor: boolean;
   arrangementTimelinePresent: boolean;
   arrangementToolsOpen: boolean;
@@ -1314,6 +1317,9 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const arrangementPlayback = document.querySelector('[data-testid="arrangement-playback-readout"]');
       const arrangementTimeline = document.querySelector('[data-testid="arrangement-timeline"]');
       const selectedBlockEditor = document.querySelector('[data-testid="selected-block-editor"]');
+      const arrangementPatternControls = document.querySelector('[data-testid="arrangement-pattern-controls"]');
+      const arrangementTrackStateControls = document.querySelector('[data-testid="arrangement-track-state-controls"]');
+      const arrangementShapeControls = document.querySelector('[data-testid="arrangement-shape-controls"]');
       const arrangementBars = document.querySelector('[data-testid="arrangement-bars-input"]');
       const blockMoves = document.querySelector('[data-testid="block-moves"]');
       const blockMovesToggle = document.querySelector('[data-testid="block-moves-toggle"]');
@@ -1447,6 +1453,15 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           arrangementEssentialBeforeBlockMoves: follows(arrangementBars, blockMoves),
           arrangementPlaybackBeforeTimeline: follows(arrangementPlayback, arrangementTimeline),
           arrangementPlaybackPresent: Boolean(arrangementPlayback),
+          arrangementPatternControlsVisible: Boolean(
+            arrangementPatternControls && arrangementPatternControls.getBoundingClientRect().height > 0
+          ),
+          arrangementShapeControlsVisible: Boolean(
+            arrangementShapeControls && arrangementShapeControls.getBoundingClientRect().height > 0
+          ),
+          arrangementTrackStateControlsVisible: Boolean(
+            arrangementTrackStateControls && arrangementTrackStateControls.getBoundingClientRect().height > 0
+          ),
           arrangementTimelineBeforeEditor: follows(arrangementTimeline, selectedBlockEditor),
           arrangementTimelinePresent: Boolean(arrangementTimeline),
           arrangementToolsOpen: Boolean(arrangementTools?.open),

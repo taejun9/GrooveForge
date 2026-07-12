@@ -12005,37 +12005,55 @@ export function App(): ReactElement {
                   ))}
                 </select>
               </label>
-              <div className="block-pattern-row" aria-label="Block pattern">
-                {patternSlots.map((pattern) => (
-                  <button
-                    key={pattern}
-                    className={selectedArrangementBlock.pattern === pattern ? "selected" : ""}
-                    data-testid={`arrangement-pattern-${pattern}`}
-                    type="button"
-                    onClick={() => updateArrangementBlock(selectedArrangementIndex, { pattern })}
-                  >
-                    <span>{pattern}</span>
-                    <small>{patternEventCount(project.patterns[pattern])}</small>
-                  </button>
-                ))}
-              </div>
-              <div className="arrangement-mute-row" aria-label="Block track mutes">
-                {arrangementMuteTrackIds.map((track) => {
-                  const muted = selectedArrangementBlock.mutedTracks.includes(track);
-                  return (
+              <div className="arrangement-control-group" data-testid="arrangement-pattern-controls">
+                <div className="arrangement-control-group-heading">
+                  <span>Pattern</span>
+                  <small>
+                    {selectedArrangementBlock.pattern} · {patternEventCount(project.patterns[selectedArrangementBlock.pattern])} events
+                  </small>
+                </div>
+                <div className="block-pattern-row" aria-label="Block pattern">
+                  {patternSlots.map((pattern) => (
                     <button
-                      aria-pressed={muted}
-                      className={muted ? "selected" : ""}
-                      data-testid={`arrangement-track-mute-${track}`}
-                      key={track}
-                      onClick={() => toggleArrangementTrackMute(track)}
-                      title={`${muted ? "Unmute" : "Mute"} ${arrangementMuteTrackLabel(track)} in this block`}
+                      key={pattern}
+                      className={selectedArrangementBlock.pattern === pattern ? "selected" : ""}
+                      data-testid={`arrangement-pattern-${pattern}`}
                       type="button"
+                      onClick={() => updateArrangementBlock(selectedArrangementIndex, { pattern })}
                     >
-                      {arrangementMuteTrackLabel(track)}
+                      <span>{pattern}</span>
+                      <small>{patternEventCount(project.patterns[pattern])}</small>
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
+              </div>
+              <div className="arrangement-control-group" data-testid="arrangement-track-state-controls">
+                <div className="arrangement-control-group-heading">
+                  <span>Track state</span>
+                  <small>
+                    {selectedArrangementBlock.mutedTracks.length === 0
+                      ? "All playing"
+                      : `${selectedArrangementBlock.mutedTracks.length} muted`}
+                  </small>
+                </div>
+                <div className="arrangement-mute-row" aria-label="Block track mutes">
+                  {arrangementMuteTrackIds.map((track) => {
+                    const muted = selectedArrangementBlock.mutedTracks.includes(track);
+                    return (
+                      <button
+                        aria-pressed={muted}
+                        className={muted ? "selected" : ""}
+                        data-testid={`arrangement-track-mute-${track}`}
+                        key={track}
+                        onClick={() => toggleArrangementTrackMute(track)}
+                        title={`${muted ? "Unmute" : "Mute"} ${arrangementMuteTrackLabel(track)} in this block`}
+                        type="button"
+                      >
+                        {arrangementMuteTrackLabel(track)}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <div className="arrangement-clipboard-row" aria-label="Arrangement block clipboard">
                 <button
@@ -12063,65 +12081,73 @@ export function App(): ReactElement {
                     : "Clipboard empty"}
                 </small>
               </div>
-              <label>
-                <span>Bars</span>
-                <input
-                  aria-label="Arrangement block bars"
-                  data-testid="arrangement-bars-input"
-                  type="number"
-                  min={minArrangementBars}
-                  max={maxArrangementBars}
-                  step={1}
-                  value={selectedArrangementBlock.bars}
-                  onChange={(event) =>
-                    updateArrangementBlock(selectedArrangementIndex, { bars: Number(event.target.value) })
-                  }
-                />
-              </label>
-              <label>
-                <span>Split after</span>
-                <input
-                  aria-label="Split arrangement block after bars"
-                  data-testid="arrangement-split-after"
-                  disabled={!canSplitArrangementBlock}
-                  type="number"
-                  min={1}
-                  max={Math.max(1, selectedArrangementBars - 1)}
-                  step={1}
-                  value={clampSplitAfterBars(splitAfterBars, selectedArrangementBars)}
-                  onChange={(event) => setSplitAfterBars(clampSplitAfterBars(Number(event.target.value), selectedArrangementBars))}
-                />
-              </label>
-              <label>
-                <span title={`${arrangementEnergyGain(selectedArrangementBlock.energy).toFixed(2)}x gain`}>
-                  Energy {Math.round(selectedArrangementBlock.energy * 100)}%
-                </span>
-                <div className="energy-inputs">
-                  <input
-                    data-testid="arrangement-energy-slider"
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={selectedArrangementBlock.energy}
-                    onChange={(event) =>
-                      updateArrangementBlock(selectedArrangementIndex, { energy: Number(event.target.value) })
-                    }
-                  />
-                  <input
-                    aria-label="Arrangement energy percent"
-                    data-testid="arrangement-energy-input"
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={1}
-                    value={Math.round(selectedArrangementBlock.energy * 100)}
-                    onChange={(event) =>
-                      updateArrangementBlock(selectedArrangementIndex, { energy: Number(event.target.value) / 100 })
-                    }
-                  />
+              <div className="arrangement-control-group arrangement-shape-controls" data-testid="arrangement-shape-controls">
+                <div className="arrangement-control-group-heading">
+                  <span>Block shape</span>
+                  <small>
+                    {barCountLabel(selectedArrangementBlock.bars)} · {Math.round(selectedArrangementBlock.energy * 100)}% energy · {canSplitArrangementBlock ? "Split ready" : "1 bar cannot split"}
+                  </small>
                 </div>
-              </label>
+                <label>
+                  <span>Bars</span>
+                  <input
+                    aria-label="Arrangement block bars"
+                    data-testid="arrangement-bars-input"
+                    type="number"
+                    min={minArrangementBars}
+                    max={maxArrangementBars}
+                    step={1}
+                    value={selectedArrangementBlock.bars}
+                    onChange={(event) =>
+                      updateArrangementBlock(selectedArrangementIndex, { bars: Number(event.target.value) })
+                    }
+                  />
+                </label>
+                <label>
+                  <span>Split after</span>
+                  <input
+                    aria-label="Split arrangement block after bars"
+                    data-testid="arrangement-split-after"
+                    disabled={!canSplitArrangementBlock}
+                    type="number"
+                    min={1}
+                    max={Math.max(1, selectedArrangementBars - 1)}
+                    step={1}
+                    value={clampSplitAfterBars(splitAfterBars, selectedArrangementBars)}
+                    onChange={(event) => setSplitAfterBars(clampSplitAfterBars(Number(event.target.value), selectedArrangementBars))}
+                  />
+                </label>
+                <label>
+                  <span title={`${arrangementEnergyGain(selectedArrangementBlock.energy).toFixed(2)}x gain`}>
+                    Energy {Math.round(selectedArrangementBlock.energy * 100)}%
+                  </span>
+                  <div className="energy-inputs">
+                    <input
+                      data-testid="arrangement-energy-slider"
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={selectedArrangementBlock.energy}
+                      onChange={(event) =>
+                        updateArrangementBlock(selectedArrangementIndex, { energy: Number(event.target.value) })
+                      }
+                    />
+                    <input
+                      aria-label="Arrangement energy percent"
+                      data-testid="arrangement-energy-input"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={Math.round(selectedArrangementBlock.energy * 100)}
+                      onChange={(event) =>
+                        updateArrangementBlock(selectedArrangementIndex, { energy: Number(event.target.value) / 100 })
+                      }
+                    />
+                  </div>
+                </label>
+              </div>
               <div className="arrangement-actions" aria-label="Arrangement structure actions">
                 <button
                   data-testid="arrangement-move-left"
