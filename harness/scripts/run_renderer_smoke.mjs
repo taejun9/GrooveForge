@@ -76,6 +76,15 @@ function validateFirstRunRenderer(html) {
     !html.includes('<details class="guidance-center" data-testid="guidance-center" open="">'),
     "Guide & Review Center should be collapsed by default so the core workspace remains close to first-run controls"
   );
+  check(
+    html.includes('<details class="first-run-launchpad" data-testid="first-run-launchpad" open="">') &&
+      html.includes('data-testid="first-run-launchpad-toggle"') &&
+      html.includes('data-testid="first-run-launchpad-content"') &&
+      html.includes('data-testid="first-run-start-beat"') &&
+      html.includes('data-testid="first-run-producer-pass"') &&
+      html.includes('data-testid="first-run-open-project"'),
+    "first-run launchpad should start open with beginner, producer, and existing-project choices plus a persistent toggle"
+  );
   const transportBandIndex = html.indexOf('data-testid="workflow-target-transport"');
   const transportStatusControlsIndex = html.indexOf('data-testid="transport-status-controls"');
   const transportEssentialsIndex = html.indexOf('data-testid="transport-essential-controls"');
@@ -384,6 +393,17 @@ function validateFirstRunRenderer(html) {
       "Tempo, edit history, and input posture",
       "Exports",
       "WAV, stems, MIDI, sheet, and bundle"
+    ],
+    "launchpad lifecycle": [
+      'data-testid="first-run-launchpad"',
+      'data-testid="first-run-launchpad-toggle"',
+      'data-testid="first-run-launchpad-content"',
+      'data-testid="first-run-start-beat"',
+      'data-testid="first-run-producer-pass"',
+      'data-testid="first-run-open-project"',
+      "Start or switch project",
+      "Choose a ready-to-edit local project",
+      "Choices open"
     ],
     "master output first": [
       'data-testid="master-output-role-readout"',

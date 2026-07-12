@@ -12,7 +12,7 @@ const isLaunchSmoke = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1";
 const isProjectIoSmoke = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE === "1";
 const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
-const launchSmokeTimeoutMs = 240000;
+const launchSmokeTimeoutMs = 360000;
 const projectIoSmokeTimeoutMs = launchSmokeTimeoutMs;
 
 type NativeMenuCommand =
@@ -86,6 +86,10 @@ type LaunchSmokeLayoutEvidence = {
   harmonyMovesOpen: boolean;
   harmonyMovesToggleVisible: boolean;
   instrumentDirectChordsPresent: boolean;
+  launchpadActionCount: number;
+  launchpadContentVisible: boolean;
+  launchpadOpen: boolean;
+  launchpadToggleVisible: boolean;
   mixerBasicBalanceBeforeProcessing: boolean;
   mixerProcessingOpen: boolean;
   mixerProcessingToggleVisible: boolean;
@@ -217,6 +221,7 @@ type LaunchSmokePaletteEvidence = {
   instrumentTools: LaunchSmokeInstrumentToolsEvidence;
   mixerTools: LaunchSmokeMixerToolsEvidence;
   masterTools: LaunchSmokeMasterToolsEvidence;
+  launchpad: LaunchSmokeLaunchpadEvidence;
   transportTools: LaunchSmokeTransportToolsEvidence;
   deliveryTools: LaunchSmokeDeliveryToolsEvidence;
   opened: boolean;
@@ -297,6 +302,14 @@ type LaunchSmokeTransportToolsEvidence = {
   studioSessionOpen: boolean;
 };
 
+type LaunchSmokeLaunchpadEvidence = {
+  collapsedAfterStarter: boolean;
+  initialOpen: boolean;
+  manualClose: boolean;
+  manualReopen: boolean;
+  sameStarterCollapse: boolean;
+};
+
 type LaunchSmokeVisualEvidence = {
   bitmapBytes: number;
   brightSamples: number;
@@ -318,6 +331,7 @@ type ProjectIoSmokeEvidence = {
   hasPreloadBridge: boolean;
   hasSaveProject: boolean;
   location: string;
+  launchpadCollapsedAfterUiOpen: boolean;
   openResult: {
     canceled: boolean;
     contentsLength?: number;
@@ -325,6 +339,7 @@ type ProjectIoSmokeEvidence = {
     filePath?: string;
   };
   readyState: string;
+  projectOpenButtonPresent: boolean;
   samplingTextPresent: boolean;
   saveResult: {
     canceled: boolean;
@@ -1114,6 +1129,12 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "workflow-target-mix",
         "workflow-target-master",
         "guide-quick-start",
+        "first-run-launchpad",
+        "first-run-launchpad-toggle",
+        "first-run-launchpad-content",
+        "first-run-start-beat",
+        "first-run-producer-pass",
+        "first-run-open-project",
         "guide-quick-start-headline",
         "audience-session-readout",
         "audience-session-action-beginner",
@@ -1307,6 +1328,9 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const workflowNavigator = document.querySelector('[data-testid="workflow-navigator"]');
       const workspaceGrid = document.querySelector('.workspace-grid');
       const workflowNavigatorStyle = workflowNavigator ? getComputedStyle(workflowNavigator) : null;
+      const launchpad = document.querySelector('[data-testid="first-run-launchpad"]');
+      const launchpadToggle = document.querySelector('[data-testid="first-run-launchpad-toggle"]');
+      const launchpadContent = document.querySelector('[data-testid="first-run-launchpad-content"]');
       const transportStatusControls = document.querySelector('[data-testid="transport-status-controls"]');
       const transportEssentialControls = document.querySelector('[data-testid="transport-essential-controls"]');
       const transportPlay = document.querySelector('[data-testid="transport-play"]');
@@ -1439,6 +1463,12 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           harmonyMovesOpen: Boolean(harmonyMoves?.open),
           harmonyMovesToggleVisible: Boolean(harmonyMovesToggle && harmonyMovesToggle.getBoundingClientRect().height > 0),
           instrumentDirectChordsPresent: Boolean(instrumentDirectChords),
+          launchpadActionCount: document.querySelectorAll(
+            '[data-testid="first-run-start-beat"], [data-testid="first-run-producer-pass"], [data-testid="first-run-open-project"]'
+          ).length,
+          launchpadContentVisible: Boolean(launchpadContent && launchpadContent.getBoundingClientRect().height > 0),
+          launchpadOpen: Boolean(launchpad?.open),
+          launchpadToggleVisible: Boolean(launchpadToggle && launchpadToggle.getBoundingClientRect().height > 0),
           mixerBasicBalanceBeforeProcessing: follows(mixerVolume, mixerProcessing),
           mixerProcessingOpen: Boolean(mixerProcessing?.open),
           mixerProcessingToggleVisible: Boolean(mixerProcessingToggle && mixerProcessingToggle.getBoundingClientRect().height > 0),
@@ -1569,6 +1599,13 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
             resetSessionOpen: true,
             studioExportsOpen: false,
             studioSessionOpen: false
+          },
+          launchpad: {
+            collapsedAfterStarter: false,
+            initialOpen: false,
+            manualClose: false,
+            manualReopen: false,
+            sameStarterCollapse: false
           },
           completionBeginner: emptyRoute,
           completionProducer: emptyRoute,
@@ -1981,6 +2018,9 @@ async function collectProjectIoSmokeEvidence(win: BrowserWindow): Promise<Projec
       const bodyText = document.body?.textContent ?? "";
       const saveResult = await bridge?.saveProject?.(sourceContents, defaultName);
       const openResult = await bridge?.openProject?.();
+      const projectOpenButton = document.querySelector('[data-testid="project-open"]');
+      projectOpenButton?.click();
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       return {
         appKind: bridge?.appKind ?? null,
         defaultName,
@@ -1988,6 +2028,8 @@ async function collectProjectIoSmokeEvidence(win: BrowserWindow): Promise<Projec
         hasPreloadBridge: Boolean(bridge),
         hasSaveProject: typeof bridge?.saveProject === "function",
         location: window.location.href,
+        launchpadCollapsedAfterUiOpen:
+          document.querySelector('[data-testid="first-run-launchpad"]')?.open === false,
         openResult: {
           canceled: openResult?.canceled === true,
           contentsLength: typeof openResult?.contents === "string" ? openResult.contents.length : undefined,
@@ -1995,6 +2037,7 @@ async function collectProjectIoSmokeEvidence(win: BrowserWindow): Promise<Projec
           filePath: openResult?.filePath
         },
         readyState: document.readyState,
+        projectOpenButtonPresent: projectOpenButton !== null,
         samplingTextPresent: /AudioClipEvent|sample import|sample browser|chop pads|sampler track|audio clip/i.test(bodyText),
         saveResult: {
           canceled: saveResult?.canceled === true,
@@ -2025,6 +2068,9 @@ function projectIoSmokeFailures(evidence: ProjectIoSmokeEvidence): string[] {
   }
   if (!evidence.hasPreloadBridge || !evidence.hasSaveProject || !evidence.hasOpenProject) {
     failures.push("preload bridge should expose appKind, saveProject, and openProject");
+  }
+  if (!evidence.projectOpenButtonPresent || !evidence.launchpadCollapsedAfterUiOpen) {
+    failures.push("project Open UI should load the configured project and collapse the first-run launchpad");
   }
   if (evidence.saveResult.canceled) {
     failures.push("native saveProject should not be canceled in project IO smoke");

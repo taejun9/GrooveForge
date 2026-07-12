@@ -196,6 +196,7 @@ type GrooveforgeLaunchSmokePaletteEvidence = {
   instrumentTools: GrooveforgeLaunchSmokeInstrumentToolsEvidence;
   mixerTools: GrooveforgeLaunchSmokeMixerToolsEvidence;
   masterTools: GrooveforgeLaunchSmokeMasterToolsEvidence;
+  launchpad: GrooveforgeLaunchSmokeLaunchpadEvidence;
   transportTools: GrooveforgeLaunchSmokeTransportToolsEvidence;
   nextStepRail: GrooveforgeLaunchSmokeAudienceNextStepRailEvidence;
   opened: boolean;
@@ -293,6 +294,14 @@ type GrooveforgeLaunchSmokeTransportToolsEvidence = {
   resetSessionOpen: boolean;
   studioExportsOpen: boolean;
   studioSessionOpen: boolean;
+};
+
+type GrooveforgeLaunchSmokeLaunchpadEvidence = {
+  collapsedAfterStarter: boolean;
+  initialOpen: boolean;
+  manualClose: boolean;
+  manualReopen: boolean;
+  sameStarterCollapse: boolean;
 };
 
 interface Window {

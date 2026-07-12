@@ -188,14 +188,82 @@ button {
 
 .first-run-launchpad {
   display: grid;
-  gap: 8px;
-  max-width: 320px;
-  padding: 12px;
+  max-width: 340px;
   border: 1px solid rgba(120, 240, 200, 0.24);
   border-radius: 8px;
   background:
     radial-gradient(circle at top right, rgba(120, 240, 200, 0.12), transparent 54%),
     rgba(17, 22, 20, 0.88);
+  overflow: hidden;
+}
+
+.first-run-launchpad-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+  padding: 7px 9px;
+}
+
+.first-run-launchpad-summary::-webkit-details-marker {
+  display: none;
+}
+
+.first-run-launchpad-summary-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  color: #78f0c8;
+  background: rgba(120, 240, 200, 0.11);
+}
+
+.first-run-launchpad-summary-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.first-run-launchpad-summary-copy strong,
+.first-run-launchpad-summary-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.first-run-launchpad-summary-copy strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.first-run-launchpad-summary-copy small,
+.first-run-launchpad-summary-context {
+  color: rgba(244, 239, 231, 0.56);
+  font-size: 9px;
+}
+
+.first-run-launchpad-summary-context {
+  white-space: nowrap;
+}
+
+.first-run-launchpad-chevron {
+  color: rgba(244, 239, 231, 0.5);
+  transition: transform 140ms ease;
+}
+
+.first-run-launchpad[open] .first-run-launchpad-chevron {
+  transform: rotate(180deg);
+}
+
+.first-run-launchpad-content {
+  display: grid;
+  gap: 8px;
+  border-block-start: 1px solid rgba(120, 240, 200, 0.12);
+  padding: 10px;
 }
 
 .first-run-launchpad-heading {
@@ -209,12 +277,12 @@ button {
   text-transform: uppercase;
 }
 
-.first-run-launchpad > strong {
+.first-run-launchpad-content > strong {
   font-size: 17px;
   line-height: 1.1;
 }
 
-.first-run-launchpad > small {
+.first-run-launchpad-content > small {
   color: rgba(244, 239, 231, 0.62);
   font-size: 11px;
   line-height: 1.4;
@@ -30523,6 +30591,14 @@ input[type="range"] {
   .brand-start,
   .first-run-launchpad {
     max-width: none;
+  }
+
+  .first-run-launchpad-summary {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .first-run-launchpad-summary-context {
+    display: none;
   }
 
   .field.title-field,

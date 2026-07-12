@@ -10,7 +10,7 @@ import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gu
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(import.meta.url);
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
-const timeoutMs = 300000;
+const timeoutMs = 420000;
 const failures = [];
 const expectedLiveTestIds = [
   "workflow-target-transport",
@@ -20,6 +20,12 @@ const expectedLiveTestIds = [
   "workflow-target-mix",
   "workflow-target-master",
   "guide-quick-start",
+  "first-run-launchpad",
+  "first-run-launchpad-toggle",
+  "first-run-launchpad-content",
+  "first-run-start-beat",
+  "first-run-producer-pass",
+  "first-run-open-project",
   "guide-quick-start-headline",
   "audience-session-readout",
   "audience-session-action-beginner",
@@ -171,6 +177,13 @@ function checkResult(result) {
   check(Array.isArray(evidence?.missingText) && evidence.missingText.length === 0, "live desktop renderer should contain all expected beginner/pro text");
   check(evidence?.samplingTextPresent === false, "live desktop first-run surface should not expose sampling-first language");
   check(evidence?.layout?.guidanceCenterOpen === false, "live desktop Guide & Review Center should start collapsed");
+  check(
+    evidence?.layout?.launchpadOpen === true &&
+      evidence?.layout?.launchpadToggleVisible === true &&
+      evidence?.layout?.launchpadContentVisible === true &&
+      evidence?.layout?.launchpadActionCount === 3,
+    "live desktop first-run launchpad should start open with a visible toggle and all three project-entry actions"
+  );
   check(evidence?.layout?.patternLabOpen === false, "live desktop Pattern Lab should start collapsed");
   check(
     evidence?.layout?.feedbackOutsideGuidance === true && evidence?.layout?.feedbackAfterGuidance === true,
@@ -212,6 +225,14 @@ function checkResult(result) {
       evidence?.palette?.transportTools?.resetSessionOpen === false &&
       evidence?.palette?.transportTools?.resetExportsOpen === false,
     "live desktop transport secondary tools should expand for Studio and reset compactly for Guided"
+  );
+  check(
+    evidence?.palette?.launchpad?.initialOpen === true &&
+      evidence?.palette?.launchpad?.collapsedAfterStarter === true &&
+      evidence?.palette?.launchpad?.manualReopen === true &&
+      evidence?.palette?.launchpad?.manualClose === true &&
+      evidence?.palette?.launchpad?.sameStarterCollapse === true,
+    "live desktop launchpad should collapse after changed or identical starter selection and remain manually reopenable and closable"
   );
   check(
     evidence?.layout?.patternLabToggleVisible === true &&
@@ -1013,6 +1034,9 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Transport essentials: Play direct ${result.evidence.layout.transportPlayDirectVisible ? "yes" : "no"}, Save direct ${result.evidence.layout.transportSaveDirectVisible ? "yes" : "no"}, Guided helpers ${result.evidence.layout.transportSessionOpen || result.evidence.layout.transportExportsOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.transportTools.studioSessionOpen && result.evidence.palette.transportTools.studioExportsOpen ? "yes" : "no"}`
+  );
+  console.log(
+    `- Launchpad lifecycle: initial ${result.evidence.layout.launchpadOpen ? "open" : "collapsed"}, starter collapse ${result.evidence.palette.launchpad.collapsedAfterStarter ? "yes" : "no"}, manual reopen/close ${result.evidence.palette.launchpad.manualReopen && result.evidence.palette.launchpad.manualClose ? "yes" : "no"}`
   );
   console.log(
     `- Note-editor-first layout: Capture & Ideas ${result.evidence.layout.captureIdeasOpen ? "open" : "collapsed"}, auto-reveal ${result.evidence.palette.captureIdeas.autoReveal ? "yes" : "no"}, note grids after capture ${result.evidence.layout.noteLanesAfterCaptureIdeas ? "yes" : "no"}`

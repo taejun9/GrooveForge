@@ -1151,6 +1151,7 @@ export function App(): ReactElement {
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [commandReferenceOpen, setCommandReferenceOpen] = useState(false);
   const [guidanceCenterOpen, setGuidanceCenterOpen] = useState(false);
+  const [launchpadOpen, setLaunchpadOpen] = useState(true);
   const [quickActionQuery, setQuickActionQuery] = useState("");
   const [quickActionSearchHintResult, setQuickActionSearchHintResult] = useState<QuickActionSearchHintResult | null>(null);
   const [quickActionSearchResult, setQuickActionSearchResult] = useState<QuickActionSearchResult | null>(null);
@@ -2808,6 +2809,7 @@ export function App(): ReactElement {
       `Restored local draft ${formatLocalDraftSavedAt(recovery.savedAt)}`
     );
     clearLocalDraftState();
+    setLaunchpadOpen(false);
 
     if (changed) {
       setSelectedArrangementIndex(0);
@@ -6792,6 +6794,7 @@ export function App(): ReactElement {
       controllerRef.current?.stop();
       controllerRef.current = null;
       replaceProject(nextProject, `Loaded ${sourceName}`, sourceName);
+      setLaunchpadOpen(false);
       setPlaybackPosition(null);
       setIsPlaying(false);
       setLocalDraftRecoveryResult(null);
@@ -7260,6 +7263,7 @@ export function App(): ReactElement {
     const beforeProject = projectRef.current;
     const resultAction = quickActions.find((action) => action.id === `audience-starter-${starterId}`) ?? null;
     const changed = updateProject(() => createAudienceStarterProject(starterId), `Built ${label} starter project`);
+    setLaunchpadOpen(false);
     if (changed) {
       setSelectedNote(null);
       setSelectedDrumStep(null);
@@ -10212,6 +10216,7 @@ export function App(): ReactElement {
     window.__grooveforgeLaunchSmoke = {
       ...(window.__grooveforgeLaunchSmoke ?? {}),
       collectAudienceSessionQuickActionEvidence: () => {
+        const initialLaunchpadOpen = document.querySelector<HTMLDetailsElement>('[data-testid="first-run-launchpad"]')?.open ?? false;
         flushSync(() => {
           setKeyboardCaptureEnabled(false);
           setCaptureIdeasOpen(false);
@@ -10367,6 +10372,31 @@ export function App(): ReactElement {
         const starterBeginner = runAudienceStarterRoute("beginner");
         markLaunchSmokePaletteStep("starter-producer");
         const starterProducer = runAudienceStarterRoute("producer");
+        const collapsedAfterStarter =
+          document.querySelector<HTMLDetailsElement>('[data-testid="first-run-launchpad"]')?.open === false;
+        flushSync(() => {
+          document.querySelector<HTMLElement>('[data-testid="first-run-launchpad-toggle"]')?.click();
+        });
+        const manualReopen = document.querySelector<HTMLDetailsElement>('[data-testid="first-run-launchpad"]')?.open === true;
+        flushSync(() => {
+          createAudienceStarter("producer");
+        });
+        const sameStarterCollapse =
+          document.querySelector<HTMLDetailsElement>('[data-testid="first-run-launchpad"]')?.open === false;
+        flushSync(() => {
+          document.querySelector<HTMLElement>('[data-testid="first-run-launchpad-toggle"]')?.click();
+        });
+        flushSync(() => {
+          document.querySelector<HTMLElement>('[data-testid="first-run-launchpad-toggle"]')?.click();
+        });
+        const manualClose = document.querySelector<HTMLDetailsElement>('[data-testid="first-run-launchpad"]')?.open === false;
+        const launchpad = {
+          collapsedAfterStarter,
+          initialOpen: initialLaunchpadOpen,
+          manualClose,
+          manualReopen,
+          sameStarterCollapse
+        };
         markLaunchSmokePaletteStep("returning");
         return {
           arrangementTools,
@@ -10388,6 +10418,7 @@ export function App(): ReactElement {
           instrumentTools,
           mixerTools,
           masterTools,
+          launchpad,
           transportTools,
           nextStepRail: readAudienceNextStepRailEvidence(),
           opened: true,
@@ -10492,7 +10523,28 @@ export function App(): ReactElement {
               <span>{window.grooveforge?.appKind ?? "desktop"} workstation</span>
             </div>
           </div>
-          <div className="first-run-launchpad" data-testid="first-run-launchpad">
+          <details className="first-run-launchpad" data-testid="first-run-launchpad" open={launchpadOpen}>
+            <summary
+              className="first-run-launchpad-summary"
+              data-testid="first-run-launchpad-toggle"
+              onClick={(event) => {
+                event.preventDefault();
+                setLaunchpadOpen((open) => !open);
+              }}
+            >
+              <span className="first-run-launchpad-summary-icon" aria-hidden="true">
+                <Sparkles size={15} />
+              </span>
+              <span className="first-run-launchpad-summary-copy">
+                <strong>Start or switch project</strong>
+                <small>{launchpadOpen ? "Choose a ready-to-edit local project" : `${project.title} active · reopen project choices`}</small>
+              </span>
+              <span className="first-run-launchpad-summary-context">
+                {project.mode === "studio" ? "Studio" : "Guided"} · {launchpadOpen ? "Choices open" : "Compact"}
+              </span>
+              <ArrowDown className="first-run-launchpad-chevron" size={14} aria-hidden="true" />
+            </summary>
+            <div className="first-run-launchpad-content" data-testid="first-run-launchpad-content">
             <div className="first-run-launchpad-heading">
               <Sparkles size={15} aria-hidden="true" />
               <span>Start here</span>
@@ -10532,7 +10584,8 @@ export function App(): ReactElement {
               <FolderOpen size={14} aria-hidden="true" />
               <span>Open an existing project</span>
             </button>
-          </div>
+            </div>
+          </details>
         </div>
 
         <div className="transport-controls">
