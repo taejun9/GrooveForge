@@ -38,6 +38,16 @@ function validateDemandMaterialization(palette) {
   const active = palette.materializeWhenActive(true, factory);
   check(factoryCalls === 1, "active Quick Actions materialization should call the full command factory exactly once");
   check(active.length === 1 && active[0]?.id === "complete-command-graph", "active Quick Actions should return the factory's complete command graph");
+
+  const cachedActive = palette.materializeWhenActive(true, factory, active);
+  check(factoryCalls === 1, "palette-local renders should reuse the active session graph without calling the factory again");
+  check(cachedActive === active, "palette-local renders should retain the same active command graph identity");
+
+  const closed = palette.materializeWhenActive(false, factory, active);
+  check(closed === inactiveFirst, "closing Quick Actions should return the stable inactive graph instead of a cached active graph");
+  const reopened = palette.materializeWhenActive(true, factory, null);
+  check(factoryCalls === 2, "reopening Quick Actions after cache invalidation should build a fresh command graph");
+  check(reopened !== active, "reopened Quick Actions should not reuse the previous session graph");
 }
 
 function installBrowserMocks() {
@@ -1990,7 +2000,7 @@ try {
     console.log("- Audience Session Acceptance palette: route readout plus both acceptance lanes are searchable and return focused acceptance metrics");
     console.log("- Audience Session Proof Handoff palette: route readout plus both proof handoff lanes are searchable and return focused proof metrics");
     console.log("- Audience Delivery Proof Bridge palette: route readout plus both proof lanes are searchable and return focused proof metrics");
-    console.log("- Quick Actions lifecycle: closed first render skips the full command factory; active materialization returns the complete command graph");
+    console.log("- Quick Actions lifecycle: closed renders skip the factory; one open session reuses its complete graph; reopen builds a fresh graph");
     console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack, Delivery Bundle ZIP");
   }
 } finally {

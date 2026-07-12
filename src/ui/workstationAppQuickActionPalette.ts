@@ -26,8 +26,8 @@ import { createBeatReadinessChecks } from "./workstationAppDerivations";
 const maxQuickActionPins = 5;
 const inactiveMaterializedItems: unknown[] = [];
 
-export function materializeWhenActive<T>(active: boolean, factory: () => T[]): T[] {
-  return active ? factory() : (inactiveMaterializedItems as T[]);
+export function materializeWhenActive<T>(active: boolean, factory: () => T[], snapshot: T[] | null = null): T[] {
+  return active ? snapshot ?? factory() : (inactiveMaterializedItems as T[]);
 }
 
 export type NextMoveQuickActionSource = "beat-map" | "structure-lens";

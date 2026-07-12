@@ -1152,6 +1152,7 @@ export function App(): ReactElement {
   const [splitAfterBars, setSplitAfterBars] = useState(1);
   const [snapshotNameDrafts, setSnapshotNameDrafts] = useState<Record<string, string>>({});
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const quickActionSessionRef = useRef<QuickAction[] | null>(null);
   const [commandReferenceOpen, setCommandReferenceOpen] = useState(false);
   const [guidanceCenterOpen, setGuidanceCenterOpen] = useState(false);
   const [launchpadOpen, setLaunchpadOpen] = useState(true);
@@ -8715,6 +8716,10 @@ export function App(): ReactElement {
   }
 
   function openQuickActions(): void {
+    if (quickActionsOpen) {
+      return;
+    }
+    quickActionSessionRef.current = buildQuickActions();
     setCommandReferenceOpen(false);
     setQuickActionQuery("");
     setQuickActionSearchHintResult(null);
@@ -8765,8 +8770,10 @@ export function App(): ReactElement {
   }
 
   function closeQuickActions(): void {
+    quickActionSessionRef.current = null;
     setQuickActionsOpen(false);
     setQuickActionQuery("");
+    setQuickActionScope("all");
     setQuickActionSearchHintResult(null);
     setQuickActionSearchResult(null);
     setQuickActionSearchRecoveryResult(null);
@@ -8774,8 +8781,10 @@ export function App(): ReactElement {
   }
 
   function openCommandReference(): void {
+    quickActionSessionRef.current = null;
     setQuickActionsOpen(false);
     setQuickActionQuery("");
+    setQuickActionScope("all");
     setCommandReferenceOpen(true);
   }
 
@@ -8786,8 +8795,10 @@ export function App(): ReactElement {
     const pattern = activePattern(currentProject);
     const exportAnalysis = analyzeExport(currentProject);
 
+    quickActionSessionRef.current = null;
     setQuickActionsOpen(false);
     setQuickActionQuery("");
+    setQuickActionScope("all");
     setCommandReferenceOpen(true);
     setProjectStatus(
       `Command Reference Route Readout Pattern ${currentProject.selectedPattern}: ${summary.filterCount} filters / ${
@@ -9278,8 +9289,8 @@ export function App(): ReactElement {
     );
   }
 
-  const quickActionsMaterialized = quickActionsOpen || window.grooveforge?.launchSmoke === true;
-  const quickActions = materializeWhenActive(quickActionsMaterialized, () => createQuickActions({
+  function buildQuickActions(): QuickAction[] {
+    return createQuickActions({
     arrangementArcPadOptions,
     arrangementArcPreviewSummary,
     arrangementMuteMapSummary,
@@ -9679,7 +9690,16 @@ export function App(): ReactElement {
     onSelectTransportLoopScope: selectTransportLoopScope,
     onTogglePlayback: togglePlayback,
     onUndo: undoProject
-  }));
+    });
+  }
+
+  const quickActionsAuditActive = window.grooveforge?.launchSmoke === true;
+  const quickActionsMaterialized = quickActionsOpen || quickActionsAuditActive;
+  const quickActions = materializeWhenActive(
+    quickActionsMaterialized,
+    buildQuickActions,
+    quickActionsOpen && !quickActionsAuditActive ? quickActionSessionRef.current : null
+  );
   useEffect(() => {
     if (!quickActionsMaterialized) {
       return;
