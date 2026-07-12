@@ -247,6 +247,10 @@ function validateFirstRunRenderer(html) {
   const masterPresetIndex = html.indexOf('data-testid="master-preset-Clean Demo"');
   const masterPolishIndex = html.indexOf('data-testid="master-polish-tools"');
   const masterReviewIndex = html.indexOf('data-testid="master-review-tools"');
+  const finishChecklistIndex = html.indexOf('data-testid="finish-checklist"');
+  const masterReviewQueueToolsIndex = html.indexOf('data-testid="master-review-queue-tools"');
+  const exportMeterIndex = html.indexOf('data-testid="export-meter"');
+  const masterMixCoachToolsIndex = html.indexOf('data-testid="master-mix-coach-tools"');
   check(
     masterPanelIndex >= 0 &&
       masterRoleIndex > masterPanelIndex &&
@@ -259,9 +263,22 @@ function validateFirstRunRenderer(html) {
     "Master hierarchy should keep output role, precise ceiling, presets, Polish & Automation, and Review & Export in order"
   );
   check(
+    finishChecklistIndex > masterReviewIndex &&
+      masterReviewQueueToolsIndex > finishChecklistIndex &&
+      exportMeterIndex > masterReviewQueueToolsIndex &&
+      masterMixCoachToolsIndex > exportMeterIndex,
+    "Master Review should keep Finish Checklist and Export Meter direct around compact Review Queue and Mix Coach diagnostics"
+  );
+  check(
     !html.includes('<details class="master-polish-tools" data-testid="master-polish-tools" open="">') &&
-      !html.includes('<details class="master-review-tools" data-testid="master-review-tools" open="">'),
-    "Guided first render should keep Polish & Automation and Review & Export collapsed"
+      !html.includes('<details class="master-review-tools" data-testid="master-review-tools" open="">') &&
+      !html.includes('<details class="master-diagnostic-tools" data-testid="master-review-queue-tools" open="">') &&
+      !html.includes('<details class="master-diagnostic-tools" data-testid="master-mix-coach-tools" open="">') &&
+      html.includes('data-testid="master-review-queue-toggle"') &&
+      html.includes('data-testid="master-review-queue-content"') &&
+      html.includes('data-testid="master-mix-coach-toggle"') &&
+      html.includes('data-testid="master-mix-coach-content"'),
+    "Guided first render should keep Polish, Review & Export, Review Queue, and Mix Coach compact with persistent summaries"
   );
   const handoffPackIndex = html.indexOf('data-testid="handoff-pack"');
   const handoffRouteIndex = html.indexOf('data-testid="handoff-pack-route-readout"');
@@ -470,11 +487,19 @@ function validateFirstRunRenderer(html) {
       'data-testid="master-review-tools"',
       'data-testid="master-review-toggle"',
       'data-testid="master-review-content"',
+      'data-testid="master-review-queue-tools"',
+      'data-testid="master-review-queue-toggle"',
+      'data-testid="master-review-queue-content"',
+      'data-testid="master-mix-coach-tools"',
+      'data-testid="master-mix-coach-toggle"',
+      'data-testid="master-mix-coach-content"',
       "Limiter ceiling",
       "Lower values leave more headroom before export.",
       "Output preset",
       "Polish &amp; Automation",
-      "Review &amp; Export"
+      "Review &amp; Export",
+      "Prioritized production issues and targeted fixes",
+      "Balance diagnosis and local corrective moves"
     ],
     "delivery actions first": [
       'data-testid="handoff-pack-direct"',

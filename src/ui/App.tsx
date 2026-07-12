@@ -1138,6 +1138,8 @@ export function App(): ReactElement {
   const [channelProcessingOpen, setChannelProcessingOpen] = useState<Record<string, boolean>>({});
   const [masterPolishOpen, setMasterPolishOpen] = useState(false);
   const [masterReviewOpen, setMasterReviewOpen] = useState(false);
+  const [masterReviewQueueOpen, setMasterReviewQueueOpen] = useState(false);
+  const [masterMixCoachOpen, setMasterMixCoachOpen] = useState(false);
   const [transportSessionOpen, setTransportSessionOpen] = useState(false);
   const [transportExportsOpen, setTransportExportsOpen] = useState(false);
   const [deliveryStatusOpen, setDeliveryStatusOpen] = useState(false);
@@ -2950,6 +2952,8 @@ export function App(): ReactElement {
     setMixReviewOpen(advancedOpen);
     setMasterPolishOpen(advancedOpen);
     setMasterReviewOpen(advancedOpen);
+    setMasterReviewQueueOpen(false);
+    setMasterMixCoachOpen(false);
     setTransportSessionOpen(advancedOpen);
     setTransportExportsOpen(advancedOpen);
     setDeliveryStatusOpen(advancedOpen);
@@ -4123,6 +4127,7 @@ export function App(): ReactElement {
 
   function applyMixFixPreset(preset: MixFixPreset): void {
     setMasterReviewOpen(true);
+    setMasterMixCoachOpen(true);
     const beforeProject = projectRef.current;
     const beforeAnalysis = analyzeExport(beforeProject);
     const beforeStemAnalyses = analyzeStemExports(beforeProject);
@@ -7506,6 +7511,7 @@ export function App(): ReactElement {
 
   function focusMixCoachCheck(check: MixCoachCheck): void {
     setMasterReviewOpen(true);
+    setMasterMixCoachOpen(true);
     const currentChecks = createMixCoachChecks(exportAnalysis, stemAnalyses);
     const currentCheck = currentChecks.find((candidate) => candidate.id === check.id) ?? check;
     setMixCoachFocusId(check.id);
@@ -7516,6 +7522,7 @@ export function App(): ReactElement {
 
   function focusMixCoach(): MixCoachCheck | null {
     setMasterReviewOpen(true);
+    setMasterMixCoachOpen(true);
     const check = mixCoachFocusCheck(createMixCoachChecks(exportAnalysis, stemAnalyses));
     if (check) {
       focusMixCoachCheck(check);
@@ -8592,6 +8599,7 @@ export function App(): ReactElement {
 
   function focusReviewQueueItem(item: ReviewQueueItem): void {
     setMasterReviewOpen(true);
+    setMasterReviewQueueOpen(true);
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
       arrange: arrangePanelRef.current,
@@ -8612,6 +8620,7 @@ export function App(): ReactElement {
 
   function focusReviewQueueRouteReadout(): void {
     setMasterReviewOpen(true);
+    setMasterReviewQueueOpen(true);
     const item = reviewQueueSummary.items[0] ?? null;
     reviewQueuePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8623,6 +8632,7 @@ export function App(): ReactElement {
 
   function applyReviewFix(item?: ReviewQueueItem): void {
     setMasterReviewOpen(true);
+    setMasterReviewQueueOpen(true);
     const beforeProject = projectRef.current;
     const beforeAnalysis = analyzeExport(beforeProject);
     const beforeStemAnalyses = analyzeStemExports(beforeProject);
@@ -10274,6 +10284,8 @@ export function App(): ReactElement {
         const guidedProcessingOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mixer-processing-drum_rack"]')?.open ?? true;
         const guidedMasterPolishOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-polish-tools"]')?.open ?? true;
         const guidedMasterReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? true;
+        const guidedMasterReviewQueueOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-queue-tools"]')?.open ?? true;
+        const guidedMasterMixCoachOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-mix-coach-tools"]')?.open ?? true;
         const guidedDeliveryStatusOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-status-tools"]')?.open ?? true;
         const guidedDeliveryAuditOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-audit-tools"]')?.open ?? true;
         const guidedTransportSessionOpen = document.querySelector<HTMLDetailsElement>('[data-testid="transport-session-tools"]')?.open ?? true;
@@ -10288,6 +10300,8 @@ export function App(): ReactElement {
         const studioProcessingOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mixer-processing-drum_rack"]')?.open ?? false;
         const studioMasterPolishOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-polish-tools"]')?.open ?? false;
         const studioMasterReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? false;
+        const studioMasterReviewQueueOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-queue-tools"]')?.open ?? true;
+        const studioMasterMixCoachOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-mix-coach-tools"]')?.open ?? true;
         const studioDeliveryStatusOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-status-tools"]')?.open ?? false;
         const studioDeliveryAuditOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-audit-tools"]')?.open ?? false;
         const studioTransportSessionOpen = document.querySelector<HTMLDetailsElement>('[data-testid="transport-session-tools"]')?.open ?? false;
@@ -10306,6 +10320,8 @@ export function App(): ReactElement {
         const resetProcessingOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mixer-processing-drum_rack"]')?.open ?? true;
         const resetMasterPolishOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-polish-tools"]')?.open ?? true;
         const resetMasterReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? true;
+        const resetMasterReviewQueueOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-queue-tools"]')?.open ?? true;
+        const resetMasterMixCoachOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-mix-coach-tools"]')?.open ?? true;
         const resetDeliveryStatusOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-status-tools"]')?.open ?? true;
         const resetDeliveryAuditOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-audit-tools"]')?.open ?? true;
         const resetTransportSessionOpen = document.querySelector<HTMLDetailsElement>('[data-testid="transport-session-tools"]')?.open ?? true;
@@ -10338,13 +10354,33 @@ export function App(): ReactElement {
           studioMixReviewOpen,
           studioProcessingOpen
         };
+        flushSync(() => focusReviewQueueRouteReadout());
+        const routedMasterReviewQueueOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-queue-tools"]')?.open ?? false;
+        flushSync(() => {
+          setMasterReviewQueueOpen(false);
+          focusMixCoach();
+        });
+        const routedMasterMixCoachOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-mix-coach-tools"]')?.open ?? false;
+        flushSync(() => {
+          setMasterReviewQueueOpen(false);
+          setMasterMixCoachOpen(false);
+          setMasterReviewOpen(false);
+        });
         const masterTools = {
           guidedMasterPolishOpen,
           guidedMasterReviewOpen,
+          guidedMasterReviewQueueOpen,
+          guidedMasterMixCoachOpen,
           resetMasterPolishOpen,
           resetMasterReviewOpen,
+          resetMasterReviewQueueOpen,
+          resetMasterMixCoachOpen,
+          routedMasterReviewQueueOpen,
+          routedMasterMixCoachOpen,
           studioMasterPolishOpen,
-          studioMasterReviewOpen
+          studioMasterReviewOpen,
+          studioMasterReviewQueueOpen,
+          studioMasterMixCoachOpen
         };
         const deliveryTools = {
           guidedAuditOpen: guidedDeliveryAuditOpen,
@@ -12875,28 +12911,66 @@ export function App(): ReactElement {
                 sectionRef={finishChecklistPanelRef}
                 onFocus={focusFinishChecklistCard}
               />
-              <ReviewQueue
-                summary={reviewQueueSummary}
-                focusedItemId={reviewQueueFocusId}
-                result={reviewQueueResult}
-                fixResult={reviewFixResult}
-                project={project}
-                sectionRef={reviewQueuePanelRef}
-                onFix={applyReviewFix}
-                onFocus={focusReviewQueueItem}
-              />
+              <details className="master-diagnostic-tools" data-testid="master-review-queue-tools" open={masterReviewQueueOpen}>
+                <summary
+                  className="master-diagnostic-summary"
+                  data-testid="master-review-queue-toggle"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setMasterReviewQueueOpen((open) => !open);
+                  }}
+                >
+                  <span className="master-diagnostic-copy">
+                    <strong>Review Queue</strong>
+                    <small>Prioritized production issues and targeted fixes</small>
+                  </span>
+                  <span className="master-diagnostic-context">{reviewQueueSummary.headline}</span>
+                  <ArrowDown className="master-diagnostic-chevron" size={15} aria-hidden="true" />
+                </summary>
+                <div className="master-diagnostic-content" data-testid="master-review-queue-content">
+                  <ReviewQueue
+                    summary={reviewQueueSummary}
+                    focusedItemId={reviewQueueFocusId}
+                    result={reviewQueueResult}
+                    fixResult={reviewFixResult}
+                    project={project}
+                    sectionRef={reviewQueuePanelRef}
+                    onFix={applyReviewFix}
+                    onFocus={focusReviewQueueItem}
+                  />
+                </div>
+              </details>
               <ExportMeter analysis={exportAnalysis} />
-              <MixCoach
-                checks={mixCoachChecks}
-                focusedCheckId={mixCoachFocusId}
-                focusSummary={mixCoachFocusSummary}
-                focusResult={mixCoachResult}
-                fixPreview={mixFixPreviewSummary}
-                fixes={mixFixActions}
-                result={mixFixResult}
-                onApplyFix={applyMixFixPreset}
-                onFocusCheck={focusMixCoachCheck}
-              />
+              <details className="master-diagnostic-tools" data-testid="master-mix-coach-tools" open={masterMixCoachOpen}>
+                <summary
+                  className="master-diagnostic-summary"
+                  data-testid="master-mix-coach-toggle"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setMasterMixCoachOpen((open) => !open);
+                  }}
+                >
+                  <span className="master-diagnostic-copy">
+                    <strong>Mix Coach</strong>
+                    <small>Balance diagnosis and local corrective moves</small>
+                  </span>
+                  <span className="master-diagnostic-context">{mixCoachSummary(mixCoachChecks)}</span>
+                  <ArrowDown className="master-diagnostic-chevron" size={15} aria-hidden="true" />
+                </summary>
+                <div className="master-diagnostic-content" data-testid="master-mix-coach-content">
+                  <MixCoach
+                    checks={mixCoachChecks}
+                    focusedCheckId={mixCoachFocusId}
+                    focusSummary={mixCoachFocusSummary}
+                    focusResult={mixCoachResult}
+                    fixPreview={mixFixPreviewSummary}
+                    fixes={mixFixActions}
+                    result={mixFixResult}
+                    onApplyFix={applyMixFixPreset}
+                    onFocusCheck={focusMixCoachCheck}
+                  />
+                </div>
+              </details>
             </div>
           </details>
         </section>

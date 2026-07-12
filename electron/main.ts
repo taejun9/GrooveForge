@@ -114,7 +114,11 @@ type LaunchSmokeLayoutEvidence = {
   masterPolishBeforeReview: boolean;
   masterPolishOpen: boolean;
   masterPolishToggleVisible: boolean;
+  masterMixCoachPresent: boolean;
+  masterMixCoachOpen: boolean;
   masterReviewOpen: boolean;
+  masterReviewQueuePresent: boolean;
+  masterReviewQueueOpen: boolean;
   masterReviewToggleVisible: boolean;
   masterRoleBeforeControls: boolean;
   patternLabOpen: boolean;
@@ -290,11 +294,19 @@ type LaunchSmokeMixerToolsEvidence = {
 };
 
 type LaunchSmokeMasterToolsEvidence = {
+  guidedMasterMixCoachOpen: boolean;
   guidedMasterPolishOpen: boolean;
+  guidedMasterReviewQueueOpen: boolean;
   guidedMasterReviewOpen: boolean;
+  resetMasterMixCoachOpen: boolean;
   resetMasterPolishOpen: boolean;
+  resetMasterReviewQueueOpen: boolean;
   resetMasterReviewOpen: boolean;
+  routedMasterMixCoachOpen: boolean;
+  routedMasterReviewQueueOpen: boolean;
+  studioMasterMixCoachOpen: boolean;
   studioMasterPolishOpen: boolean;
+  studioMasterReviewQueueOpen: boolean;
   studioMasterReviewOpen: boolean;
 };
 
@@ -1340,6 +1352,8 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const masterPolishToggle = document.querySelector('[data-testid="master-polish-toggle"]');
       const masterReview = document.querySelector('[data-testid="master-review-tools"]');
       const masterReviewToggle = document.querySelector('[data-testid="master-review-toggle"]');
+      const masterReviewQueue = document.querySelector('[data-testid="master-review-queue-tools"]');
+      const masterMixCoach = document.querySelector('[data-testid="master-mix-coach-tools"]');
       const deliveryRoute = document.querySelector('[data-testid="handoff-pack-route-readout"]');
       const deliveryDirect = document.querySelector('[data-testid="handoff-pack-direct"]');
       const deliveryStatus = document.querySelector('[data-testid="handoff-status-tools"]');
@@ -1530,7 +1544,11 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           masterPolishBeforeReview: follows(masterPolish, masterReview),
           masterPolishOpen: Boolean(masterPolish?.open),
           masterPolishToggleVisible: Boolean(masterPolishToggle && masterPolishToggle.getBoundingClientRect().height > 0),
+          masterMixCoachPresent: Boolean(masterMixCoach),
+          masterMixCoachOpen: Boolean(masterMixCoach?.open),
           masterReviewOpen: Boolean(masterReview?.open),
+          masterReviewQueuePresent: Boolean(masterReviewQueue),
+          masterReviewQueueOpen: Boolean(masterReviewQueue?.open),
           masterReviewToggleVisible: Boolean(masterReviewToggle && masterReviewToggle.getBoundingClientRect().height > 0),
           masterRoleBeforeControls: follows(masterRole, masterOutputControls),
           patternLabOpen: Boolean(patternLab?.open),
@@ -1620,11 +1638,19 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
             studioProcessingOpen: false
           },
           masterTools: {
+            guidedMasterMixCoachOpen: true,
             guidedMasterPolishOpen: true,
+            guidedMasterReviewQueueOpen: true,
             guidedMasterReviewOpen: true,
+            resetMasterMixCoachOpen: true,
             resetMasterPolishOpen: true,
+            resetMasterReviewQueueOpen: true,
             resetMasterReviewOpen: true,
+            routedMasterMixCoachOpen: false,
+            routedMasterReviewQueueOpen: false,
+            studioMasterMixCoachOpen: true,
             studioMasterPolishOpen: false,
+            studioMasterReviewQueueOpen: true,
             studioMasterReviewOpen: false
           },
           deliveryTools: {

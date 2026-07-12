@@ -271,11 +271,19 @@ type GrooveforgeLaunchSmokeMixerToolsEvidence = {
 };
 
 type GrooveforgeLaunchSmokeMasterToolsEvidence = {
+  guidedMasterMixCoachOpen: boolean;
   guidedMasterPolishOpen: boolean;
+  guidedMasterReviewQueueOpen: boolean;
   guidedMasterReviewOpen: boolean;
+  resetMasterMixCoachOpen: boolean;
   resetMasterPolishOpen: boolean;
+  resetMasterReviewQueueOpen: boolean;
   resetMasterReviewOpen: boolean;
+  routedMasterMixCoachOpen: boolean;
+  routedMasterReviewQueueOpen: boolean;
+  studioMasterMixCoachOpen: boolean;
   studioMasterPolishOpen: boolean;
+  studioMasterReviewQueueOpen: boolean;
   studioMasterReviewOpen: boolean;
 };
 

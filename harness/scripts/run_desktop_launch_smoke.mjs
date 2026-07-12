@@ -354,6 +354,10 @@ function checkResult(result) {
   check(
     evidence?.layout?.masterPolishOpen === false &&
       evidence?.layout?.masterReviewOpen === false &&
+      evidence?.layout?.masterReviewQueuePresent === true &&
+      evidence?.layout?.masterReviewQueueOpen === false &&
+      evidence?.layout?.masterMixCoachPresent === true &&
+      evidence?.layout?.masterMixCoachOpen === false &&
       evidence?.layout?.masterPolishToggleVisible === true &&
       evidence?.layout?.masterReviewToggleVisible === true,
     "live desktop Guided mode should show compact Polish & Automation and Review & Export toggles"
@@ -361,11 +365,19 @@ function checkResult(result) {
   check(
     evidence?.palette?.masterTools?.guidedMasterPolishOpen === false &&
       evidence?.palette?.masterTools?.guidedMasterReviewOpen === false &&
+      evidence?.palette?.masterTools?.guidedMasterReviewQueueOpen === false &&
+      evidence?.palette?.masterTools?.guidedMasterMixCoachOpen === false &&
       evidence?.palette?.masterTools?.studioMasterPolishOpen === true &&
       evidence?.palette?.masterTools?.studioMasterReviewOpen === true &&
+      evidence?.palette?.masterTools?.studioMasterReviewQueueOpen === false &&
+      evidence?.palette?.masterTools?.studioMasterMixCoachOpen === false &&
       evidence?.palette?.masterTools?.resetMasterPolishOpen === false &&
-      evidence?.palette?.masterTools?.resetMasterReviewOpen === false,
-    "live desktop Master tools should expand for Studio and reset compactly for Guided through the shared mode handler"
+      evidence?.palette?.masterTools?.resetMasterReviewOpen === false &&
+      evidence?.palette?.masterTools?.resetMasterReviewQueueOpen === false &&
+      evidence?.palette?.masterTools?.resetMasterMixCoachOpen === false &&
+      evidence?.palette?.masterTools?.routedMasterReviewQueueOpen === true &&
+      evidence?.palette?.masterTools?.routedMasterMixCoachOpen === true,
+    "live desktop Master tools should keep nested diagnostics compact across modes, reveal routed destinations, and reset compactly"
   );
   check(
     evidence?.layout?.deliveryDirectPresent === true &&
@@ -1064,7 +1076,7 @@ child.on("exit", (code, signal) => {
     `- Mixer-first layout: strips before moves ${result.evidence.layout.mixerStripsBeforeMixMoves ? "yes" : "no"}, basic balance before processing ${result.evidence.layout.mixerBasicBalanceBeforeProcessing ? "yes" : "no"}, Guided tools ${result.evidence.layout.mixerProcessingOpen || result.evidence.layout.mixMovesOpen || result.evidence.layout.mixReviewOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.mixerTools.studioProcessingOpen && result.evidence.palette.mixerTools.studioMixMovesOpen && result.evidence.palette.mixerTools.studioMixReviewOpen ? "yes" : "no"}`
   );
   console.log(
-    `- Master-first layout: output before helpers ${result.evidence.layout.masterControlsBeforePolish ? "yes" : "no"}, precise ceiling bounds ${result.evidence.layout.masterCeilingBoundsReady ? "yes" : "no"}, Guided tools ${result.evidence.layout.masterPolishOpen || result.evidence.layout.masterReviewOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.masterTools.studioMasterPolishOpen && result.evidence.palette.masterTools.studioMasterReviewOpen ? "yes" : "no"}`
+    `- Master-first layout: output before helpers ${result.evidence.layout.masterControlsBeforePolish ? "yes" : "no"}, precise ceiling bounds ${result.evidence.layout.masterCeilingBoundsReady ? "yes" : "no"}, diagnostics compact ${!result.evidence.palette.masterTools.studioMasterReviewQueueOpen && !result.evidence.palette.masterTools.studioMasterMixCoachOpen ? "yes" : "no"}, routed reveal ${result.evidence.palette.masterTools.routedMasterReviewQueueOpen && result.evidence.palette.masterTools.routedMasterMixCoachOpen ? "yes" : "no"}, Studio outer auto-expand ${result.evidence.palette.masterTools.studioMasterPolishOpen && result.evidence.palette.masterTools.studioMasterReviewOpen ? "yes" : "no"}`
   );
   console.log(
     `- Delivery-first layout: visible outside Guide ${result.evidence.layout.deliveryOutsideGuidance && result.evidence.layout.deliveryDirectVisible ? "yes" : "no"}, direct actions before proof ${result.evidence.layout.deliveryDirectBeforeStatus ? "yes" : "no"}, Guided proof ${result.evidence.layout.deliveryStatusOpen || result.evidence.layout.deliveryAuditOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.deliveryTools.studioStatusOpen && result.evidence.palette.deliveryTools.studioAuditOpen ? "yes" : "no"}`
