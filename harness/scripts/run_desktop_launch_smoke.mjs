@@ -64,6 +64,10 @@ const expectedLiveTestIds = [
   "workspace-feedback-anchor",
   "note-editor-panel",
   "capture-ideas",
+  "instrument-direct-chords",
+  "chord-event-grid",
+  "harmony-moves",
+  "sound-design-tools",
   "export-stems",
   "export-midi",
   "export-handoff-sheet",
@@ -155,6 +159,28 @@ function checkResult(result) {
       evidence?.palette?.captureIdeas?.autoReveal === true &&
       evidence?.palette?.captureIdeas?.resetOpen === false,
     "live desktop Capture & Ideas should auto-reveal when keyboard capture is armed"
+  );
+  check(
+    evidence?.layout?.instrumentDirectChordsPresent === true &&
+      evidence?.layout?.chordEventsBeforeHarmonyMoves === true &&
+      evidence?.layout?.chordsBeforeSoundDesign === true,
+    "live desktop Instrument panel should put direct chord events before Harmony Moves and Sound Design"
+  );
+  check(
+    evidence?.layout?.harmonyMovesOpen === false &&
+      evidence?.layout?.soundDesignOpen === false &&
+      evidence?.layout?.harmonyMovesToggleVisible === true &&
+      evidence?.layout?.soundDesignToggleVisible === true,
+    "live desktop Guided mode should show collapsed Harmony Moves and Sound Design toggles"
+  );
+  check(
+    evidence?.palette?.instrumentTools?.guidedHarmonyOpen === false &&
+      evidence?.palette?.instrumentTools?.guidedSoundOpen === false &&
+      evidence?.palette?.instrumentTools?.studioHarmonyOpen === true &&
+      evidence?.palette?.instrumentTools?.studioSoundOpen === true &&
+      evidence?.palette?.instrumentTools?.resetHarmonyOpen === false &&
+      evidence?.palette?.instrumentTools?.resetSoundOpen === false,
+    "live desktop Instrument tools should expand for Studio and reset compactly for Guided through the shared mode handler"
   );
 
   const missingTestIds = expectedLiveTestIds.filter((testId) => evidence?.testIds?.[testId] !== true);
@@ -808,6 +834,9 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Note-editor-first layout: Capture & Ideas ${result.evidence.layout.captureIdeasOpen ? "open" : "collapsed"}, auto-reveal ${result.evidence.palette.captureIdeas.autoReveal ? "yes" : "no"}, note grids after capture ${result.evidence.layout.noteLanesAfterCaptureIdeas ? "yes" : "no"}`
+  );
+  console.log(
+    `- Instrument-first layout: chord events before harmony ${result.evidence.layout.chordEventsBeforeHarmonyMoves ? "yes" : "no"}, Guided tools ${result.evidence.layout.harmonyMovesOpen || result.evidence.layout.soundDesignOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.instrumentTools.studioHarmonyOpen && result.evidence.palette.instrumentTools.studioSoundOpen ? "yes" : "no"}`
   );
   console.log(
     `- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors, ${result.evidence.visual.nonBackgroundSamples}/${result.evidence.visual.sampledPixels} non-background samples`

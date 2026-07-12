@@ -2538,6 +2538,7 @@ function StudioToneDriftSummaryStrip({
 }
 
 export function ChordEditor({
+  advancedOpen,
   chordPads,
   chordClipboard,
   chordMovePreview,
@@ -2552,6 +2553,7 @@ export function ChordEditor({
   beatDuplicateStep,
   previousBeatDuplicateStep,
   onAdd,
+  onAdvancedOpenChange,
   onChange,
   onCopy,
   onDelete,
@@ -2568,6 +2570,7 @@ export function ChordEditor({
   onSelect,
   onVoicing
 }: {
+  advancedOpen: boolean;
   chordPads: ChordPadOption[];
   chordClipboard: ChordClipboard | null;
   chordMovePreview: ChordMovePreviewSummary;
@@ -2582,6 +2585,7 @@ export function ChordEditor({
   beatDuplicateStep: number | null;
   previousBeatDuplicateStep: number | null;
   onAdd: () => void;
+  onAdvancedOpenChange: (open: boolean) => void;
   onChange: (index: number, update: Partial<ChordEvent>) => boolean;
   onCopy: () => void;
   onDelete: (index: number) => boolean;
@@ -2621,104 +2625,11 @@ export function ChordEditor({
         <span>Chords</span>
         <strong>{chords.length} events</strong>
       </div>
-      <div className="chord-tools" aria-label="Chord progression tools">
-        <div className="chord-preset-row" aria-label="Chord progression presets">
-          {chordProgressionPresetIds.map((preset) => (
-            <button
-              data-testid={`chord-preset-${preset}`}
-              key={preset}
-              onClick={() => onPreset(preset)}
-              type="button"
-            >
-              {chordProgressionPresetLabel(preset)}
-            </button>
-          ))}
-        </div>
+      <div className="chord-primary-tools" aria-label="Chord event actions" data-testid="chord-primary-actions">
         <button data-testid="chord-add" onClick={onAdd} title="Add chord event" type="button">
           <Plus size={14} aria-hidden="true" />
           <span>Add chord</span>
         </button>
-      </div>
-      <div
-        className={`chord-move-preview ${chordMovePreview.tone}`}
-        data-preview-chord-pad={chordMovePreview.padId}
-        data-preview-chord-rhythm={chordMovePreview.rhythmId}
-        data-preview-chord-voicing={chordMovePreview.voicingId}
-        data-testid="chord-move-preview"
-        title={chordMovePreview.detailTitle}
-      >
-        <span data-testid="chord-move-preview-status">{chordMovePreview.statusLabel}</span>
-        <strong data-testid="chord-move-preview-selected">{chordMovePreview.selectedLabel}</strong>
-        <small data-testid="chord-move-preview-harmonic">{chordMovePreview.harmonicLabel}</small>
-        <small data-testid="chord-move-preview-rhythm">{chordMovePreview.rhythmLabel}</small>
-        <small data-testid="chord-move-preview-voicing">{chordMovePreview.voicingLabel}</small>
-        <small data-testid="chord-move-preview-moves">{chordMovePreview.moveLabel}</small>
-      </div>
-      {chordMoveResult && <ChordMoveResultStrip result={chordMoveResult} />}
-      <div className="chord-pad-row" aria-label="Chord Pads">
-        {chordPads.map((pad) => (
-          <button
-            className={pad.selected ? "selected" : ""}
-            data-testid={`chord-pad-${pad.id}`}
-            disabled={!selectedChord}
-            key={pad.id}
-            onClick={() => onPad(pad.id)}
-            title={`${pad.label} ${pad.root}${pad.quality}`}
-            type="button"
-          >
-            <span>{pad.label}</span>
-            <strong>
-              {pad.root}
-              {pad.quality}
-            </strong>
-            <small>{pad.detail}</small>
-          </button>
-        ))}
-      </div>
-      <div className="chord-rhythm-panel" data-testid="chord-rhythm-pads">
-        <div className="chord-rhythm-heading">
-          <span>Chord Rhythm</span>
-          <strong>Length + Chance</strong>
-        </div>
-        <div className="chord-rhythm-row" aria-label="Chord Rhythm Pads">
-          {chordRhythms.map((rhythm) => (
-            <button
-              data-testid={`chord-rhythm-${rhythm.id}`}
-              disabled={chords.length === 0}
-              key={rhythm.id}
-              onClick={() => onRhythm(rhythm.id)}
-              title={`${rhythm.label} ${rhythm.preview}`}
-              type="button"
-            >
-              <span>{rhythm.label}</span>
-              <strong>{rhythm.preview}</strong>
-              <small>{rhythm.chanceCount} chance edit / {rhythm.detail}</small>
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="chord-voicing-panel" data-testid="chord-voicing-pads">
-        <div className="chord-voicing-heading">
-          <span>Chord Voicing</span>
-          <strong>Color + Shape</strong>
-        </div>
-        <div className="chord-voicing-row" aria-label="Chord Voicing Pads">
-          {chordVoicings.map((voicing) => (
-            <button
-              className={voicing.selected ? "selected" : ""}
-              data-testid={`chord-voicing-${voicing.id}`}
-              disabled={!selectedChord}
-              key={voicing.id}
-              onClick={() => onVoicing(voicing.id)}
-              title={`${voicing.label} ${voicing.preview}`}
-              type="button"
-            >
-              <span>{voicing.label}</span>
-              <strong>{voicing.preview}</strong>
-              <small>{voicing.detail}</small>
-            </button>
-          ))}
-        </div>
       </div>
       {harmonicSummary && (
         <div className={harmonicSummary.inKey ? "chord-harmonic-readout" : "chord-harmonic-readout warn"} data-testid="chord-harmonic-readout">
@@ -2826,7 +2737,7 @@ export function ChordEditor({
         </button>
         <small data-testid="chord-clipboard-detail">{chordClipboard ? `Clipboard ${chordClipboardLabel}` : "Clipboard empty"}</small>
       </div>
-      <div className="chord-slots">
+      <div className="chord-slots" data-testid="chord-event-grid">
         {chords.map((chord, index) => {
           const selected = selectedIndex === index;
           const playing = currentStep !== null && currentStep >= chord.step && currentStep < chord.step + chord.length;
@@ -3011,6 +2922,124 @@ export function ChordEditor({
           );
         })}
       </div>
+      <details
+        className="harmony-moves"
+        data-testid="harmony-moves"
+        open={advancedOpen}
+      >
+        <summary
+          className="harmony-moves-summary"
+          data-testid="harmony-moves-toggle"
+          onClick={(event) => {
+            event.preventDefault();
+            onAdvancedOpenChange(!advancedOpen);
+          }}
+        >
+          <span className="harmony-moves-copy">
+            <strong>Harmony Moves</strong>
+            <small>Progressions, reharmonization, rhythm, and voicing</small>
+          </span>
+          <span className="harmony-moves-context">
+            {selectedChord ? `${selectedChord.root}${selectedChord.quality} selected` : "Select a chord"} · {chords.length} events
+          </span>
+          <ArrowDown className="harmony-moves-chevron" size={16} aria-hidden="true" />
+        </summary>
+        <div className="harmony-moves-content" data-testid="harmony-moves-content">
+          <div className="chord-preset-row" aria-label="Chord progression presets">
+            {chordProgressionPresetIds.map((preset) => (
+              <button
+                data-testid={`chord-preset-${preset}`}
+                key={preset}
+                onClick={() => onPreset(preset)}
+                type="button"
+              >
+                {chordProgressionPresetLabel(preset)}
+              </button>
+            ))}
+          </div>
+          <div
+            className={`chord-move-preview ${chordMovePreview.tone}`}
+            data-preview-chord-pad={chordMovePreview.padId}
+            data-preview-chord-rhythm={chordMovePreview.rhythmId}
+            data-preview-chord-voicing={chordMovePreview.voicingId}
+            data-testid="chord-move-preview"
+            title={chordMovePreview.detailTitle}
+          >
+            <span data-testid="chord-move-preview-status">{chordMovePreview.statusLabel}</span>
+            <strong data-testid="chord-move-preview-selected">{chordMovePreview.selectedLabel}</strong>
+            <small data-testid="chord-move-preview-harmonic">{chordMovePreview.harmonicLabel}</small>
+            <small data-testid="chord-move-preview-rhythm">{chordMovePreview.rhythmLabel}</small>
+            <small data-testid="chord-move-preview-voicing">{chordMovePreview.voicingLabel}</small>
+            <small data-testid="chord-move-preview-moves">{chordMovePreview.moveLabel}</small>
+          </div>
+          {chordMoveResult && <ChordMoveResultStrip result={chordMoveResult} />}
+          <div className="chord-pad-row" aria-label="Chord Pads">
+            {chordPads.map((pad) => (
+              <button
+                className={pad.selected ? "selected" : ""}
+                data-testid={`chord-pad-${pad.id}`}
+                disabled={!selectedChord}
+                key={pad.id}
+                onClick={() => onPad(pad.id)}
+                title={`${pad.label} ${pad.root}${pad.quality}`}
+                type="button"
+              >
+                <span>{pad.label}</span>
+                <strong>
+                  {pad.root}
+                  {pad.quality}
+                </strong>
+                <small>{pad.detail}</small>
+              </button>
+            ))}
+          </div>
+          <div className="chord-rhythm-panel" data-testid="chord-rhythm-pads">
+            <div className="chord-rhythm-heading">
+              <span>Chord Rhythm</span>
+              <strong>Length + Chance</strong>
+            </div>
+            <div className="chord-rhythm-row" aria-label="Chord Rhythm Pads">
+              {chordRhythms.map((rhythm) => (
+                <button
+                  data-testid={`chord-rhythm-${rhythm.id}`}
+                  disabled={chords.length === 0}
+                  key={rhythm.id}
+                  onClick={() => onRhythm(rhythm.id)}
+                  title={`${rhythm.label} ${rhythm.preview}`}
+                  type="button"
+                >
+                  <span>{rhythm.label}</span>
+                  <strong>{rhythm.preview}</strong>
+                  <small>{rhythm.chanceCount} chance edit / {rhythm.detail}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="chord-voicing-panel" data-testid="chord-voicing-pads">
+            <div className="chord-voicing-heading">
+              <span>Chord Voicing</span>
+              <strong>Color + Shape</strong>
+            </div>
+            <div className="chord-voicing-row" aria-label="Chord Voicing Pads">
+              {chordVoicings.map((voicing) => (
+                <button
+                  className={voicing.selected ? "selected" : ""}
+                  data-testid={`chord-voicing-${voicing.id}`}
+                  disabled={!selectedChord}
+                  key={voicing.id}
+                  onClick={() => onVoicing(voicing.id)}
+                  title={`${voicing.label} ${voicing.preview}`}
+                  type="button"
+                >
+                  <span>{voicing.label}</span>
+                  <strong>{voicing.preview}</strong>
+                  <small>{voicing.detail}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </details>
     </div>
   );
 }

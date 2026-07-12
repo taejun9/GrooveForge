@@ -56,15 +56,22 @@ type LaunchSmokeEvidence = {
 };
 
 type LaunchSmokeLayoutEvidence = {
+  chordEventsBeforeHarmonyMoves: boolean;
+  chordsBeforeSoundDesign: boolean;
   captureIdeasOpen: boolean;
   captureIdeasToggleVisible: boolean;
   feedbackAfterGuidance: boolean;
   feedbackOutsideGuidance: boolean;
   guidanceCenterOpen: boolean;
+  harmonyMovesOpen: boolean;
+  harmonyMovesToggleVisible: boolean;
+  instrumentDirectChordsPresent: boolean;
   patternLabOpen: boolean;
   patternLabToggleVisible: boolean;
   noteLanesAfterCaptureIdeas: boolean;
   noteLanesPresent: boolean;
+  soundDesignOpen: boolean;
+  soundDesignToggleVisible: boolean;
   stepGridAfterPatternLab: boolean;
   stepGridPresent: boolean;
 };
@@ -147,6 +154,7 @@ type LaunchSmokePaletteEvidence = {
   dualProducer: LaunchSmokePaletteRouteEvidence;
   dualReadout: LaunchSmokePaletteRouteEvidence;
   guided: LaunchSmokePaletteRouteEvidence;
+  instrumentTools: LaunchSmokeInstrumentToolsEvidence;
   opened: boolean;
   producer: LaunchSmokePaletteRouteEvidence;
   routeBridge: LaunchSmokePaletteRouteEvidence;
@@ -165,6 +173,15 @@ type LaunchSmokeCaptureIdeasEvidence = {
   autoReveal: boolean;
   initialOpen: boolean;
   resetOpen: boolean;
+};
+
+type LaunchSmokeInstrumentToolsEvidence = {
+  guidedHarmonyOpen: boolean;
+  guidedSoundOpen: boolean;
+  resetHarmonyOpen: boolean;
+  resetSoundOpen: boolean;
+  studioHarmonyOpen: boolean;
+  studioSoundOpen: boolean;
 };
 
 type LaunchSmokeVisualEvidence = {
@@ -1031,6 +1048,10 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "workspace-feedback-anchor",
         "note-editor-panel",
         "capture-ideas",
+        "instrument-direct-chords",
+        "chord-event-grid",
+        "harmony-moves",
+        "sound-design-tools",
         "export-stems",
         "export-midi",
         "export-handoff-sheet",
@@ -1066,6 +1087,8 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "Pattern A",
         "Pattern Lab",
         "Capture & Ideas",
+        "Harmony Moves",
+        "Sound Design",
         "Drums",
         "808",
         "Synth",
@@ -1090,6 +1113,12 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const captureIdeas = document.querySelector('[data-testid="capture-ideas"]');
       const captureIdeasToggle = document.querySelector('[data-testid="capture-ideas-toggle"]');
       const noteLanes = document.querySelector('.note-lanes');
+      const instrumentDirectChords = document.querySelector('[data-testid="instrument-direct-chords"]');
+      const chordEventGrid = document.querySelector('[data-testid="chord-event-grid"]');
+      const harmonyMoves = document.querySelector('[data-testid="harmony-moves"]');
+      const harmonyMovesToggle = document.querySelector('[data-testid="harmony-moves-toggle"]');
+      const soundDesign = document.querySelector('[data-testid="sound-design-tools"]');
+      const soundDesignToggle = document.querySelector('[data-testid="sound-design-toggle"]');
       const follows = (before, after) =>
         Boolean(before && after && (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING));
       const emptyRoute = {
@@ -1164,15 +1193,22 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         hasSaveProject: typeof bridge?.saveProject === "function",
         location: window.location.href,
         layout: {
+          chordEventsBeforeHarmonyMoves: follows(chordEventGrid, harmonyMoves),
+          chordsBeforeSoundDesign: follows(instrumentDirectChords, soundDesign),
           captureIdeasOpen: Boolean(captureIdeas?.open),
           captureIdeasToggleVisible: Boolean(captureIdeasToggle && captureIdeasToggle.getBoundingClientRect().height > 0),
           feedbackAfterGuidance: follows(guidanceCenter, feedbackAnchor),
           feedbackOutsideGuidance: Boolean(guidanceCenter && feedbackAnchor && !guidanceCenter.contains(feedbackAnchor)),
           guidanceCenterOpen: Boolean(guidanceCenter?.open),
+          harmonyMovesOpen: Boolean(harmonyMoves?.open),
+          harmonyMovesToggleVisible: Boolean(harmonyMovesToggle && harmonyMovesToggle.getBoundingClientRect().height > 0),
+          instrumentDirectChordsPresent: Boolean(instrumentDirectChords),
           patternLabOpen: Boolean(patternLab?.open),
           patternLabToggleVisible: Boolean(patternLabToggle && patternLabToggle.getBoundingClientRect().height > 0),
           noteLanesAfterCaptureIdeas: follows(captureIdeas, noteLanes),
           noteLanesPresent: Boolean(noteLanes),
+          soundDesignOpen: Boolean(soundDesign?.open),
+          soundDesignToggleVisible: Boolean(soundDesignToggle && soundDesignToggle.getBoundingClientRect().height > 0),
           stepGridAfterPatternLab: follows(patternLab, stepGrid),
           stepGridPresent: Boolean(stepGrid)
         },
@@ -1186,6 +1222,14 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
             autoReveal: false,
             initialOpen: true,
             resetOpen: true
+          },
+          instrumentTools: {
+            guidedHarmonyOpen: true,
+            guidedSoundOpen: true,
+            resetHarmonyOpen: true,
+            resetSoundOpen: true,
+            studioHarmonyOpen: false,
+            studioSoundOpen: false
           },
           completionBeginner: emptyRoute,
           completionProducer: emptyRoute,

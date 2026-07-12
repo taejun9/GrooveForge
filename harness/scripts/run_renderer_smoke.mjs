@@ -90,6 +90,24 @@ function validateFirstRunRenderer(html) {
     !html.includes('<details class="capture-ideas" data-testid="capture-ideas" open="">'),
     "Capture & Ideas should be collapsed by default so direct 808 and melody editing remains primary"
   );
+  const instrumentPanelIndex = html.indexOf('data-testid="workflow-target-sound"');
+  const directChordsIndex = html.indexOf('data-testid="instrument-direct-chords"');
+  const chordEventGridIndex = html.indexOf('data-testid="chord-event-grid"');
+  const harmonyMovesIndex = html.indexOf('data-testid="harmony-moves"');
+  const soundDesignIndex = html.indexOf('data-testid="sound-design-tools"');
+  check(
+    instrumentPanelIndex >= 0 &&
+      directChordsIndex > instrumentPanelIndex &&
+      chordEventGridIndex > directChordsIndex &&
+      harmonyMovesIndex > chordEventGridIndex &&
+      soundDesignIndex > harmonyMovesIndex,
+    "Instrument hierarchy should keep direct chord events before Harmony Moves and Sound Design"
+  );
+  check(
+    !html.includes('<details class="harmony-moves" data-testid="harmony-moves" open="">') &&
+      !html.includes('<details class="instrument-tools" data-testid="sound-design-tools" open="">'),
+    "Guided first render should keep Harmony Moves and Sound Design collapsed"
+  );
 
   const checks = {
     "starter transport": [
@@ -171,6 +189,21 @@ function validateFirstRunRenderer(html) {
       "Keys off",
       'class="note-lanes"',
       "scale locked grid"
+    ],
+    "instrument chord first": [
+      'data-testid="instrument-direct-chords"',
+      'data-testid="chord-primary-actions"',
+      'data-testid="chord-event-grid"',
+      'data-testid="harmony-moves"',
+      'data-testid="harmony-moves-toggle"',
+      'data-testid="harmony-moves-content"',
+      'data-testid="sound-design-tools"',
+      'data-testid="sound-design-toggle"',
+      'data-testid="sound-design-content"',
+      "Harmony Moves",
+      "Progressions, reharmonization, rhythm, and voicing",
+      "Sound Design",
+      "Devices, kits, tone shaping, and A/B snapshots"
     ],
     "producer workflow": [
       "Professional producer",
