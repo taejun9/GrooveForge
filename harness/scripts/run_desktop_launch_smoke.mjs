@@ -68,6 +68,11 @@ const expectedLiveTestIds = [
   "chord-event-grid",
   "harmony-moves",
   "sound-design-tools",
+  "arrangement-playback-readout",
+  "arrangement-timeline",
+  "selected-block-editor",
+  "block-moves",
+  "arrangement-tools",
   "export-stems",
   "export-midi",
   "export-handoff-sheet",
@@ -181,6 +186,33 @@ function checkResult(result) {
       evidence?.palette?.instrumentTools?.resetHarmonyOpen === false &&
       evidence?.palette?.instrumentTools?.resetSoundOpen === false,
     "live desktop Instrument tools should expand for Studio and reset compactly for Guided through the shared mode handler"
+  );
+  check(
+    evidence?.layout?.arrangementPlaybackPresent === true &&
+      evidence?.layout?.arrangementTimelinePresent === true &&
+      evidence?.layout?.selectedBlockEditorPresent === true &&
+      evidence?.layout?.arrangementPlaybackBeforeTimeline === true &&
+      evidence?.layout?.arrangementTimelineBeforeEditor === true &&
+      evidence?.layout?.arrangementEssentialBeforeBlockMoves === true &&
+      evidence?.layout?.blockMovesBeforeArrangementTools === true,
+    "live desktop Arrangement panel should put playback, timeline, and essential block editing before optional tools"
+  );
+  check(
+    evidence?.layout?.blockMovesOpen === false &&
+      evidence?.layout?.arrangementToolsOpen === false &&
+      evidence?.layout?.blockMovesToggleVisible === true &&
+      evidence?.layout?.arrangementToolsToggleVisible === true,
+    "live desktop Guided mode should show collapsed Block Moves and Arrangement Tools toggles"
+  );
+  check(
+    evidence?.palette?.arrangementTools?.guidedArrangementOpen === false &&
+      evidence?.palette?.arrangementTools?.guidedBlockMovesOpen === false &&
+      evidence?.palette?.arrangementTools?.studioArrangementOpen === true &&
+      evidence?.palette?.arrangementTools?.studioBlockMovesFullWidth === true &&
+      evidence?.palette?.arrangementTools?.studioBlockMovesOpen === true &&
+      evidence?.palette?.arrangementTools?.resetArrangementOpen === false &&
+      evidence?.palette?.arrangementTools?.resetBlockMovesOpen === false,
+    "live desktop Arrangement tools should expand for Studio and reset compactly for Guided through the shared mode handler"
   );
 
   const missingTestIds = expectedLiveTestIds.filter((testId) => evidence?.testIds?.[testId] !== true);
@@ -837,6 +869,9 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Instrument-first layout: chord events before harmony ${result.evidence.layout.chordEventsBeforeHarmonyMoves ? "yes" : "no"}, Guided tools ${result.evidence.layout.harmonyMovesOpen || result.evidence.layout.soundDesignOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.instrumentTools.studioHarmonyOpen && result.evidence.palette.instrumentTools.studioSoundOpen ? "yes" : "no"}`
+  );
+  console.log(
+    `- Arrangement-first layout: timeline before editor ${result.evidence.layout.arrangementTimelineBeforeEditor ? "yes" : "no"}, essential edits before moves ${result.evidence.layout.arrangementEssentialBeforeBlockMoves ? "yes" : "no"}, Guided tools ${result.evidence.layout.blockMovesOpen || result.evidence.layout.arrangementToolsOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.arrangementTools.studioBlockMovesOpen && result.evidence.palette.arrangementTools.studioArrangementOpen ? "yes" : "no"}`
   );
   console.log(
     `- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors, ${result.evidence.visual.nonBackgroundSamples}/${result.evidence.visual.sampledPixels} non-background samples`

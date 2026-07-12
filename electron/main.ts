@@ -56,6 +56,16 @@ type LaunchSmokeEvidence = {
 };
 
 type LaunchSmokeLayoutEvidence = {
+  arrangementEssentialBeforeBlockMoves: boolean;
+  arrangementPlaybackBeforeTimeline: boolean;
+  arrangementPlaybackPresent: boolean;
+  arrangementTimelineBeforeEditor: boolean;
+  arrangementTimelinePresent: boolean;
+  arrangementToolsOpen: boolean;
+  arrangementToolsToggleVisible: boolean;
+  blockMovesBeforeArrangementTools: boolean;
+  blockMovesOpen: boolean;
+  blockMovesToggleVisible: boolean;
   chordEventsBeforeHarmonyMoves: boolean;
   chordsBeforeSoundDesign: boolean;
   captureIdeasOpen: boolean;
@@ -72,6 +82,7 @@ type LaunchSmokeLayoutEvidence = {
   noteLanesPresent: boolean;
   soundDesignOpen: boolean;
   soundDesignToggleVisible: boolean;
+  selectedBlockEditorPresent: boolean;
   stepGridAfterPatternLab: boolean;
   stepGridPresent: boolean;
 };
@@ -146,6 +157,7 @@ type LaunchSmokeBridgeDirectEvidenceBundle = {
 };
 
 type LaunchSmokePaletteEvidence = {
+  arrangementTools: LaunchSmokeArrangementToolsEvidence;
   captureIdeas: LaunchSmokeCaptureIdeasEvidence;
   completionBeginner: LaunchSmokePaletteRouteEvidence;
   completionProducer: LaunchSmokePaletteRouteEvidence;
@@ -182,6 +194,16 @@ type LaunchSmokeInstrumentToolsEvidence = {
   resetSoundOpen: boolean;
   studioHarmonyOpen: boolean;
   studioSoundOpen: boolean;
+};
+
+type LaunchSmokeArrangementToolsEvidence = {
+  guidedArrangementOpen: boolean;
+  guidedBlockMovesOpen: boolean;
+  resetArrangementOpen: boolean;
+  resetBlockMovesOpen: boolean;
+  studioArrangementOpen: boolean;
+  studioBlockMovesFullWidth: boolean;
+  studioBlockMovesOpen: boolean;
 };
 
 type LaunchSmokeVisualEvidence = {
@@ -1052,6 +1074,11 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "chord-event-grid",
         "harmony-moves",
         "sound-design-tools",
+        "arrangement-playback-readout",
+        "arrangement-timeline",
+        "selected-block-editor",
+        "block-moves",
+        "arrangement-tools",
         "export-stems",
         "export-midi",
         "export-handoff-sheet",
@@ -1089,6 +1116,8 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "Capture & Ideas",
         "Harmony Moves",
         "Sound Design",
+        "Block Moves",
+        "Arrangement Tools",
         "Drums",
         "808",
         "Synth",
@@ -1119,6 +1148,14 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const harmonyMovesToggle = document.querySelector('[data-testid="harmony-moves-toggle"]');
       const soundDesign = document.querySelector('[data-testid="sound-design-tools"]');
       const soundDesignToggle = document.querySelector('[data-testid="sound-design-toggle"]');
+      const arrangementPlayback = document.querySelector('[data-testid="arrangement-playback-readout"]');
+      const arrangementTimeline = document.querySelector('[data-testid="arrangement-timeline"]');
+      const selectedBlockEditor = document.querySelector('[data-testid="selected-block-editor"]');
+      const arrangementBars = document.querySelector('[data-testid="arrangement-bars-input"]');
+      const blockMoves = document.querySelector('[data-testid="block-moves"]');
+      const blockMovesToggle = document.querySelector('[data-testid="block-moves-toggle"]');
+      const arrangementTools = document.querySelector('[data-testid="arrangement-tools"]');
+      const arrangementToolsToggle = document.querySelector('[data-testid="arrangement-tools-toggle"]');
       const follows = (before, after) =>
         Boolean(before && after && (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING));
       const emptyRoute = {
@@ -1193,6 +1230,16 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         hasSaveProject: typeof bridge?.saveProject === "function",
         location: window.location.href,
         layout: {
+          arrangementEssentialBeforeBlockMoves: follows(arrangementBars, blockMoves),
+          arrangementPlaybackBeforeTimeline: follows(arrangementPlayback, arrangementTimeline),
+          arrangementPlaybackPresent: Boolean(arrangementPlayback),
+          arrangementTimelineBeforeEditor: follows(arrangementTimeline, selectedBlockEditor),
+          arrangementTimelinePresent: Boolean(arrangementTimeline),
+          arrangementToolsOpen: Boolean(arrangementTools?.open),
+          arrangementToolsToggleVisible: Boolean(arrangementToolsToggle && arrangementToolsToggle.getBoundingClientRect().height > 0),
+          blockMovesBeforeArrangementTools: follows(blockMoves, arrangementTools),
+          blockMovesOpen: Boolean(blockMoves?.open),
+          blockMovesToggleVisible: Boolean(blockMovesToggle && blockMovesToggle.getBoundingClientRect().height > 0),
           chordEventsBeforeHarmonyMoves: follows(chordEventGrid, harmonyMoves),
           chordsBeforeSoundDesign: follows(instrumentDirectChords, soundDesign),
           captureIdeasOpen: Boolean(captureIdeas?.open),
@@ -1209,6 +1256,7 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           noteLanesPresent: Boolean(noteLanes),
           soundDesignOpen: Boolean(soundDesign?.open),
           soundDesignToggleVisible: Boolean(soundDesignToggle && soundDesignToggle.getBoundingClientRect().height > 0),
+          selectedBlockEditorPresent: Boolean(selectedBlockEditor),
           stepGridAfterPatternLab: follows(patternLab, stepGrid),
           stepGridPresent: Boolean(stepGrid)
         },
@@ -1218,6 +1266,15 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           readiness: emptyBridgeDirect
         },
         palette: {
+          arrangementTools: {
+            guidedArrangementOpen: true,
+            guidedBlockMovesOpen: true,
+            resetArrangementOpen: true,
+            resetBlockMovesOpen: true,
+            studioArrangementOpen: false,
+            studioBlockMovesFullWidth: false,
+            studioBlockMovesOpen: false
+          },
           captureIdeas: {
             autoReveal: false,
             initialOpen: true,

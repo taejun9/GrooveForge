@@ -108,6 +108,28 @@ function validateFirstRunRenderer(html) {
       !html.includes('<details class="instrument-tools" data-testid="sound-design-tools" open="">'),
     "Guided first render should keep Harmony Moves and Sound Design collapsed"
   );
+  const arrangementPanelIndex = html.indexOf('data-testid="workflow-target-arrange"');
+  const arrangementPlaybackIndex = html.indexOf('data-testid="arrangement-playback-readout"');
+  const arrangementTimelineIndex = html.indexOf('data-testid="arrangement-timeline"');
+  const selectedBlockEditorIndex = html.indexOf('data-testid="selected-block-editor"');
+  const arrangementBarsIndex = html.indexOf('data-testid="arrangement-bars-input"');
+  const blockMovesIndex = html.indexOf('data-testid="block-moves"');
+  const arrangementToolsIndex = html.indexOf('data-testid="arrangement-tools"');
+  check(
+    arrangementPanelIndex >= 0 &&
+      arrangementPlaybackIndex > arrangementPanelIndex &&
+      arrangementTimelineIndex > arrangementPlaybackIndex &&
+      selectedBlockEditorIndex > arrangementTimelineIndex &&
+      arrangementBarsIndex > selectedBlockEditorIndex &&
+      blockMovesIndex > arrangementBarsIndex &&
+      arrangementToolsIndex > blockMovesIndex,
+    "Arrangement hierarchy should keep playback, timeline, essential block editing, Block Moves, and Arrangement Tools in order"
+  );
+  check(
+    !html.includes('<details class="block-moves" data-testid="block-moves" open="">') &&
+      !html.includes('<details class="arrangement-tools" data-testid="arrangement-tools" open="">'),
+    "Guided first render should keep Block Moves and Arrangement Tools collapsed"
+  );
 
   const checks = {
     "starter transport": [
@@ -204,6 +226,21 @@ function validateFirstRunRenderer(html) {
       "Progressions, reharmonization, rhythm, and voicing",
       "Sound Design",
       "Devices, kits, tone shaping, and A/B snapshots"
+    ],
+    "arrangement timeline first": [
+      'data-testid="arrangement-playback-readout"',
+      'data-testid="arrangement-timeline"',
+      'data-testid="selected-block-editor"',
+      'data-testid="block-moves"',
+      'data-testid="block-moves-toggle"',
+      'data-testid="block-moves-content"',
+      'data-testid="arrangement-tools"',
+      'data-testid="arrangement-tools-toggle"',
+      'data-testid="arrangement-tools-content"',
+      "Block Moves",
+      "Producer presets, priority suggestions, and structural previews",
+      "Arrangement Tools",
+      "Templates, song-form chains, section cues, mute maps, and transitions"
     ],
     "producer workflow": [
       "Professional producer",
