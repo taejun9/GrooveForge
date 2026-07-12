@@ -130,6 +130,31 @@ function validateFirstRunRenderer(html) {
       !html.includes('<details class="arrangement-tools" data-testid="arrangement-tools" open="">'),
     "Guided first render should keep Block Moves and Arrangement Tools collapsed"
   );
+  const mixerPanelIndex = html.indexOf('data-testid="workflow-target-mix"');
+  const mixerStripsIndex = html.indexOf('data-testid="mixer-channel-strips"');
+  const mixerMuteIndex = html.indexOf('data-testid="mixer-mute-drum_rack"');
+  const mixerVolumeIndex = html.indexOf('data-testid="mixer-volume-drum_rack"');
+  const mixerPanIndex = html.indexOf('data-testid="mixer-pan-drum_rack"');
+  const mixerProcessingIndex = html.indexOf('data-testid="mixer-processing-drum_rack"');
+  const mixMovesIndex = html.indexOf('data-testid="mix-moves"');
+  const mixReviewIndex = html.indexOf('data-testid="mix-review-tools"');
+  check(
+    mixerPanelIndex >= 0 &&
+      mixerStripsIndex > mixerPanelIndex &&
+      mixerMuteIndex > mixerStripsIndex &&
+      mixerVolumeIndex > mixerMuteIndex &&
+      mixerPanIndex > mixerVolumeIndex &&
+      mixerProcessingIndex > mixerPanIndex &&
+      mixMovesIndex > mixerProcessingIndex &&
+      mixReviewIndex > mixMovesIndex,
+    "Mixer hierarchy should keep direct strips and basic balance before processing, Mix Moves, and Audition & Compare"
+  );
+  check(
+    !html.includes('<details class="mixer-processing" data-testid="mixer-processing-drum_rack" open="">') &&
+      !html.includes('<details class="mix-moves" data-testid="mix-moves" open="">') &&
+      !html.includes('<details class="mix-review-tools" data-testid="mix-review-tools" open="">'),
+    "Guided first render should keep channel Processing, Mix Moves, and Audition & Compare collapsed"
+  );
 
   const checks = {
     "starter transport": [
@@ -241,6 +266,22 @@ function validateFirstRunRenderer(html) {
       "Producer presets, priority suggestions, and structural previews",
       "Arrangement Tools",
       "Templates, song-form chains, section cues, mute maps, and transitions"
+    ],
+    "mixer strips first": [
+      'data-testid="mixer-channel-strips"',
+      'data-testid="mixer-processing-drum_rack"',
+      'data-testid="mixer-processing-toggle-drum_rack"',
+      'data-testid="mix-moves"',
+      'data-testid="mix-moves-toggle"',
+      'data-testid="mix-moves-content"',
+      'data-testid="mix-review-tools"',
+      'data-testid="mix-review-toggle"',
+      'data-testid="mix-review-content"',
+      "Tone &amp; Space",
+      "Mix Moves",
+      "Balance presets and Space send shaping",
+      "Audition &amp; Compare",
+      "Stem isolation, listening decisions, and Mix Snapshot A/B"
     ],
     "producer workflow": [
       "Professional producer",

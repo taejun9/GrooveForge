@@ -1133,6 +1133,9 @@ export function App(): ReactElement {
   const [harmonyMovesOpen, setHarmonyMovesOpen] = useState(false);
   const [arrangementToolsOpen, setArrangementToolsOpen] = useState(false);
   const [blockMovesOpen, setBlockMovesOpen] = useState(false);
+  const [mixMovesOpen, setMixMovesOpen] = useState(false);
+  const [mixReviewOpen, setMixReviewOpen] = useState(false);
+  const [channelProcessingOpen, setChannelProcessingOpen] = useState<Record<string, boolean>>({});
   const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
   const [arrangementBlockClipboard, setArrangementBlockClipboard] = useState<ArrangementBlockClipboard | null>(null);
   const [splitAfterBars, setSplitAfterBars] = useState(1);
@@ -2927,6 +2930,11 @@ export function App(): ReactElement {
     setHarmonyMovesOpen(advancedOpen);
     setArrangementToolsOpen(advancedOpen);
     setBlockMovesOpen(advancedOpen);
+    setMixMovesOpen(advancedOpen);
+    setMixReviewOpen(advancedOpen);
+    setChannelProcessingOpen(
+      Object.fromEntries(projectRef.current.mixer.map((channel) => [channel.id, advancedOpen]))
+    );
   }
 
   async function requestMidiInputAccess(): Promise<void> {
@@ -4105,6 +4113,7 @@ export function App(): ReactElement {
   }
 
   function applyStemAuditionPad(padId: StemAuditionPadId): void {
+    setMixReviewOpen(true);
     const pad = stemAuditionPadDefinitions.find((definition) => definition.id === padId);
     if (!pad) {
       setProjectStatus("Stem audition pad not found");
@@ -4122,12 +4131,14 @@ export function App(): ReactElement {
   }
 
   function captureMixSnapshot(slot: MixSnapshotSlotId): void {
+    setMixReviewOpen(true);
     const snapshot = createMixSnapshot(slot, projectRef.current, exportAnalysis, stemAnalyses);
     setMixSnapshots((current) => ({ ...current, [slot]: snapshot }));
     setProjectStatus(`Captured Mix Snapshot ${slot}: ${snapshot.statusLabel}`);
   }
 
   function recallMixSnapshot(slot: MixSnapshotSlotId): void {
+    setMixReviewOpen(true);
     const snapshot = mixSnapshots[slot];
     if (!snapshot) {
       setProjectStatus(`Mix Snapshot ${slot} is empty`);
@@ -4160,6 +4171,7 @@ export function App(): ReactElement {
   }
 
   function clearMixSnapshots(): void {
+    setMixReviewOpen(true);
     if (!mixSnapshots.A && !mixSnapshots.B) {
       setProjectStatus("Mix Snapshot A/B already clear");
       return;
@@ -4169,6 +4181,7 @@ export function App(): ReactElement {
   }
 
   function applyMixBalancePad(padId: MixBalancePadId): void {
+    setMixMovesOpen(true);
     const pad = mixBalancePadDefinitions.find((definition) => definition.id === padId);
     if (!pad) {
       setMixBalanceResult(null);
@@ -4196,6 +4209,7 @@ export function App(): ReactElement {
   }
 
   function applySpaceFxPad(padId: SpaceFxPadId): void {
+    setMixMovesOpen(true);
     const pad = spaceFxPadDefinitions.find((definition) => definition.id === padId);
     if (!pad) {
       setSpaceFxResult(null);
@@ -7467,6 +7481,7 @@ export function App(): ReactElement {
   }
 
   function focusStemAuditionReadout(): void {
+    setMixReviewOpen(true);
     mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
       `Stem Audition ${stemAuditionReadout.statusLabel}: ${stemAuditionReadout.roleLabel} / ${stemAuditionReadout.detailLabel} / Decision ${stemAuditionDecision.targetLabel}`
@@ -7474,6 +7489,7 @@ export function App(): ReactElement {
   }
 
   function focusStemAuditionRouteReadout(): void {
+    setMixReviewOpen(true);
     const pad = stemAuditionDecision.targetId
       ? stemAuditionPadOptions.find((option) => option.id === stemAuditionDecision.targetId) ?? null
       : null;
@@ -7486,6 +7502,7 @@ export function App(): ReactElement {
   }
 
   function focusMixSnapshotReadout(): void {
+    setMixReviewOpen(true);
     mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
       `Mix Snapshot A/B ${mixSnapshotComparison.statusLabel}: ${mixSnapshotComparison.winnerLabel} / Decision ${mixSnapshotComparison.decisionActionLabel}`
@@ -7493,6 +7510,7 @@ export function App(): ReactElement {
   }
 
   function focusMixSnapshotRouteReadout(): void {
+    setMixReviewOpen(true);
     const directCommand = `mix-snapshot-${mixSnapshotComparison.decisionActionId}`;
     mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -7503,6 +7521,7 @@ export function App(): ReactElement {
   }
 
   function focusMixBalanceReadout(): void {
+    setMixMovesOpen(true);
     mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
       `Mix Balance ${mixBalancePreviewSummary.statusLabel}: ${mixBalancePreviewSummary.padLabel} / ${mixBalancePreviewSummary.channelLabel}`
@@ -7510,6 +7529,7 @@ export function App(): ReactElement {
   }
 
   function focusMixBalanceRouteReadout(): void {
+    setMixMovesOpen(true);
     const pad =
       mixBalancePadOptions.find((option) => option.id === mixBalancePreviewSummary.padId) ??
       mixBalancePadOptions[0] ??
@@ -7524,6 +7544,7 @@ export function App(): ReactElement {
   }
 
   function focusSpaceFxReadout(): void {
+    setMixMovesOpen(true);
     mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
       `Space FX ${spaceFxPreviewSummary.statusLabel}: ${spaceFxPreviewSummary.padLabel} / ${spaceFxPreviewSummary.sendLabel}`
@@ -7531,6 +7552,7 @@ export function App(): ReactElement {
   }
 
   function focusSpaceFxRouteReadout(): void {
+    setMixMovesOpen(true);
     const pad =
       spaceFxPadOptions.find((option) => option.id === spaceFxPreviewSummary.padId) ??
       spaceFxPadOptions[0] ??
@@ -10155,11 +10177,17 @@ export function App(): ReactElement {
         const guidedHarmonyOpen = document.querySelector<HTMLDetailsElement>('[data-testid="harmony-moves"]')?.open ?? true;
         const guidedArrangementOpen = document.querySelector<HTMLDetailsElement>('[data-testid="arrangement-tools"]')?.open ?? true;
         const guidedBlockMovesOpen = document.querySelector<HTMLDetailsElement>('[data-testid="block-moves"]')?.open ?? true;
+        const guidedMixMovesOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mix-moves"]')?.open ?? true;
+        const guidedMixReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mix-review-tools"]')?.open ?? true;
+        const guidedProcessingOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mixer-processing-drum_rack"]')?.open ?? true;
         flushSync(() => updateModeAwareToolPanels("studio"));
         const studioSoundOpen = document.querySelector<HTMLDetailsElement>('[data-testid="sound-design-tools"]')?.open ?? false;
         const studioHarmonyOpen = document.querySelector<HTMLDetailsElement>('[data-testid="harmony-moves"]')?.open ?? false;
         const studioArrangementOpen = document.querySelector<HTMLDetailsElement>('[data-testid="arrangement-tools"]')?.open ?? false;
         const studioBlockMovesOpen = document.querySelector<HTMLDetailsElement>('[data-testid="block-moves"]')?.open ?? false;
+        const studioMixMovesOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mix-moves"]')?.open ?? false;
+        const studioMixReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mix-review-tools"]')?.open ?? false;
+        const studioProcessingOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mixer-processing-drum_rack"]')?.open ?? false;
         const studioBlockMovesElement = document.querySelector<HTMLDetailsElement>('[data-testid="block-moves"]');
         const studioBlockMovesStyle = studioBlockMovesElement ? getComputedStyle(studioBlockMovesElement) : null;
         const studioBlockMovesFullWidth =
@@ -10169,6 +10197,9 @@ export function App(): ReactElement {
         const resetHarmonyOpen = document.querySelector<HTMLDetailsElement>('[data-testid="harmony-moves"]')?.open ?? true;
         const resetArrangementOpen = document.querySelector<HTMLDetailsElement>('[data-testid="arrangement-tools"]')?.open ?? true;
         const resetBlockMovesOpen = document.querySelector<HTMLDetailsElement>('[data-testid="block-moves"]')?.open ?? true;
+        const resetMixMovesOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mix-moves"]')?.open ?? true;
+        const resetMixReviewOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mix-review-tools"]')?.open ?? true;
+        const resetProcessingOpen = document.querySelector<HTMLDetailsElement>('[data-testid="mixer-processing-drum_rack"]')?.open ?? true;
         const arrangementTools = {
           guidedArrangementOpen,
           guidedBlockMovesOpen,
@@ -10185,6 +10216,17 @@ export function App(): ReactElement {
           resetSoundOpen,
           studioHarmonyOpen,
           studioSoundOpen
+        };
+        const mixerTools = {
+          guidedMixMovesOpen,
+          guidedMixReviewOpen,
+          guidedProcessingOpen,
+          resetMixMovesOpen,
+          resetMixReviewOpen,
+          resetProcessingOpen,
+          studioMixMovesOpen,
+          studioMixReviewOpen,
+          studioProcessingOpen
         };
         markLaunchSmokePaletteStep("producer");
         const producer = quickActionEvidenceById("audience-session-enter-producer", projectRef.current, {
@@ -10248,6 +10290,7 @@ export function App(): ReactElement {
           dualReadout,
           guided,
           instrumentTools,
+          mixerTools,
           nextStepRail: readAudienceNextStepRailEvidence(),
           opened: true,
           producer,
@@ -12115,67 +12158,7 @@ export function App(): ReactElement {
 
         <section className="panel mixer-panel" data-testid="workflow-target-mix" aria-label="Mixer" ref={mixPanelRef}>
           <PanelTitle icon={<SlidersHorizontal size={18} />} title="Mixer" meta={`${activeChannels} audible`} />
-          <MixBalancePads
-            pads={mixBalancePadOptions}
-            preview={mixBalancePreviewSummary}
-            result={mixBalanceResult}
-            onApply={applyMixBalancePad}
-          />
-          <SpaceFxPads
-            pads={spaceFxPadOptions}
-            preview={spaceFxPreviewSummary}
-            result={spaceFxResult}
-            onApply={applySpaceFxPad}
-          />
-          <StemAuditionPads pads={stemAuditionPadOptions} onApply={applyStemAuditionPad} />
-          <div
-            className={["stem-audition-readout", stemAuditionReadout.tone].join(" ")}
-            data-testid="stem-audition-readout"
-            title={stemAuditionReadout.detailTitle}
-          >
-            <span data-testid="stem-audition-status">{stemAuditionReadout.statusLabel}</span>
-            <strong data-testid="stem-audition-label">{stemAuditionReadout.roleLabel}</strong>
-            <small data-testid="stem-audition-detail">{stemAuditionReadout.detailLabel}</small>
-          </div>
-          <div
-            className={["stem-audition-decision", stemAuditionDecision.tone].join(" ")}
-            data-stem-audition-decision={stemAuditionDecision.targetId ?? "none"}
-            data-testid="stem-audition-decision"
-            title={stemAuditionDecision.detailTitle}
-          >
-            <span data-testid="stem-audition-decision-status">{stemAuditionDecision.statusLabel}</span>
-            <strong data-testid="stem-audition-decision-target">{stemAuditionDecision.targetLabel}</strong>
-            <small data-testid="stem-audition-decision-detail">{stemAuditionDecision.detailLabel}</small>
-            <small data-testid="stem-audition-decision-next-check">{stemAuditionDecision.nextCheckLabel}</small>
-            <button
-              className="stem-audition-decision-action"
-              data-stem-audition-decision-action={stemAuditionDecision.targetId ?? "none"}
-              data-testid="stem-audition-decision-run"
-              disabled={stemAuditionDecision.targetId === null}
-              onClick={() => {
-                if (stemAuditionDecision.targetId) {
-                  applyStemAuditionPad(stemAuditionDecision.targetId);
-                }
-              }}
-              title={
-                stemAuditionDecision.targetId
-                  ? `Run ${stemAuditionDecision.targetLabel}: ${stemAuditionDecision.nextCheckLabel}`
-                  : stemAuditionDecision.detailTitle
-              }
-              type="button"
-            >
-              <Play size={13} aria-hidden="true" />
-              <span>{stemAuditionDecision.targetLabel}</span>
-            </button>
-          </div>
-          <MixSnapshotAB
-            snapshots={mixSnapshots}
-            summary={mixSnapshotComparison}
-            onCapture={captureMixSnapshot}
-            onRecall={recallMixSnapshot}
-            onClear={clearMixSnapshots}
-          />
-          <div className="mixer-strips">
+          <div className="mixer-strips" data-testid="mixer-channel-strips">
             {project.mixer.map((channel) => {
               const roleSummary = mixerChannelRoleSummary(channel);
               return (
@@ -12252,7 +12235,27 @@ export function App(): ReactElement {
                   <StemLevelMeter analysis={stemAnalyses[channel.id]} trackId={channel.id} />
                 )}
                 {channel.id !== "master" && (
-                  <div className="eq-controls" aria-label={`${channel.name} channel EQ`}>
+                  <details
+                    className="mixer-processing"
+                    data-testid={`mixer-processing-${channel.id}`}
+                    open={channelProcessingOpen[channel.id] === true}
+                  >
+                    <summary
+                      className="mixer-processing-summary"
+                      data-testid={`mixer-processing-toggle-${channel.id}`}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setChannelProcessingOpen((current) => ({ ...current, [channel.id]: current[channel.id] !== true }));
+                      }}
+                    >
+                      <span>
+                        <strong>Tone &amp; Space</strong>
+                        <small>Cut {percentLabel(channel.lowCut)} · Drive {percentLabel(channel.drive)} · Space {percentLabel(channel.send)}</small>
+                      </span>
+                      <ArrowDown className="mixer-processing-chevron" size={14} aria-hidden="true" />
+                    </summary>
+                    <div className="mixer-processing-content">
+                      <div className="eq-controls" aria-label={`${channel.name} channel EQ`}>
                     <label className="strip-control">
                       <span>Low cut</span>
                       <div className="eq-inputs">
@@ -12378,7 +12381,9 @@ export function App(): ReactElement {
                         />
                       </div>
                     </label>
-                  </div>
+                      </div>
+                    </div>
+                  </details>
                 )}
                 <div className="strip-readout">
                   <span>{channel.volumeDb} dB</span>
@@ -12397,6 +12402,108 @@ export function App(): ReactElement {
               );
             })}
           </div>
+          <details className="mix-moves" data-testid="mix-moves" open={mixMovesOpen}>
+            <summary
+              className="mix-tools-summary"
+              data-testid="mix-moves-toggle"
+              onClick={(event) => {
+                event.preventDefault();
+                setMixMovesOpen((open) => !open);
+              }}
+            >
+              <span className="mix-tools-copy">
+                <strong>Mix Moves</strong>
+                <small>Balance presets and Space send shaping</small>
+              </span>
+              <span className="mix-tools-context">
+                {mixBalancePreviewSummary.statusLabel} · {spaceFxPreviewSummary.statusLabel} · {project.mode === "studio" ? "Studio" : "Guided"}
+              </span>
+              <ArrowDown className="mix-tools-chevron" size={16} aria-hidden="true" />
+            </summary>
+            <div className="mix-tools-content" data-testid="mix-moves-content">
+              <MixBalancePads
+                pads={mixBalancePadOptions}
+                preview={mixBalancePreviewSummary}
+                result={mixBalanceResult}
+                onApply={applyMixBalancePad}
+              />
+              <SpaceFxPads
+                pads={spaceFxPadOptions}
+                preview={spaceFxPreviewSummary}
+                result={spaceFxResult}
+                onApply={applySpaceFxPad}
+              />
+            </div>
+          </details>
+          <details className="mix-review-tools" data-testid="mix-review-tools" open={mixReviewOpen}>
+            <summary
+              className="mix-tools-summary"
+              data-testid="mix-review-toggle"
+              onClick={(event) => {
+                event.preventDefault();
+                setMixReviewOpen((open) => !open);
+              }}
+            >
+              <span className="mix-tools-copy">
+                <strong>Audition &amp; Compare</strong>
+                <small>Stem isolation, listening decisions, and Mix Snapshot A/B</small>
+              </span>
+              <span className="mix-tools-context">
+                {stemAuditionReadout.statusLabel} · {mixSnapshotComparison.statusLabel} · {project.mode === "studio" ? "Studio" : "Guided"}
+              </span>
+              <ArrowDown className="mix-tools-chevron" size={16} aria-hidden="true" />
+            </summary>
+            <div className="mix-tools-content" data-testid="mix-review-content">
+              <StemAuditionPads pads={stemAuditionPadOptions} onApply={applyStemAuditionPad} />
+              <div
+                className={["stem-audition-readout", stemAuditionReadout.tone].join(" ")}
+                data-testid="stem-audition-readout"
+                title={stemAuditionReadout.detailTitle}
+              >
+                <span data-testid="stem-audition-status">{stemAuditionReadout.statusLabel}</span>
+                <strong data-testid="stem-audition-label">{stemAuditionReadout.roleLabel}</strong>
+                <small data-testid="stem-audition-detail">{stemAuditionReadout.detailLabel}</small>
+              </div>
+              <div
+                className={["stem-audition-decision", stemAuditionDecision.tone].join(" ")}
+                data-stem-audition-decision={stemAuditionDecision.targetId ?? "none"}
+                data-testid="stem-audition-decision"
+                title={stemAuditionDecision.detailTitle}
+              >
+                <span data-testid="stem-audition-decision-status">{stemAuditionDecision.statusLabel}</span>
+                <strong data-testid="stem-audition-decision-target">{stemAuditionDecision.targetLabel}</strong>
+                <small data-testid="stem-audition-decision-detail">{stemAuditionDecision.detailLabel}</small>
+                <small data-testid="stem-audition-decision-next-check">{stemAuditionDecision.nextCheckLabel}</small>
+                <button
+                  className="stem-audition-decision-action"
+                  data-stem-audition-decision-action={stemAuditionDecision.targetId ?? "none"}
+                  data-testid="stem-audition-decision-run"
+                  disabled={stemAuditionDecision.targetId === null}
+                  onClick={() => {
+                    if (stemAuditionDecision.targetId) {
+                      applyStemAuditionPad(stemAuditionDecision.targetId);
+                    }
+                  }}
+                  title={
+                    stemAuditionDecision.targetId
+                      ? `Run ${stemAuditionDecision.targetLabel}: ${stemAuditionDecision.nextCheckLabel}`
+                      : stemAuditionDecision.detailTitle
+                  }
+                  type="button"
+                >
+                  <Play size={13} aria-hidden="true" />
+                  <span>{stemAuditionDecision.targetLabel}</span>
+                </button>
+              </div>
+              <MixSnapshotAB
+                snapshots={mixSnapshots}
+                summary={mixSnapshotComparison}
+                onCapture={captureMixSnapshot}
+                onRecall={recallMixSnapshot}
+                onClear={clearMixSnapshots}
+              />
+            </div>
+          </details>
         </section>
 
         <section className="panel master-panel" data-testid="workflow-target-master" aria-label="Master" ref={masterPanelRef}>
