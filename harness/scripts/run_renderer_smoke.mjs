@@ -141,6 +141,38 @@ function validateFirstRunRenderer(html) {
       !html.includes('<details class="transport-export-tools" data-testid="transport-export-tools" open="">'),
     "Guided first render should keep Session Context and Exports collapsed"
   );
+  check(
+    [
+      'aria-keyshortcuts="Control+K Meta+K"',
+      'aria-keyshortcuts="? Control+/ Meta+/"',
+      'aria-keyshortcuts="Space"',
+      'aria-keyshortcuts="Control+Z Meta+Z"',
+      'aria-keyshortcuts="Control+Y Meta+Y Control+Shift+Z Meta+Shift+Z"',
+      'aria-keyshortcuts="Control+O Meta+O"',
+      'aria-keyshortcuts="Control+S Meta+S"'
+    ].every((shortcut) => html.includes(shortcut)),
+    "essential transport and project controls should expose their existing desktop shortcuts"
+  );
+  check(
+    html.includes('title="Open Quick Actions (Ctrl/Cmd+K)"') &&
+      html.includes('title="Open Command Reference (? or Ctrl/Cmd+/)"') &&
+      html.includes('title="Play song loop (Space)"') &&
+      html.includes('title="Undo last edit (Ctrl/Cmd+Z)"') &&
+      html.includes('title="Redo last undone edit (Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y)"') &&
+      html.includes('title="Open project (Ctrl/Cmd+O)"') &&
+      html.includes('title="Save project (Ctrl/Cmd+S)"'),
+    "essential transport and project controls should name shortcuts in native tooltips"
+  );
+  check(
+    html.includes('data-testid="transport-play"') && html.includes('aria-pressed="false"'),
+    "initial Play control should expose its stopped pressed state"
+  );
+  check(
+    ["A", "B", "C"].every((pattern, index) =>
+      html.includes(`aria-keyshortcuts="${index + 1}"`) && html.includes(`title="Edit Pattern ${pattern} (${index + 1})"`)
+    ),
+    "Pattern A/B/C tabs should expose 1/2/3 shortcut semantics and tooltips"
+  );
   const patternPlaybackIndex = html.indexOf('data-testid="pattern-playback-readout"');
   const patternLabIndex = html.indexOf('data-testid="pattern-lab"');
   const drumGridIndex = html.indexOf('class="step-grid"');

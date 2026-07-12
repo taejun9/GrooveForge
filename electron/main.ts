@@ -131,6 +131,10 @@ type LaunchSmokeLayoutEvidence = {
   stepGridAfterPatternLab: boolean;
   stepGridPresent: boolean;
   transportEssentialsBeforeProject: boolean;
+  essentialShortcutMetadataReady: boolean;
+  essentialShortcutTitlesReady: boolean;
+  patternShortcutMetadataReady: boolean;
+  playPressedStateReady: boolean;
   transportExportsContainWav: boolean;
   transportExportsOpen: boolean;
   transportExportsToggleVisible: boolean;
@@ -1369,8 +1373,16 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const transportStatusControls = document.querySelector('[data-testid="transport-status-controls"]');
       const transportEssentialControls = document.querySelector('[data-testid="transport-essential-controls"]');
       const transportPlay = document.querySelector('[data-testid="transport-play"]');
+      const quickActionsOpen = document.querySelector('[data-testid="quick-actions-open"]');
+      const commandReferenceOpen = document.querySelector('[data-testid="command-reference-open"]');
+      const undoButton = document.querySelector('[data-testid="undo-button"]');
+      const redoButton = document.querySelector('[data-testid="redo-button"]');
+      const projectOpen = document.querySelector('[data-testid="project-open"]');
       const projectEssentialControls = document.querySelector('[data-testid="project-essential-controls"]');
       const projectSave = document.querySelector('[data-testid="project-save"]');
+      const patternTabs = ["A", "B", "C"].map((pattern) =>
+        document.querySelector('[data-testid="pattern-tab-' + pattern + '"]')
+      );
       const transportSession = document.querySelector('[data-testid="transport-session-tools"]');
       const transportSessionToggle = document.querySelector('[data-testid="transport-session-toggle"]');
       const transportExports = document.querySelector('[data-testid="transport-export-tools"]');
@@ -1560,6 +1572,29 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           selectedBlockEditorPresent: Boolean(selectedBlockEditor),
           stepGridAfterPatternLab: follows(patternLab, stepGrid),
           stepGridPresent: Boolean(stepGrid),
+          essentialShortcutMetadataReady:
+            quickActionsOpen?.getAttribute("aria-keyshortcuts") === "Control+K Meta+K" &&
+            commandReferenceOpen?.getAttribute("aria-keyshortcuts") === "? Control+/ Meta+/" &&
+            transportPlay?.getAttribute("aria-keyshortcuts") === "Space" &&
+            undoButton?.getAttribute("aria-keyshortcuts") === "Control+Z Meta+Z" &&
+            redoButton?.getAttribute("aria-keyshortcuts") === "Control+Y Meta+Y Control+Shift+Z Meta+Shift+Z" &&
+            projectOpen?.getAttribute("aria-keyshortcuts") === "Control+O Meta+O" &&
+            projectSave?.getAttribute("aria-keyshortcuts") === "Control+S Meta+S",
+          essentialShortcutTitlesReady:
+            quickActionsOpen?.getAttribute("title") === "Open Quick Actions (Ctrl/Cmd+K)" &&
+            commandReferenceOpen?.getAttribute("title") === "Open Command Reference (? or Ctrl/Cmd+/)" &&
+            transportPlay?.getAttribute("title")?.endsWith("loop (Space)") === true &&
+            undoButton?.getAttribute("title") === "Undo last edit (Ctrl/Cmd+Z)" &&
+            redoButton?.getAttribute("title") === "Redo last undone edit (Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y)" &&
+            projectOpen?.getAttribute("title") === "Open project (Ctrl/Cmd+O)" &&
+            projectSave?.getAttribute("title") === "Save project (Ctrl/Cmd+S)",
+          patternShortcutMetadataReady: patternTabs.every(
+            (tab, index) =>
+              tab?.getAttribute("aria-keyshortcuts") === String(index + 1) &&
+              tab?.getAttribute("title") ===
+                "Edit Pattern " + ["A", "B", "C"][index] + " (" + String(index + 1) + ")"
+          ),
+          playPressedStateReady: transportPlay?.getAttribute("aria-pressed") === "false",
           transportEssentialsBeforeProject: follows(transportEssentialControls, projectEssentialControls),
           transportExportsContainWav: Boolean(transportExports && exportWav && transportExports.contains(exportWav)),
           transportExportsOpen: Boolean(transportExports?.open),

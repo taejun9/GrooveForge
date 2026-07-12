@@ -10816,31 +10816,48 @@ export function App(): ReactElement {
             <Gauge size={18} aria-hidden="true" />
             <span>Click</span>
           </button>
-          <button className="icon-button" data-testid="quick-actions-open" type="button" title="Open Quick Actions" onClick={openQuickActions}>
+          <button
+            aria-keyshortcuts="Control+K Meta+K"
+            className="icon-button"
+            data-testid="quick-actions-open"
+            type="button"
+            title="Open Quick Actions (Ctrl/Cmd+K)"
+            onClick={openQuickActions}
+          >
             <KeyboardMusic size={18} aria-hidden="true" />
             <span>Actions</span>
           </button>
           <button
+            aria-keyshortcuts="? Control+/ Meta+/"
             className="icon-button"
             data-testid="command-reference-open"
             type="button"
-            title="Open Command Reference"
+            title="Open Command Reference (? or Ctrl/Cmd+/)"
             onClick={openCommandReference}
           >
             <CircleHelp size={18} aria-hidden="true" />
             <span>Help</span>
           </button>
-          <button className="icon-button primary" data-testid="transport-play" type="button" title={`Play ${transportLoopLabel(transportLoopScope).toLowerCase()} loop`} onClick={togglePlayback}>
+          <button
+            aria-keyshortcuts="Space"
+            aria-pressed={isPlaying}
+            className="icon-button primary"
+            data-testid="transport-play"
+            type="button"
+            title={`${isPlaying ? "Stop" : "Play"} ${transportLoopLabel(transportLoopScope).toLowerCase()} loop (Space)`}
+            onClick={togglePlayback}
+          >
             {isPlaying ? <CircleStop size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
             <span>{isPlaying ? "Stop" : "Play"}</span>
           </button>
           </div>
           <div className="project-essential-controls" data-testid="project-essential-controls">
           <button
+            aria-keyshortcuts="Control+Z Meta+Z"
             className="icon-button"
             data-testid="undo-button"
             type="button"
-            title="Undo last edit"
+            title="Undo last edit (Ctrl/Cmd+Z)"
             disabled={!canUndo}
             onClick={undoProject}
           >
@@ -10848,21 +10865,36 @@ export function App(): ReactElement {
             <span>Undo</span>
           </button>
           <button
+            aria-keyshortcuts="Control+Y Meta+Y Control+Shift+Z Meta+Shift+Z"
             className="icon-button"
             data-testid="redo-button"
             type="button"
-            title="Redo last undone edit"
+            title="Redo last undone edit (Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y)"
             disabled={!canRedo}
             onClick={redoProject}
           >
             <Redo2 size={18} aria-hidden="true" />
             <span>Redo</span>
           </button>
-          <button className="icon-button" data-testid="project-open" type="button" title="Open project" onClick={() => void handleOpenProject()}>
+          <button
+            aria-keyshortcuts="Control+O Meta+O"
+            className="icon-button"
+            data-testid="project-open"
+            type="button"
+            title="Open project (Ctrl/Cmd+O)"
+            onClick={() => void handleOpenProject()}
+          >
             <FolderOpen size={18} aria-hidden="true" />
             <span>Open</span>
           </button>
-          <button className="icon-button" data-testid="project-save" type="button" title="Save project" onClick={() => void handleSaveProject()}>
+          <button
+            aria-keyshortcuts="Control+S Meta+S"
+            className="icon-button"
+            data-testid="project-save"
+            type="button"
+            title="Save project (Ctrl/Cmd+S)"
+            onClick={() => void handleSaveProject()}
+          >
             <Save size={18} aria-hidden="true" />
             <span>Save</span>
           </button>
@@ -11390,12 +11422,14 @@ export function App(): ReactElement {
               const playing = playingPattern === pattern;
               return (
                 <button
+                  aria-keyshortcuts={String(patternSlots.indexOf(pattern) + 1)}
                   key={pattern}
                   aria-current={playing ? "step" : undefined}
                   className={["pattern-tab", selected ? "selected" : "", playing ? "playing" : ""].filter(Boolean).join(" ")}
                   data-playing={playing ? "true" : "false"}
                   data-testid={`pattern-tab-${pattern}`}
                   type="button"
+                  title={`Edit Pattern ${pattern} (${patternSlots.indexOf(pattern) + 1})`}
                   onClick={() => selectPattern(pattern)}
                 >
                   <span>{pattern}</span>

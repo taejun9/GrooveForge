@@ -227,6 +227,13 @@ function checkResult(result) {
     "live desktop transport secondary tools should expand for Studio and reset compactly for Guided"
   );
   check(
+    evidence?.layout?.essentialShortcutMetadataReady === true &&
+      evidence?.layout?.essentialShortcutTitlesReady === true &&
+      evidence?.layout?.patternShortcutMetadataReady === true &&
+      evidence?.layout?.playPressedStateReady === true,
+    "live desktop essential controls should expose exact shortcut semantics, tooltip hints, pattern keys, and stopped Play state"
+  );
+  check(
     evidence?.palette?.launchpad?.initialOpen === true &&
       evidence?.palette?.launchpad?.collapsedAfterStarter === true &&
       evidence?.palette?.launchpad?.manualReopen === true &&
@@ -1059,6 +1066,9 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Transport essentials: Play direct ${result.evidence.layout.transportPlayDirectVisible ? "yes" : "no"}, Save direct ${result.evidence.layout.transportSaveDirectVisible ? "yes" : "no"}, Guided helpers ${result.evidence.layout.transportSessionOpen || result.evidence.layout.transportExportsOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.transportTools.studioSessionOpen && result.evidence.palette.transportTools.studioExportsOpen ? "yes" : "no"}`
+  );
+  console.log(
+    `- Shortcut discovery: essential metadata ${result.evidence.layout.essentialShortcutMetadataReady ? "yes" : "no"}, tooltip hints ${result.evidence.layout.essentialShortcutTitlesReady ? "yes" : "no"}, Pattern 1/2/3 ${result.evidence.layout.patternShortcutMetadataReady ? "yes" : "no"}, Play state ${result.evidence.layout.playPressedStateReady ? "yes" : "no"}`
   );
   console.log(
     `- Launchpad lifecycle: initial ${result.evidence.layout.launchpadOpen ? "open" : "collapsed"}, starter collapse ${result.evidence.palette.launchpad.collapsedAfterStarter ? "yes" : "no"}, manual reopen/close ${result.evidence.palette.launchpad.manualReopen && result.evidence.palette.launchpad.manualClose ? "yes" : "no"}`
