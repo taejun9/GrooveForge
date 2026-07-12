@@ -177,6 +177,7 @@ type GrooveforgeLaunchSmokeAudienceDeliveryProofBridgeEvidence = {
 };
 
 type GrooveforgeLaunchSmokePaletteEvidence = {
+  captureIdeas: GrooveforgeLaunchSmokeCaptureIdeasEvidence;
   completionCheckpoints: GrooveforgeLaunchSmokeAudienceCompletionCheckpointEvidence;
   completionBeginner: GrooveforgeLaunchSmokeRouteEvidence;
   completionProducer: GrooveforgeLaunchSmokeRouteEvidence;
@@ -222,6 +223,12 @@ type GrooveforgeLaunchSmokeBridgeDirectEvidence = {
 type GrooveforgeLaunchSmokeBridgeDirectEvidenceBundle = {
   completion: GrooveforgeLaunchSmokeBridgeDirectEvidence;
   readiness: GrooveforgeLaunchSmokeBridgeDirectEvidence;
+};
+
+type GrooveforgeLaunchSmokeCaptureIdeasEvidence = {
+  autoReveal: boolean;
+  initialOpen: boolean;
+  resetOpen: boolean;
 };
 
 interface Window {
