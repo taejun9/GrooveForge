@@ -177,6 +177,7 @@ type GrooveforgeLaunchSmokeAudienceDeliveryProofBridgeEvidence = {
 };
 
 type GrooveforgeLaunchSmokePaletteEvidence = {
+  arrangementTools: GrooveforgeLaunchSmokeArrangementToolsEvidence;
   captureIdeas: GrooveforgeLaunchSmokeCaptureIdeasEvidence;
   completionCheckpoints: GrooveforgeLaunchSmokeAudienceCompletionCheckpointEvidence;
   completionBeginner: GrooveforgeLaunchSmokeRouteEvidence;
@@ -239,6 +240,16 @@ type GrooveforgeLaunchSmokeInstrumentToolsEvidence = {
   resetSoundOpen: boolean;
   studioHarmonyOpen: boolean;
   studioSoundOpen: boolean;
+};
+
+type GrooveforgeLaunchSmokeArrangementToolsEvidence = {
+  guidedArrangementOpen: boolean;
+  guidedBlockMovesOpen: boolean;
+  resetArrangementOpen: boolean;
+  resetBlockMovesOpen: boolean;
+  studioArrangementOpen: boolean;
+  studioBlockMovesFullWidth: boolean;
+  studioBlockMovesOpen: boolean;
 };
 
 interface Window {

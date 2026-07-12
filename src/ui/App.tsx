@@ -1131,6 +1131,8 @@ export function App(): ReactElement {
   const [chordClipboard, setChordClipboard] = useState<ChordClipboard | null>(null);
   const [soundDesignOpen, setSoundDesignOpen] = useState(false);
   const [harmonyMovesOpen, setHarmonyMovesOpen] = useState(false);
+  const [arrangementToolsOpen, setArrangementToolsOpen] = useState(false);
+  const [blockMovesOpen, setBlockMovesOpen] = useState(false);
   const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
   const [arrangementBlockClipboard, setArrangementBlockClipboard] = useState<ArrangementBlockClipboard | null>(null);
   const [splitAfterBars, setSplitAfterBars] = useState(1);
@@ -2041,7 +2043,7 @@ export function App(): ReactElement {
   }, [currentPattern.chordEvents.length, project.selectedPattern]);
 
   useEffect(() => {
-    updateInstrumentToolMode(project.mode);
+    updateModeAwareToolPanels(project.mode);
   }, [project.mode]);
 
   useEffect(() => {
@@ -2919,10 +2921,12 @@ export function App(): ReactElement {
     setMidiCaptureArmed(armed);
   }
 
-  function updateInstrumentToolMode(mode: ProjectState["mode"]): void {
+  function updateModeAwareToolPanels(mode: ProjectState["mode"]): void {
     const advancedOpen = mode === "studio";
     setSoundDesignOpen(advancedOpen);
     setHarmonyMovesOpen(advancedOpen);
+    setArrangementToolsOpen(advancedOpen);
+    setBlockMovesOpen(advancedOpen);
   }
 
   async function requestMidiInputAccess(): Promise<void> {
@@ -3564,6 +3568,7 @@ export function App(): ReactElement {
   }
 
   function cueArrangementTransition(transition: ArrangementTransitionMapTransition): void {
+    setArrangementToolsOpen(true);
     if (isPlaying) {
       setProjectStatus("Stop playback before cueing a transition");
       return;
@@ -3746,6 +3751,7 @@ export function App(): ReactElement {
   }
 
   function cueSectionLocator(section: ArrangementSection): void {
+    setArrangementToolsOpen(true);
     if (isPlaying) {
       setProjectStatus("Stop playback before cueing a section");
       return;
@@ -3794,6 +3800,7 @@ export function App(): ReactElement {
   }
 
   function cyclePatternChainStep(index: number): void {
+    setArrangementToolsOpen(true);
     const block = projectRef.current.arrangement[index];
     if (!block) {
       setProjectStatus("Chain step not found");
@@ -3807,6 +3814,7 @@ export function App(): ReactElement {
   }
 
   function applyArrangementMoveToSelected(preset: ArrangementMovePreset): void {
+    setBlockMovesOpen(true);
     const beforeProject = projectRef.current;
     const blockIndex = selectedArrangementIndex;
     const block = projectRef.current.arrangement[selectedArrangementIndex];
@@ -3831,6 +3839,7 @@ export function App(): ReactElement {
   }
 
   function applyArrangementFocusPreset(presetId: ArrangementFocusPresetId): void {
+    setArrangementToolsOpen(true);
     const preset = arrangementFocusPresets.find((candidate) => candidate.id === presetId);
     const beforeProject = projectRef.current;
     const blockIndex = selectedArrangementIndex;
@@ -3861,6 +3870,7 @@ export function App(): ReactElement {
   }
 
   function applyArrangementArcPad(padId: ArrangementArcPadId): void {
+    setArrangementToolsOpen(true);
     const pad = arrangementArcPadDefinitions.find((definition) => definition.id === padId);
     if (!pad) {
       setArrangementArcResult(null);
@@ -3897,6 +3907,7 @@ export function App(): ReactElement {
   }
 
   function applyArrangementTemplate(template: ArrangementTemplateId): void {
+    setArrangementToolsOpen(true);
     const beforeProject = projectRef.current;
     const arrangement = createArrangementTemplate(template);
     const firstBlock = arrangement[0];
@@ -3923,6 +3934,7 @@ export function App(): ReactElement {
   }
 
   function applyPatternChain(chain: PatternChainId): void {
+    setArrangementToolsOpen(true);
     const beforeProject = projectRef.current;
     const arrangement = createPatternChain(chain);
     const firstBlock = arrangement[0];
@@ -3948,6 +3960,7 @@ export function App(): ReactElement {
   }
 
   function expandPatternChain(): void {
+    setArrangementToolsOpen(true);
     const beforeProject = projectRef.current;
     const arrangement = expandPatternChainArrangement(projectRef.current.arrangement);
     const firstBlock = arrangement[0];
@@ -3971,6 +3984,7 @@ export function App(): ReactElement {
   }
 
   function runPatternChainPriorityAction(actionId: PatternChainPrioritySummary["actionId"]): void {
+    setArrangementToolsOpen(true);
     if (actionId === "aligned") {
       return;
     }
@@ -4613,6 +4627,7 @@ export function App(): ReactElement {
   }
 
   function runSelectedBlockEditPriorityAction(actionId: SelectedBlockEditPrioritySummary["actionId"]): void {
+    setBlockMovesOpen(true);
     switch (actionId) {
       case "copy":
         copySelectedArrangementBlock();
@@ -6964,7 +6979,7 @@ export function App(): ReactElement {
       afterExportPreflight
     );
 
-    updateInstrumentToolMode(mode);
+    updateModeAwareToolPanels(mode);
 
     setModeSwitchResult(
       createModeSwitchResult(mode, beforeProject, afterProject, afterModeFocus, afterSessionPass, afterFirstBeatPath, changed)
@@ -8028,6 +8043,7 @@ export function App(): ReactElement {
   }
 
   function focusArrangementMuteMapLane(lane: ArrangementMuteMapLane): void {
+    setArrangementToolsOpen(true);
     setArrangementMuteMapFocusId(lane.id);
     arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setArrangementMuteMapResult(createArrangementMuteMapFocusResult(lane, arrangementMuteMapSummary));
@@ -8035,6 +8051,7 @@ export function App(): ReactElement {
   }
 
   function focusArrangementMuteMapReadout(): void {
+    setArrangementToolsOpen(true);
     const lane = activeArrangementMuteMapQuickActionLane(arrangementMuteMapSummary);
     arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8045,6 +8062,7 @@ export function App(): ReactElement {
   }
 
   function focusArrangementTransitionMapTransition(transition: ArrangementTransitionMapTransition): void {
+    setArrangementToolsOpen(true);
     setArrangementTransitionMapFocusId(transition.id);
     arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setArrangementTransitionMapResult(createArrangementTransitionMapFocusResult(transition, arrangementTransitionMapSummary));
@@ -8052,6 +8070,7 @@ export function App(): ReactElement {
   }
 
   function focusArrangementTransitionMapReadout(): void {
+    setArrangementToolsOpen(true);
     const transition = activeArrangementTransitionMapQuickActionTransition(arrangementTransitionMapSummary);
     arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -10131,15 +10150,34 @@ export function App(): ReactElement {
         });
         const resetOpen = document.querySelector<HTMLDetailsElement>('[data-testid="capture-ideas"]')?.open ?? true;
         const captureIdeas = { autoReveal, initialOpen, resetOpen };
-        flushSync(() => updateInstrumentToolMode("guided"));
+        flushSync(() => updateModeAwareToolPanels("guided"));
         const guidedSoundOpen = document.querySelector<HTMLDetailsElement>('[data-testid="sound-design-tools"]')?.open ?? true;
         const guidedHarmonyOpen = document.querySelector<HTMLDetailsElement>('[data-testid="harmony-moves"]')?.open ?? true;
-        flushSync(() => updateInstrumentToolMode("studio"));
+        const guidedArrangementOpen = document.querySelector<HTMLDetailsElement>('[data-testid="arrangement-tools"]')?.open ?? true;
+        const guidedBlockMovesOpen = document.querySelector<HTMLDetailsElement>('[data-testid="block-moves"]')?.open ?? true;
+        flushSync(() => updateModeAwareToolPanels("studio"));
         const studioSoundOpen = document.querySelector<HTMLDetailsElement>('[data-testid="sound-design-tools"]')?.open ?? false;
         const studioHarmonyOpen = document.querySelector<HTMLDetailsElement>('[data-testid="harmony-moves"]')?.open ?? false;
-        flushSync(() => updateInstrumentToolMode("guided"));
+        const studioArrangementOpen = document.querySelector<HTMLDetailsElement>('[data-testid="arrangement-tools"]')?.open ?? false;
+        const studioBlockMovesOpen = document.querySelector<HTMLDetailsElement>('[data-testid="block-moves"]')?.open ?? false;
+        const studioBlockMovesElement = document.querySelector<HTMLDetailsElement>('[data-testid="block-moves"]');
+        const studioBlockMovesStyle = studioBlockMovesElement ? getComputedStyle(studioBlockMovesElement) : null;
+        const studioBlockMovesFullWidth =
+          studioBlockMovesStyle?.gridColumnStart === "1" && studioBlockMovesStyle.gridColumnEnd === "-1";
+        flushSync(() => updateModeAwareToolPanels("guided"));
         const resetSoundOpen = document.querySelector<HTMLDetailsElement>('[data-testid="sound-design-tools"]')?.open ?? true;
         const resetHarmonyOpen = document.querySelector<HTMLDetailsElement>('[data-testid="harmony-moves"]')?.open ?? true;
+        const resetArrangementOpen = document.querySelector<HTMLDetailsElement>('[data-testid="arrangement-tools"]')?.open ?? true;
+        const resetBlockMovesOpen = document.querySelector<HTMLDetailsElement>('[data-testid="block-moves"]')?.open ?? true;
+        const arrangementTools = {
+          guidedArrangementOpen,
+          guidedBlockMovesOpen,
+          resetArrangementOpen,
+          resetBlockMovesOpen,
+          studioArrangementOpen,
+          studioBlockMovesFullWidth,
+          studioBlockMovesOpen
+        };
         const instrumentTools = {
           guidedHarmonyOpen,
           guidedSoundOpen,
@@ -10194,6 +10232,7 @@ export function App(): ReactElement {
         const starterProducer = runAudienceStarterRoute("producer");
         markLaunchSmokePaletteStep("returning");
         return {
+          arrangementTools,
           captureIdeas,
           completionCheckpoints: readAudienceCompletionCheckpointEvidence(),
           completionBeginner,
@@ -11610,106 +11649,6 @@ export function App(): ReactElement {
 
         <section className="panel arrangement-panel" data-testid="workflow-target-arrange" aria-label="Arrangement" ref={arrangePanelRef}>
           <PanelTitle icon={<Music2 size={18} />} title="Arrangement" meta={`${project.arrangement.length} blocks / ${barCountLabel(arrangementTotalBars(project))}`} />
-          <ArrangementTemplateControls
-            preview={arrangementTemplatePreviewSummary}
-            result={arrangementTemplateResult}
-            onApply={applyArrangementTemplate}
-          />
-          <ArrangementArcPads
-            pads={arrangementArcPadOptions}
-            preview={arrangementArcPreviewSummary}
-            result={arrangementArcResult}
-            onApply={applyArrangementArcPad}
-          />
-          <SectionLocatorPads disabled={isPlaying} pads={sectionLocatorPads} result={sectionCueResult} onCue={cueSectionLocator} />
-          <div className="pattern-chain-row" aria-label="Pattern chain">
-            <PatternChainPreview preview={patternChainPreviewSummary} />
-            <PatternChainPreviewDecision
-              summary={createPatternChainPreviewDecision(patternChainPreviewSummary)}
-              onRun={runPatternChainPriorityAction}
-            />
-            <PatternChainPriorityReadout summary={patternChainPrioritySummary} onRun={runPatternChainPriorityAction} />
-            <div className="pattern-chain-heading">
-              <span>Chain</span>
-              <strong data-testid="pattern-chain-current">{patternChainReadout(project.arrangement)}</strong>
-            </div>
-            <button
-              className="pattern-chain-expand"
-              data-testid="pattern-chain-expand"
-              onClick={expandPatternChain}
-              title="Expand the current chain into a longer song form"
-              type="button"
-            >
-              <ArrowRight size={14} aria-hidden="true" />
-              <span>Expand</span>
-              <small>{barCountLabel(16)} song form</small>
-            </button>
-            <div className="pattern-chain-actions">
-              {patternChainIds.map((chain) => {
-                const chainBlocks = createPatternChain(chain);
-                const chainBars = chainBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
-                return (
-                  <button
-                    data-testid={`pattern-chain-${chain}`}
-                    key={chain}
-                    onClick={() => applyPatternChain(chain)}
-                    title={`Apply ${patternChainLabel(chain)}`}
-                    type="button"
-                  >
-                    <ArrowRight size={14} aria-hidden="true" />
-                    <span>{patternChainLabel(chain)}</span>
-                    <small>{patternChainReadout(chainBlocks)} / {barCountLabel(chainBars)}</small>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="pattern-chain-editor" aria-label="Pattern chain step editor" data-testid="pattern-chain-step-editor">
-              {project.arrangement.slice(0, 8).map((block, index) => {
-                const nextPattern = nextPatternSlot(block.pattern);
-                return (
-                  <button
-                    aria-label={`Chain step ${index + 1} ${block.section} Pattern ${block.pattern}, ${barCountLabel(block.bars)}. Switch to Pattern ${nextPattern}`}
-                    className={selectedArrangementIndex === index ? "selected" : ""}
-                    data-testid={`pattern-chain-step-${index}`}
-                    key={`${block.section}-${index}-${block.pattern}`}
-                    onClick={() => cyclePatternChainStep(index)}
-                    title={`Switch step ${index + 1} to Pattern ${nextPattern}`}
-                    type="button"
-                  >
-                    <span>Step {index + 1}</span>
-                    <strong data-testid={`pattern-chain-step-pattern-${index}`}>{block.pattern}</strong>
-                    <small>
-                      {block.section} {normalizeArrangementBars(block.bars)}b
-                    </small>
-                  </button>
-                );
-              })}
-            </div>
-            {patternChainResult && <PatternChainResultStrip result={patternChainResult} />}
-          </div>
-          <ArrangementFocusPanel
-            preview={arrangementFocusPreviewSummary}
-            result={arrangementFocusResult}
-            summary={selectedArrangementFocus}
-            onApply={applyArrangementFocusPreset}
-          />
-          <ArrangementMuteMap
-            focusedLaneId={arrangementMuteMapFocusId}
-            onFocus={focusArrangementMuteMapLane}
-            playingArrangementIndex={playingArrangementIndex}
-            result={arrangementMuteMapResult}
-            summary={arrangementMuteMapSummary}
-          />
-          <ArrangementTransitionMap
-            cuedTransitionId={transportLoopScope === "transition" ? arrangementTransitionLoopTarget?.transition.id ?? null : null}
-            isPlaying={isPlaying}
-            focusedTransitionId={arrangementTransitionMapFocusId}
-            onCue={cueArrangementTransition}
-            onFocus={focusArrangementTransitionMapTransition}
-            playingArrangementIndex={playingArrangementIndex}
-            result={arrangementTransitionMapResult}
-            summary={arrangementTransitionMapSummary}
-          />
           <div
             className={["arrangement-playback-readout", arrangementPlaybackReadout.tone].join(" ")}
             data-testid="arrangement-playback-readout"
@@ -11749,7 +11688,7 @@ export function App(): ReactElement {
               </span>
             </button>
           </div>
-          <div className="arrangement-track">
+          <div className="arrangement-track" data-testid="arrangement-timeline">
             {project.arrangement.map((block, index) => {
               const selected = selectedArrangementIndex === index;
               const playing = playingArrangementIndex === index;
@@ -11776,7 +11715,7 @@ export function App(): ReactElement {
             })}
           </div>
           {selectedArrangementBlock && (
-            <div className="arrangement-editor" aria-label="Selected arrangement block editor">
+            <div className="arrangement-editor" aria-label="Selected arrangement block editor" data-testid="selected-block-editor">
               <div className="arrangement-editor-heading">
                 <span>Block {selectedArrangementIndex + 1}</span>
                 <strong>
@@ -11846,39 +11785,6 @@ export function App(): ReactElement {
                   );
                 })}
               </div>
-              <ArrangementMovePreviewDecision
-                summary={createArrangementMovePreviewDecision(arrangementMovePrioritySummary)}
-                onApply={() => {
-                  if (arrangementMovePrioritySummary.presetId !== "none") {
-                    applyArrangementMoveToSelected(arrangementMovePrioritySummary.presetId);
-                  }
-                }}
-              />
-              <ArrangementMovePriorityReadout summary={arrangementMovePrioritySummary} onApply={applyArrangementMoveToSelected} />
-              <div className="arrangement-move-row" aria-label="Arrangement moves">
-                {arrangementMovePresetIds.map((preset) => (
-                  <button
-                    data-testid={`arrangement-move-${preset}`}
-                    key={preset}
-                    onClick={() => applyArrangementMoveToSelected(preset)}
-                    title={`Apply ${arrangementMovePresetLabel(preset)} move to selected block`}
-                    type="button"
-                  >
-                    {arrangementMovePresetLabel(preset)}
-                  </button>
-                ))}
-              </div>
-              {arrangementMoveResult?.blockIndex === selectedArrangementIndex && (
-                <ArrangementMoveResultStrip result={arrangementMoveResult} />
-              )}
-              <SelectedBlockEditPreviewDecision
-                summary={createSelectedBlockEditPreviewDecision(selectedBlockEditPrioritySummary)}
-                onRun={runSelectedBlockEditPriorityAction}
-              />
-              <SelectedBlockEditPriorityReadout
-                summary={selectedBlockEditPrioritySummary}
-                onRun={runSelectedBlockEditPriorityAction}
-              />
               <div className="arrangement-clipboard-row" aria-label="Arrangement block clipboard">
                 <button
                   data-testid="arrangement-copy"
@@ -12028,8 +11934,183 @@ export function App(): ReactElement {
               {selectedBlockEditResult?.blockIndex === selectedArrangementIndex && (
                 <SelectedBlockEditResultStrip result={selectedBlockEditResult} />
               )}
+              <details className="block-moves" data-testid="block-moves" open={blockMovesOpen}>
+                <summary
+                  className="block-moves-summary"
+                  data-testid="block-moves-toggle"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setBlockMovesOpen((open) => !open);
+                  }}
+                >
+                  <span className="block-moves-copy">
+                    <strong>Block Moves</strong>
+                    <small>Producer presets, priority suggestions, and structural previews</small>
+                  </span>
+                  <span className="block-moves-context">
+                    Block {selectedArrangementIndex + 1} · {selectedArrangementBlock.section} · Pattern {selectedArrangementBlock.pattern}
+                  </span>
+                  <ArrowDown className="block-moves-chevron" size={16} aria-hidden="true" />
+                </summary>
+                <div className="block-moves-content" data-testid="block-moves-content">
+                  <ArrangementMovePreviewDecision
+                    summary={createArrangementMovePreviewDecision(arrangementMovePrioritySummary)}
+                    onApply={() => {
+                      if (arrangementMovePrioritySummary.presetId !== "none") {
+                        applyArrangementMoveToSelected(arrangementMovePrioritySummary.presetId);
+                      }
+                    }}
+                  />
+                  <ArrangementMovePriorityReadout summary={arrangementMovePrioritySummary} onApply={applyArrangementMoveToSelected} />
+                  <div className="arrangement-move-row" aria-label="Arrangement moves">
+                    {arrangementMovePresetIds.map((preset) => (
+                      <button
+                        data-testid={`arrangement-move-${preset}`}
+                        key={preset}
+                        onClick={() => applyArrangementMoveToSelected(preset)}
+                        title={`Apply ${arrangementMovePresetLabel(preset)} move to selected block`}
+                        type="button"
+                      >
+                        {arrangementMovePresetLabel(preset)}
+                      </button>
+                    ))}
+                  </div>
+                  {arrangementMoveResult?.blockIndex === selectedArrangementIndex && (
+                    <ArrangementMoveResultStrip result={arrangementMoveResult} />
+                  )}
+                  <SelectedBlockEditPreviewDecision
+                    summary={createSelectedBlockEditPreviewDecision(selectedBlockEditPrioritySummary)}
+                    onRun={runSelectedBlockEditPriorityAction}
+                  />
+                  <SelectedBlockEditPriorityReadout
+                    summary={selectedBlockEditPrioritySummary}
+                    onRun={runSelectedBlockEditPriorityAction}
+                  />
+                </div>
+              </details>
             </div>
           )}
+          <details className="arrangement-tools" data-testid="arrangement-tools" open={arrangementToolsOpen}>
+            <summary
+              className="arrangement-tools-summary"
+              data-testid="arrangement-tools-toggle"
+              onClick={(event) => {
+                event.preventDefault();
+                setArrangementToolsOpen((open) => !open);
+              }}
+            >
+              <span className="arrangement-tools-copy">
+                <strong>Arrangement Tools</strong>
+                <small>Templates, song-form chains, section cues, mute maps, and transitions</small>
+              </span>
+              <span className="arrangement-tools-context">
+                {project.arrangement.length} blocks · {barCountLabel(arrangementTotalBars(project))} · {project.mode === "studio" ? "Studio" : "Guided"}
+              </span>
+              <ArrowDown className="arrangement-tools-chevron" size={16} aria-hidden="true" />
+            </summary>
+            <div className="arrangement-tools-content" data-testid="arrangement-tools-content">
+              <ArrangementTemplateControls
+                preview={arrangementTemplatePreviewSummary}
+                result={arrangementTemplateResult}
+                onApply={applyArrangementTemplate}
+              />
+              <ArrangementArcPads
+                pads={arrangementArcPadOptions}
+                preview={arrangementArcPreviewSummary}
+                result={arrangementArcResult}
+                onApply={applyArrangementArcPad}
+              />
+              <SectionLocatorPads disabled={isPlaying} pads={sectionLocatorPads} result={sectionCueResult} onCue={cueSectionLocator} />
+              <div className="pattern-chain-row" aria-label="Pattern chain">
+                <PatternChainPreview preview={patternChainPreviewSummary} />
+                <PatternChainPreviewDecision
+                  summary={createPatternChainPreviewDecision(patternChainPreviewSummary)}
+                  onRun={runPatternChainPriorityAction}
+                />
+                <PatternChainPriorityReadout summary={patternChainPrioritySummary} onRun={runPatternChainPriorityAction} />
+                <div className="pattern-chain-heading">
+                  <span>Chain</span>
+                  <strong data-testid="pattern-chain-current">{patternChainReadout(project.arrangement)}</strong>
+                </div>
+                <button
+                  className="pattern-chain-expand"
+                  data-testid="pattern-chain-expand"
+                  onClick={expandPatternChain}
+                  title="Expand the current chain into a longer song form"
+                  type="button"
+                >
+                  <ArrowRight size={14} aria-hidden="true" />
+                  <span>Expand</span>
+                  <small>{barCountLabel(16)} song form</small>
+                </button>
+                <div className="pattern-chain-actions">
+                  {patternChainIds.map((chain) => {
+                    const chainBlocks = createPatternChain(chain);
+                    const chainBars = chainBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+                    return (
+                      <button
+                        data-testid={`pattern-chain-${chain}`}
+                        key={chain}
+                        onClick={() => applyPatternChain(chain)}
+                        title={`Apply ${patternChainLabel(chain)}`}
+                        type="button"
+                      >
+                        <ArrowRight size={14} aria-hidden="true" />
+                        <span>{patternChainLabel(chain)}</span>
+                        <small>{patternChainReadout(chainBlocks)} / {barCountLabel(chainBars)}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="pattern-chain-editor" aria-label="Pattern chain step editor" data-testid="pattern-chain-step-editor">
+                  {project.arrangement.slice(0, 8).map((block, index) => {
+                    const nextPattern = nextPatternSlot(block.pattern);
+                    return (
+                      <button
+                        aria-label={`Chain step ${index + 1} ${block.section} Pattern ${block.pattern}, ${barCountLabel(block.bars)}. Switch to Pattern ${nextPattern}`}
+                        className={selectedArrangementIndex === index ? "selected" : ""}
+                        data-testid={`pattern-chain-step-${index}`}
+                        key={`${block.section}-${index}-${block.pattern}`}
+                        onClick={() => cyclePatternChainStep(index)}
+                        title={`Switch step ${index + 1} to Pattern ${nextPattern}`}
+                        type="button"
+                      >
+                        <span>Step {index + 1}</span>
+                        <strong data-testid={`pattern-chain-step-pattern-${index}`}>{block.pattern}</strong>
+                        <small>
+                          {block.section} {normalizeArrangementBars(block.bars)}b
+                        </small>
+                      </button>
+                    );
+                  })}
+                </div>
+                {patternChainResult && <PatternChainResultStrip result={patternChainResult} />}
+              </div>
+              <ArrangementFocusPanel
+                preview={arrangementFocusPreviewSummary}
+                result={arrangementFocusResult}
+                summary={selectedArrangementFocus}
+                onApply={applyArrangementFocusPreset}
+              />
+              <ArrangementMuteMap
+                focusedLaneId={arrangementMuteMapFocusId}
+                onFocus={focusArrangementMuteMapLane}
+                playingArrangementIndex={playingArrangementIndex}
+                result={arrangementMuteMapResult}
+                summary={arrangementMuteMapSummary}
+              />
+              <ArrangementTransitionMap
+                cuedTransitionId={transportLoopScope === "transition" ? arrangementTransitionLoopTarget?.transition.id ?? null : null}
+                isPlaying={isPlaying}
+                focusedTransitionId={arrangementTransitionMapFocusId}
+                onCue={cueArrangementTransition}
+                onFocus={focusArrangementTransitionMapTransition}
+                playingArrangementIndex={playingArrangementIndex}
+                result={arrangementTransitionMapResult}
+                summary={arrangementTransitionMapSummary}
+              />
+            </div>
+          </details>
         </section>
 
         <section className="panel mixer-panel" data-testid="workflow-target-mix" aria-label="Mixer" ref={mixPanelRef}>
