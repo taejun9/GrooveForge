@@ -6894,6 +6894,61 @@ h2 {
   padding: 0 12px;
 }
 
+.quick-actions-panel input:disabled {
+  color: rgba(244, 239, 231, 0.46);
+  cursor: wait;
+}
+
+.quick-actions-load-state {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.2);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.05);
+  padding: 12px;
+}
+
+.quick-actions-load-state.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.055);
+}
+
+.quick-actions-load-state span,
+.quick-actions-load-state strong,
+.quick-actions-load-state small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.quick-actions-load-state span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.quick-actions-load-state strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.quick-actions-load-state small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+}
+
+.quick-actions-load-state button {
+  justify-self: start;
+  min-height: 30px;
+  border: 1px solid rgba(255, 122, 79, 0.3);
+  border-radius: 6px;
+  color: #f4efe7;
+  background: rgba(255, 122, 79, 0.1);
+  padding: 5px 9px;
+}
+
 .command-reference-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

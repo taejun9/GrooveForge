@@ -3,10 +3,15 @@
 import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import ts from "typescript";
 import { createServer } from "vite";
 
 const failures = [];
 const styles = readFileSync(new URL("../../src/styles.css", import.meta.url), "utf8");
+const appSource = readFileSync(new URL("../../src/ui/App.tsx", import.meta.url), "utf8");
+const graphSource = readFileSync(new URL("../../src/ui/workstationAppQuickActionGraph.ts", import.meta.url), "utf8");
+const quickActionSource = readFileSync(new URL("../../src/ui/workstationAppQuickActions.tsx", import.meta.url), "utf8");
+const shellSource = readFileSync(new URL("../../src/ui/workstationShellPanels.tsx", import.meta.url), "utf8");
 
 function check(condition, message) {
   if (!condition) {
@@ -48,6 +53,134 @@ function validateDemandMaterialization(palette) {
   const reopened = palette.materializeWhenActive(true, factory, null);
   check(factoryCalls === 2, "reopening Quick Actions after cache invalidation should build a fresh command graph");
   check(reopened !== active, "reopened Quick Actions should not reuse the previous session graph");
+}
+
+const graphSharedHelperNames = [
+  "patternCueSwitchSelectedBlockPlacement",
+  "patternUseSelectedBlockPlacement",
+  "handoffSendReadinessLabel",
+  "handoffSendReadinessGateLabel",
+  "handoffBlockerRouteLabel",
+  "tempoNudgeRouteSummary",
+  "swingFeelRouteSummary",
+  "keyRetargetOptionSummary",
+  "keyRetargetPatternSummary",
+  "keyRetargetablePatternEventTotal",
+  "styleDirectionCurrentSummary",
+  "styleDirectionTargetSummary",
+  "styleDirectionPatternSummary",
+  "firstBeatPathCommandDetail",
+  "keyboardCaptureDefaultSummary",
+  "keyboardCapturePitchMapSummary",
+  "quickActionCaptureStepModeLabel",
+  "quickActionSoundDesignPosture",
+  "layerStarterRouteLabel",
+  "patternStackRouteLabel",
+  "drumMoveRouteLabel",
+  "bassMoveRouteLabel",
+  "melodyMoveRouteLabel",
+  "chordMoveRouteLabel"
+];
+
+function printNamedFunction(source, fileName, functionName) {
+  const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const declaration = sourceFile.statements.find(
+    (statement) => ts.isFunctionDeclaration(statement) && statement.name?.text === functionName
+  );
+  check(Boolean(declaration), `${fileName} should declare ${functionName}`);
+  return declaration
+    ? ts.createPrinter({ removeComments: true }).printNode(ts.EmitHint.Unspecified, declaration, sourceFile)
+    : "";
+}
+
+function validateLazyQuickActionGraphSource(graph) {
+  check(
+    appSource.includes('void import("./workstationAppQuickActionGraph")'),
+    "App should request the Quick Actions command graph through a dynamic import"
+  );
+  check(
+    !appSource.includes('from "./workstationAppQuickActionGraph"'),
+    "App should not statically import the Quick Actions command graph"
+  );
+  check(
+    graphSource.includes("export function createQuickActions({") && !quickActionSource.includes("export function createQuickActions({"),
+    "the complete command factory should live only in the lazy graph module"
+  );
+  check(typeof graph.createQuickActions === "function", "the lazy graph module should export the complete command factory");
+  for (const helperName of graphSharedHelperNames) {
+    check(
+      typeof graph[helperName] === "function" &&
+        printNamedFunction(graphSource, "workstationAppQuickActionGraph.ts", helperName) ===
+          printNamedFunction(quickActionSource, "workstationAppQuickActions.tsx", helperName),
+      `lazy graph helper ${helperName} should match its first-render helper implementation`
+    );
+  }
+  check(
+    shellSource.includes('"quick-actions-load-error" : "quick-actions-loading"') &&
+      shellSource.includes('data-testid="quick-actions-load-retry"') &&
+      shellSource.includes("aria-busy={loading}"),
+    "Quick Actions should expose explicit accessible loading, failure, and retry states"
+  );
+  check(
+    styles.includes(".quick-actions-load-state") && styles.includes(".quick-actions-load-state.danger"),
+    "Quick Actions loading and failure states should retain dedicated styling"
+  );
+}
+
+function validateQuickActionLoadStates(shell) {
+  const baseProps = {
+    actions: [],
+    inspectedPinnedActionId: null,
+    inspectedRecentActionId: null,
+    open: true,
+    pinnedActionIds: [],
+    pinnedResult: null,
+    query: "",
+    recentActionSource: [],
+    recentResult: null,
+    recents: [],
+    searchHintResult: null,
+    searchRecoveryResult: null,
+    searchResult: null,
+    scope: "all",
+    scopeResult: null,
+    scopeOptions: [],
+    onApplySearchHint() {},
+    onClose() {},
+    onInspectPinnedAction() {},
+    onInspectRecentAction() {},
+    onOpenCommandReference() {},
+    onQueryChange() {},
+    onRecoverSearchClear() {},
+    onRecoverSearchScope() {},
+    onRetryLoad() {},
+    onRun() {},
+    onScopeChange() {},
+    onTogglePin() {}
+  };
+  const loadingHtml = renderToStaticMarkup(
+    React.createElement(shell.QuickActions, { ...baseProps, loadError: null, loading: true })
+  );
+  const errorHtml = renderToStaticMarkup(
+    React.createElement(shell.QuickActions, {
+      ...baseProps,
+      loadError: "Quick Actions could not load. Your project is unchanged.",
+      loading: false
+    })
+  );
+
+  check(
+    loadingHtml.includes('data-testid="quick-actions-loading"') &&
+      loadingHtml.includes('aria-busy="true"') &&
+      loadingHtml.includes("The workstation stays usable while Actions becomes ready."),
+    "Quick Actions loading state should render an immediate busy dialog without false empty results"
+  );
+  check(
+    errorHtml.includes('data-testid="quick-actions-load-error"') &&
+      errorHtml.includes('data-testid="quick-actions-load-retry"') &&
+      errorHtml.includes("Your project is unchanged."),
+    "Quick Actions load failure should render a non-destructive retry path"
+  );
 }
 
 function installBrowserMocks() {
@@ -1996,10 +2129,13 @@ try {
   const html = renderToStaticMarkup(React.createElement(App));
   validateFirstRunRenderer(html);
   check(
-    html.includes('data-quick-actions-materialized="false"'),
-    "first render should keep the closed Quick Actions command graph unmaterialized"
+    html.includes('data-quick-actions-materialized="false"') &&
+      html.includes('data-quick-actions-graph-state="deferred"'),
+    "first render should keep the closed Quick Actions command graph unloaded and unmaterialized"
   );
   validateDemandMaterialization(await server.ssrLoadModule("/src/ui/workstationAppQuickActionPalette.ts"));
+  validateLazyQuickActionGraphSource(await server.ssrLoadModule("/src/ui/workstationAppQuickActionGraph.ts"));
+  validateQuickActionLoadStates(await server.ssrLoadModule("/src/ui/workstationShellPanels.tsx"));
   validateAudienceSessionQuickActionResults(
     await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
     await server.ssrLoadModule("/src/domain/workstation.ts")
@@ -2082,7 +2218,7 @@ try {
     console.log("- Audience Session Acceptance palette: route readout plus both acceptance lanes are searchable and return focused acceptance metrics");
     console.log("- Audience Session Proof Handoff palette: route readout plus both proof handoff lanes are searchable and return focused proof metrics");
     console.log("- Audience Delivery Proof Bridge palette: route readout plus both proof lanes are searchable and return focused proof metrics");
-    console.log("- Quick Actions lifecycle: closed renders skip the factory; one open session reuses its complete graph; reopen builds a fresh graph");
+    console.log("- Quick Actions lifecycle: graph module loads on demand with explicit wait/retry UI; one open session reuses its complete graph; reopen builds a fresh graph");
     console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack, Delivery Bundle ZIP");
   }
 } finally {

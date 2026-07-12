@@ -2519,6 +2519,8 @@ export function QuickActions({
   actions,
   inspectedPinnedActionId,
   inspectedRecentActionId,
+  loading,
+  loadError,
   open,
   pinnedActionIds,
   pinnedResult,
@@ -2542,11 +2544,14 @@ export function QuickActions({
   onRun,
   onScopeChange,
   onTogglePin,
-  onOpenCommandReference
+  onOpenCommandReference,
+  onRetryLoad
 }: {
   actions: QuickAction[];
   inspectedPinnedActionId: string | null;
   inspectedRecentActionId: string | null;
+  loading: boolean;
+  loadError: string | null;
   open: boolean;
   pinnedActionIds: string[];
   pinnedResult: QuickActionPinnedResult | null;
@@ -2571,9 +2576,79 @@ export function QuickActions({
   onScopeChange: (scope: QuickActionScopeId) => void;
   onTogglePin: (action: QuickAction) => void;
   onOpenCommandReference: () => void;
+  onRetryLoad: () => void;
 }): ReactElement | null {
   if (!open) {
     return null;
+  }
+
+  if (loading || loadError) {
+    return (
+      <div
+        className="quick-actions-overlay"
+        data-testid="quick-actions"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) {
+            onClose();
+          }
+        }}
+      >
+        <section
+          aria-busy={loading}
+          aria-label="Quick Actions"
+          aria-modal="true"
+          className="quick-actions-panel"
+          role="dialog"
+        >
+          <div className="quick-actions-heading">
+            <div>
+              <KeyboardMusic size={18} aria-hidden="true" />
+              <span>Quick Actions</span>
+            </div>
+            <div className="quick-actions-heading-actions">
+              <button
+                data-testid="quick-actions-open-command-reference"
+                onClick={onOpenCommandReference}
+                title="Open Command Reference"
+                type="button"
+              >
+                <CircleHelp size={14} aria-hidden="true" />
+              </button>
+              <button data-testid="quick-actions-close" onClick={onClose} title="Close Quick Actions" type="button">
+                <X size={14} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+          <input
+            aria-label="Search Quick Actions"
+            data-testid="quick-actions-search"
+            disabled
+            placeholder={loading ? "Loading commands…" : "Commands unavailable"}
+            type="search"
+            value=""
+          />
+          <div
+            aria-live="polite"
+            className={`quick-actions-load-state ${loadError ? "danger" : ""}`}
+            data-testid={loadError ? "quick-actions-load-error" : "quick-actions-loading"}
+            role={loadError ? "alert" : "status"}
+          >
+            <span>{loadError ? "Commands unavailable" : "Preparing command search"}</span>
+            <strong>{loadError ?? "Loading the full local command set…"}</strong>
+            <small>
+              {loadError
+                ? "Retry without changing the beat, playback, export, or project file."
+                : "The workstation stays usable while Actions becomes ready."}
+            </small>
+            {loadError && (
+              <button data-testid="quick-actions-load-retry" onClick={onRetryLoad} type="button">
+                Retry loading
+              </button>
+            )}
+          </div>
+        </section>
+      </div>
+    );
   }
 
   const trimmedQuery = query.trim();

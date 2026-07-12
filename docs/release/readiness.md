@@ -2,6 +2,8 @@
 
 This matrix is the current proof trail for the local-first GrooveForge MVP. It does not replace QA commands; it explains which current files and gates support each completion requirement.
 
+Run `npm run quick-actions:bundle-smoke` after `npm run build` to prove that the complete Quick Actions command graph stays out of the initial HTML modulepreload set while its smaller static helpers remain available to the first render.
+
 ## Release Gate
 
 Run the local release gate before a completion report:

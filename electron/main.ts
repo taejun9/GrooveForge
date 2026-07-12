@@ -134,6 +134,7 @@ type LaunchSmokeLayoutEvidence = {
   masterRoleBeforeControls: boolean;
   patternLabOpen: boolean;
   patternLabToggleVisible: boolean;
+  quickActionGraphReady: boolean;
   noteLanesAfterCaptureIdeas: boolean;
   noteLanesPresent: boolean;
   soundDesignOpen: boolean;
@@ -1320,6 +1321,7 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "Handoff Pack"
       ];
       const bodyText = document.body?.textContent ?? "";
+      const appShell = document.querySelector('.app-shell');
       const testIds = Object.fromEntries(
         expectedTestIds.map((testId) => [testId, document.querySelector(\`[data-testid="\${testId}"]\`) !== null])
       );
@@ -1648,6 +1650,7 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           masterRoleBeforeControls: follows(masterRole, masterOutputControls),
           patternLabOpen: Boolean(patternLab?.open),
           patternLabToggleVisible: Boolean(patternLabToggle && patternLabToggle.getBoundingClientRect().height > 0),
+          quickActionGraphReady: appShell?.getAttribute('data-quick-actions-graph-state') === 'ready',
           noteLanesAfterCaptureIdeas: follows(captureIdeas, noteLanes),
           noteLanesPresent: Boolean(noteLanes),
           soundDesignOpen: Boolean(soundDesign?.open),

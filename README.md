@@ -698,6 +698,7 @@ npm run desktop:local-delivery-zip-smoke
 npm run delivery:bundle-zip-smoke
 npm run typecheck
 npm run build
+npm run quick-actions:bundle-smoke
 npm run desktop:smoke
 npm run desktop:crash-report-regression-smoke
 npm run desktop:launch-smoke

@@ -178,6 +178,10 @@ function checkResult(result) {
   check(evidence?.samplingTextPresent === false, "live desktop first-run surface should not expose sampling-first language");
   check(evidence?.layout?.guidanceCenterOpen === false, "live desktop Guide & Review Center should start collapsed");
   check(
+    evidence?.layout?.quickActionGraphReady === true,
+    "live desktop should finish the on-demand Quick Actions graph load before exhaustive command evidence runs"
+  );
+  check(
     evidence?.layout?.guideQuickStartDecisionVisible === true &&
       evidence?.layout?.guideQuickStartDetailsOpen === false &&
       evidence?.layout?.guideQuickStartDetailsToggleVisible === true &&
@@ -1081,6 +1085,7 @@ child.on("exit", (code, signal) => {
   console.log(
     `- Guide Quick Start: decision direct ${result.evidence.layout.guideQuickStartDecisionVisible ? "yes" : "no"}, progress compact ${!result.evidence.layout.guideQuickStartDetailsOpen && result.evidence.layout.guideQuickStartDetailsContentHidden ? "yes" : "no"}, native open/close ${result.evidence.layout.guideQuickStartDetailsInteractionReady ? "yes" : "no"}`
   );
+  console.log(`- Quick Actions graph: on-demand module ${result.evidence.layout.quickActionGraphReady ? "ready" : "not ready"}`);
   console.log(
     `- Audience Session: actions direct ${result.evidence.layout.audienceSessionActionsDirectVisible ? "yes" : "no"}, proof compact ${!result.evidence.layout.audienceSessionProofOpen && result.evidence.layout.audienceSessionProofContentHidden ? "yes" : "no"}, native open/close ${result.evidence.layout.audienceSessionProofInteractionReady ? "yes" : "no"}, proof rows ${result.evidence.layout.audienceSessionProofRowsPreserved ? "10/10" : "missing"}`
   );
