@@ -375,6 +375,16 @@ button {
   margin-top: 18px;
 }
 
+.workspace-feedback-anchor {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.workspace-feedback-anchor:empty {
+  display: none;
+}
+
 @media (max-width: 720px) {
   .guidance-center {
     margin-inline: 10px;
@@ -16179,6 +16189,97 @@ h2 {
 
 .pattern-tabs button span {
   font-size: 13px;
+}
+
+.pattern-lab {
+  border: 1px solid rgba(240, 195, 106, 0.22);
+  border-radius: 8px;
+  background: rgba(240, 195, 106, 0.035);
+  overflow: clip;
+}
+
+.pattern-lab-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 52px;
+  padding: 8px 10px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.pattern-lab-summary::-webkit-details-marker {
+  display: none;
+}
+
+.pattern-lab-summary:hover {
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.pattern-lab-summary:focus-visible {
+  outline: 2px solid #f0c36a;
+  outline-offset: -3px;
+}
+
+.pattern-lab-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  color: #f0c36a;
+  background: rgba(240, 195, 106, 0.1);
+}
+
+.pattern-lab-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pattern-lab-copy strong {
+  font-size: 12px;
+}
+
+.pattern-lab-copy small,
+.pattern-lab-context {
+  color: rgba(244, 239, 231, 0.54);
+  font-size: 9px;
+}
+
+.pattern-lab-context {
+  padding: 4px 7px;
+  border: 1px solid rgba(244, 239, 231, 0.09);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.pattern-lab-chevron {
+  color: rgba(244, 239, 231, 0.5);
+  transition: transform 160ms ease;
+}
+
+.pattern-lab[open] .pattern-lab-chevron {
+  transform: rotate(180deg);
+}
+
+.pattern-lab-content {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border-top: 1px solid rgba(244, 239, 231, 0.08);
+}
+
+@media (max-width: 720px) {
+  .pattern-lab-summary {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .pattern-lab-context {
+    display: none;
+  }
 }
 
 .pattern-tabs button small {

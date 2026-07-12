@@ -55,14 +55,29 @@ function validateFirstRunRenderer(html) {
   check(html.length > 250000, `first-run renderer output should be substantial, got ${html.length} characters`);
   const quickStartIndex = html.indexOf('data-testid="guide-quick-start"');
   const guidanceCenterIndex = html.indexOf('data-testid="guidance-center"');
+  const feedbackAnchorIndex = html.indexOf('data-testid="workspace-feedback-anchor"');
   const workspaceIndex = html.indexOf('class="workspace-grid"');
   check(
-    quickStartIndex >= 0 && guidanceCenterIndex > quickStartIndex && workspaceIndex > guidanceCenterIndex,
-    "first-run hierarchy should keep Guide Quick Start visible before the on-demand guidance center and core workspace"
+    quickStartIndex >= 0 &&
+      guidanceCenterIndex > quickStartIndex &&
+      feedbackAnchorIndex > guidanceCenterIndex &&
+      workspaceIndex > feedbackAnchorIndex,
+    "first-run hierarchy should keep Guide Quick Start, on-demand guidance, global feedback, and core workspace in order"
   );
   check(
     !html.includes('<details class="guidance-center" data-testid="guidance-center" open="">'),
     "Guide & Review Center should be collapsed by default so the core workspace remains close to first-run controls"
+  );
+  const patternPlaybackIndex = html.indexOf('data-testid="pattern-playback-readout"');
+  const patternLabIndex = html.indexOf('data-testid="pattern-lab"');
+  const drumGridIndex = html.indexOf('class="step-grid"');
+  check(
+    patternPlaybackIndex >= 0 && patternLabIndex > patternPlaybackIndex && drumGridIndex > patternLabIndex,
+    "drum editor hierarchy should keep playback context, the on-demand Pattern Lab, and the 16-step grid in order"
+  );
+  check(
+    !html.includes('<details class="pattern-lab" data-testid="pattern-lab" open="">'),
+    "Pattern Lab should be collapsed by default so direct drum programming remains primary"
   );
 
   const checks = {
@@ -80,6 +95,7 @@ function validateFirstRunRenderer(html) {
       'data-testid="guidance-center"',
       'data-testid="guidance-center-toggle"',
       'data-testid="guidance-center-content"',
+      'data-testid="workspace-feedback-anchor"',
       "Guide &amp; Review Center",
       "Open step-by-step guidance, beat checks, and delivery help",
       'value="Untitled Beat"',
@@ -123,6 +139,16 @@ function validateFirstRunRenderer(html) {
       "Workflow navigator",
       "Guided Focus",
       "Guided Session Pass"
+    ],
+    "compose-first drum editor": [
+      'data-testid="pattern-lab"',
+      'data-testid="pattern-lab-toggle"',
+      'data-testid="pattern-lab-content"',
+      "Pattern Lab",
+      "Compare, generate, clone, vary, stack, and add fills",
+      "Pattern A",
+      'class="step-grid"',
+      'data-testid="drum-step-kick-0"'
     ],
     "producer workflow": [
       "Professional producer",
