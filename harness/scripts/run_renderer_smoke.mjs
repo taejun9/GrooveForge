@@ -155,6 +155,30 @@ function validateFirstRunRenderer(html) {
       !html.includes('<details class="mix-review-tools" data-testid="mix-review-tools" open="">'),
     "Guided first render should keep channel Processing, Mix Moves, and Audition & Compare collapsed"
   );
+  const masterPanelIndex = html.indexOf('data-testid="workflow-target-master"');
+  const masterRoleIndex = html.indexOf('data-testid="master-output-role-readout"');
+  const masterControlsIndex = html.indexOf('data-testid="master-output-controls"');
+  const masterCeilingIndex = html.indexOf('data-testid="master-ceiling"');
+  const masterCeilingInputIndex = html.indexOf('data-testid="master-ceiling-input"');
+  const masterPresetIndex = html.indexOf('data-testid="master-preset-Clean Demo"');
+  const masterPolishIndex = html.indexOf('data-testid="master-polish-tools"');
+  const masterReviewIndex = html.indexOf('data-testid="master-review-tools"');
+  check(
+    masterPanelIndex >= 0 &&
+      masterRoleIndex > masterPanelIndex &&
+      masterControlsIndex > masterRoleIndex &&
+      masterCeilingIndex > masterControlsIndex &&
+      masterCeilingInputIndex > masterCeilingIndex &&
+      masterPresetIndex > masterCeilingInputIndex &&
+      masterPolishIndex > masterPresetIndex &&
+      masterReviewIndex > masterPolishIndex,
+    "Master hierarchy should keep output role, precise ceiling, presets, Polish & Automation, and Review & Export in order"
+  );
+  check(
+    !html.includes('<details class="master-polish-tools" data-testid="master-polish-tools" open="">') &&
+      !html.includes('<details class="master-review-tools" data-testid="master-review-tools" open="">'),
+    "Guided first render should keep Polish & Automation and Review & Export collapsed"
+  );
 
   const checks = {
     "starter transport": [
@@ -282,6 +306,23 @@ function validateFirstRunRenderer(html) {
       "Balance presets and Space send shaping",
       "Audition &amp; Compare",
       "Stem isolation, listening decisions, and Mix Snapshot A/B"
+    ],
+    "master output first": [
+      'data-testid="master-output-role-readout"',
+      'data-testid="master-output-controls"',
+      'data-testid="master-ceiling"',
+      'data-testid="master-ceiling-input"',
+      'data-testid="master-polish-tools"',
+      'data-testid="master-polish-toggle"',
+      'data-testid="master-polish-content"',
+      'data-testid="master-review-tools"',
+      'data-testid="master-review-toggle"',
+      'data-testid="master-review-content"',
+      "Limiter ceiling",
+      "Lower values leave more headroom before export.",
+      "Output preset",
+      "Polish &amp; Automation",
+      "Review &amp; Export"
     ],
     "producer workflow": [
       "Professional producer",

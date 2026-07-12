@@ -194,6 +194,7 @@ type GrooveforgeLaunchSmokePaletteEvidence = {
   guided: GrooveforgeLaunchSmokeRouteEvidence;
   instrumentTools: GrooveforgeLaunchSmokeInstrumentToolsEvidence;
   mixerTools: GrooveforgeLaunchSmokeMixerToolsEvidence;
+  masterTools: GrooveforgeLaunchSmokeMasterToolsEvidence;
   nextStepRail: GrooveforgeLaunchSmokeAudienceNextStepRailEvidence;
   opened: boolean;
   producer: GrooveforgeLaunchSmokeRouteEvidence;
@@ -263,6 +264,15 @@ type GrooveforgeLaunchSmokeMixerToolsEvidence = {
   studioMixMovesOpen: boolean;
   studioMixReviewOpen: boolean;
   studioProcessingOpen: boolean;
+};
+
+type GrooveforgeLaunchSmokeMasterToolsEvidence = {
+  guidedMasterPolishOpen: boolean;
+  guidedMasterReviewOpen: boolean;
+  resetMasterPolishOpen: boolean;
+  resetMasterReviewOpen: boolean;
+  studioMasterPolishOpen: boolean;
+  studioMasterReviewOpen: boolean;
 };
 
 interface Window {
