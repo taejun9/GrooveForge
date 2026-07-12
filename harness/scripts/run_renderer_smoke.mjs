@@ -22,6 +22,24 @@ function checkExcludes(text, needle, label) {
   check(!text.toLowerCase().includes(needle.toLowerCase()), `${label} should not include ${needle}`);
 }
 
+function validateDemandMaterialization(palette) {
+  let factoryCalls = 0;
+  const factory = () => {
+    factoryCalls += 1;
+    return [{ id: "complete-command-graph" }];
+  };
+
+  const inactiveFirst = palette.materializeWhenActive(false, factory);
+  const inactiveSecond = palette.materializeWhenActive(false, factory);
+  check(factoryCalls === 0, "inactive Quick Actions materialization should not call the full command factory");
+  check(inactiveFirst.length === 0, "inactive Quick Actions materialization should return no commands");
+  check(inactiveFirst === inactiveSecond, "inactive Quick Actions materialization should reuse one stable empty array");
+
+  const active = palette.materializeWhenActive(true, factory);
+  check(factoryCalls === 1, "active Quick Actions materialization should call the full command factory exactly once");
+  check(active.length === 1 && active[0]?.id === "complete-command-graph", "active Quick Actions should return the factory's complete command graph");
+}
+
 function installBrowserMocks() {
   const storage = new Map();
   const localStorage = {
@@ -1885,6 +1903,11 @@ try {
   const { App } = await server.ssrLoadModule("/src/ui/App.tsx");
   const html = renderToStaticMarkup(React.createElement(App));
   validateFirstRunRenderer(html);
+  check(
+    html.includes('data-quick-actions-materialized="false"'),
+    "first render should keep the closed Quick Actions command graph unmaterialized"
+  );
+  validateDemandMaterialization(await server.ssrLoadModule("/src/ui/workstationAppQuickActionPalette.ts"));
   validateAudienceSessionQuickActionResults(
     await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
     await server.ssrLoadModule("/src/domain/workstation.ts")
@@ -1967,6 +1990,7 @@ try {
     console.log("- Audience Session Acceptance palette: route readout plus both acceptance lanes are searchable and return focused acceptance metrics");
     console.log("- Audience Session Proof Handoff palette: route readout plus both proof handoff lanes are searchable and return focused proof metrics");
     console.log("- Audience Delivery Proof Bridge palette: route readout plus both proof lanes are searchable and return focused proof metrics");
+    console.log("- Quick Actions lifecycle: closed first render skips the full command factory; active materialization returns the complete command graph");
     console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack, Delivery Bundle ZIP");
   }
 } finally {
