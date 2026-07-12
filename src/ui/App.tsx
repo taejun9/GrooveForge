@@ -1129,6 +1129,8 @@ export function App(): ReactElement {
   const [drumClipboard, setDrumClipboard] = useState<DrumClipboard | null>(null);
   const [selectedChordIndex, setSelectedChordIndex] = useState<number | null>(0);
   const [chordClipboard, setChordClipboard] = useState<ChordClipboard | null>(null);
+  const [soundDesignOpen, setSoundDesignOpen] = useState(false);
+  const [harmonyMovesOpen, setHarmonyMovesOpen] = useState(false);
   const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
   const [arrangementBlockClipboard, setArrangementBlockClipboard] = useState<ArrangementBlockClipboard | null>(null);
   const [splitAfterBars, setSplitAfterBars] = useState(1);
@@ -2039,6 +2041,10 @@ export function App(): ReactElement {
   }, [currentPattern.chordEvents.length, project.selectedPattern]);
 
   useEffect(() => {
+    updateInstrumentToolMode(project.mode);
+  }, [project.mode]);
+
+  useEffect(() => {
     const snapshotIds = new Set(project.snapshots.map((snapshot) => snapshot.id));
     setSnapshotNameDrafts((current) => {
       const nextDrafts = Object.fromEntries(Object.entries(current).filter(([snapshotId]) => snapshotIds.has(snapshotId)));
@@ -2911,6 +2917,12 @@ export function App(): ReactElement {
       setCaptureIdeasOpen(true);
     }
     setMidiCaptureArmed(armed);
+  }
+
+  function updateInstrumentToolMode(mode: ProjectState["mode"]): void {
+    const advancedOpen = mode === "studio";
+    setSoundDesignOpen(advancedOpen);
+    setHarmonyMovesOpen(advancedOpen);
   }
 
   async function requestMidiInputAccess(): Promise<void> {
@@ -4195,12 +4207,14 @@ export function App(): ReactElement {
   }
 
   function previewSoundPreset(preset: SoundPresetTarget): void {
+    setSoundDesignOpen(true);
     setSoundPresetPreviewId(preset);
     setSoundPresetResult(null);
     setProjectStatus(`${soundPresetLabel(preset)} sound preset preview`);
   }
 
   function applySoundPreset(preset: SoundPresetTarget = soundPresetPreviewId): void {
+    setSoundDesignOpen(true);
     const beforeSound = projectRef.current.sound;
     const targetSound = soundPresetDesign(preset);
     const changed = updateProject(
@@ -4221,6 +4235,7 @@ export function App(): ReactElement {
   }
 
   function applySoundFocusPad(padId: SoundFocusPadId): void {
+    setSoundDesignOpen(true);
     const pad = soundFocusPadDefinitions.find((definition) => definition.id === padId);
     if (!pad) {
       setSoundFocusResult(null);
@@ -4246,6 +4261,7 @@ export function App(): ReactElement {
   }
 
   function applyDrumKitPad(padId: DrumKitPadId): void {
+    setSoundDesignOpen(true);
     const pad = drumKitPadDefinitions.find((definition) => definition.id === padId);
     if (!pad) {
       setDrumKitResult(null);
@@ -4301,6 +4317,7 @@ export function App(): ReactElement {
   }
 
   function captureSoundSnapshot(slot: SoundSnapshotSlotId): void {
+    setSoundDesignOpen(true);
     const snapshot = createSoundSnapshot(slot, projectRef.current.sound);
     setSoundSnapshots((current) => ({ ...current, [slot]: snapshot }));
     setProjectStatus(`Captured Sound Snapshot ${slot}: ${snapshot.statusLabel}`);
@@ -6080,6 +6097,7 @@ export function App(): ReactElement {
   }
 
   function applyChordProgressionPreset(preset: ChordProgressionPreset): void {
+    setHarmonyMovesOpen(true);
     const changed = updateCurrentPattern(
       (pattern) => ({
         ...pattern,
@@ -6095,6 +6113,7 @@ export function App(): ReactElement {
   }
 
   function applyChordPad(padId: ChordPadId): void {
+    setHarmonyMovesOpen(true);
     if (selectedChordIndex === null || !selectedChord) {
       setChordMoveResult(null);
       setProjectStatus("Select a chord event");
@@ -6124,6 +6143,7 @@ export function App(): ReactElement {
   }
 
   function applyChordRhythm(rhythmId: ChordRhythmId): void {
+    setHarmonyMovesOpen(true);
     const rhythm = chordRhythmDefinitions.find((definition) => definition.id === rhythmId);
     if (!rhythm) {
       setChordMoveResult(null);
@@ -6164,6 +6184,7 @@ export function App(): ReactElement {
   }
 
   function applyChordVoicingPad(voicingId: ChordVoicingId): void {
+    setHarmonyMovesOpen(true);
     if (selectedChordIndex === null || !selectedChord) {
       setChordMoveResult(null);
       setProjectStatus("Select a chord event");
@@ -6942,6 +6963,8 @@ export function App(): ReactElement {
       afterFinishChecklist,
       afterExportPreflight
     );
+
+    updateInstrumentToolMode(mode);
 
     setModeSwitchResult(
       createModeSwitchResult(mode, beforeProject, afterProject, afterModeFocus, afterSessionPass, afterFirstBeatPath, changed)
@@ -7842,6 +7865,9 @@ export function App(): ReactElement {
       deliver: deliverPanelRef.current
     };
 
+    if (card.target === "sound") {
+      setSoundDesignOpen(true);
+    }
     targetRefs[card.target]?.scrollIntoView({ block: "start", behavior: "auto" });
     setBeatSpineJumpResult(createBeatSpineJumpResult(card, beatSpineSummary));
     setBeatSpineResult(null);
@@ -8212,6 +8238,9 @@ export function App(): ReactElement {
       sound: soundPanelRef.current
     };
 
+    if (item.focusTarget === "sound") {
+      setSoundDesignOpen(true);
+    }
     setStyleInspectorFocusId(item.focusId);
     targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
     setStyleInspectorResult(createStyleInspectorFocusResult(item, styleInspectorSummary));
@@ -8226,11 +8255,13 @@ export function App(): ReactElement {
   }
 
   function focusTimbreCheck(): void {
+    setSoundDesignOpen(true);
     soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(`Timbre Check ${soundTimbreCheckSummary.statusLabel}: ${soundTimbreCheckSummary.balanceLabel}`);
   }
 
   function focusSoundPresetReadout(): void {
+    setSoundDesignOpen(true);
     soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
       `Sound Preset ${soundPresetPreviewSummary.statusLabel}: ${soundPresetPreviewSummary.presetLabel} / ${soundPresetPreviewSummary.toneLabel}`
@@ -8238,6 +8269,7 @@ export function App(): ReactElement {
   }
 
   function focusSoundPresetRouteReadout(): void {
+    setSoundDesignOpen(true);
     const routeLabel = soundPresetRouteLabel(project.sound, soundPresetDesign(soundPresetPreviewSummary.presetId));
     soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8246,6 +8278,7 @@ export function App(): ReactElement {
   }
 
   function focusDrumKitReadout(): void {
+    setSoundDesignOpen(true);
     soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
       `Drum Kit ${drumKitPreviewSummary.statusLabel}: ${drumKitPreviewSummary.kitLabel} / ${drumKitPreviewSummary.rackLabel}`
@@ -8253,6 +8286,7 @@ export function App(): ReactElement {
   }
 
   function focusDrumKitRouteReadout(): void {
+    setSoundDesignOpen(true);
     const pad =
       drumKitPadOptions.find((option) => option.id === drumKitPreviewSummary.padId) ??
       drumKitPadOptions[0] ??
@@ -8265,6 +8299,7 @@ export function App(): ReactElement {
   }
 
   function focusSoundFocusReadout(): void {
+    setSoundDesignOpen(true);
     soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
       `Sound Focus ${soundFocusPreviewSummary.statusLabel}: ${soundFocusPreviewSummary.padLabel} / ${soundFocusPreviewSummary.parameterLabel}`
@@ -8272,6 +8307,7 @@ export function App(): ReactElement {
   }
 
   function focusSoundFocusRouteReadout(): void {
+    setSoundDesignOpen(true);
     const pad =
       soundFocusPadOptions.find((option) => option.id === soundFocusPreviewSummary.padId) ??
       soundFocusPadOptions[0] ??
@@ -8284,6 +8320,7 @@ export function App(): ReactElement {
   }
 
   function focusSoundSnapshotReadout(): void {
+    setSoundDesignOpen(true);
     soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
       `Sound Snapshot A/B ${soundSnapshotComparison.statusLabel}: ${soundSnapshotComparison.actionLabel} / ${soundSnapshotComparison.winnerLabel}`
@@ -10094,6 +10131,23 @@ export function App(): ReactElement {
         });
         const resetOpen = document.querySelector<HTMLDetailsElement>('[data-testid="capture-ideas"]')?.open ?? true;
         const captureIdeas = { autoReveal, initialOpen, resetOpen };
+        flushSync(() => updateInstrumentToolMode("guided"));
+        const guidedSoundOpen = document.querySelector<HTMLDetailsElement>('[data-testid="sound-design-tools"]')?.open ?? true;
+        const guidedHarmonyOpen = document.querySelector<HTMLDetailsElement>('[data-testid="harmony-moves"]')?.open ?? true;
+        flushSync(() => updateInstrumentToolMode("studio"));
+        const studioSoundOpen = document.querySelector<HTMLDetailsElement>('[data-testid="sound-design-tools"]')?.open ?? false;
+        const studioHarmonyOpen = document.querySelector<HTMLDetailsElement>('[data-testid="harmony-moves"]')?.open ?? false;
+        flushSync(() => updateInstrumentToolMode("guided"));
+        const resetSoundOpen = document.querySelector<HTMLDetailsElement>('[data-testid="sound-design-tools"]')?.open ?? true;
+        const resetHarmonyOpen = document.querySelector<HTMLDetailsElement>('[data-testid="harmony-moves"]')?.open ?? true;
+        const instrumentTools = {
+          guidedHarmonyOpen,
+          guidedSoundOpen,
+          resetHarmonyOpen,
+          resetSoundOpen,
+          studioHarmonyOpen,
+          studioSoundOpen
+        };
         markLaunchSmokePaletteStep("producer");
         const producer = quickActionEvidenceById("audience-session-enter-producer", projectRef.current, {
           ...projectRef.current,
@@ -10154,6 +10208,7 @@ export function App(): ReactElement {
           dualProducer,
           dualReadout,
           guided,
+          instrumentTools,
           nextStepRail: readAudienceNextStepRailEvidence(),
           opened: true,
           producer,
@@ -11438,89 +11493,119 @@ export function App(): ReactElement {
 
         <section className="panel instrument-panel" data-testid="workflow-target-sound" aria-label="Instrument panel" ref={soundPanelRef}>
           <PanelTitle icon={<Sparkles size={18} />} title="Instruments" meta={project.mode === "guided" ? "curated" : "editable"} />
-          <div className="device-list">
-            <Device icon={<Drum size={17} />} name="Drum Rack" value={`${soundPresetLabel(project.sound.preset)} kit`} color="#78f0c8" />
-            <Device
-              icon={<Waves size={17} />}
-              name="808 Engine"
-              value={`drive ${percentLabel(project.sound.bassDrive)} / duck ${percentLabel(project.sound.sidechainDuck)}`}
-              color="#ff7a4f"
+          <div className="instrument-direct-chords" data-testid="instrument-direct-chords">
+            <ChordEditor
+              advancedOpen={harmonyMovesOpen}
+              chordPads={chordPadOptions}
+              chordClipboard={chordClipboard}
+              chordMovePreview={chordMovePreviewSummary}
+              chordMoveResult={chordMoveResult}
+              chordRhythms={chordRhythmOptions}
+              chordVoicings={chordVoicingOptions}
+              chords={currentPattern.chordEvents}
+              currentStep={currentEditorStep}
+              currentKey={project.key}
+              rootOptions={chordRootOptions}
+              selectedIndex={selectedChordIndex}
+              beatDuplicateStep={selectedChordBeatDuplicateStep}
+              previousBeatDuplicateStep={selectedChordPreviousBeatDuplicateStep}
+              onAdd={addChordEvent}
+              onAdvancedOpenChange={setHarmonyMovesOpen}
+              onChange={updateChordEvent}
+              onCopy={copySelectedChord}
+              onDelete={deleteChordEvent}
+              onDuplicate={duplicateSelectedChord}
+              onDuplicateBeat={() => {
+                if (selectedChordBeatDuplicateStep !== null) {
+                  duplicateSelectedChordToStep(selectedChordBeatDuplicateStep);
+                }
+              }}
+              onDuplicatePreviousBeat={() => {
+                if (selectedChordPreviousBeatDuplicateStep !== null) {
+                  duplicateSelectedChordToStep(selectedChordPreviousBeatDuplicateStep);
+                }
+              }}
+              onInvert={moveSelectedChordInversion}
+              onMoveStep={moveSelectedChordStep}
+              onAudition={auditionSelectedChord}
+              onPad={applyChordPad}
+              onPaste={pasteCopiedChord}
+              onPreset={applyChordProgressionPreset}
+              onRhythm={applyChordRhythm}
+              onSelect={selectChordEvent}
+              onVoicing={applyChordVoicingPad}
             />
-            <Device icon={<Music2 size={17} />} name="Synth" value={`${style.melodyStyle} / bright ${percentLabel(project.sound.synthBrightness)}`} color="#8aa8ff" />
-            <Device icon={<SlidersHorizontal size={17} />} name="Chord Tone" value={`warm ${percentLabel(project.sound.chordWarmth)}`} color="#d58cff" />
+            {editorAuditionResult?.kind === "chord" && <EditorAuditionResultStrip result={editorAuditionResult} />}
+            {selectedEventDeleteResult?.kind === "chord" && <SelectedEventDeleteResultStrip result={selectedEventDeleteResult} />}
           </div>
-          <SoundDesigner
-            drumKitPads={drumKitPadOptions}
-            drumKitPreview={drumKitPreviewSummary}
-            drumKitResult={drumKitResult}
-            focusPreview={soundFocusPreviewSummary}
-            focusPads={soundFocusPadOptions}
-            focusResult={soundFocusResult}
-            mode={project.mode}
-            presetPreview={soundPresetPreviewSummary}
-            presetPreviewId={soundPresetPreviewId}
-            presetResult={soundPresetResult}
-            sound={project.sound}
-            soundSnapshots={soundSnapshots}
-            soundSnapshotSummary={soundSnapshotComparison}
-            studioToneBaseline={studioToneBaseline}
-            studioToneBaselineResult={studioToneBaselineResult}
-            studioToneDrift={studioToneDrift}
-            studioToneResetResult={studioToneResetResult}
-            timbreCheck={soundTimbreCheckSummary}
-            onChange={updateSoundDesign}
-            onApplyPreset={applySoundPreset}
-            onDrumKitPad={applyDrumKitPad}
-            onFocusPad={applySoundFocusPad}
-            onCaptureSoundSnapshot={captureSoundSnapshot}
-            onRecallSoundSnapshot={recallSoundSnapshot}
-            onClearSoundSnapshots={clearSoundSnapshots}
-            onCaptureStudioToneBaseline={captureStudioToneBaseline}
-            onPreviewPreset={previewSoundPreset}
-            onResetLargestStudioToneDrift={resetLargestStudioToneDrift}
-            onStudioToneResetResult={setStudioToneResetResult}
-          />
-          <ChordEditor
-            chordPads={chordPadOptions}
-            chordClipboard={chordClipboard}
-            chordMovePreview={chordMovePreviewSummary}
-            chordMoveResult={chordMoveResult}
-            chordRhythms={chordRhythmOptions}
-            chordVoicings={chordVoicingOptions}
-            chords={currentPattern.chordEvents}
-            currentStep={currentEditorStep}
-            currentKey={project.key}
-            rootOptions={chordRootOptions}
-            selectedIndex={selectedChordIndex}
-            beatDuplicateStep={selectedChordBeatDuplicateStep}
-            previousBeatDuplicateStep={selectedChordPreviousBeatDuplicateStep}
-            onAdd={addChordEvent}
-            onChange={updateChordEvent}
-            onCopy={copySelectedChord}
-            onDelete={deleteChordEvent}
-            onDuplicate={duplicateSelectedChord}
-            onDuplicateBeat={() => {
-              if (selectedChordBeatDuplicateStep !== null) {
-                duplicateSelectedChordToStep(selectedChordBeatDuplicateStep);
-              }
-            }}
-            onDuplicatePreviousBeat={() => {
-              if (selectedChordPreviousBeatDuplicateStep !== null) {
-                duplicateSelectedChordToStep(selectedChordPreviousBeatDuplicateStep);
-              }
-            }}
-            onInvert={moveSelectedChordInversion}
-            onMoveStep={moveSelectedChordStep}
-            onAudition={auditionSelectedChord}
-            onPad={applyChordPad}
-            onPaste={pasteCopiedChord}
-            onPreset={applyChordProgressionPreset}
-            onRhythm={applyChordRhythm}
-            onSelect={selectChordEvent}
-            onVoicing={applyChordVoicingPad}
-          />
-          {editorAuditionResult?.kind === "chord" && <EditorAuditionResultStrip result={editorAuditionResult} />}
-          {selectedEventDeleteResult?.kind === "chord" && <SelectedEventDeleteResultStrip result={selectedEventDeleteResult} />}
+          <details
+            className="instrument-tools"
+            data-testid="sound-design-tools"
+            open={soundDesignOpen}
+          >
+            <summary
+              className="instrument-tools-summary"
+              data-testid="sound-design-toggle"
+              onClick={(event) => {
+                event.preventDefault();
+                setSoundDesignOpen((open) => !open);
+              }}
+            >
+              <span className="instrument-tools-icon" aria-hidden="true"><SlidersHorizontal size={16} /></span>
+              <span className="instrument-tools-copy">
+                <strong>Sound Design</strong>
+                <small>Devices, kits, tone shaping, and A/B snapshots</small>
+              </span>
+              <span className="instrument-tools-context">
+                {soundPresetLabel(project.sound.preset)} · {soundTimbreCheckSummary.statusLabel} · {project.mode === "studio" ? "Studio" : "Guided"}
+              </span>
+              <ArrowDown className="instrument-tools-chevron" size={16} aria-hidden="true" />
+            </summary>
+            <div className="instrument-tools-content" data-testid="sound-design-content">
+              <div className="device-list">
+                <Device icon={<Drum size={17} />} name="Drum Rack" value={`${soundPresetLabel(project.sound.preset)} kit`} color="#78f0c8" />
+                <Device
+                  icon={<Waves size={17} />}
+                  name="808 Engine"
+                  value={`drive ${percentLabel(project.sound.bassDrive)} / duck ${percentLabel(project.sound.sidechainDuck)}`}
+                  color="#ff7a4f"
+                />
+                <Device icon={<Music2 size={17} />} name="Synth" value={`${style.melodyStyle} / bright ${percentLabel(project.sound.synthBrightness)}`} color="#8aa8ff" />
+                <Device icon={<SlidersHorizontal size={17} />} name="Chord Tone" value={`warm ${percentLabel(project.sound.chordWarmth)}`} color="#d58cff" />
+              </div>
+              <SoundDesigner
+                drumKitPads={drumKitPadOptions}
+                drumKitPreview={drumKitPreviewSummary}
+                drumKitResult={drumKitResult}
+                focusPreview={soundFocusPreviewSummary}
+                focusPads={soundFocusPadOptions}
+                focusResult={soundFocusResult}
+                mode={project.mode}
+                presetPreview={soundPresetPreviewSummary}
+                presetPreviewId={soundPresetPreviewId}
+                presetResult={soundPresetResult}
+                sound={project.sound}
+                soundSnapshots={soundSnapshots}
+                soundSnapshotSummary={soundSnapshotComparison}
+                studioToneBaseline={studioToneBaseline}
+                studioToneBaselineResult={studioToneBaselineResult}
+                studioToneDrift={studioToneDrift}
+                studioToneResetResult={studioToneResetResult}
+                timbreCheck={soundTimbreCheckSummary}
+                onChange={updateSoundDesign}
+                onApplyPreset={applySoundPreset}
+                onDrumKitPad={applyDrumKitPad}
+                onFocusPad={applySoundFocusPad}
+                onCaptureSoundSnapshot={captureSoundSnapshot}
+                onRecallSoundSnapshot={recallSoundSnapshot}
+                onClearSoundSnapshots={clearSoundSnapshots}
+                onCaptureStudioToneBaseline={captureStudioToneBaseline}
+                onPreviewPreset={previewSoundPreset}
+                onResetLargestStudioToneDrift={resetLargestStudioToneDrift}
+                onStudioToneResetResult={setStudioToneResetResult}
+              />
+            </div>
+          </details>
         </section>
 
         <section className="panel arrangement-panel" data-testid="workflow-target-arrange" aria-label="Arrangement" ref={arrangePanelRef}>

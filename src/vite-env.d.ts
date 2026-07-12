@@ -191,6 +191,7 @@ type GrooveforgeLaunchSmokePaletteEvidence = {
   dualProducer: GrooveforgeLaunchSmokeRouteEvidence;
   dualReadout: GrooveforgeLaunchSmokeRouteEvidence;
   guided: GrooveforgeLaunchSmokeRouteEvidence;
+  instrumentTools: GrooveforgeLaunchSmokeInstrumentToolsEvidence;
   nextStepRail: GrooveforgeLaunchSmokeAudienceNextStepRailEvidence;
   opened: boolean;
   producer: GrooveforgeLaunchSmokeRouteEvidence;
@@ -229,6 +230,15 @@ type GrooveforgeLaunchSmokeCaptureIdeasEvidence = {
   autoReveal: boolean;
   initialOpen: boolean;
   resetOpen: boolean;
+};
+
+type GrooveforgeLaunchSmokeInstrumentToolsEvidence = {
+  guidedHarmonyOpen: boolean;
+  guidedSoundOpen: boolean;
+  resetHarmonyOpen: boolean;
+  resetSoundOpen: boolean;
+  studioHarmonyOpen: boolean;
+  studioSoundOpen: boolean;
 };
 
 interface Window {
