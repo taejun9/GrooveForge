@@ -10949,13 +10949,6 @@ export function App(): ReactElement {
         onFocus={focusSessionPassCard}
       />
 
-      <WorkflowNavigator
-        items={workflowNavigatorItems}
-        result={workflowNavigatorResult}
-        sectionRef={workflowNavigatorPanelRef}
-        onJump={jumpToWorkflowNavigatorItem}
-      />
-
       <StyleInspector
         composerActionsSummary={composerActionsSummary}
         composerActionResult={composerActionResult}
@@ -11169,6 +11162,13 @@ export function App(): ReactElement {
         {undoRedoResult && <UndoRedoResultStrip result={undoRedoResult} />}
         {quickActionResult && <QuickActionResultStrip result={quickActionResult} />}
       </div>
+
+      <WorkflowNavigator
+        items={workflowNavigatorItems}
+        result={workflowNavigatorResult}
+        sectionRef={workflowNavigatorPanelRef}
+        onJump={jumpToWorkflowNavigatorItem}
+      />
 
       <section className="workspace-grid">
         <section className="panel pattern-panel" data-testid="workflow-target-compose" aria-label="Pattern editor" ref={composePanelRef}>
