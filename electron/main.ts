@@ -91,6 +91,11 @@ type LaunchSmokeLayoutEvidence = {
   feedbackAfterGuidance: boolean;
   feedbackOutsideGuidance: boolean;
   guidanceCenterOpen: boolean;
+  guideQuickStartDecisionVisible: boolean;
+  guideQuickStartDetailsContentHidden: boolean;
+  guideQuickStartDetailsInteractionReady: boolean;
+  guideQuickStartDetailsOpen: boolean;
+  guideQuickStartDetailsToggleVisible: boolean;
   harmonyMovesOpen: boolean;
   harmonyMovesToggleVisible: boolean;
   instrumentDirectChordsPresent: boolean;
@@ -1313,6 +1318,10 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         expectedTestIds.map((testId) => [testId, document.querySelector(\`[data-testid="\${testId}"]\`) !== null])
       );
       const guidanceCenter = document.querySelector('[data-testid="guidance-center"]');
+      const guideQuickStartDecision = document.querySelector('[data-testid="guide-quick-start-decision"]');
+      const guideQuickStartDetails = document.querySelector('[data-testid="guide-quick-start-details"]');
+      const guideQuickStartDetailsToggle = document.querySelector('[data-testid="guide-quick-start-details-toggle"]');
+      const guideQuickStartDetailsContent = document.querySelector('[data-testid="guide-quick-start-details-content"]');
       const feedbackAnchor = document.querySelector('[data-testid="workspace-feedback-anchor"]');
       const patternLab = document.querySelector('[data-testid="pattern-lab"]');
       const patternLabToggle = document.querySelector('[data-testid="pattern-lab-toggle"]');
@@ -1390,6 +1399,11 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const exportWav = document.querySelector('[data-testid="export-wav"]');
       const follows = (before, after) =>
         Boolean(before && after && (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING));
+      const guideQuickStartDetailsInitiallyOpen = Boolean(guideQuickStartDetails?.open);
+      guideQuickStartDetailsToggle?.click();
+      const guideQuickStartDetailsOpened = Boolean(guideQuickStartDetails?.open);
+      guideQuickStartDetailsToggle?.click();
+      const guideQuickStartDetailsClosedAgain = !Boolean(guideQuickStartDetails?.open);
       const emptyRoute = {
         actionPresent: false,
         countText: "",
@@ -1525,6 +1539,18 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           feedbackAfterGuidance: follows(guidanceCenter, feedbackAnchor),
           feedbackOutsideGuidance: Boolean(guidanceCenter && feedbackAnchor && !guidanceCenter.contains(feedbackAnchor)),
           guidanceCenterOpen: Boolean(guidanceCenter?.open),
+          guideQuickStartDecisionVisible: Boolean(
+            guideQuickStartDecision && guideQuickStartDecision.getBoundingClientRect().height > 0
+          ),
+          guideQuickStartDetailsContentHidden: Boolean(
+            guideQuickStartDetailsContent && guideQuickStartDetailsContent.getBoundingClientRect().height === 0
+          ),
+          guideQuickStartDetailsInteractionReady:
+            !guideQuickStartDetailsInitiallyOpen && guideQuickStartDetailsOpened && guideQuickStartDetailsClosedAgain,
+          guideQuickStartDetailsOpen: Boolean(guideQuickStartDetails?.open),
+          guideQuickStartDetailsToggleVisible: Boolean(
+            guideQuickStartDetailsToggle && guideQuickStartDetailsToggle.getBoundingClientRect().height > 0
+          ),
           harmonyMovesOpen: Boolean(harmonyMoves?.open),
           harmonyMovesToggleVisible: Boolean(harmonyMovesToggle && harmonyMovesToggle.getBoundingClientRect().height > 0),
           instrumentDirectChordsPresent: Boolean(instrumentDirectChords),

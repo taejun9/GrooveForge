@@ -1286,6 +1286,101 @@ h2 {
   min-width: 0;
 }
 
+.guide-quick-start-details {
+  min-width: 0;
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 7px;
+  background: rgba(17, 16, 15, 0.28);
+  overflow: hidden;
+}
+
+.guide-quick-start-details-summary {
+  display: grid;
+  grid-template-columns: minmax(190px, auto) minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 9px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.guide-quick-start-details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.guide-quick-start-details-summary:hover {
+  background: rgba(130, 215, 255, 0.07);
+}
+
+.guide-quick-start-details-summary:focus-visible {
+  outline: 2px solid rgba(130, 215, 255, 0.74);
+  outline-offset: -2px;
+}
+
+.guide-quick-start-details-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.guide-quick-start-details-copy strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.guide-quick-start-details-copy small,
+.guide-quick-start-details-context {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 9px;
+}
+
+.guide-quick-start-details-copy strong,
+.guide-quick-start-details-copy small,
+.guide-quick-start-details-context {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guide-quick-start-details-context {
+  justify-self: end;
+  text-align: end;
+}
+
+.guide-quick-start-details-chevron {
+  color: rgba(244, 239, 231, 0.5);
+  transition: transform 160ms ease;
+}
+
+.guide-quick-start-details[open] .guide-quick-start-details-chevron {
+  transform: rotate(180deg);
+}
+
+.guide-quick-start-details-content {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid rgba(244, 239, 231, 0.08);
+}
+
+.guide-quick-start-details:not([open]) > .guide-quick-start-details-content {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .guide-quick-start-details-summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .guide-quick-start-details-context {
+    grid-column: 1 / -1;
+    justify-self: start;
+    text-align: start;
+  }
+}
+
 .guide-quick-start-decision {
   display: grid;
   grid-template-columns: minmax(96px, 0.32fr) minmax(150px, 0.55fr) minmax(132px, 0.36fr) minmax(0, 1fr) minmax(112px, auto);

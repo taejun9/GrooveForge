@@ -1,4 +1,5 @@
 import {
+  ArrowDown,
   ArrowRight,
   Download,
   Drum,
@@ -2753,6 +2754,18 @@ export function GuideQuickStart({
             <span>Run {decision.source}</span>
           </button>
         </div>
+        <details className="guide-quick-start-details" data-testid="guide-quick-start-details">
+          <summary className="guide-quick-start-details-summary" data-testid="guide-quick-start-details-toggle">
+            <span className="guide-quick-start-details-copy">
+              <strong>Progress &amp; routes</strong>
+              <small>Completion diagnostics, bottleneck, context, and alternate paths</small>
+            </span>
+            <span className="guide-quick-start-details-context">
+              {completionScore.scoreLabel} · {completionBottleneckLabel}
+            </span>
+            <ArrowDown className="guide-quick-start-details-chevron" size={15} aria-hidden="true" />
+          </summary>
+          <div className="guide-quick-start-details-content" data-testid="guide-quick-start-details-content">
         <div
           className={`guide-quick-start-priority ${priority.tone}`}
           data-guide-quick-start-priority={priority.source}
@@ -2880,6 +2893,8 @@ export function GuideQuickStart({
             <small>{workflowSpotlight.detailLabel}</small>
           </button>
         </div>
+          </div>
+        </details>
       </div>
       {result && <GuideQuickStartResultStrip result={result} />}
     </section>

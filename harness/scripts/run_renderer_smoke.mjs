@@ -106,6 +106,30 @@ function validateFirstRunRenderer(html) {
     !html.includes('<details class="guidance-center" data-testid="guidance-center" open="">'),
     "Guide & Review Center should be collapsed by default so the core workspace remains close to first-run controls"
   );
+  const guideQuickStartDecisionIndex = html.indexOf('data-testid="guide-quick-start-decision"');
+  const guideQuickStartDetailsIndex = html.indexOf('data-testid="guide-quick-start-details"');
+  const guideQuickStartPriorityIndex = html.indexOf('data-testid="guide-quick-start-priority"');
+  check(
+    guideQuickStartDecisionIndex >= 0 &&
+      guideQuickStartDetailsIndex > guideQuickStartDecisionIndex &&
+      guideQuickStartPriorityIndex > guideQuickStartDetailsIndex,
+    "Guide Quick Start should keep the recommended decision direct before on-demand progress and route details"
+  );
+  check(
+    !html.includes('<details class="guide-quick-start-details" data-testid="guide-quick-start-details" open="">') &&
+      html.includes('data-testid="guide-quick-start-details-toggle"') &&
+      html.includes('data-testid="guide-quick-start-details-content"') &&
+      html.includes("Progress &amp; routes") &&
+      html.includes("Completion diagnostics, bottleneck, context, and alternate paths"),
+    "Guide Quick Start progress and alternate routes should start compact behind an informative native disclosure"
+  );
+  check(
+      styles.includes(".guide-quick-start-details-summary:focus-visible") &&
+      styles.includes(".guide-quick-start-details[open] .guide-quick-start-details-chevron") &&
+      styles.includes(".guide-quick-start-details:not([open]) > .guide-quick-start-details-content") &&
+      styles.includes(".guide-quick-start-details-content"),
+    "Guide Quick Start disclosure should retain keyboard focus, open-state, and content styling"
+  );
   check(
     html.includes('<details class="first-run-launchpad" data-testid="first-run-launchpad" open="">') &&
       html.includes('data-testid="first-run-launchpad-toggle"') &&

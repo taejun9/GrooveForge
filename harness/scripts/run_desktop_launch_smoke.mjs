@@ -178,6 +178,14 @@ function checkResult(result) {
   check(evidence?.samplingTextPresent === false, "live desktop first-run surface should not expose sampling-first language");
   check(evidence?.layout?.guidanceCenterOpen === false, "live desktop Guide & Review Center should start collapsed");
   check(
+    evidence?.layout?.guideQuickStartDecisionVisible === true &&
+      evidence?.layout?.guideQuickStartDetailsOpen === false &&
+      evidence?.layout?.guideQuickStartDetailsToggleVisible === true &&
+      evidence?.layout?.guideQuickStartDetailsContentHidden === true &&
+      evidence?.layout?.guideQuickStartDetailsInteractionReady === true,
+    `live desktop Guide Quick Start should keep its decision direct and progress/routes compact with native open-close behavior (decision ${evidence?.layout?.guideQuickStartDecisionVisible}, open ${evidence?.layout?.guideQuickStartDetailsOpen}, toggle ${evidence?.layout?.guideQuickStartDetailsToggleVisible}, hidden ${evidence?.layout?.guideQuickStartDetailsContentHidden}, interaction ${evidence?.layout?.guideQuickStartDetailsInteractionReady})`
+  );
+  check(
     evidence?.layout?.launchpadOpen === true &&
       evidence?.layout?.launchpadToggleVisible === true &&
       evidence?.layout?.launchpadContentVisible === true &&
@@ -1060,6 +1068,9 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Compose-first layout: Guide ${result.evidence.layout.guidanceCenterOpen ? "open" : "collapsed"}, Pattern Lab ${result.evidence.layout.patternLabOpen ? "open" : "collapsed"}, feedback outside guide ${result.evidence.layout.feedbackOutsideGuidance ? "yes" : "no"}, step grid after lab ${result.evidence.layout.stepGridAfterPatternLab ? "yes" : "no"}`
+  );
+  console.log(
+    `- Guide Quick Start: decision direct ${result.evidence.layout.guideQuickStartDecisionVisible ? "yes" : "no"}, progress compact ${!result.evidence.layout.guideQuickStartDetailsOpen && result.evidence.layout.guideQuickStartDetailsContentHidden ? "yes" : "no"}, native open/close ${result.evidence.layout.guideQuickStartDetailsInteractionReady ? "yes" : "no"}`
   );
   console.log(
     `- Workspace navigation: outside Guide ${result.evidence.layout.workflowNavigatorOutsideGuidance ? "yes" : "no"}, before workstation ${result.evidence.layout.workflowNavigatorBeforeWorkspace ? "yes" : "no"}, sticky ${result.evidence.layout.workflowNavigatorSticky ? "yes" : "no"}, Compose/Deliver jumps ${result.evidence.layout.workflowNavigatorComposeJumpReady && result.evidence.layout.workflowNavigatorDeliverJumpReady ? "yes" : "no"}, stages ${result.evidence.layout.workflowNavigatorStageCount}`
