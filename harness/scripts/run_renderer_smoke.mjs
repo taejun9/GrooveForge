@@ -76,6 +76,32 @@ function validateFirstRunRenderer(html) {
     !html.includes('<details class="guidance-center" data-testid="guidance-center" open="">'),
     "Guide & Review Center should be collapsed by default so the core workspace remains close to first-run controls"
   );
+  const transportBandIndex = html.indexOf('data-testid="workflow-target-transport"');
+  const transportStatusControlsIndex = html.indexOf('data-testid="transport-status-controls"');
+  const transportEssentialsIndex = html.indexOf('data-testid="transport-essential-controls"');
+  const transportPlayIndex = html.indexOf('data-testid="transport-play"');
+  const projectEssentialsIndex = html.indexOf('data-testid="project-essential-controls"');
+  const projectSaveIndex = html.indexOf('data-testid="project-save"');
+  const transportSessionIndex = html.indexOf('data-testid="transport-session-tools"');
+  const transportExportsIndex = html.indexOf('data-testid="transport-export-tools"');
+  const exportWavIndex = html.indexOf('data-testid="export-wav"');
+  check(
+    transportBandIndex >= 0 &&
+      transportStatusControlsIndex > transportBandIndex &&
+      transportEssentialsIndex > transportStatusControlsIndex &&
+      transportPlayIndex > transportEssentialsIndex &&
+      projectEssentialsIndex > transportPlayIndex &&
+      projectSaveIndex > projectEssentialsIndex &&
+      transportSessionIndex > projectSaveIndex &&
+      transportExportsIndex > transportSessionIndex &&
+      exportWavIndex > transportExportsIndex,
+    "Transport hierarchy should keep status, direct transport, direct project safety, Session Context, and Exports in order"
+  );
+  check(
+    !html.includes('<details class="transport-session-tools" data-testid="transport-session-tools" open="">') &&
+      !html.includes('<details class="transport-export-tools" data-testid="transport-export-tools" open="">'),
+    "Guided first render should keep Session Context and Exports collapsed"
+  );
   const patternPlaybackIndex = html.indexOf('data-testid="pattern-playback-readout"');
   const patternLabIndex = html.indexOf('data-testid="pattern-lab"');
   const drumGridIndex = html.indexOf('class="step-grid"');
@@ -339,6 +365,25 @@ function validateFirstRunRenderer(html) {
       "Balance presets and Space send shaping",
       "Audition &amp; Compare",
       "Stem isolation, listening decisions, and Mix Snapshot A/B"
+    ],
+    "transport essentials first": [
+      'data-testid="transport-status-controls"',
+      'data-testid="transport-essential-controls"',
+      'data-testid="transport-play"',
+      'data-testid="project-essential-controls"',
+      'data-testid="project-open"',
+      'data-testid="project-save"',
+      'data-testid="transport-session-tools"',
+      'data-testid="transport-session-toggle"',
+      'data-testid="transport-session-content"',
+      'data-testid="transport-export-tools"',
+      'data-testid="transport-export-toggle"',
+      'data-testid="transport-export-content"',
+      'data-testid="export-wav"',
+      "Session Context",
+      "Tempo, edit history, and input posture",
+      "Exports",
+      "WAV, stems, MIDI, sheet, and bundle"
     ],
     "master output first": [
       'data-testid="master-output-role-readout"',

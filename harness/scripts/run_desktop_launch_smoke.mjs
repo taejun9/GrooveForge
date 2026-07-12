@@ -62,6 +62,17 @@ const expectedLiveTestIds = [
   "pattern-tab-A",
   "pattern-lab",
   "workspace-feedback-anchor",
+  "transport-status-controls",
+  "transport-essential-controls",
+  "transport-play",
+  "project-essential-controls",
+  "project-open",
+  "project-save",
+  "transport-session-tools",
+  "transport-session-toggle",
+  "transport-export-tools",
+  "transport-export-toggle",
+  "export-wav",
   "workflow-navigator",
   "workflow-jump-compose",
   "workflow-jump-arrange",
@@ -175,6 +186,32 @@ function checkResult(result) {
       evidence?.layout?.workflowNavigatorStageCount === 4 &&
       evidence?.layout?.workflowNavigatorSticky === true,
     `live desktop Workflow Navigator should be visible outside optional guidance, sticky before the workstation, expose four stage actions, and jump to Compose and Deliver (present ${evidence?.layout?.workflowNavigatorPresent}, visible ${evidence?.layout?.workflowNavigatorVisible}, outside ${evidence?.layout?.workflowNavigatorOutsideGuidance}, before ${evidence?.layout?.workflowNavigatorBeforeWorkspace}, sticky ${evidence?.layout?.workflowNavigatorSticky}, stages ${evidence?.layout?.workflowNavigatorStageCount}, compose jump ${evidence?.layout?.workflowNavigatorComposeJumpReady}, deliver jump ${evidence?.layout?.workflowNavigatorDeliverJumpReady})`
+  );
+  check(
+    evidence?.layout?.transportStatusBeforeEssentials === true &&
+      evidence?.layout?.transportEssentialsBeforeProject === true &&
+      evidence?.layout?.transportProjectBeforeSession === true &&
+      evidence?.layout?.transportSessionBeforeExports === true &&
+      evidence?.layout?.transportPlayDirectVisible === true &&
+      evidence?.layout?.transportSaveDirectVisible === true &&
+      evidence?.layout?.transportExportsContainWav === true,
+    "live desktop transport should keep direct Play and project safety before Session Context and Exports"
+  );
+  check(
+    evidence?.layout?.transportSessionOpen === false &&
+      evidence?.layout?.transportExportsOpen === false &&
+      evidence?.layout?.transportSessionToggleVisible === true &&
+      evidence?.layout?.transportExportsToggleVisible === true,
+    "live desktop Guided mode should keep Session Context and Exports compact with visible toggles"
+  );
+  check(
+    evidence?.palette?.transportTools?.guidedSessionOpen === false &&
+      evidence?.palette?.transportTools?.guidedExportsOpen === false &&
+      evidence?.palette?.transportTools?.studioSessionOpen === true &&
+      evidence?.palette?.transportTools?.studioExportsOpen === true &&
+      evidence?.palette?.transportTools?.resetSessionOpen === false &&
+      evidence?.palette?.transportTools?.resetExportsOpen === false,
+    "live desktop transport secondary tools should expand for Studio and reset compactly for Guided"
   );
   check(
     evidence?.layout?.patternLabToggleVisible === true &&
@@ -973,6 +1010,9 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Workspace navigation: outside Guide ${result.evidence.layout.workflowNavigatorOutsideGuidance ? "yes" : "no"}, before workstation ${result.evidence.layout.workflowNavigatorBeforeWorkspace ? "yes" : "no"}, sticky ${result.evidence.layout.workflowNavigatorSticky ? "yes" : "no"}, Compose/Deliver jumps ${result.evidence.layout.workflowNavigatorComposeJumpReady && result.evidence.layout.workflowNavigatorDeliverJumpReady ? "yes" : "no"}, stages ${result.evidence.layout.workflowNavigatorStageCount}`
+  );
+  console.log(
+    `- Transport essentials: Play direct ${result.evidence.layout.transportPlayDirectVisible ? "yes" : "no"}, Save direct ${result.evidence.layout.transportSaveDirectVisible ? "yes" : "no"}, Guided helpers ${result.evidence.layout.transportSessionOpen || result.evidence.layout.transportExportsOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.transportTools.studioSessionOpen && result.evidence.palette.transportTools.studioExportsOpen ? "yes" : "no"}`
   );
   console.log(
     `- Note-editor-first layout: Capture & Ideas ${result.evidence.layout.captureIdeasOpen ? "open" : "collapsed"}, auto-reveal ${result.evidence.palette.captureIdeas.autoReveal ? "yes" : "no"}, note grids after capture ${result.evidence.layout.noteLanesAfterCaptureIdeas ? "yes" : "no"}`

@@ -573,6 +573,92 @@ h2 {
   justify-content: flex-end;
 }
 
+.transport-status-controls,
+.transport-essential-controls,
+.project-essential-controls,
+.transport-tools-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.transport-session-tools,
+.transport-export-tools {
+  min-width: 156px;
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.035);
+  overflow: hidden;
+}
+
+.transport-session-tools[open],
+.transport-export-tools[open] {
+  flex: 1 1 100%;
+}
+
+.transport-session-tools > summary,
+.transport-export-tools > summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  min-height: 38px;
+  cursor: pointer;
+  list-style: none;
+  padding: 5px 8px;
+}
+
+.transport-session-tools > summary::-webkit-details-marker,
+.transport-export-tools > summary::-webkit-details-marker {
+  display: none;
+}
+
+.transport-session-tools > summary > span,
+.transport-export-tools > summary > span {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.transport-session-tools > summary strong,
+.transport-export-tools > summary strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.transport-session-tools > summary small,
+.transport-export-tools > summary small {
+  overflow: hidden;
+  color: rgba(244, 239, 231, 0.56);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transport-session-tools > summary svg,
+.transport-export-tools > summary svg {
+  color: #82d7ff;
+}
+
+.transport-session-tools > summary > svg:last-child,
+.transport-export-tools > summary > svg:last-child {
+  color: rgba(244, 239, 231, 0.5);
+  transition: transform 140ms ease;
+}
+
+.transport-session-tools[open] > summary > svg:last-child,
+.transport-export-tools[open] > summary > svg:last-child {
+  transform: rotate(180deg);
+}
+
+.transport-tools-content {
+  border-block-start: 1px solid rgba(244, 239, 231, 0.08);
+  padding: 8px;
+}
+
 .transport-status {
   display: grid;
   min-width: 92px;
@@ -30452,6 +30538,40 @@ input[type="range"] {
 
   .command-strip .icon-button {
     flex: 1 1 86px;
+  }
+
+  .transport-status-controls,
+  .transport-essential-controls,
+  .project-essential-controls,
+  .transport-session-tools,
+  .transport-export-tools {
+    width: 100%;
+  }
+
+  .transport-essential-controls,
+  .project-essential-controls,
+  .transport-tools-content {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+  }
+
+  .transport-status-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .transport-status,
+  .transport-position-readout,
+  .tap-tempo-readout,
+  .edit-history-readout,
+  .keyboard-capture-posture {
+    max-width: none;
+    width: 100%;
+  }
+
+  .playback-mode-row {
+    grid-column: 1 / -1;
   }
 
   .session-meter > span {
