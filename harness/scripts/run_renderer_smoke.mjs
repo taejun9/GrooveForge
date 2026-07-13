@@ -9,6 +9,7 @@ import { createServer } from "vite";
 const failures = [];
 const styles = readFileSync(new URL("../../src/styles.css", import.meta.url), "utf8");
 const appSource = readFileSync(new URL("../../src/ui/App.tsx", import.meta.url), "utf8");
+const composePanelsSource = readFileSync(new URL("../../src/ui/workstationComposePanels.tsx", import.meta.url), "utf8");
 const graphSource = readFileSync(new URL("../../src/ui/workstationAppQuickActionGraph.ts", import.meta.url), "utf8");
 const quickActionSource = readFileSync(new URL("../../src/ui/workstationAppQuickActions.tsx", import.meta.url), "utf8");
 const shellSource = readFileSync(new URL("../../src/ui/workstationShellPanels.tsx", import.meta.url), "utf8");
@@ -433,6 +434,96 @@ function validateDrumGridKeyboardNavigation(html, navigation) {
   check(
     styles.includes(".drum-grid-keyboard-help") && styles.includes("text-align: right"),
     "drum grid keyboard guidance should retain a compact dedicated presentation"
+  );
+}
+
+function validateNoteGridKeyboardNavigation(html, navigation) {
+  const bassTags = html.match(/<button[^>]*data-testid="note-step-bass-[^"]+"[^>]*>/g) ?? [];
+  const melodyTags = html.match(/<button[^>]*data-testid="note-step-melody-[^"]+"[^>]*>/g) ?? [];
+  const gridRows = [
+    { track: "bass", tags: bassTags, expectedCount: 144 },
+    { track: "melody", tags: melodyTags, expectedCount: 160 }
+  ];
+  for (const { track, tags, expectedCount } of gridRows) {
+    check(tags.length === expectedCount, `${track} keyboard grid should render ${expectedCount} direct note buttons, got ${tags.length}`);
+    check(
+      tags.every((tag) => tag.includes('aria-pressed="true"') || tag.includes('aria-pressed="false"')),
+      `every ${track} note cell should expose an explicit pressed state`
+    );
+    check(
+      tags.filter((tag) => tag.includes('tabindex="0"')).length === 1 &&
+        tags.filter((tag) => tag.includes('tabindex="-1"')).length === expectedCount - 1,
+      `${track} note grid should expose exactly one cell in the page Tab order`
+    );
+  }
+  check(
+    html.includes('data-testid="note-grid-bass"') &&
+      html.includes('aria-label="808 note sequencer"') &&
+      html.includes('aria-describedby="note-grid-keyboard-help-bass"') &&
+      html.includes('data-testid="note-grid-melody"') &&
+      html.includes('aria-label="Synth note sequencer"') &&
+      html.includes('aria-describedby="note-grid-keyboard-help-melody"') &&
+      (html.match(/Arrow keys move · Enter or Space toggles/g) ?? []).length >= 3,
+    "808 and Synth grids should expose separate named groups with visible and accessible keyboard guidance"
+  );
+  check(
+    composePanelsSource.includes("function handleKeyDown") &&
+      composePanelsSource.includes("isNoteGridActivationKey(event.key)") &&
+      composePanelsSource.includes("event.stopPropagation()") &&
+      composePanelsSource.includes("event.currentTarget.click()") &&
+      composePanelsSource.includes("noteGridNavigationTarget({ track, step, pitch }, event.key, displayPitches)") &&
+      composePanelsSource.includes("onSelect(target)") &&
+      appSource.includes("function selectNoteGridCell") &&
+      appSource.includes("setSelectedDrumStep(null)") &&
+      appSource.includes("setSelectedChordIndex(null)"),
+    "note-grid keyboard handling should consume activation, reuse the click path, and keep directional selection exclusive"
+  );
+  check(
+    navigation.isNoteGridActivationKey("Enter") &&
+      navigation.isNoteGridActivationKey(" ") &&
+      !navigation.isNoteGridActivationKey("ArrowDown") &&
+      navigation.isNoteGridNavigationKey("ArrowDown") &&
+      navigation.isNoteGridNavigationKey("End") &&
+      !navigation.isNoteGridNavigationKey("Enter"),
+    "note grids should keep activation keys separate from navigation keys"
+  );
+
+  const pitchSets = {
+    bass: ["G1", "F1", "Eb1", "D1", "C1", "Bb0", "A0", "G0", "F0"],
+    melody: ["E5", "D5", "C5", "B4", "A4", "G4", "F4", "E4", "D4", "C4"]
+  };
+  const selectedBass = { track: "bass", step: 7, pitch: "C1" };
+  const selectedEntry = navigation.noteGridEntryCell("bass", pitchSets.bass, selectedBass);
+  const defaultEntry = navigation.noteGridEntryCell("melody", pitchSets.melody, selectedBass);
+  check(
+    selectedEntry === selectedBass && defaultEntry.track === "melody" && defaultEntry.step === 0 && defaultEntry.pitch === "E5",
+    "each note grid should enter at its selected cell or visually top-left cell"
+  );
+  for (const [track, pitches] of Object.entries(pitchSets)) {
+    for (const [pitchIndex, pitch] of pitches.entries()) {
+      for (let step = 0; step < 16; step += 1) {
+        const current = { track, pitch, step };
+        const expectedTargets = {
+          ArrowLeft: { track, pitch, step: Math.max(0, step - 1) },
+          ArrowRight: { track, pitch, step: Math.min(15, step + 1) },
+          ArrowUp: { track, pitch: pitches[Math.max(0, pitchIndex - 1)], step },
+          ArrowDown: { track, pitch: pitches[Math.min(pitches.length - 1, pitchIndex + 1)], step },
+          Home: { track, pitch, step: 0 },
+          End: { track, pitch, step: 15 }
+        };
+        for (const [key, expected] of Object.entries(expectedTargets)) {
+          const target = navigation.noteGridNavigationTarget(current, key, pitches);
+          check(
+            target.track === expected.track && target.pitch === expected.pitch && target.step === expected.step,
+            `${track} grid ${key} should map ${pitch} step ${step + 1} to ${expected.pitch} step ${expected.step + 1}`
+          );
+        }
+      }
+    }
+  }
+  check(
+    styles.includes(".note-grid-keyboard-help") && styles.includes("text-align: right"),
+    "note-grid keyboard guidance should retain a compact dedicated presentation"
   );
 }
 
@@ -2585,6 +2676,10 @@ try {
     html,
     await server.ssrLoadModule("/src/ui/drumGridKeyboardNavigation.ts")
   );
+  validateNoteGridKeyboardNavigation(
+    html,
+    await server.ssrLoadModule("/src/ui/noteGridKeyboardNavigation.ts")
+  );
   check(
     html.includes('data-quick-actions-materialized="false"') &&
       html.includes('data-quick-actions-graph-state="deferred"'),
@@ -2672,6 +2767,7 @@ try {
     console.log("- Deep editor commands: conditional fixed dock reuses Play, Actions, Undo, Redo, and Save after the full transport leaves view");
     console.log("- Minimum Studio transport: secondary Session Context and Exports stay compact through 1180px entry and resize while retaining manual reopen");
     console.log("- Drum grid keyboard: one roving Tab stop, bounded arrows/Home/End, explicit pressed state, Enter/Space toggle, and visible guidance");
+    console.log("- Note-grid keyboard: one Tab stop per 808/Synth grid, exhaustive spatial arrows/Home/End, pressed state, guarded Enter/Space, and guidance");
     console.log(
       "- Beginner path: Guide Quick Start, Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
     );

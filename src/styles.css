@@ -21040,6 +21040,14 @@ input[type="range"] {
   font-size: 11px;
 }
 
+.note-grid-keyboard-help {
+  margin: -2px 0 8px;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.3;
+  text-align: right;
+}
+
 .piano-grid {
   display: grid;
   gap: 6px;

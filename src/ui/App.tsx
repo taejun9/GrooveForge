@@ -5412,6 +5412,12 @@ export function App(): ReactElement {
     setSelectedChordIndex(null);
   }
 
+  function selectNoteGridCell(note: SelectedNote): void {
+    setSelectedNote(note);
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
+  }
+
   function toggleBassNote(step: number, pitch: string): void {
     const exists = currentPattern.bassNotes.some((note) => note.step === step && note.pitch === pitch);
     const selectedSameNote = selectedNote?.track === "bass" && selectedNote.step === step && selectedNote.pitch === pitch;
@@ -12175,6 +12181,7 @@ export function App(): ReactElement {
               color="#ff7a4f"
               currentStep={currentEditorStep}
               selectedNote={selectedNote}
+              onSelect={selectNoteGridCell}
               onToggle={toggleBassNote}
             />
             <NoteEditor
@@ -12185,6 +12192,7 @@ export function App(): ReactElement {
               color="#8aa8ff"
               currentStep={currentEditorStep}
               selectedNote={selectedNote}
+              onSelect={selectNoteGridCell}
               onToggle={toggleMelodyNote}
             />
           </div>

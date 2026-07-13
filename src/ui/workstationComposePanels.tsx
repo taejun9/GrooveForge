@@ -1,10 +1,16 @@
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Drum, ListChecks, Music2, Play, Plus, RotateCcw, Save, SlidersHorizontal, Trash2, Waves, X } from "lucide-react";
-import type { CSSProperties, ReactElement, ReactNode } from "react";
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactElement, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { BassNote, ChordEvent, ChordProgressionPreset, ChordQuality, DrumLane, MelodyNote, NoteTrack, PatternSlot, PatternVariationPreset, ProjectState, SoundDesign } from "../domain/workstation";
 import { chordInversions, chordInversionLabel, chordProgressionPresetIds, chordProgressionPresetLabel, chordQualities, drumStepProbability, drumStepTimingMs, drumStepVelocity, hatRepeatCount, maxDrumTimingMs, minDrumTimingMs, normalizeChordInversion, normalizeDrumProbability, normalizeDrumTimingMs, normalizeDrumVelocity, normalizeEventProbability, normalizeHatRepeat, scalePitchNames, soundPresetIds, soundPresetLabel, steps } from "../domain/workstation";
 import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewDecisionSummary, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneSuggestionSummary, PatternCloneResult, PatternFillPreviewSummary, PatternFillSuggestionSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationSuggestionSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewDecisionSummary, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewDecisionSummary, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SoundSnapshot, SoundSnapshotComparisonSummary, SoundSnapshotSlotId, SoundSnapshotSlotMap, SoundTimbreCheckSummary, SwingFeelResult } from "./workstationUiModel";
 import { drumLabels, keyboardCaptureKeyLabels } from "./workstationUiModel";
+import {
+  isNoteGridActivationKey,
+  isNoteGridNavigationKey,
+  noteGridEntryCell,
+  noteGridNavigationTarget
+} from "./noteGridKeyboardNavigation";
 import { chanceBadgeLabel, clampStepStart, compactChanceBadgeLabel, nextEmptyChordStep, percentLabel, pitchParts, timingLabel, trackOctaveRange } from "./workstationPatternTools";
 import type { StudioToneBaseline, StudioToneBaselineResult, StudioToneDriftSummary, StudioToneResetResult } from "./studioToneTools";
 import { studioToneControls, studioToneResetNextCheck } from "./studioToneTools";
@@ -1252,6 +1258,7 @@ export function NoteEditor({
   color,
   currentStep,
   selectedNote,
+  onSelect,
   onToggle
 }: {
   title: string;
@@ -1261,16 +1268,48 @@ export function NoteEditor({
   color: string;
   currentStep: number | null;
   selectedNote: SelectedNote | null;
+  onSelect: (note: SelectedNote) => void;
   onToggle: (step: number, pitch: string) => void;
 }): ReactElement {
   const displayPitches = [...pitches].reverse();
+  const tabStop = noteGridEntryCell(track, displayPitches, selectedNote);
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, step: number, pitch: string): void {
+    if (isNoteGridActivationKey(event.key)) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.click();
+      return;
+    }
+    if (!isNoteGridNavigationKey(event.key)) {
+      return;
+    }
+    event.preventDefault();
+    const target = noteGridNavigationTarget({ track, step, pitch }, event.key, displayPitches);
+    onSelect(target);
+    const gridButtons = event.currentTarget.closest(".piano-grid")?.querySelectorAll<HTMLButtonElement>("button") ?? [];
+    Array.from(gridButtons)
+      .find((button) => button.dataset.notePitch === target.pitch && button.dataset.noteStep === `${target.step}`)
+      ?.focus();
+  }
+
   return (
     <div className="note-lane">
       <div className="lane-header">
         <span>{title}</span>
         <strong>{notes.length} events</strong>
       </div>
-      <div className="piano-grid" style={{ "--note": color } as CSSProperties}>
+      <p className="note-grid-keyboard-help" id={`note-grid-keyboard-help-${track}`}>
+        Arrow keys move · Enter or Space toggles
+      </p>
+      <div
+        aria-describedby={`note-grid-keyboard-help-${track}`}
+        aria-label={`${title} note sequencer`}
+        className="piano-grid"
+        data-testid={`note-grid-${track}`}
+        role="group"
+        style={{ "--note": color } as CSSProperties}
+      >
         {displayPitches.map((pitch) => (
           <div className="piano-row" key={pitch}>
             <span>{pitch}</span>
@@ -1289,8 +1328,14 @@ export function NoteEditor({
                     className={["note", note ? "active" : "", currentStep === step ? "playhead" : "", selected ? "selected" : ""]
                       .filter(Boolean)
                       .join(" ")}
+                    data-note-pitch={pitch}
+                    data-note-step={step}
+                    data-note-track={track}
+                    data-testid={`note-step-${track}-${step}-${pitch}`}
                     key={`${pitch}-${step}`}
                     onClick={() => onToggle(step, pitch)}
+                    onKeyDown={(event) => handleKeyDown(event, step, pitch)}
+                    tabIndex={tabStop.pitch === pitch && tabStop.step === step ? 0 : -1}
                     type="button"
                   >
                     {note && <span className="note-length-fill" style={{ inlineSize: `${Math.min(100, note.length * 25)}%` }} />}

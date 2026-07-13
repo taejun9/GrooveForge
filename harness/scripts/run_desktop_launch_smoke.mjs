@@ -188,6 +188,21 @@ function checkResult(result) {
     "live desktop drum grid should expose one roving Tab stop, pressed state, representative native arrow navigation, single Enter/Space toggles, unchanged playback, and Undo restoration"
   );
   check(
+      evidence?.modalFocus?.noteGrid?.bassButtonCount === 144 &&
+      evidence?.modalFocus?.noteGrid?.melodyButtonCount === 160 &&
+      evidence?.modalFocus?.noteGrid?.pressedSemanticsReady === true &&
+      evidence?.modalFocus?.noteGrid?.rovingTabReady === true &&
+      evidence?.modalFocus?.noteGrid?.nativeArrowReady === true &&
+      evidence?.modalFocus?.noteGrid?.navigationSelectionReady === true &&
+      evidence?.modalFocus?.noteGrid?.navigationEventCountUnchanged === true &&
+      evidence?.modalFocus?.noteGrid?.enterToggleReady === true &&
+      evidence?.modalFocus?.noteGrid?.spaceToggleReady === true &&
+      evidence?.modalFocus?.noteGrid?.activationSingleToggleReady === true &&
+      evidence?.modalFocus?.noteGrid?.playbackStayedStopped === true &&
+      evidence?.modalFocus?.noteGrid?.undoRestored === true,
+    "live desktop 808 and Synth grids should expose one Tab stop each, pressed state, representative native spatial navigation, single Enter/Space toggles, unchanged playback, and Undo restoration"
+  );
+  check(
     evidence?.modalFocus?.quickInitialFocus === "quick-actions-search" &&
       evidence?.modalFocus?.quickForwardWrap === true &&
       evidence?.modalFocus?.quickBackwardWrap === true &&
@@ -1235,6 +1250,7 @@ child.on("exit", (code, signal) => {
     `- Quick Actions keyboard selection: arrows/Home/End retained search focus; Enter ran ${result.evidence.modalFocus.quickKeyboardSelectedTitle}`
   );
   console.log("- Drum grid keyboard: 64 pressed-state buttons, one roving Tab stop, bounded navigation, Enter/Space toggles, playback guard, and Undo ready");
+  console.log("- Note-grid keyboard: one 808 and one Synth Tab stop, native spatial navigation, Enter/Space toggles, playback guard, and Undo ready");
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
   console.log("- Swing Feel pads: five dark-theme controls, pressed semantics ready, one selected target");
   console.log(

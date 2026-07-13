@@ -338,6 +338,7 @@ interface Window {
     appKind: "desktop";
     launchSmoke?: boolean;
     reportLaunchSmokeDrumGridSnapshot?: (payload: unknown) => void;
+    reportLaunchSmokeNoteGridSnapshot?: (payload: unknown) => void;
     saveProject?: (contents: string, defaultName: string) => Promise<{ canceled: boolean; filePath?: string }>;
     openProject?: () => Promise<{ canceled: boolean; filePath?: string; contents?: string }>;
     onMenuCommand?: (callback: (command: NativeMenuCommand) => void) => () => void;
