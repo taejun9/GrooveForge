@@ -482,6 +482,24 @@ function validateFirstRunRenderer(html) {
       styles.includes("color: #b8ffe7;"),
     "Swing Feel pads should override native light buttons with complete dark, hover, focus, selected, and text-hierarchy styling"
   );
+  check(
+    styles.includes(":where(button) {") &&
+      styles.includes("appearance: none;") &&
+      styles.includes("border: 1px solid rgba(244, 239, 231, 0.16);") &&
+      styles.includes("background: rgba(244, 239, 231, 0.045);") &&
+      styles.includes(":where(button:hover:not(:disabled)) {") &&
+      styles.includes(":where(button:focus-visible) {") &&
+      styles.includes("outline: 2px solid #82d7ff;") &&
+      styles.includes(":where(button:disabled) {") &&
+      styles.includes("cursor: not-allowed;") &&
+      html.includes('data-testid="groove-preset-tight"') &&
+      html.includes('data-testid="chord-copy"') &&
+      html.includes('data-testid="arrangement-copy"') &&
+      html.includes('data-testid="stem-audition-drum_rack"') &&
+      html.includes('data-testid="mix-snapshot-capture-a"') &&
+      html.includes('data-testid="session-brief-starter-starter"'),
+    "the low-specificity button foundation should theme formerly native first-viewport and deep-workflow controls without replacing component styles"
+  );
   const transportBandIndex = html.indexOf('data-testid="workflow-target-transport"');
   const transportStatusControlsIndex = html.indexOf('data-testid="transport-status-controls"');
   const transportEssentialsIndex = html.indexOf('data-testid="transport-essential-controls"');

@@ -213,6 +213,14 @@ function checkResult(result) {
     `live desktop Swing Feel pads should expose five dark-theme buttons with exactly one truthful selected target (theme ${evidence?.layout?.swingFeelDarkThemeReady}, semantics ${evidence?.layout?.swingFeelPressedSemanticsReady}, selected ${evidence?.layout?.swingFeelSelectedCount})`
   );
   check(
+    evidence?.layout?.buttonThemeFoundationReady === true &&
+      evidence?.layout?.buttonThemeDisabledReady === true &&
+      evidence?.layout?.buttonThemeSpecialistStateReady === true &&
+      evidence?.layout?.buttonThemeRepresentativeCount === 6 &&
+      evidence?.layout?.buttonThemeNativeSurfaceCount === 0,
+    `live desktop buttons should use the dark low-specificity foundation without native surfaces while preserving disabled and specialist states (foundation ${evidence?.layout?.buttonThemeFoundationReady}, representatives ${evidence?.layout?.buttonThemeRepresentativeCount}, native ${evidence?.layout?.buttonThemeNativeSurfaceCount}, disabled ${evidence?.layout?.buttonThemeDisabledReady}, specialist ${evidence?.layout?.buttonThemeSpecialistStateReady})`
+  );
+  check(
     evidence?.layout?.projectOwnershipReady === true,
     `live desktop should identify an editable 8-bar foundation with honest local-only save guidance (project ${evidence?.layout?.projectStatus}, safety ${evidence?.layout?.projectSafetyStatus} / ${evidence?.layout?.projectSafetyLabel} / ${evidence?.layout?.projectSafetyDetail})`
   );
@@ -1129,6 +1137,9 @@ child.on("exit", (code, signal) => {
   );
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
   console.log("- Swing Feel pads: five dark-theme controls, pressed semantics ready, one selected target");
+  console.log(
+    `- Button theme foundation: ${result.evidence.layout.buttonThemeRepresentativeCount} representative inherited controls, ${result.evidence.layout.buttonThemeNativeSurfaceCount} native surfaces, disabled and specialist states preserved`
+  );
   console.log(
     `- Note-editor-first layout: Capture & Ideas ${result.evidence.layout.captureIdeasOpen ? "open" : "collapsed"}, auto-reveal ${result.evidence.palette.captureIdeas.autoReveal ? "yes" : "no"}, note grids after capture ${result.evidence.layout.noteLanesAfterCaptureIdeas ? "yes" : "no"}`
   );

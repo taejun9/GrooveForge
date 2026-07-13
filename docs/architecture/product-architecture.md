@@ -80,6 +80,8 @@ Audience starter creation is an action-to-workspace route, not only a project fa
 
 Direct preset controls in the first editing viewport must fully own their rendered state rather than inherit browser-native control chrome. Swing Feel pads therefore define dark base, hover, focus-visible, and selected surfaces plus explicit pressed semantics; this presentation layer remains separate from the existing swing project field, undo history, realtime scheduler, and export pipeline.
 
+The workstation also owns a zero-specificity button foundation through `:where(button)`. It removes native appearance and supplies the minimum dark surface, border, radius, foreground, hover, focus-visible, and disabled contract while allowing every class- or component-scoped selector to override presentation. This is a rendering boundary only and must not alter event handlers, command routing, project mutation, keyboard shortcuts, playback, or export.
+
 The core project model should make composition events first-class. In the core architecture, a clip is a pattern, MIDI, or automation container, not an imported audio asset:
 
 - `Project`: version, title, BPM, key/scale, swing, tracks, arrangement, master settings.

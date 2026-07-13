@@ -150,6 +150,11 @@ type LaunchSmokeLayoutEvidence = {
   swingFeelDarkThemeReady: boolean;
   swingFeelPressedSemanticsReady: boolean;
   swingFeelSelectedCount: number;
+  buttonThemeDisabledReady: boolean;
+  buttonThemeFoundationReady: boolean;
+  buttonThemeNativeSurfaceCount: number;
+  buttonThemeRepresentativeCount: number;
+  buttonThemeSpecialistStateReady: boolean;
   transportEssentialsBeforeProject: boolean;
   essentialShortcutMetadataReady: boolean;
   essentialShortcutTitlesReady: boolean;
@@ -1368,6 +1373,19 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         document.querySelectorAll('[data-testid="swing-feel-pads"] button[data-testid^="swing-feel-"]')
       );
       const swingFeelSelectedButtons = swingFeelButtons.filter((button) => button.getAttribute('aria-pressed') === 'true');
+      const allButtons = Array.from(document.querySelectorAll('button'));
+      const buttonThemeRepresentativeIds = [
+        'groove-preset-tight',
+        'chord-copy',
+        'arrangement-copy',
+        'stem-audition-drum_rack',
+        'mix-snapshot-capture-a',
+        'session-brief-starter-starter'
+      ];
+      const buttonThemeRepresentatives = buttonThemeRepresentativeIds
+        .map((testId) => document.querySelector('[data-testid="' + testId + '"]'))
+        .filter(Boolean);
+      const chordPasteButton = document.querySelector('[data-testid="chord-paste"]');
       const captureIdeas = document.querySelector('[data-testid="capture-ideas"]');
       const captureIdeasToggle = document.querySelector('[data-testid="capture-ideas-toggle"]');
       const noteLanes = document.querySelector('.note-lanes');
@@ -1736,6 +1754,36 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
             swingFeelSelectedButtons[0]?.getAttribute('data-testid') === 'swing-feel-style' &&
             swingFeelSelectedButtons[0]?.classList.contains('selected') === true,
           swingFeelSelectedCount: swingFeelSelectedButtons.length,
+          buttonThemeDisabledReady: (() => {
+            if (!(chordPasteButton instanceof HTMLButtonElement) || !chordPasteButton.disabled) return false;
+            const style = getComputedStyle(chordPasteButton);
+            return style.appearance === 'none' && style.cursor === 'not-allowed' && Number(style.opacity) <= 0.48;
+          })(),
+          buttonThemeFoundationReady:
+            buttonThemeRepresentatives.length === buttonThemeRepresentativeIds.length &&
+            buttonThemeRepresentatives.every((button) => {
+              const style = getComputedStyle(button);
+              return (
+                style.appearance === 'none' &&
+                style.backgroundColor !== 'rgb(239, 239, 239)' &&
+                style.backgroundColor !== 'rgba(0, 0, 0, 0)' &&
+                style.borderRadius === '5px' &&
+                style.color !== 'rgb(0, 0, 0)'
+              );
+            }),
+          buttonThemeNativeSurfaceCount: allButtons.filter((button) => {
+            const style = getComputedStyle(button);
+            return style.appearance !== 'none' || style.backgroundColor === 'rgb(239, 239, 239)';
+          }).length,
+          buttonThemeRepresentativeCount: buttonThemeRepresentatives.length,
+          buttonThemeSpecialistStateReady: (() => {
+            const selectedSwingStyle = swingFeelSelectedButtons[0] ? getComputedStyle(swingFeelSelectedButtons[0]) : null;
+            const playStyle = transportPlay ? getComputedStyle(transportPlay) : null;
+            return (
+              selectedSwingStyle?.backgroundColor === 'rgba(120, 240, 200, 0.14)' &&
+              playStyle?.backgroundColor === 'rgb(120, 240, 200)'
+            );
+          })(),
           essentialShortcutMetadataReady:
             quickActionsOpen?.getAttribute("aria-keyshortcuts") === "Control+K Meta+K" &&
             commandReferenceOpen?.getAttribute("aria-keyshortcuts") === "? Control+/ Meta+/" &&

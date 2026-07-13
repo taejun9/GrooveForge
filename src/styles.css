@@ -28,8 +28,32 @@ textarea {
   font: inherit;
 }
 
-button {
+:where(button) {
+  appearance: none;
+  border: 1px solid rgba(244, 239, 231, 0.16);
+  border-radius: 5px;
+  background: rgba(244, 239, 231, 0.045);
+  color: #f4efe7;
   cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+
+:where(button:hover:not(:disabled)) {
+  border-color: rgba(130, 215, 255, 0.42);
+  background: rgba(130, 215, 255, 0.085);
+}
+
+:where(button:focus-visible) {
+  outline: 2px solid #82d7ff;
+  outline-offset: 2px;
+}
+
+:where(button:disabled) {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .app-shell {
