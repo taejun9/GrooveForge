@@ -35,6 +35,11 @@ contextBridge.exposeInMainWorld("grooveforge", {
       ipcRenderer.send("grooveforge:launch-smoke-drum-grid-snapshot", payload);
     }
   },
+  reportLaunchSmokeNoteGridSnapshot: (payload: unknown) => {
+    if (process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1") {
+      ipcRenderer.send("grooveforge:launch-smoke-note-grid-snapshot", payload);
+    }
+  },
   saveProject: (contents: string, defaultName: string) =>
     ipcRenderer.invoke("grooveforge:save-project", { contents, defaultName }) as Promise<{ canceled: boolean; filePath?: string }>,
   openProject: () =>

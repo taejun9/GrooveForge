@@ -11,6 +11,7 @@ const menuCommandChannel = "grooveforge:menu-command";
 const isLaunchSmoke = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1";
 const isProjectIoSmoke = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE === "1";
 const launchSmokeDrumGridSnapshotChannel = "grooveforge:launch-smoke-drum-grid-snapshot";
+const launchSmokeNoteGridSnapshotChannel = "grooveforge:launch-smoke-note-grid-snapshot";
 const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
 const launchSmokeTimeoutMs = 640000;
@@ -303,6 +304,21 @@ type LaunchSmokeDrumGridKeyboardEvidence = {
   undoRestored: boolean;
 };
 
+type LaunchSmokeNoteGridKeyboardEvidence = {
+  activationSingleToggleReady: boolean;
+  bassButtonCount: number;
+  enterToggleReady: boolean;
+  melodyButtonCount: number;
+  nativeArrowReady: boolean;
+  navigationEventCountUnchanged: boolean;
+  navigationSelectionReady: boolean;
+  playbackStayedStopped: boolean;
+  pressedSemanticsReady: boolean;
+  rovingTabReady: boolean;
+  spaceToggleReady: boolean;
+  undoRestored: boolean;
+};
+
 type LaunchSmokeModalFocusEvidence = {
   commandShortcutFromEditable: boolean;
   commandBackwardWrap: boolean;
@@ -323,6 +339,7 @@ type LaunchSmokeModalFocusEvidence = {
   dockViewportReady: boolean;
   dockVisible: boolean;
   drumGrid: LaunchSmokeDrumGridKeyboardEvidence;
+  noteGrid: LaunchSmokeNoteGridKeyboardEvidence;
   editableFocusRestored: boolean;
   editableQuestionTyped: boolean;
   editableValuePreserved: boolean;
@@ -346,7 +363,7 @@ type LaunchSmokeModalFocusEvidence = {
   switchInitialFocus: string;
 };
 
-type LaunchSmokeModalFocusCoreEvidence = Omit<LaunchSmokeModalFocusEvidence, "drumGrid">;
+type LaunchSmokeModalFocusCoreEvidence = Omit<LaunchSmokeModalFocusEvidence, "drumGrid" | "noteGrid">;
 
 type LaunchSmokeBridgeDirectEvidence = {
   buttonPresent: boolean;
@@ -1189,6 +1206,26 @@ function launchSmokeModalFocusFailures(evidence: LaunchSmokeModalFocusEvidence):
     !evidence.drumGrid.undoRestored
   ) {
     failures.push("drum grid Enter and Space should toggle exactly one selected hit through undo while leaving playback stopped");
+  }
+  if (
+    evidence.noteGrid.bassButtonCount !== 144 ||
+    evidence.noteGrid.melodyButtonCount !== 160 ||
+    !evidence.noteGrid.pressedSemanticsReady ||
+    !evidence.noteGrid.rovingTabReady ||
+    !evidence.noteGrid.nativeArrowReady ||
+    !evidence.noteGrid.navigationSelectionReady ||
+    !evidence.noteGrid.navigationEventCountUnchanged
+  ) {
+    failures.push("808 and Synth grids should expose one Tab stop each with pressed-state parity and representative non-mutating native spatial navigation");
+  }
+  if (
+    !evidence.noteGrid.enterToggleReady ||
+    !evidence.noteGrid.spaceToggleReady ||
+    !evidence.noteGrid.activationSingleToggleReady ||
+    !evidence.noteGrid.playbackStayedStopped ||
+    !evidence.noteGrid.undoRestored
+  ) {
+    failures.push("note-grid Enter and Space should toggle exactly one selected note through undo while leaving playback stopped");
   }
   if (!evidence.quickShortcutFromEditable || !evidence.commandShortcutFromEditable) {
     failures.push("modified Quick Actions and Command Reference shortcuts should open from an editable workstation field");
@@ -2701,6 +2738,238 @@ function collectLaunchSmokeDrumGridKeyboardEvidenceWithTimeout(
   });
 }
 
+async function collectLaunchSmokeNoteGridKeyboardEvidence(
+  win: BrowserWindow,
+  onStep: (step: string) => void = () => {}
+): Promise<LaunchSmokeNoteGridKeyboardEvidence> {
+  type NoteGridSnapshot = {
+    activePitch: string;
+    activeStep: number;
+    activeTestId: string;
+    activeTrack: string;
+    bassActiveCount: number;
+    bassButtonCount: number;
+    bassTabStopTestIds: string[];
+    melodyActiveCount: number;
+    melodyButtonCount: number;
+    melodyTabStopTestIds: string[];
+    playing: boolean;
+    pressedSemanticsReady: boolean;
+    selectedTestId: string;
+    targetPressed: boolean;
+  };
+
+  const runStep = async <T,>(script: string): Promise<T> => (await win.webContents.executeJavaScript(script)) as T;
+  const recordedSteps: NoteGridSnapshot[] = [];
+  let recorderBridgeReady = false;
+  const handleRecorderSnapshot = (event: Electron.IpcMainEvent, payload: unknown): void => {
+    if (event.sender !== win.webContents || typeof payload !== "object" || payload === null) {
+      return;
+    }
+    const candidate = payload as { snapshot?: unknown; step?: unknown };
+    if (candidate.step === 0) {
+      recorderBridgeReady = true;
+      return;
+    }
+    if (
+      typeof candidate.step === "number" &&
+      Number.isInteger(candidate.step) &&
+      candidate.step >= 1 &&
+      candidate.step <= 6 &&
+      typeof candidate.snapshot === "object" &&
+      candidate.snapshot !== null
+    ) {
+      recordedSteps[candidate.step - 1] = candidate.snapshot as NoteGridSnapshot;
+    }
+  };
+  ipcMain.on(launchSmokeNoteGridSnapshotChannel, handleRecorderSnapshot);
+
+  try {
+    win.webContents.focus();
+    onStep("installing renderer recorder");
+    const initial = await runStep<NoteGridSnapshot>(`
+      (() => {
+        const snapshot = () => {
+          const bassButtons = Array.from(document.querySelectorAll('[data-testid="note-grid-bass"] button'));
+          const melodyButtons = Array.from(document.querySelectorAll('[data-testid="note-grid-melody"] button'));
+          const buttons = [...bassButtons, ...melodyButtons];
+          const selected = buttons.filter((button) => button.classList.contains('selected'));
+          const active = document.activeElement instanceof HTMLButtonElement ? document.activeElement : null;
+          return {
+            activePitch: active?.dataset.notePitch ?? '',
+            activeStep: Number(active?.dataset.noteStep ?? -1),
+            activeTestId: active?.dataset.testid ?? '',
+            activeTrack: active?.dataset.noteTrack ?? '',
+            bassActiveCount: bassButtons.filter((button) => button.getAttribute('aria-pressed') === 'true').length,
+            bassButtonCount: bassButtons.length,
+            bassTabStopTestIds: bassButtons.filter((button) => button.tabIndex === 0).map((button) => button.dataset.testid ?? ''),
+            melodyActiveCount: melodyButtons.filter((button) => button.getAttribute('aria-pressed') === 'true').length,
+            melodyButtonCount: melodyButtons.length,
+            melodyTabStopTestIds: melodyButtons.filter((button) => button.tabIndex === 0).map((button) => button.dataset.testid ?? ''),
+            playing: document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'true',
+            pressedSemanticsReady: buttons.every(
+              (button) => (button.getAttribute('aria-pressed') === 'true') === button.classList.contains('active')
+            ),
+            selectedTestId: selected.length === 1 ? selected[0]?.dataset.testid ?? '' : '',
+            targetPressed: selected.length === 1 && selected[0]?.getAttribute('aria-pressed') === 'true'
+          };
+        };
+        const recorder = { steps: [], listener: null };
+        recorder.listener = (event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+            return;
+          }
+          setTimeout(() => {
+            const nextSnapshot = snapshot();
+            recorder.steps.push(nextSnapshot);
+            window.grooveforge?.reportLaunchSmokeNoteGridSnapshot?.({
+              step: recorder.steps.length,
+              snapshot: nextSnapshot
+            });
+            if (recorder.steps.length >= 6) {
+              document.removeEventListener('keydown', recorder.listener, true);
+            }
+          }, 0);
+        };
+        window.__grooveforgeNoteGridKeyboardSmoke = recorder;
+        document.addEventListener('keydown', recorder.listener, true);
+        document.querySelector('[data-testid="note-grid-bass"] button[tabindex="0"]')?.focus();
+        const initialSnapshot = snapshot();
+        window.grooveforge?.reportLaunchSmokeNoteGridSnapshot?.({ step: 0, snapshot: initialSnapshot });
+        return initialSnapshot;
+      })();
+    `);
+    const sendKey = async (
+      keyCode: string,
+      expectedStep: number,
+      modifiers: Electron.InputEvent["modifiers"] = []
+    ): Promise<void> => {
+      win.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
+      win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
+      const stepDeadline = Date.now() + 30000;
+      while (Date.now() < stepDeadline && !recordedSteps[expectedStep - 1]) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      if (!recordedSteps[expectedStep - 1]) {
+        throw new Error(`Native note-grid keyboard recorder did not receive step ${expectedStep} (${keyCode}).`);
+      }
+    };
+    const sendCommandKey = async (
+      keyCode: string,
+      modifiers: Electron.InputEvent["modifiers"]
+    ): Promise<void> => {
+      win.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
+      win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    };
+    const commandModifier: Electron.InputEvent["modifiers"] = process.platform === "darwin" ? ["meta"] : ["control"];
+
+    onStep("sending native spatial navigation and activation keys");
+    await sendKey("Right", 1);
+    await sendKey("Down", 2);
+    await sendKey("Enter", 3);
+    await sendCommandKey("Z", commandModifier);
+    await sendKey("Escape", 4);
+    await sendKey("Space", 5);
+    await sendCommandKey("Z", commandModifier);
+    await sendKey("Escape", 6);
+    onStep("collecting renderer snapshots");
+    const recorderDeadline = Date.now() + 20000;
+    while (Date.now() < recorderDeadline && recordedSteps.filter(Boolean).length < 6) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const [afterRight, afterDown, afterEnter, afterEnterUndo, afterSpace, afterSpaceUndo] = recordedSteps;
+    if (!afterRight || !afterDown || !afterEnter || !afterEnterUndo || !afterSpace || !afterSpaceUndo) {
+      throw new Error(
+        `Native note-grid keyboard recorder returned ${recordedSteps.filter(Boolean).length}/6 snapshots ` +
+          `(bridge ${recorderBridgeReady ? "ready" : "missing"}, initial focus ${initial.activeTestId || "none"}).`
+      );
+    }
+    onStep("validating renderer snapshots");
+    const navigationSnapshots = [afterRight, afterDown];
+    const allSnapshots = [initial, ...navigationSnapshots, afterEnter, afterEnterUndo, afterSpace, afterSpaceUndo];
+    const evidence: LaunchSmokeNoteGridKeyboardEvidence = {
+      activationSingleToggleReady:
+        afterEnter.bassActiveCount === afterDown.bassActiveCount + 1 &&
+        afterSpace.bassActiveCount === afterDown.bassActiveCount + 1,
+      bassButtonCount: initial.bassButtonCount,
+      enterToggleReady:
+        afterEnter.activeTestId === afterDown.activeTestId &&
+        afterEnter.selectedTestId === afterDown.selectedTestId &&
+        afterEnter.targetPressed,
+      melodyButtonCount: initial.melodyButtonCount,
+      nativeArrowReady:
+        initial.activeTrack === "bass" &&
+        initial.activeStep === 0 &&
+        afterRight.activeTrack === "bass" &&
+        afterRight.activePitch === initial.activePitch &&
+        afterRight.activeStep === 1 &&
+        afterDown.activeTrack === "bass" &&
+        afterDown.activePitch !== afterRight.activePitch &&
+        afterDown.activeStep === afterRight.activeStep,
+      navigationEventCountUnchanged: navigationSnapshots.every(
+        (item) => item.bassActiveCount === initial.bassActiveCount && item.melodyActiveCount === initial.melodyActiveCount
+      ),
+      navigationSelectionReady: navigationSnapshots.every(
+        (item) =>
+          item.selectedTestId === item.activeTestId &&
+          item.bassTabStopTestIds.length === 1 &&
+          item.bassTabStopTestIds[0] === item.activeTestId &&
+          item.melodyTabStopTestIds.length === 1
+      ),
+      playbackStayedStopped: allSnapshots.every((item) => !item.playing),
+      pressedSemanticsReady: allSnapshots.every((item) => item.pressedSemanticsReady),
+      rovingTabReady:
+        initial.bassTabStopTestIds.length === 1 &&
+        initial.bassTabStopTestIds[0] === initial.activeTestId &&
+        initial.melodyTabStopTestIds.length === 1 &&
+        navigationSnapshots.every(
+          (item) => item.bassTabStopTestIds.length === 1 && item.melodyTabStopTestIds.length === 1
+        ),
+      spaceToggleReady:
+        afterSpace.activeTestId === afterDown.activeTestId &&
+        afterSpace.selectedTestId === afterDown.selectedTestId &&
+        afterSpace.targetPressed,
+      undoRestored:
+        !afterEnterUndo.targetPressed &&
+        !afterSpaceUndo.targetPressed &&
+        afterEnterUndo.bassActiveCount === initial.bassActiveCount &&
+        afterSpaceUndo.bassActiveCount === initial.bassActiveCount &&
+        afterEnterUndo.melodyActiveCount === initial.melodyActiveCount &&
+        afterSpaceUndo.melodyActiveCount === initial.melodyActiveCount
+    };
+    onStep("restoring initial editor selection");
+    await runStep(`document.querySelector('[data-testid="chord-slot-0"]')?.focus();`);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return evidence;
+  } finally {
+    ipcMain.removeListener(launchSmokeNoteGridSnapshotChannel, handleRecorderSnapshot);
+  }
+}
+
+function collectLaunchSmokeNoteGridKeyboardEvidenceWithTimeout(
+  win: BrowserWindow
+): Promise<LaunchSmokeNoteGridKeyboardEvidence> {
+  return new Promise((resolve, reject) => {
+    let step = "starting";
+    const timeout = setTimeout(
+      () => reject(new Error(`Timed out collecting native note-grid keyboard evidence at ${step}.`)),
+      120000
+    );
+    void collectLaunchSmokeNoteGridKeyboardEvidence(win, (nextStep) => {
+      step = nextStep;
+    })
+      .then((evidence) => {
+        clearTimeout(timeout);
+        resolve(evidence);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+}
+
 async function collectLaunchSmokeModalFocusEvidence(
   win: BrowserWindow,
   onStep: (step: string) => void = () => {}
@@ -3449,6 +3718,7 @@ function projectIoSmokeFailures(evidence: ProjectIoSmokeEvidence): string[] {
 function installLaunchSmoke(win: BrowserWindow): void {
   let finished = false;
   let drumGridKeyboardEvidence: LaunchSmokeDrumGridKeyboardEvidence | null = null;
+  let noteGridKeyboardEvidence: LaunchSmokeNoteGridKeyboardEvidence | null = null;
   let minimumWindowEvidence: LaunchSmokeMinimumWindowEvidence | null = null;
   let lastProgress: Record<string, unknown> = { phase: "waiting-ready-to-show" };
   const timeout = setTimeout(() => {
@@ -3515,6 +3785,26 @@ function installLaunchSmoke(win: BrowserWindow): void {
                 });
               });
           }
+          if (!noteGridKeyboardEvidence) {
+            lastProgress = { phase: "collecting-note-grid-keyboard", evidence };
+            return collectLaunchSmokeNoteGridKeyboardEvidenceWithTimeout(win)
+              .then((collectedEvidence) => {
+                if (finished) {
+                  return;
+                }
+                noteGridKeyboardEvidence = collectedEvidence;
+                lastProgress = {
+                  phase: "note-grid-keyboard-collected",
+                  evidence: { ...evidence, drumGrid: drumGridKeyboardEvidence, noteGrid: collectedEvidence }
+                };
+                setTimeout(() => poll(deadline), 100);
+              })
+              .catch((error: unknown) => {
+                fail("Production desktop note-grid keyboard JavaScript failed.", {
+                  error: error instanceof Error ? error.message : String(error)
+                });
+              });
+          }
           lastProgress = { phase: "collecting-bridge-direct", evidence };
           return collectLaunchSmokeBridgeDirectEvidenceWithTimeout(win)
             .then((bridgeDirectEvidence) => {
@@ -3569,7 +3859,8 @@ function installLaunchSmoke(win: BrowserWindow): void {
                         .then(
                           (modalFocusCoreEvidence): LaunchSmokeModalFocusEvidence => ({
                             ...modalFocusCoreEvidence,
-                            drumGrid: drumGridKeyboardEvidence as LaunchSmokeDrumGridKeyboardEvidence
+                            drumGrid: drumGridKeyboardEvidence as LaunchSmokeDrumGridKeyboardEvidence,
+                            noteGrid: noteGridKeyboardEvidence as LaunchSmokeNoteGridKeyboardEvidence
                           })
                         )
                         .then((modalFocusEvidence) => {
