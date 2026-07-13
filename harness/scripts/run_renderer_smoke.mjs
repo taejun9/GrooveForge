@@ -589,6 +589,7 @@ function validateFirstRunRenderer(html) {
   );
   check(
     [
+      'data-testid="project-title-input"',
       'aria-keyshortcuts="Control+K Meta+K"',
       'aria-keyshortcuts="? Control+/ Meta+/"',
       'aria-keyshortcuts="Space"',
@@ -597,7 +598,7 @@ function validateFirstRunRenderer(html) {
       'aria-keyshortcuts="Control+O Meta+O"',
       'aria-keyshortcuts="Control+S Meta+S"'
     ].every((shortcut) => html.includes(shortcut)),
-    "essential transport and project controls should expose their existing desktop shortcuts"
+    "essential transport and project controls should expose a stable editable field hook and their existing desktop shortcuts"
   );
   check(
     html.includes('title="Open Quick Actions (Ctrl/Cmd+K)"') &&

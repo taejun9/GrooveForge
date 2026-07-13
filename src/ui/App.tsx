@@ -2215,14 +2215,12 @@ export function App(): ReactElement {
   ]);
 
   function handleDesktopShortcut(event: KeyboardEvent): void {
-    if (isEditableShortcutTarget(event.target)) {
-      return;
-    }
-
+    const editableTarget = isEditableShortcutTarget(event.target);
     const key = event.key.toLowerCase();
     const withCommandModifier = event.metaKey || event.ctrlKey;
     const wantsQuickActions = withCommandModifier && !event.shiftKey && key === "k";
-    const wantsCommandReference = key === "?" || (withCommandModifier && !event.shiftKey && key === "/");
+    const wantsModifiedCommandReference = withCommandModifier && !event.shiftKey && key === "/";
+    const wantsCommandReference = wantsModifiedCommandReference || (!editableTarget && key === "?");
     const wantsUndo = withCommandModifier && !event.shiftKey && key === "z";
     const wantsRedo = withCommandModifier && ((event.shiftKey && key === "z") || key === "y");
     const wantsSave = withCommandModifier && !event.shiftKey && key === "s";
@@ -2237,6 +2235,10 @@ export function App(): ReactElement {
     if (wantsQuickActions) {
       event.preventDefault();
       openQuickActions();
+      return;
+    }
+
+    if (editableTarget) {
       return;
     }
 
@@ -10850,6 +10852,7 @@ export function App(): ReactElement {
           <label className="field title-field">
             <span>Title</span>
             <input
+              data-testid="project-title-input"
               type="text"
               value={project.title}
               onChange={(event) => updateProject((current) => ({ ...current, title: event.target.value }))}
