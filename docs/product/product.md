@@ -65,6 +65,8 @@ The first-session acceptance test is concrete: choose BPM/key/style, program dru
 
 The actual default `starterProject` must embody that promise before any audience action is clicked: Guided, 82 BPM, A minor, Lo-fi as one explicitly changeable starting profile across all 14 styles, exactly 8 bars, Starter Sketch delivery, Clean Demo master posture, and style/key-matched editable Pattern A/B/C drum, bass, melody, and chord events. The first screen identifies this data as an `Editable 8-bar foundation`, not a disposable demo, while Project Safety Readout says it is editable now, local only, and requires Save for a durable project file. Trap remains fully available as one profile and Beat Blueprint, but it is not the first-run product identity.
 
+The two first-run starter choices must complete their promise after the explicit click rather than only replace project data. `Start an 8-bar beat` names and lands on the focusable Pattern editor with the drum grid visible; `Start a studio pass` names and lands on the focusable Review Queue with Review & Export and Review Queue expanded. Both visible and Quick Actions starter commands reuse this route, while neither route auto-plays, applies fixes, or changes data beyond the selected starter creation.
+
 ## Product Boundary
 
 Core product:

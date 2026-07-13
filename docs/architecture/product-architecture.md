@@ -76,6 +76,8 @@ Default project creation, first-run navigation, and MVP validation must instanti
 
 First-run ownership state must describe the default event project as an editable 8-bar foundation rather than a demo. Before an explicit file save, the compact safety state remains warning-toned and must say the project is editable now, local only, and needs Save for a durable `.grooveforge.json` copy; the first mutation continues through the existing unsaved-change and renderer-local draft path.
 
+Audience starter creation is an action-to-workspace route, not only a project factory. The beginner route moves viewport and programmatic focus to the direct Pattern editor; the producer route first expands the nested Review & Export and Review Queue disclosures, then moves viewport and focus to Review Queue. Starter and Workflow Navigator routes share a measured sticky-navigation clearance fallback after normal `scrollIntoView`, so nested or top-level targets remain visible across renderers. These focus targets stay outside project state and must not trigger playback, fixes, export, remote behavior, or additional project mutation.
+
 The core project model should make composition events first-class. In the core architecture, a clip is a pattern, MIDI, or automation container, not an imported audio asset:
 
 - `Project`: version, title, BPM, key/scale, swing, tracks, arrangement, master settings.

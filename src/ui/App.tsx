@@ -7310,6 +7310,39 @@ export function App(): ReactElement {
     focusBeatBlueprintsPanel();
   }
 
+  function scrollWorkspaceTargetIntoView(target: HTMLElement | null): void {
+    if (!target) {
+      return;
+    }
+
+    target.scrollIntoView({ block: "start", behavior: "auto" });
+    const navigator = workflowNavigatorPanelRef.current;
+    if (!navigator || window.innerWidth < 1221) {
+      return;
+    }
+
+    const targetTop = target.getBoundingClientRect().top;
+    const desiredTop = navigator.getBoundingClientRect().bottom + 12;
+    if (targetTop < desiredTop) {
+      window.scrollBy({ top: targetTop - desiredTop, behavior: "auto" });
+    }
+  }
+
+  function focusAudienceStarterLanding(starterId: AudienceStarterProjectId): void {
+    window.setTimeout(() => {
+      if (starterId === "producer") {
+        flushSync(() => {
+          setMasterReviewOpen(true);
+          setMasterReviewQueueOpen(true);
+        });
+      }
+
+      const target = starterId === "beginner" ? composePanelRef.current : reviewQueuePanelRef.current;
+      scrollWorkspaceTargetIntoView(target);
+      target?.focus({ preventScroll: true });
+    }, 0);
+  }
+
   function createAudienceStarter(starterId: AudienceStarterProjectId) {
     const label = audienceStarterProjectLabel(starterId);
     const beforeProject = projectRef.current;
@@ -7322,6 +7355,7 @@ export function App(): ReactElement {
       setSelectedChordIndex(0);
       setSelectedArrangementIndex(0);
       selectTransportLoopScope("arrangement", false);
+      focusAudienceStarterLanding(starterId);
       if (resultAction) {
         const result = createQuickActionResult(
           resultAction,
@@ -7867,7 +7901,7 @@ export function App(): ReactElement {
       deliver: deliverPanelRef.current
     };
 
-    targetRefs[zone]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[zone]);
   }
 
   function jumpToWorkflowNavigatorItem(item: WorkflowNavigatorItem): void {
@@ -10306,8 +10340,44 @@ export function App(): ReactElement {
       };
     };
 
+    const readAudienceStarterLanding = (
+      starterId: AudienceStarterProjectId
+    ): GrooveforgeLaunchSmokeStarterLandingRouteEvidence => {
+      const landingTarget =
+        starterId === "beginner"
+          ? document.querySelector<HTMLElement>('[data-testid="workflow-target-compose"]')
+          : document.querySelector<HTMLElement>('[data-testid="review-queue"]');
+      const landingRect = landingTarget?.getBoundingClientRect() ?? null;
+      const navigatorRect = document.querySelector<HTMLElement>('[data-testid="workflow-navigator"]')?.getBoundingClientRect() ?? null;
+
+      return {
+        clearOfNavigator: Boolean(landingRect && navigatorRect && landingRect.top >= navigatorRect.bottom + 8),
+        focusTestId: document.activeElement instanceof HTMLElement ? document.activeElement.dataset.testid ?? "" : "",
+        inViewport: Boolean(
+          landingRect && landingRect.top >= 0 && landingRect.top < window.innerHeight && landingRect.bottom > 0
+        ),
+        producerQueueOpen:
+          document.querySelector<HTMLDetailsElement>('[data-testid="master-review-queue-tools"]')?.open ?? false,
+        producerReviewOpen: document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? false,
+        projectTitle: projectRef.current.title
+      };
+    };
+
+    const collectAudienceStarterLandingEvidence = async (): Promise<GrooveforgeLaunchSmokeStarterLandingEvidence> => {
+      createAudienceStarter("beginner");
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      const beginner = readAudienceStarterLanding("beginner");
+      createAudienceStarter("producer");
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      const producer = readAudienceStarterLanding("producer");
+      return { beginner, producer };
+    };
+
     window.__grooveforgeLaunchSmoke = {
       ...(window.__grooveforgeLaunchSmoke ?? {}),
+      collectAudienceStarterLandingEvidence,
       collectChordCardKeyboardEvidence: () => {
         const cards = [...document.querySelectorAll<HTMLElement>('[data-testid^="chord-slot-"]')];
         const initial = cards.find((card) => card.dataset.editorOpen === "true");
@@ -10647,6 +10717,7 @@ export function App(): ReactElement {
       }
       delete current.collectAudienceSessionQuickActionEvidence;
       delete current.collectChordCardKeyboardEvidence;
+      delete current.collectAudienceStarterLandingEvidence;
       if (!current.collectAudienceRouteBridgeDirectEvidence) {
         delete window.__grooveforgeLaunchSmoke;
       }
@@ -10721,7 +10792,7 @@ export function App(): ReactElement {
               <Music2 size={15} aria-hidden="true" />
               <span>
                 <strong>Start an 8-bar beat</strong>
-                <small>Guided · drums, bass, chords, melody</small>
+                <small>Guided · opens the drum grid</small>
               </span>
             </button>
             <button
@@ -10733,7 +10804,7 @@ export function App(): ReactElement {
               <SlidersHorizontal size={15} aria-hidden="true" />
               <span>
                 <strong>Start a studio pass</strong>
-                <small>Producer workflow · arrangement and delivery</small>
+                <small>Studio · opens Review Queue</small>
               </span>
             </button>
             <button
@@ -11485,7 +11556,13 @@ export function App(): ReactElement {
       />
 
       <section className="workspace-grid">
-        <section className="panel pattern-panel" data-testid="workflow-target-compose" aria-label="Pattern editor" ref={composePanelRef}>
+        <section
+          className="panel pattern-panel"
+          data-testid="workflow-target-compose"
+          aria-label="Pattern editor"
+          ref={composePanelRef}
+          tabIndex={-1}
+        >
           <PanelTitle icon={<Drum size={18} />} title="Drums" meta="16 step rack" />
           <div className="pattern-tabs" aria-label="Pattern">
             {patternSlots.map((pattern) => {

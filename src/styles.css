@@ -4630,6 +4630,12 @@ h2 {
     backdrop-filter: blur(14px);
     background: rgba(17, 16, 15, 0.9);
   }
+
+  .workspace-grid > .panel,
+  .review-queue,
+  .handoff-pack {
+    scroll-margin-top: 148px;
+  }
 }
 
 .workflow-navigator-heading {

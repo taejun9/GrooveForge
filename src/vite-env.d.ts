@@ -78,6 +78,20 @@ type GrooveforgeLaunchSmokeAudienceStarterEvidence = GrooveforgeLaunchSmokeRoute
   visibleResultTitle: string;
 };
 
+type GrooveforgeLaunchSmokeStarterLandingRouteEvidence = {
+  clearOfNavigator: boolean;
+  focusTestId: string;
+  inViewport: boolean;
+  producerQueueOpen: boolean;
+  producerReviewOpen: boolean;
+  projectTitle: string;
+};
+
+type GrooveforgeLaunchSmokeStarterLandingEvidence = {
+  beginner: GrooveforgeLaunchSmokeStarterLandingRouteEvidence;
+  producer: GrooveforgeLaunchSmokeStarterLandingRouteEvidence;
+};
+
 type GrooveforgeLaunchSmokeAudienceNextStepRailEvidence = {
   activeAudience: string;
   beginnerAction: string;
@@ -331,6 +345,9 @@ interface Window {
     collectAudienceRouteBridgeDirectEvidence?: () =>
       | GrooveforgeLaunchSmokeBridgeDirectEvidenceBundle
       | Promise<GrooveforgeLaunchSmokeBridgeDirectEvidenceBundle>;
+    collectAudienceStarterLandingEvidence?: () =>
+      | GrooveforgeLaunchSmokeStarterLandingEvidence
+      | Promise<GrooveforgeLaunchSmokeStarterLandingEvidence>;
     collectAudienceSessionQuickActionEvidence?: () => GrooveforgeLaunchSmokePaletteEvidence | Promise<GrooveforgeLaunchSmokePaletteEvidence>;
     collectChordCardKeyboardEvidence?: () => GrooveforgeLaunchSmokeChordCardEvidence;
   };

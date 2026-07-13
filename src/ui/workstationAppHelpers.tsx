@@ -4818,7 +4818,13 @@ export function ReviewQueue({
   const fixPreview = createReviewFixPreview(summary, focusedItemId, project, analyzeExport(project));
 
   return (
-    <section className={`review-queue ${summary.tone}`} data-testid="review-queue" aria-label="Review queue" ref={sectionRef}>
+    <section
+      className={`review-queue ${summary.tone}`}
+      data-testid="review-queue"
+      aria-label="Review queue"
+      ref={sectionRef}
+      tabIndex={-1}
+    >
       <div className="review-queue-heading">
         <div>
           <ListChecks size={16} aria-hidden="true" />

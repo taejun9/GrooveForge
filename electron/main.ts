@@ -206,6 +206,20 @@ type LaunchSmokeAudienceStarterEvidence = LaunchSmokePaletteRouteEvidence & {
   visibleResultTitle: string;
 };
 
+type LaunchSmokeStarterLandingRouteEvidence = {
+  clearOfNavigator: boolean;
+  focusTestId: string;
+  inViewport: boolean;
+  producerQueueOpen: boolean;
+  producerReviewOpen: boolean;
+  projectTitle: string;
+};
+
+type LaunchSmokeStarterLandingEvidence = {
+  beginner: LaunchSmokeStarterLandingRouteEvidence;
+  producer: LaunchSmokeStarterLandingRouteEvidence;
+};
+
 type LaunchSmokeCommandReferenceEvidence = {
   contextHasDirectComposition: boolean;
   contextHasFollowupRoutes: boolean;
@@ -1542,12 +1556,20 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         const deliverTarget = document.querySelector('[data-testid="handoff-pack"]');
         const composeButton = document.querySelector('[data-testid="workflow-jump-compose"]');
         const composeTarget = document.querySelector('[data-testid="workflow-target-compose"]');
+        const workflowNavigator = document.querySelector('[data-testid="workflow-navigator"]');
         deliverButton?.click();
         const deliverRect = deliverTarget?.getBoundingClientRect() ?? null;
         composeButton?.click();
-        const composeTop = composeTarget?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+        const composeRect = composeTarget?.getBoundingClientRect() ?? null;
+        const workflowNavigatorRect = workflowNavigator?.getBoundingClientRect() ?? null;
         return {
-          composeReady: Math.abs(composeTop) <= 2,
+          composeReady: Boolean(
+            composeRect &&
+            workflowNavigatorRect &&
+            composeRect.top >= workflowNavigatorRect.bottom + 8 &&
+            composeRect.top < window.innerHeight &&
+            composeRect.bottom > 0
+          ),
           deliverReady: Boolean(deliverRect && deliverRect.top < window.innerHeight && deliverRect.bottom > 0)
         };
       })();
@@ -1903,6 +1925,38 @@ function collectLaunchSmokePaletteEvidenceWithTimeout(win: BrowserWindow): Promi
         .catch(() => reject(new Error("Timed out collecting live Quick Actions palette evidence.")));
     }, 150000);
     void collectLaunchSmokePaletteEvidence(win)
+      .then((evidence) => {
+        clearTimeout(timeout);
+        resolve(evidence);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+}
+
+async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Promise<LaunchSmokeStarterLandingEvidence> {
+  const result = await win.webContents.executeJavaScript(`
+    (async () => {
+      const collector = window.__grooveforgeLaunchSmoke?.collectAudienceStarterLandingEvidence;
+      if (window.grooveforge?.launchSmoke !== true || typeof collector !== "function") {
+        return { ready: false, evidence: null };
+      }
+      const evidence = await collector();
+      return { ready: true, evidence };
+    })();
+  `);
+  if (!result || result.ready !== true || !result.evidence) {
+    throw new Error("Launch smoke Audience Starter landing hook was not ready.");
+  }
+  return result.evidence as LaunchSmokeStarterLandingEvidence;
+}
+
+function collectLaunchSmokeStarterLandingEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeStarterLandingEvidence> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Timed out collecting Audience Starter landing evidence.")), 90000);
+    void collectLaunchSmokeStarterLandingEvidence(win)
       .then((evidence) => {
         clearTimeout(timeout);
         resolve(evidence);
@@ -2400,15 +2454,20 @@ function installLaunchSmoke(win: BrowserWindow): void {
                     return;
                   }
 
-                  lastProgress = { phase: "collecting-command-reference", evidence: evidenceWithPalette };
-                  return collectLaunchSmokeCommandReferenceEvidenceWithTimeout(win)
-                    .then((commandReferenceEvidence) => {
+                  lastProgress = { phase: "collecting-starter-landing", evidence: evidenceWithPalette };
+                  return collectLaunchSmokeStarterLandingEvidenceWithTimeout(win)
+                    .then((starterLandingEvidence) => {
+                      const evidenceWithStarterLanding = { ...evidenceWithPalette, starterLanding: starterLandingEvidence };
+                      lastProgress = { phase: "starter-landing-collected", evidence: evidenceWithStarterLanding };
+                      lastProgress = { phase: "collecting-command-reference", evidence: evidenceWithStarterLanding };
+                      return collectLaunchSmokeCommandReferenceEvidenceWithTimeout(win)
+                        .then((commandReferenceEvidence) => {
                       if (finished) {
                         return;
                       }
 
                       const commandReferenceFailures = launchSmokeCommandReferenceFailures(commandReferenceEvidence);
-                      const evidenceWithCommandReference = { ...evidenceWithPalette, commandReference: commandReferenceEvidence };
+                      const evidenceWithCommandReference = { ...evidenceWithStarterLanding, commandReference: commandReferenceEvidence };
                       lastProgress = {
                         phase: "command-reference-collected",
                         evidence: evidenceWithCommandReference,
@@ -2465,9 +2524,15 @@ function installLaunchSmoke(win: BrowserWindow): void {
                             error: error instanceof Error ? error.message : String(error)
                           });
                         });
+                        })
+                        .catch((error: unknown) => {
+                          fail("Production desktop Command Reference JavaScript failed.", {
+                            error: error instanceof Error ? error.message : String(error)
+                          });
+                        });
                     })
                     .catch((error: unknown) => {
-                      fail("Production desktop Command Reference JavaScript failed.", {
+                      fail("Production desktop Audience Starter landing JavaScript failed.", {
                         error: error instanceof Error ? error.message : String(error)
                       });
                     });

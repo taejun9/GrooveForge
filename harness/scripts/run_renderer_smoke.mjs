@@ -423,6 +423,39 @@ function validateFirstRunRenderer(html) {
       html.includes('data-testid="first-run-open-project"'),
     "first-run launchpad should start open with beginner, producer, and existing-project choices plus a persistent toggle"
   );
+  const audienceStarterLandingSource = printNamedFunction(appSource, "App.tsx", "focusAudienceStarterLanding");
+  const createAudienceStarterSource = printNamedFunction(appSource, "App.tsx", "createAudienceStarter");
+  const workspaceScrollSource = printNamedFunction(appSource, "App.tsx", "scrollWorkspaceTargetIntoView");
+  const workflowJumpSource = printNamedFunction(appSource, "App.tsx", "jumpToWorkflowZone");
+  check(
+    html.includes("Guided · opens the drum grid") &&
+      html.includes("Studio · opens Review Queue") &&
+      html.includes('data-testid="workflow-target-compose" aria-label="Pattern editor" tabindex="-1"') &&
+      html.includes('data-testid="review-queue" aria-label="Review queue" tabindex="-1"'),
+    "first-run choices should name their direct destinations and keep both landing regions programmatically focusable"
+  );
+  check(
+    audienceStarterLandingSource.includes('starterId === "producer"') &&
+      audienceStarterLandingSource.includes("setMasterReviewOpen(true)") &&
+      audienceStarterLandingSource.includes("setMasterReviewQueueOpen(true)") &&
+      audienceStarterLandingSource.includes("composePanelRef.current") &&
+      audienceStarterLandingSource.includes("reviewQueuePanelRef.current") &&
+      audienceStarterLandingSource.includes("scrollWorkspaceTargetIntoView(target)") &&
+      audienceStarterLandingSource.includes("focus({ preventScroll: true })") &&
+      createAudienceStarterSource.includes("focusAudienceStarterLanding(starterId)") &&
+      workspaceScrollSource.includes('scrollIntoView({ block: "start", behavior: "auto" })') &&
+      workspaceScrollSource.includes("window.innerWidth < 1221") &&
+      workspaceScrollSource.includes("navigator.getBoundingClientRect().bottom + 12") &&
+      workspaceScrollSource.includes('window.scrollBy({ top: targetTop - desiredTop, behavior: "auto" })') &&
+      workflowJumpSource.includes("scrollWorkspaceTargetIntoView(targetRefs[zone])"),
+    "both visible and Quick Actions starter creation should reuse one deterministic Compose or Review Queue landing route"
+  );
+  check(
+    styles.includes(".workspace-grid > .panel,") &&
+      styles.includes(".review-queue,") &&
+      styles.includes("scroll-margin-top: 148px;"),
+    "desktop workspace landing targets should clear the sticky Workflow Navigator"
+  );
   const transportBandIndex = html.indexOf('data-testid="workflow-target-transport"');
   const transportStatusControlsIndex = html.indexOf('data-testid="transport-status-controls"');
   const transportEssentialsIndex = html.indexOf('data-testid="transport-essential-controls"');
@@ -2339,6 +2372,7 @@ try {
     console.log(`- Markup: ${html.length} characters from App first render`);
     console.log("- Starter: Untitled Beat, Guided 82 BPM A minor Lo-fi, 8 bars, Starter Sketch, 14 editable styles visible");
     console.log("- Project ownership: Editable 8-bar foundation, editable now, local only, explicit Save-to-keep guidance");
+    console.log("- Starter landing: beginner opens the focused drum grid; producer opens the focused Review Queue; sticky navigation stays clear");
     console.log(
       "- Beginner path: Guide Quick Start, Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
     );

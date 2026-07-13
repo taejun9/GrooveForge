@@ -211,6 +211,22 @@ function checkResult(result) {
     `live desktop should identify an editable 8-bar foundation with honest local-only save guidance (project ${evidence?.layout?.projectStatus}, safety ${evidence?.layout?.projectSafetyStatus} / ${evidence?.layout?.projectSafetyLabel} / ${evidence?.layout?.projectSafetyDetail})`
   );
   check(
+    evidence?.starterLanding?.beginner?.projectTitle === "First Guided Beat" &&
+      evidence?.starterLanding?.beginner?.focusTestId === "workflow-target-compose" &&
+      evidence?.starterLanding?.beginner?.inViewport === true &&
+      evidence?.starterLanding?.beginner?.clearOfNavigator === true,
+    `live beginner starter should focus a visible Pattern editor below the sticky Workflow Navigator (${JSON.stringify(evidence?.starterLanding?.beginner ?? null)})`
+  );
+  check(
+    evidence?.starterLanding?.producer?.projectTitle === "Producer Fast Pass" &&
+      evidence?.starterLanding?.producer?.focusTestId === "review-queue" &&
+      evidence?.starterLanding?.producer?.inViewport === true &&
+      evidence?.starterLanding?.producer?.clearOfNavigator === true &&
+      evidence?.starterLanding?.producer?.producerReviewOpen === true &&
+      evidence?.starterLanding?.producer?.producerQueueOpen === true,
+    `live producer starter should open and focus a visible Review Queue below the sticky Workflow Navigator (${JSON.stringify(evidence?.starterLanding?.producer ?? null)})`
+  );
+  check(
     evidence?.layout?.feedbackOutsideGuidance === true && evidence?.layout?.feedbackAfterGuidance === true,
     "live desktop global command feedback should remain outside and after optional guidance"
   );
@@ -1105,6 +1121,7 @@ child.on("exit", (code, signal) => {
   console.log(
     `- Launchpad lifecycle: initial ${result.evidence.layout.launchpadOpen ? "open" : "collapsed"}, starter collapse ${result.evidence.palette.launchpad.collapsedAfterStarter ? "yes" : "no"}, manual reopen/close ${result.evidence.palette.launchpad.manualReopen && result.evidence.palette.launchpad.manualClose ? "yes" : "no"}`
   );
+  console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
   console.log(
     `- Note-editor-first layout: Capture & Ideas ${result.evidence.layout.captureIdeasOpen ? "open" : "collapsed"}, auto-reveal ${result.evidence.palette.captureIdeas.autoReveal ? "yes" : "no"}, note grids after capture ${result.evidence.layout.noteLanesAfterCaptureIdeas ? "yes" : "no"}`
   );
