@@ -10473,6 +10473,37 @@ export function App(): ReactElement {
           : document.querySelector<HTMLElement>('[data-testid="review-queue"]');
       const landingRect = landingTarget?.getBoundingClientRect() ?? null;
       const navigatorRect = document.querySelector<HTMLElement>('[data-testid="workflow-navigator"]')?.getBoundingClientRect() ?? null;
+      const chordToolGroup = document.querySelector<HTMLElement>('[data-testid="chord-edit-tools"]');
+      const chordToolButtons = chordToolGroup
+        ? [...chordToolGroup.querySelectorAll<HTMLButtonElement>("button")]
+        : [];
+      const chordToolGroupRect = chordToolGroup?.getBoundingClientRect() ?? null;
+      const chordToolReadableLabels = chordToolButtons.filter((button) => {
+        const buttonRect = button.getBoundingClientRect();
+        const label = button.querySelector<HTMLElement>("span");
+        const labelStyle = label ? window.getComputedStyle(label) : null;
+        return Boolean(
+          chordToolGroupRect &&
+            label &&
+            labelStyle &&
+            buttonRect.width > 0 &&
+            buttonRect.left >= chordToolGroupRect.left - 1 &&
+            buttonRect.right <= chordToolGroupRect.right + 1 &&
+            label.clientWidth > 0 &&
+            label.scrollWidth <= label.clientWidth + 1 &&
+            labelStyle.whiteSpace !== "nowrap" &&
+            labelStyle.textOverflow === "clip"
+        );
+      });
+      const chordToolAccessibleNames = chordToolButtons
+        .map((button) => button.getAttribute("aria-label")?.trim() ?? "")
+        .filter((label) => label.length > 0);
+      const chordToolRowCount = new Set(
+        chordToolButtons.map((button) => Math.round(button.getBoundingClientRect().top))
+      ).size;
+      const chordToolColumnCount = chordToolGroup
+        ? window.getComputedStyle(chordToolGroup).gridTemplateColumns.trim().split(/\s+/).length
+        : 0;
       const reviewQueue = document.querySelector<HTMLElement>('[data-testid="review-queue"]');
       const reviewQueueRect = reviewQueue?.getBoundingClientRect() ?? null;
       const reviewQueueFields = [
@@ -10512,6 +10543,16 @@ export function App(): ReactElement {
       });
 
       return {
+        chordToolColumnCount: starterId === "beginner" ? chordToolColumnCount : 0,
+        chordToolCount: starterId === "beginner" ? chordToolButtons.length : 0,
+        chordToolInternalOverflow:
+          starterId === "beginner" && chordToolGroup
+            ? Math.max(0, chordToolGroup.scrollWidth - chordToolGroup.clientWidth)
+            : 0,
+        chordToolReadableLabelCount: starterId === "beginner" ? chordToolReadableLabels.length : 0,
+        chordToolRowCount: starterId === "beginner" ? chordToolRowCount : 0,
+        chordToolUniqueAccessibleNameCount:
+          starterId === "beginner" ? new Set(chordToolAccessibleNames).size : 0,
         clearOfNavigator: Boolean(landingRect && navigatorRect && landingRect.top >= navigatorRect.bottom + 8),
         focusTestId: document.activeElement instanceof HTMLElement ? document.activeElement.dataset.testid ?? "" : "",
         inViewport: Boolean(

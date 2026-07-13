@@ -2685,8 +2685,9 @@ export function ChordEditor({
           </small>
         </div>
       )}
-      <div className="chord-edit-row" aria-label="Selected chord edit tools">
+      <div className="chord-edit-row" aria-label="Selected chord edit tools" data-testid="chord-edit-tools">
         <button
+          aria-label="Audition selected chord"
           data-testid="chord-audition"
           disabled={!selectedChord}
           onClick={onAudition}
@@ -2694,9 +2695,10 @@ export function ChordEditor({
           type="button"
         >
           <Play size={13} aria-hidden="true" />
-          <span>Aud</span>
+          <span>Audition</span>
         </button>
         <button
+          aria-label="Move selected chord one step left"
           data-testid="chord-move-left"
           disabled={!canMoveLeft}
           onClick={() => onMoveStep(-1)}
@@ -2704,9 +2706,10 @@ export function ChordEditor({
           type="button"
         >
           <ArrowLeft size={13} aria-hidden="true" />
-          <span>Step</span>
+          <span>Step left</span>
         </button>
         <button
+          aria-label="Move selected chord one step right"
           data-testid="chord-move-right"
           disabled={!canMoveRight}
           onClick={() => onMoveStep(1)}
@@ -2714,9 +2717,10 @@ export function ChordEditor({
           type="button"
         >
           <ArrowRight size={13} aria-hidden="true" />
-          <span>Step</span>
+          <span>Step right</span>
         </button>
         <button
+          aria-label="Duplicate selected chord to the next empty step"
           data-testid="chord-duplicate"
           disabled={!canDuplicate}
           onClick={onDuplicate}
@@ -2724,9 +2728,10 @@ export function ChordEditor({
           type="button"
         >
           <Copy size={13} aria-hidden="true" />
-          <span>Dup</span>
+          <span>Duplicate</span>
         </button>
         <button
+          aria-label="Duplicate selected chord to the previous beat"
           data-testid="chord-duplicate-previous-beat"
           disabled={previousBeatDuplicateStep === null}
           onClick={onDuplicatePreviousBeat}
@@ -2738,9 +2743,10 @@ export function ChordEditor({
           type="button"
         >
           <ArrowLeft size={13} aria-hidden="true" />
-          <span>Prev</span>
+          <span>Prev beat</span>
         </button>
         <button
+          aria-label="Duplicate selected chord to the next beat"
           data-testid="chord-duplicate-beat"
           disabled={beatDuplicateStep === null}
           onClick={onDuplicateBeat}
@@ -2748,9 +2754,10 @@ export function ChordEditor({
           type="button"
         >
           <ArrowRight size={13} aria-hidden="true" />
-          <span>Next</span>
+          <span>Next beat</span>
         </button>
         <button
+          aria-label="Move selected chord voicing down"
           data-testid="chord-invert-down"
           disabled={!selectedChord || selectedInversion <= 0}
           onClick={() => onInvert(-1)}
@@ -2758,9 +2765,10 @@ export function ChordEditor({
           type="button"
         >
           <ArrowDown size={13} aria-hidden="true" />
-          <span>Voice</span>
+          <span>Voice down</span>
         </button>
         <button
+          aria-label="Move selected chord voicing up"
           data-testid="chord-invert-up"
           disabled={!selectedChord || selectedInversion >= chordInversions[chordInversions.length - 1]}
           onClick={() => onInvert(1)}
@@ -2768,7 +2776,7 @@ export function ChordEditor({
           type="button"
         >
           <ArrowUp size={13} aria-hidden="true" />
-          <span>Voice</span>
+          <span>Voice up</span>
         </button>
       </div>
       <div className="chord-clipboard-row" aria-label="Chord clipboard">

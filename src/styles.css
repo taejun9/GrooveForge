@@ -23174,6 +23174,8 @@ input[type="range"] {
 }
 
 .chord-editor {
+  container-name: chord-editor;
+  container-type: inline-size;
   display: grid;
   gap: 9px;
 }
@@ -23741,6 +23743,32 @@ input[type="range"] {
   grid-column: 1 / -1;
   color: #aba193;
   font-size: 11px;
+}
+
+@container chord-editor (max-width: 780px) {
+  .chord-edit-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .chord-edit-row button {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: center;
+    gap: 2px;
+    min-height: 48px;
+    padding: 4px;
+  }
+
+  .chord-edit-row button svg {
+    justify-self: center;
+  }
+
+  .chord-edit-row button span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    line-height: 1.1;
+  }
 }
 
 .chord-slots {
