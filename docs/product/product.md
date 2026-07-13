@@ -73,6 +73,8 @@ At the actual 1180px minimum application width, an intermediate three-row transp
 
 Quick Actions and Command Reference must also be complete keyboard workflows rather than visual overlays only. Opening either modal puts focus in its search field, Tab and Shift+Tab wrap within the active dialog, Escape closes from any contained control, and focus returns to the control that opened the workflow. Direct Quick Actions-to-Command Reference handoff preserves the original workstation opener so beginners do not lose their place and keyboard-heavy producers can resume without pointer recovery.
 
+Quick Actions search must expose one explicit runnable selection without taking focus away from the search field. ArrowUp and ArrowDown move through visible enabled results, Home and End jump to the first and last visible enabled result, disabled results are skipped, and Enter runs the selected command. Query, scope, open, and close changes reset selection to the first visible runnable result. The selected row has a non-color-only visual treatment and a polite textual position/title announcement so first-time users can follow the current target while keyboard-heavy producers can keep typing and executing without pointer recovery.
+
 ## Product Boundary
 
 Core product:

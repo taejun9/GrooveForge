@@ -179,6 +179,13 @@ function checkResult(result) {
       evidence?.modalFocus?.quickBackwardWrap === true &&
       evidence?.modalFocus?.quickEscapeClosed === true &&
       evidence?.modalFocus?.quickFocusRestored === true &&
+      evidence?.modalFocus?.quickKeyboardArrowDownMoved === true &&
+      evidence?.modalFocus?.quickKeyboardArrowUpReturned === true &&
+      evidence?.modalFocus?.quickKeyboardEndMovedLast === true &&
+      evidence?.modalFocus?.quickKeyboardHomeReturnedFirst === true &&
+      evidence?.modalFocus?.quickKeyboardFocusRetained === true &&
+      evidence?.modalFocus?.quickKeyboardEnterRanSelected === true &&
+      evidence?.modalFocus?.quickKeyboardSelectedTitle === evidence?.modalFocus?.quickKeyboardResultTitle &&
       evidence?.modalFocus?.commandInitialFocus === "command-reference-search-input" &&
       evidence?.modalFocus?.commandForwardWrap === true &&
       evidence?.modalFocus?.commandBackwardWrap === true &&
@@ -186,7 +193,7 @@ function checkResult(result) {
       evidence?.modalFocus?.commandFocusRestored === true &&
       evidence?.modalFocus?.switchInitialFocus === "command-reference-search-input" &&
       evidence?.modalFocus?.switchFocusRestored === true,
-    "live desktop modals should focus search, wrap real Tab/Shift+Tab, close on Escape, restore openers, and preserve the original opener across dialog handoff"
+    "live desktop modals should focus search, select and run Quick Actions with native arrow keys and Enter, wrap real Tab/Shift+Tab, close on Escape, restore openers, and preserve the original opener across dialog handoff"
   );
   check(evidence?.bodyTextLength > 20000, "live desktop renderer should expose a substantial workstation surface");
   check(Array.isArray(evidence?.missingText) && evidence.missingText.length === 0, "live desktop renderer should contain all expected beginner/pro text");
@@ -1175,6 +1182,9 @@ child.on("exit", (code, signal) => {
     `- Minimum window: ${result.evidence.layout.minimumWindowViewportWidth}px viewport, ${result.evidence.layout.minimumWindowTransportHeight}px header, ${result.evidence.layout.minimumWindowHorizontalOverflow}px horizontal overflow, all direct actions visible`
   );
   console.log("- Modal focus: Quick Actions and Command Reference search entry, Tab/Shift+Tab wrap, Escape restore, and cross-dialog handoff ready");
+  console.log(
+    `- Quick Actions keyboard selection: arrows/Home/End retained search focus; Enter ran ${result.evidence.modalFocus.quickKeyboardSelectedTitle}`
+  );
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
   console.log("- Swing Feel pads: five dark-theme controls, pressed semantics ready, one selected target");
   console.log(

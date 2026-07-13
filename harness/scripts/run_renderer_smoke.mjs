@@ -293,6 +293,21 @@ function validateQuickActionLoadStates(shell) {
       loading: false
     })
   );
+  const readyActions = [
+    { id: "disabled-first", title: "Disabled first", detail: "Unavailable", group: "Guide", keywords: "disabled", disabled: true, run() {} },
+    { id: "runnable-second", title: "Runnable second", detail: "First runnable", group: "Guide", keywords: "second", run() {} },
+    { id: "runnable-third", title: "Runnable third", detail: "Second runnable", group: "Guide", keywords: "third", run() {} }
+  ];
+  const readyHtml = renderToStaticMarkup(
+    React.createElement(shell.QuickActions, {
+      ...baseProps,
+      actions: readyActions,
+      loadError: null,
+      loading: false,
+      recentActionSource: readyActions,
+      scopeOptions: [{ id: "all", label: "All", count: readyActions.length }]
+    })
+  );
 
   check(
     loadingHtml.includes('data-testid="quick-actions-loading"') &&
@@ -305,6 +320,22 @@ function validateQuickActionLoadStates(shell) {
       errorHtml.includes('data-testid="quick-actions-load-retry"') &&
       errorHtml.includes("Your project is unchanged."),
     "Quick Actions load failure should render a non-destructive retry path"
+  );
+  check(
+    readyHtml.includes('aria-controls="quick-actions-list"') &&
+      readyHtml.includes('aria-describedby="quick-actions-keyboard-selection"') &&
+      readyHtml.includes('aria-keyshortcuts="ArrowDown ArrowUp Home End Enter"') &&
+      readyHtml.includes('data-keyboard-action="runnable-second"') &&
+      readyHtml.includes('data-testid="quick-actions-keyboard-selection-position">Selected 1 of 2') &&
+      readyHtml.includes('data-testid="quick-actions-keyboard-selection-title">Runnable second') &&
+      readyHtml.includes('id="quick-action-option-runnable-second"') &&
+      readyHtml.includes('class="quick-action-row keyboard-selected"'),
+    "Quick Actions ready state should select and announce the first visible runnable result while excluding disabled commands"
+  );
+  check(
+    styles.includes(".quick-actions-keyboard-selection") &&
+      styles.includes(".quick-action-row.keyboard-selected .quick-action-run"),
+    "Quick Actions keyboard selection should retain dedicated status and selected-row styling"
   );
 }
 

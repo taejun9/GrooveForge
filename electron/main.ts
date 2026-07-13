@@ -285,6 +285,15 @@ type LaunchSmokeModalFocusEvidence = {
   quickFocusRestored: boolean;
   quickForwardWrap: boolean;
   quickInitialFocus: string;
+  quickKeyboardArrowDownMoved: boolean;
+  quickKeyboardArrowUpReturned: boolean;
+  quickKeyboardEndMovedLast: boolean;
+  quickKeyboardEnterRanSelected: boolean;
+  quickKeyboardFocusRetained: boolean;
+  quickKeyboardHomeReturnedFirst: boolean;
+  quickKeyboardInitialAction: string;
+  quickKeyboardResultTitle: string;
+  quickKeyboardSelectedTitle: string;
   switchFocusRestored: boolean;
   switchInitialFocus: string;
 };
@@ -1120,6 +1129,18 @@ function launchSmokeModalFocusFailures(evidence: LaunchSmokeModalFocusEvidence):
   }
   if (!evidence.quickEscapeClosed || !evidence.quickFocusRestored) {
     failures.push("Quick Actions Escape should close the modal and restore its opener");
+  }
+  if (
+    !evidence.quickKeyboardArrowDownMoved ||
+    !evidence.quickKeyboardArrowUpReturned ||
+    !evidence.quickKeyboardEndMovedLast ||
+    !evidence.quickKeyboardHomeReturnedFirst ||
+    !evidence.quickKeyboardFocusRetained
+  ) {
+    failures.push("Quick Actions search should retain focus while native ArrowUp/ArrowDown/Home/End move the visible runnable selection");
+  }
+  if (!evidence.quickKeyboardEnterRanSelected || evidence.quickKeyboardSelectedTitle !== evidence.quickKeyboardResultTitle) {
+    failures.push("Quick Actions native Enter should run the explicitly selected result instead of the first result");
   }
   if (evidence.commandInitialFocus !== "command-reference-search-input") {
     failures.push("Command Reference should place initial focus in reference search");
@@ -2325,13 +2346,25 @@ function collectLaunchSmokeBridgeDirectEvidenceWithTimeout(win: BrowserWindow): 
   });
 }
 
-async function collectLaunchSmokeModalFocusEvidence(win: BrowserWindow): Promise<LaunchSmokeModalFocusEvidence> {
+async function collectLaunchSmokeModalFocusEvidence(
+  win: BrowserWindow,
+  onStep: (step: string) => void = () => {}
+): Promise<LaunchSmokeModalFocusEvidence> {
   type FocusSnapshot = {
     activeTestId: string;
     dialogOpen: boolean;
     firstTestId: string;
     focusInside: boolean;
     lastTestId: string;
+  };
+  type KeyboardSelectionSnapshot = {
+    actionId: string;
+    firstActionId: string;
+    lastActionId: string;
+    position: string;
+    resultTitle: string;
+    searchFocused: boolean;
+    title: string;
   };
 
   const runStep = async <T,>(script: string): Promise<T> => (await win.webContents.executeJavaScript(script)) as T;
@@ -2353,27 +2386,34 @@ async function collectLaunchSmokeModalFocusEvidence(win: BrowserWindow): Promise
         };
       })();
     `);
-  const waitFor = async (condition: string, timeoutMs = 10000): Promise<void> => {
-    const ready = await runStep<boolean>(`
-      new Promise((resolve) => {
-        const started = Date.now();
-        const tick = () => {
-          if (${condition}) {
-            resolve(true);
-            return;
-          }
-          if (Date.now() - started > ${timeoutMs}) {
-            resolve(false);
-            return;
-          }
-          requestAnimationFrame(tick);
+  const keyboardSelectionSnapshot = (): Promise<KeyboardSelectionSnapshot> =>
+    runStep<KeyboardSelectionSnapshot>(`
+      (() => {
+        const status = document.querySelector('[data-testid="quick-actions-keyboard-selection"]');
+        const rows = Array.from(document.querySelectorAll('.quick-action-row')).filter((row) => {
+          const button = row.querySelector('.quick-action-run');
+          return button instanceof HTMLButtonElement && !button.disabled;
+        });
+        return {
+          actionId: status?.dataset.keyboardAction ?? '',
+          firstActionId: rows[0]?.id?.replace('quick-action-option-', '') ?? '',
+          lastActionId: rows[rows.length - 1]?.id?.replace('quick-action-option-', '') ?? '',
+          position: document.querySelector('[data-testid="quick-actions-keyboard-selection-position"]')?.textContent?.trim() ?? '',
+          resultTitle: document.querySelector('[data-testid="quick-action-result-title"]')?.textContent?.trim() ?? '',
+          searchFocused: document.activeElement?.dataset?.testid === 'quick-actions-search',
+          title: document.querySelector('[data-testid="quick-actions-keyboard-selection-title"]')?.textContent?.trim() ?? ''
         };
-        tick();
-      });
+      })();
     `);
-    if (!ready) {
-      throw new Error(`Timed out waiting for modal focus condition: ${condition}`);
+  const waitFor = async (condition: string, timeoutMs = 10000): Promise<void> => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() <= deadline) {
+      if (await runStep<boolean>(`Boolean(${condition})`)) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
+    throw new Error(`Timed out waiting for modal focus condition: ${condition}`);
   };
   const focusBoundary = (dialogTestId: string, boundary: "first" | "last"): Promise<boolean> =>
     runStep<boolean>(`
@@ -2393,9 +2433,82 @@ async function collectLaunchSmokeModalFocusEvidence(win: BrowserWindow): Promise
     await new Promise((resolve) => setTimeout(resolve, 80));
   };
 
+  onStep("opening Quick Actions for keyboard selection");
   await runStep(`document.querySelector('[data-testid="quick-actions-open"]')?.focus(); document.querySelector('[data-testid="quick-actions-open"]')?.click();`);
   await waitFor(`document.activeElement?.dataset?.testid === 'quick-actions-search'`);
   const quickInitial = await snapshot("quick-actions-dialog");
+  onStep("entering broad keyboard-selection query");
+  await runStep(`
+    (() => {
+      const input = document.querySelector('[data-testid="quick-actions-search"]');
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      valueSetter?.call(input, 'audience session enter');
+      input?.dispatchEvent(new Event('input', { bubbles: true }));
+    })();
+  `);
+  await waitFor(
+    `document.querySelector('[data-testid="quick-actions-search"]')?.value === 'audience session enter' && document.querySelector('[data-testid="quick-actions-keyboard-selection"]')?.dataset?.keyboardAction !== 'none'`
+  );
+  const keyboardInitial = await keyboardSelectionSnapshot();
+  onStep("moving broad keyboard selection");
+  await sendKey("Down");
+  const keyboardAfterDown = await keyboardSelectionSnapshot();
+  await sendKey("Up");
+  const keyboardAfterUp = await keyboardSelectionSnapshot();
+  await sendKey("End");
+  const keyboardAfterEnd = await keyboardSelectionSnapshot();
+  await sendKey("Home");
+  const keyboardAfterHome = await keyboardSelectionSnapshot();
+  onStep("entering narrow Enter Studio query");
+  await runStep(`
+    (() => {
+      const input = document.querySelector('[data-testid="quick-actions-search"]');
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      valueSetter?.call(input, 'enter studio professional producer');
+      input?.dispatchEvent(new Event('input', { bubbles: true }));
+    })();
+  `);
+  await waitFor(
+    `document.querySelector('[data-testid="quick-actions-search"]')?.value === 'enter studio professional producer' && document.querySelector('[data-testid="quick-action-audience-session-enter-producer"]') !== null`
+  );
+  let keyboardBeforeEnter = await keyboardSelectionSnapshot();
+  const enterStudioMoveCount = await runStep<number>(`
+    (() => {
+      const selectedId = document.querySelector('[data-testid="quick-actions-keyboard-selection"]')?.dataset?.keyboardAction ?? '';
+      const ids = Array.from(document.querySelectorAll('.quick-action-row'))
+        .filter((row) => {
+          const button = row.querySelector('.quick-action-run');
+          return button instanceof HTMLButtonElement && !button.disabled;
+        })
+        .map((row) => row.id.replace('quick-action-option-', ''));
+      const currentIndex = Math.max(0, ids.indexOf(selectedId));
+      const targetIndex = ids.indexOf('audience-session-enter-producer');
+      return targetIndex < 0 ? -1 : (targetIndex - currentIndex + ids.length) % ids.length;
+    })();
+  `);
+  if (enterStudioMoveCount < 0) {
+    throw new Error("Visible Enter Studio Quick Action was not part of the runnable keyboard selection set.");
+  }
+  onStep("moving to Enter Studio action");
+  for (let index = 0; index < enterStudioMoveCount; index += 1) {
+    await sendKey("Down");
+  }
+  keyboardBeforeEnter = await keyboardSelectionSnapshot();
+  if (keyboardBeforeEnter.actionId !== "audience-session-enter-producer") {
+    throw new Error("Native ArrowDown could not reach the visible Enter Studio Quick Action.");
+  }
+  onStep("running selected Enter Studio action");
+  await sendKey("Enter");
+  await waitFor(
+    `document.querySelector('[data-testid="quick-actions"]') === null && document.querySelector('[data-testid="quick-action-result-title"]')?.textContent?.trim() === ${JSON.stringify(keyboardBeforeEnter.title)} && document.querySelector('[data-testid="mode-studio"]')?.classList.contains('selected') === true`
+  );
+  const keyboardAfterEnter = await keyboardSelectionSnapshot();
+  onStep("restoring Guided mode after keyboard execution");
+  await runStep(`document.querySelector('[data-testid="mode-guided"]')?.click();`);
+  await waitFor(`document.querySelector('[data-testid="mode-guided"]')?.classList.contains('selected') === true`);
+  await runStep(`document.querySelector('[data-testid="quick-actions-open"]')?.focus(); document.querySelector('[data-testid="quick-actions-open"]')?.click();`);
+  await waitFor(`document.activeElement?.dataset?.testid === 'quick-actions-search'`);
+  onStep("checking Quick Actions focus wrap");
   await focusBoundary("quick-actions-dialog", "last");
   const quickBeforeForward = await snapshot("quick-actions-dialog");
   await sendKey("Tab");
@@ -2408,6 +2521,7 @@ async function collectLaunchSmokeModalFocusEvidence(win: BrowserWindow): Promise
   await waitFor(`document.querySelector('[data-testid="quick-actions"]') === null && document.activeElement?.dataset?.testid === 'quick-actions-open'`);
   const quickClosed = await runStep<{ activeTestId: string; open: boolean }>(`(() => ({ activeTestId: document.activeElement?.dataset?.testid ?? '', open: document.querySelector('[data-testid="quick-actions"]') !== null }))();`);
 
+  onStep("checking Command Reference focus wrap");
   await runStep(`document.querySelector('[data-testid="command-reference-open"]')?.focus(); document.querySelector('[data-testid="command-reference-open"]')?.click();`);
   await waitFor(`document.activeElement?.dataset?.testid === 'command-reference-search-input'`);
   const commandInitial = await snapshot("command-reference-dialog");
@@ -2423,6 +2537,7 @@ async function collectLaunchSmokeModalFocusEvidence(win: BrowserWindow): Promise
   await waitFor(`document.querySelector('[data-testid="command-reference"]') === null && document.activeElement?.dataset?.testid === 'command-reference-open'`);
   const commandClosed = await runStep<{ activeTestId: string; open: boolean }>(`(() => ({ activeTestId: document.activeElement?.dataset?.testid ?? '', open: document.querySelector('[data-testid="command-reference"]') !== null }))();`);
 
+  onStep("checking cross-dialog focus restore");
   await runStep(`document.querySelector('[data-testid="quick-actions-open"]')?.focus(); document.querySelector('[data-testid="quick-actions-open"]')?.click();`);
   await waitFor(`document.activeElement?.dataset?.testid === 'quick-actions-search'`);
   await runStep(`document.querySelector('[data-testid="quick-actions-open-command-reference"]')?.click();`);
@@ -2432,6 +2547,7 @@ async function collectLaunchSmokeModalFocusEvidence(win: BrowserWindow): Promise
   await waitFor(`document.querySelector('[data-testid="command-reference"]') === null && document.activeElement?.dataset?.testid === 'quick-actions-open'`);
   const switchClosed = await runStep<{ activeTestId: string; open: boolean }>(`(() => ({ activeTestId: document.activeElement?.dataset?.testid ?? '', open: document.querySelector('[data-testid="command-reference"]') !== null }))();`);
 
+  onStep("modal focus evidence complete");
   return {
     commandBackwardWrap:
       commandBeforeBackward.activeTestId === commandBeforeBackward.firstTestId &&
@@ -2455,6 +2571,25 @@ async function collectLaunchSmokeModalFocusEvidence(win: BrowserWindow): Promise
       quickAfterForward.activeTestId === quickBeforeForward.firstTestId &&
       quickAfterForward.focusInside,
     quickInitialFocus: quickInitial.activeTestId,
+    quickKeyboardArrowDownMoved:
+      keyboardAfterDown.actionId !== keyboardInitial.actionId && keyboardAfterDown.actionId !== "",
+    quickKeyboardArrowUpReturned: keyboardAfterUp.actionId === keyboardInitial.actionId,
+    quickKeyboardEndMovedLast:
+      keyboardAfterEnd.actionId === keyboardInitial.lastActionId && keyboardAfterEnd.actionId !== keyboardInitial.actionId,
+    quickKeyboardEnterRanSelected:
+      keyboardBeforeEnter.title.length > 0 && keyboardAfterEnter.resultTitle === keyboardBeforeEnter.title,
+    quickKeyboardFocusRetained: [
+      keyboardInitial,
+      keyboardAfterDown,
+      keyboardAfterUp,
+      keyboardAfterEnd,
+      keyboardAfterHome,
+      keyboardBeforeEnter
+    ].every((snapshot) => snapshot.searchFocused),
+    quickKeyboardHomeReturnedFirst: keyboardAfterHome.actionId === keyboardInitial.firstActionId,
+    quickKeyboardInitialAction: keyboardInitial.actionId,
+    quickKeyboardResultTitle: keyboardAfterEnter.resultTitle,
+    quickKeyboardSelectedTitle: keyboardBeforeEnter.title,
     switchFocusRestored: !switchClosed.open && switchClosed.activeTestId === "quick-actions-open",
     switchInitialFocus: switchInitial.activeTestId
   };
@@ -2462,8 +2597,11 @@ async function collectLaunchSmokeModalFocusEvidence(win: BrowserWindow): Promise
 
 function collectLaunchSmokeModalFocusEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeModalFocusEvidence> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Timed out collecting live modal focus evidence.")), 90000);
-    void collectLaunchSmokeModalFocusEvidence(win)
+    let step = "starting";
+    const timeout = setTimeout(() => reject(new Error(`Timed out collecting live modal focus evidence at ${step}.`)), 180000);
+    void collectLaunchSmokeModalFocusEvidence(win, (nextStep) => {
+      step = nextStep;
+    })
       .then((evidence) => {
         clearTimeout(timeout);
         resolve(evidence);

@@ -183,6 +183,8 @@ Do not list `sampler` in the default instrument panel, first-run track list, or 
 
 Quick Actions and Command Reference share one UI-local modal focus lifecycle. Each dialog owns initial focus and Escape handling, uses the same visible-enabled focusable-element traversal for Tab and Shift+Tab wraparound, and exposes a focusable dialog fallback when no child control is available. The App shell records the active workstation opener only when entering the first modal, preserves it during direct modal-to-modal handoff, restores it after an explicit close, and clears it when command execution intentionally routes focus elsewhere. This state never enters project data, undo history, save/load, playback, render/export, or remote behavior.
 
+Quick Actions keyboard selection is also UI-local component state. It is derived only from the currently visible enabled results, resets when the palette opens or its query or scope changes, and keeps DOM focus in the search input while ArrowUp, ArrowDown, Home, and End update the selected action id. Enter resolves that selected action through the existing command run path. Selection styling, scrolling, and live status do not alter command definitions, result filtering, pinning, recent actions, project data, undo history, save/load, playback, render/export, or remote behavior.
+
 ## Genre Rule
 
 Genre is data, not a product silo. Trap, drill, boom bap, lofi, house, jersey, phonk, R&B, garage, and experimental behavior should live in `StyleProfile` presets and editable generation rules.

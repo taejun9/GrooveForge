@@ -22,7 +22,8 @@ const installedExecutable = path.join(installedApp, "Contents", "MacOS", appName
 const installedAppRoot = path.join(installedApp, "Contents", "Resources", "app");
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 // Keep the parent harness alive beyond the app's 240-second launch-smoke timeout.
-const timeoutMs = 300000;
+// Keep the parent harness alive beyond the app's 400-second launch-smoke timeout.
+const timeoutMs = 480000;
 const failures = [];
 
 function check(condition, message) {

@@ -2593,7 +2593,22 @@ export function QuickActions({
 }): ReactElement | null {
   const dialogRef = useRef<HTMLElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [keyboardActionId, setKeyboardActionId] = useState<string | null>(null);
   useModalFocusTrap(open, dialogRef, searchInputRef);
+
+  useEffect(() => {
+    setKeyboardActionId(null);
+  }, [open, query, scope]);
+
+  useEffect(() => {
+    if (!open || !keyboardActionId) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(`quick-action-option-${keyboardActionId}`)?.scrollIntoView({ block: "nearest" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [keyboardActionId, open]);
 
   if (!open) {
     return null;
@@ -2684,6 +2699,10 @@ export function QuickActions({
   const visibleActions = actions.slice(0, visibleActionLimit);
   const hiddenActionCount = Math.max(0, actions.length - visibleActions.length);
   const firstRunnableAction = actions.find((action) => !action.disabled);
+  const keyboardActions = visibleActions.filter((action) => !action.disabled);
+  const selectedKeyboardAction =
+    keyboardActions.find((action) => action.id === keyboardActionId) ?? keyboardActions[0] ?? null;
+  const selectedKeyboardIndex = selectedKeyboardAction ? keyboardActions.indexOf(selectedKeyboardAction) : -1;
   const spotlight = createQuickActionSpotlightSummary(actions, firstRunnableAction, scope, scopeOptions, query);
   const searchRecovery = createQuickActionSearchRecovery(query, scope, scopeOptions, actions.length);
   const searchHints = createQuickActionSearchHints(query, scope, recentActionSource);
@@ -2756,6 +2775,23 @@ export function QuickActions({
       )}`
     : "Recent target: none";
 
+  function moveKeyboardSelection(direction: "first" | "last" | "next" | "previous"): void {
+    if (keyboardActions.length === 0) {
+      return;
+    }
+    let nextIndex = selectedKeyboardIndex;
+    if (direction === "first") {
+      nextIndex = 0;
+    } else if (direction === "last") {
+      nextIndex = keyboardActions.length - 1;
+    } else if (direction === "next") {
+      nextIndex = (Math.max(0, selectedKeyboardIndex) + 1) % keyboardActions.length;
+    } else {
+      nextIndex = (selectedKeyboardIndex - 1 + keyboardActions.length) % keyboardActions.length;
+    }
+    setKeyboardActionId(keyboardActions[nextIndex].id);
+  }
+
   return (
     <div
       className="quick-actions-overlay"
@@ -2802,13 +2838,29 @@ export function QuickActions({
           </div>
         </div>
         <input
+          aria-controls="quick-actions-list"
+          aria-describedby="quick-actions-keyboard-selection"
+          aria-keyshortcuts="ArrowDown ArrowUp Home End Enter"
           aria-label="Search Quick Actions"
           data-testid="quick-actions-search"
           onChange={(event) => onQueryChange(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && firstRunnableAction) {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp" || event.key === "Home" || event.key === "End") {
               event.preventDefault();
-              onRun(firstRunnableAction);
+              moveKeyboardSelection(
+                event.key === "ArrowDown"
+                  ? "next"
+                  : event.key === "ArrowUp"
+                    ? "previous"
+                    : event.key === "Home"
+                      ? "first"
+                      : "last"
+              );
+              return;
+            }
+            if (event.key === "Enter" && selectedKeyboardAction) {
+              event.preventDefault();
+              onRun(selectedKeyboardAction);
             }
           }}
           placeholder="Search commands"
@@ -2853,6 +2905,27 @@ export function QuickActions({
           {visibleActions.length} shown / {actions.length} result{actions.length === 1 ? "" : "s"} /{" "}
           {scopeOptions.find((option) => option.id === scope)?.count ?? 0} matching
           {hiddenActionCount > 0 ? ` / ${hiddenActionCount} more after search or scope filter` : ""}
+        </div>
+        <div
+          aria-atomic="true"
+          aria-live="polite"
+          className="quick-actions-keyboard-selection"
+          data-keyboard-action={selectedKeyboardAction?.id ?? "none"}
+          data-testid="quick-actions-keyboard-selection"
+          id="quick-actions-keyboard-selection"
+          role="status"
+        >
+          {selectedKeyboardAction ? (
+            <>
+              <span data-testid="quick-actions-keyboard-selection-position">
+                Selected {selectedKeyboardIndex + 1} of {keyboardActions.length}
+              </span>
+              <strong data-testid="quick-actions-keyboard-selection-title">{selectedKeyboardAction.title}</strong>
+              <small>↑↓ choose · Home/End jump · Enter run</small>
+            </>
+          ) : (
+            <span>No runnable result</span>
+          )}
         </div>
         {searchResult && <QuickActionSearchResultStrip result={searchResult} />}
         {searchHintResult && <QuickActionSearchHintResultStrip result={searchHintResult} />}
@@ -3221,7 +3294,7 @@ export function QuickActions({
           )}
           {recentResult && <QuickActionRecentResultStrip result={recentResult} />}
         </div>
-        <div className="quick-actions-list" data-testid="quick-actions-list">
+        <div className="quick-actions-list" data-testid="quick-actions-list" id="quick-actions-list">
           {actions.length === 0 ? (
             <div className="quick-action-empty" data-testid="quick-actions-empty">
               {searchRecovery && (
@@ -3237,9 +3310,18 @@ export function QuickActions({
           ) : (
             visibleActions.map((action) => {
               const pinned = pinnedActionIds.includes(action.id);
+              const keyboardSelected = selectedKeyboardAction?.id === action.id;
               return (
-                <div className={`quick-action-row ${pinned ? "pinned" : ""}`} key={action.id}>
+                <div
+                  className={["quick-action-row", pinned ? "pinned" : "", keyboardSelected ? "keyboard-selected" : ""]
+                    .filter(Boolean)
+                    .join(" ")}
+                  data-keyboard-selected={keyboardSelected ? "true" : "false"}
+                  id={`quick-action-option-${action.id}`}
+                  key={action.id}
+                >
                   <button
+                    aria-current={keyboardSelected ? "true" : undefined}
                     className="quick-action-run"
                     data-testid={`quick-action-${action.id}`}
                     disabled={action.disabled}
