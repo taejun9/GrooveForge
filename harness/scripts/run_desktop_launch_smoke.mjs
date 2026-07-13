@@ -207,6 +207,10 @@ function checkResult(result) {
   );
   check(evidence?.layout?.patternLabOpen === false, "live desktop Pattern Lab should start collapsed");
   check(
+    evidence?.layout?.projectOwnershipReady === true,
+    `live desktop should identify an editable 8-bar foundation with honest local-only save guidance (project ${evidence?.layout?.projectStatus}, safety ${evidence?.layout?.projectSafetyStatus} / ${evidence?.layout?.projectSafetyLabel} / ${evidence?.layout?.projectSafetyDetail})`
+  );
+  check(
     evidence?.layout?.feedbackOutsideGuidance === true && evidence?.layout?.feedbackAfterGuidance === true,
     "live desktop global command feedback should remain outside and after optional guidance"
   );

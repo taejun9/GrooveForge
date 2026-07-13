@@ -10340,10 +10340,10 @@ export function createProjectSafetyReadoutSummary(
   }
 
   return {
-    roleLabel: "Save file",
-    statusLabel: "Local project",
-    detailLabel: "Draft writes after edits",
-    detailTitle: `${trimmedStatus || "Project ready"} / Use Save for a durable .grooveforge project file`,
+    roleLabel: "Save to keep",
+    statusLabel: "Editable now",
+    detailLabel: "Local project only",
+    detailTitle: `${trimmedStatus || "Editable project"} / Local project only / Use Save for a durable .grooveforge project file`,
     tone: "warn"
   };
 }

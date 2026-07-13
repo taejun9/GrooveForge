@@ -1283,7 +1283,7 @@ export function App(): ReactElement {
   const [handoffPackageCheckFocusId, setHandoffPackageCheckFocusId] = useState<HandoffPackageCheckFocusId | null>(null);
   const [handoffPackageCheckResult, setHandoffPackageCheckResult] = useState<HandoffPackageCheckFocusResult | null>(null);
   const [handoffExportReceipt, setHandoffExportReceipt] = useState<HandoffExportReceipt | null>(null);
-  const [projectStatus, setProjectStatus] = useState("Demo project");
+  const [projectStatus, setProjectStatus] = useState("Editable 8-bar foundation");
   const [projectFileLabel, setProjectFileLabel] = useState<string | null>(null);
   const [projectHasUnsavedChanges, setProjectHasUnsavedChanges] = useState(false);
   const [projectFileResult, setProjectFileResult] = useState<ProjectFileResult | null>(null);

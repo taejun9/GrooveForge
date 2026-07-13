@@ -134,6 +134,11 @@ type LaunchSmokeLayoutEvidence = {
   masterRoleBeforeControls: boolean;
   patternLabOpen: boolean;
   patternLabToggleVisible: boolean;
+  projectOwnershipReady: boolean;
+  projectSafetyDetail: string;
+  projectSafetyLabel: string;
+  projectSafetyStatus: string;
+  projectStatus: string;
   quickActionGraphReady: boolean;
   noteLanesAfterCaptureIdeas: boolean;
   noteLanesPresent: boolean;
@@ -1405,6 +1410,21 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const projectOpen = document.querySelector('[data-testid="project-open"]');
       const projectEssentialControls = document.querySelector('[data-testid="project-essential-controls"]');
       const projectSave = document.querySelector('[data-testid="project-save"]');
+      const projectStatus = document.querySelector('[data-testid="project-status"]');
+      const projectSafetyStatus = document.querySelector('[data-testid="project-safety-status"]');
+      const projectSafetyLabel = document.querySelector('[data-testid="project-safety-label"]');
+      const projectSafetyDetail = document.querySelector('[data-testid="project-safety-detail"]');
+      const initialProjectStatus = projectStatus?.textContent?.trim() ?? "";
+      const initialProjectSafetyStatus = projectSafetyStatus?.textContent?.trim() ?? "";
+      const initialProjectSafetyLabel = projectSafetyLabel?.textContent?.trim() ?? "";
+      const initialProjectSafetyDetail = projectSafetyDetail?.textContent?.trim() ?? "";
+      const initialProjectOwnership = window.__grooveforgeLaunchProjectOwnership ?? {
+        projectStatus: initialProjectStatus,
+        safetyStatus: initialProjectSafetyStatus,
+        safetyLabel: initialProjectSafetyLabel,
+        safetyDetail: initialProjectSafetyDetail
+      };
+      window.__grooveforgeLaunchProjectOwnership = initialProjectOwnership;
       const patternTabs = ["A", "B", "C"].map((pattern) =>
         document.querySelector('[data-testid="pattern-tab-' + pattern + '"]')
       );
@@ -1653,6 +1673,15 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           masterRoleBeforeControls: follows(masterRole, masterOutputControls),
           patternLabOpen: Boolean(patternLab?.open),
           patternLabToggleVisible: Boolean(patternLabToggle && patternLabToggle.getBoundingClientRect().height > 0),
+          projectOwnershipReady:
+            initialProjectOwnership.projectStatus === "Editable 8-bar foundation" &&
+            initialProjectOwnership.safetyStatus === "Editable now" &&
+            initialProjectOwnership.safetyLabel === "Save to keep" &&
+            initialProjectOwnership.safetyDetail === "Local project only",
+          projectSafetyDetail: initialProjectOwnership.safetyDetail,
+          projectSafetyLabel: initialProjectOwnership.safetyLabel,
+          projectSafetyStatus: initialProjectOwnership.safetyStatus,
+          projectStatus: initialProjectOwnership.projectStatus,
           quickActionGraphReady: appShell?.getAttribute('data-quick-actions-graph-state') === 'ready',
           noteLanesAfterCaptureIdeas: follows(captureIdeas, noteLanes),
           noteLanesPresent: Boolean(noteLanes),
@@ -2558,6 +2587,7 @@ function createWindow(): void {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      partition: isLaunchSmoke ? `grooveforge-launch-smoke-${process.pid}` : undefined,
       backgroundThrottling: !(isLaunchSmoke || isProjectIoSmoke)
     }
   });

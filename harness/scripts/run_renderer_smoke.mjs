@@ -120,7 +120,7 @@ function validateLocalDraftRecoveryDeferral(shell, helpers, workstation) {
     recovery,
     true,
     recovery.savedAt,
-    "Demo project",
+    "Editable 8-bar foundation",
     null,
     false
   );
@@ -128,7 +128,7 @@ function validateLocalDraftRecoveryDeferral(shell, helpers, workstation) {
     recovery,
     false,
     recovery.savedAt,
-    "Demo project",
+    "Editable 8-bar foundation",
     null,
     false
   );
@@ -175,6 +175,46 @@ function validateLocalDraftRecoveryDeferral(shell, helpers, workstation) {
       graphSource.includes('id: "clear-local-draft"') &&
       graphSource.includes("disabled: !localDraftRecovery"),
     "deferred recovery should remain wired to explicit Restore Draft and Clear Draft Quick Actions"
+  );
+}
+
+function validateFirstRunProjectOwnership(html, helpers) {
+  const initialSummary = helpers.createProjectSafetyReadoutSummary(
+    null,
+    false,
+    null,
+    "Editable 8-bar foundation",
+    null,
+    false
+  );
+  const updateProjectSource = printNamedFunction(appSource, "App.tsx", "updateProject");
+
+  check(
+    html.includes('<span data-testid="project-safety-status">Editable now</span>') &&
+      html.includes('<strong data-testid="project-safety-label">Save to keep</strong>') &&
+      html.includes('<small data-testid="project-safety-detail">Local project only</small>') &&
+      html.includes('<span data-testid="project-status">Editable 8-bar foundation</span>'),
+    "first render should identify a real editable foundation while keeping its local-only save requirement visible"
+  );
+  check(
+    initialSummary.statusLabel === "Editable now" &&
+      initialSummary.roleLabel === "Save to keep" &&
+      initialSummary.detailLabel === "Local project only" &&
+      initialSummary.detailTitle ===
+        "Editable 8-bar foundation / Local project only / Use Save for a durable .grooveforge project file" &&
+      initialSummary.tone === "warn",
+    "initial project safety should combine edit ownership, local-only truth, and explicit durable-save guidance"
+  );
+  check(
+    appSource.includes('useState("Editable 8-bar foundation")') && !appSource.includes('useState("Demo project")'),
+    "App should initialize the first-run project as an editable foundation instead of a disposable demo"
+  );
+  check(
+    updateProjectSource.includes('status = "Unsaved changes"') &&
+      updateProjectSource.includes("setProjectHasUnsavedChanges(true)") &&
+      updateProjectSource.includes("setLocalDraftWriteArmed(true)") &&
+      updateProjectSource.includes("setProjectStatus(status)"),
+    "the first real edit should still transition to unsaved changes and arm the local draft safety net"
   );
 }
 
@@ -2229,6 +2269,10 @@ try {
     await server.ssrLoadModule("/src/ui/workstationAppHelpers.tsx"),
     await server.ssrLoadModule("/src/domain/workstation.ts")
   );
+  validateFirstRunProjectOwnership(
+    html,
+    await server.ssrLoadModule("/src/ui/workstationAppHelpers.tsx")
+  );
   validateAudienceSessionQuickActionResults(
     await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
     await server.ssrLoadModule("/src/domain/workstation.ts")
@@ -2294,6 +2338,7 @@ try {
     console.log("- Scope: first-run React workstation server render without browser, Electron window, network, imported audio, or sampling scope");
     console.log(`- Markup: ${html.length} characters from App first render`);
     console.log("- Starter: Untitled Beat, Guided 82 BPM A minor Lo-fi, 8 bars, Starter Sketch, 14 editable styles visible");
+    console.log("- Project ownership: Editable 8-bar foundation, editable now, local only, explicit Save-to-keep guidance");
     console.log(
       "- Beginner path: Guide Quick Start, Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
     );

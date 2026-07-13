@@ -74,6 +74,8 @@ Composition-first invariant: GrooveForge must remain fully usable when audio imp
 
 Default project creation, first-run navigation, and MVP validation must instantiate editable musical events and built-in instruments first. They must not instantiate an audio asset graph, sample browser, chop grid, or sampler device as the required starting point for making a beat.
 
+First-run ownership state must describe the default event project as an editable 8-bar foundation rather than a demo. Before an explicit file save, the compact safety state remains warning-toned and must say the project is editable now, local only, and needs Save for a durable `.grooveforge.json` copy; the first mutation continues through the existing unsaved-change and renderer-local draft path.
+
 The core project model should make composition events first-class. In the core architecture, a clip is a pattern, MIDI, or automation container, not an imported audio asset:
 
 - `Project`: version, title, BPM, key/scale, swing, tracks, arrangement, master settings.

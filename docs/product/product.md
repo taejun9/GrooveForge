@@ -63,7 +63,7 @@ Audience Completion Route should close the same local loop before export or deli
 
 The first-session acceptance test is concrete: choose BPM/key/style, program drums, write 808/bass, add melody/chords, shape sounds, arrange sections, balance the mix, set the master posture, and export WAV/stems without importing audio. A product draft that cannot explain this path before mentioning extension features is not aligned.
 
-The actual default `starterProject` must embody that promise before any audience action is clicked: Guided, 82 BPM, A minor, Lo-fi as one explicitly changeable starting profile across all 14 styles, exactly 8 bars, Starter Sketch delivery, Clean Demo master posture, and style/key-matched editable Pattern A/B/C drum, bass, melody, and chord events. Trap remains fully available as one profile and Beat Blueprint, but it is not the first-run product identity.
+The actual default `starterProject` must embody that promise before any audience action is clicked: Guided, 82 BPM, A minor, Lo-fi as one explicitly changeable starting profile across all 14 styles, exactly 8 bars, Starter Sketch delivery, Clean Demo master posture, and style/key-matched editable Pattern A/B/C drum, bass, melody, and chord events. The first screen identifies this data as an `Editable 8-bar foundation`, not a disposable demo, while Project Safety Readout says it is editable now, local only, and requires Save for a durable project file. Trap remains fully available as one profile and Beat Blueprint, but it is not the first-run product identity.
 
 ## Product Boundary
 
