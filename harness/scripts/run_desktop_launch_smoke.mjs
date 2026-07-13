@@ -349,7 +349,15 @@ function checkResult(result) {
       evidence?.starterLanding?.beginner?.chordToolUniqueAccessibleNameCount === 8 &&
       evidence?.starterLanding?.beginner?.chordToolColumnCount === 4 &&
       evidence?.starterLanding?.beginner?.chordToolRowCount === 2 &&
-      evidence?.starterLanding?.beginner?.chordToolInternalOverflow === 0,
+      evidence?.starterLanding?.beginner?.chordToolInternalOverflow === 0 &&
+      evidence?.starterLanding?.beginner?.mixerToggleCount === 10 &&
+      evidence?.starterLanding?.beginner?.mixerToggleReadableLabelCount === 10 &&
+      evidence?.starterLanding?.beginner?.mixerToggleUniqueAccessibleNameCount === 10 &&
+      evidence?.starterLanding?.beginner?.mixerTogglePressedStateCount === 10 &&
+      evidence?.starterLanding?.beginner?.mixerToggleTitleCount === 10 &&
+      evidence?.starterLanding?.beginner?.mixerToggleContainedCount === 10 &&
+      evidence?.starterLanding?.beginner?.mixerNarrowStripCount === 5 &&
+      evidence?.starterLanding?.beginner?.mixerToggleInternalOverflow === 0,
     `live beginner starter should focus a visible Pattern editor below the sticky Workflow Navigator (${JSON.stringify(evidence?.starterLanding?.beginner ?? null)})`
   );
   check(
@@ -1282,6 +1290,7 @@ child.on("exit", (code, signal) => {
   console.log("- Note-grid keyboard: one 808 and one Synth Tab stop, native spatial navigation, Enter/Space toggles, playback guard, and Undo ready");
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
   console.log("- Chord edit tools: 8/8 readable labels, eight unique accessible names, and a contained four-by-two narrow layout");
+  console.log("- Mixer toggles: 10/10 readable Mute/Solo labels, unique channel names, pressed semantics, and five contained narrow strips");
   console.log("- Review Queue readability: 11/11 decision fields wrapped and contained across three compact diagnostic rows");
   console.log("- Swing Feel pads: five dark-theme controls, pressed semantics ready, one selected target");
   console.log(

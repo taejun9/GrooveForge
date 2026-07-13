@@ -265,6 +265,14 @@ type LaunchSmokeStarterLandingRouteEvidence = {
   clearOfNavigator: boolean;
   focusTestId: string;
   inViewport: boolean;
+  mixerNarrowStripCount: number;
+  mixerToggleContainedCount: number;
+  mixerToggleCount: number;
+  mixerToggleInternalOverflow: number;
+  mixerTogglePressedStateCount: number;
+  mixerToggleReadableLabelCount: number;
+  mixerToggleTitleCount: number;
+  mixerToggleUniqueAccessibleNameCount: number;
   producerQueueOpen: boolean;
   producerReviewOpen: boolean;
   projectTitle: string;

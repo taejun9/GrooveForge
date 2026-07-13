@@ -860,6 +860,29 @@ function validateFirstRunRenderer(html) {
       styles.includes("white-space: normal;"),
     "the selected-chord toolbar should use a readable four-by-two layout when its own component is narrow"
   );
+  check(
+    appSource.includes('aria-label={`Mute ${channel.name}`}') &&
+      appSource.includes('aria-label={`Solo ${channel.name}`}') &&
+      appSource.includes("aria-pressed={channel.muted}") &&
+      appSource.includes("aria-pressed={channel.solo}") &&
+      appSource.includes("<span>Mute</span>") &&
+      appSource.includes("<span>Solo</span>") &&
+      appSource.includes('data-testid={`mixer-strip-${channel.id}`}') &&
+      appSource.includes('data-testid={`mixer-toggles-${channel.id}`}') &&
+      appSource.includes('"Solo is unavailable on the Master channel"'),
+    "all ten mixer toggles should expose complete labels, channel-specific names, pressed state, and an explicit disabled Master solo explanation"
+  );
+  check(
+    styles.includes("container-name: mixer-strip;") &&
+      styles.includes("container-type: inline-size;") &&
+      styles.includes("@container mixer-strip (max-width: 190px)") &&
+      styles.includes("grid-template-columns: repeat(2, minmax(48px, auto));") &&
+      styles.includes("grid-template-columns: repeat(2, minmax(0, 1fr));") &&
+      styles.includes("min-width: 48px;") &&
+      styles.includes("display: block;") &&
+      styles.includes("white-space: nowrap;"),
+    "mixer toggles should retain a wide inline scan and use two contained full-label controls below the track name in each narrow strip"
+  );
   const swingFeelPadIds = ["straight", "tight", "laid", "loose", "style"];
   const swingFeelPadSegments = swingFeelPadIds.map((id) => {
     const marker = html.indexOf(`data-testid="swing-feel-${id}"`);

@@ -10504,6 +10504,50 @@ export function App(): ReactElement {
       const chordToolColumnCount = chordToolGroup
         ? window.getComputedStyle(chordToolGroup).gridTemplateColumns.trim().split(/\s+/).length
         : 0;
+      const mixerToggleButtons = [
+        ...document.querySelectorAll<HTMLButtonElement>(
+          '[data-testid^="mixer-mute-"], [data-testid^="mixer-solo-"]'
+        )
+      ];
+      const mixerToggleAccessibleNames = mixerToggleButtons
+        .map((button) => button.getAttribute("aria-label")?.trim() ?? "")
+        .filter((label) => label.length > 0);
+      const mixerToggleReadableLabels = mixerToggleButtons.filter((button) => {
+        const label = button.querySelector<HTMLElement>("span");
+        return Boolean(label && label.clientWidth > 0 && label.scrollWidth <= label.clientWidth + 1);
+      });
+      const mixerToggleContainedButtons = mixerToggleButtons.filter((button) => {
+        const strip = button.closest<HTMLElement>('[data-testid^="mixer-strip-"]');
+        const stripRect = strip?.getBoundingClientRect() ?? null;
+        const buttonRect = button.getBoundingClientRect();
+        return Boolean(
+          stripRect &&
+            buttonRect.width >= 48 &&
+            buttonRect.left >= stripRect.left - 1 &&
+            buttonRect.right <= stripRect.right + 1
+        );
+      });
+      const mixerStrips = [
+        ...document.querySelectorAll<HTMLElement>('[data-testid^="mixer-strip-"]')
+      ];
+      const mixerNarrowStrips = mixerStrips.filter((strip) => {
+        const stripTop = strip.querySelector<HTMLElement>(".strip-top");
+        const trackName = stripTop?.querySelector<HTMLElement>(":scope > span");
+        const toggles = stripTop?.querySelector<HTMLElement>(".strip-toggles");
+        const trackRect = trackName?.getBoundingClientRect() ?? null;
+        const togglesRect = toggles?.getBoundingClientRect() ?? null;
+        return Boolean(
+          stripTop &&
+            trackRect &&
+            togglesRect &&
+            window.getComputedStyle(stripTop).gridTemplateColumns.trim().split(/\s+/).length === 1 &&
+            togglesRect.top >= trackRect.bottom
+        );
+      });
+      const mixerToggleInternalOverflow = mixerStrips.reduce(
+        (maximum, strip) => Math.max(maximum, strip.scrollWidth - strip.clientWidth),
+        0
+      );
       const reviewQueue = document.querySelector<HTMLElement>('[data-testid="review-queue"]');
       const reviewQueueRect = reviewQueue?.getBoundingClientRect() ?? null;
       const reviewQueueFields = [
@@ -10558,6 +10602,21 @@ export function App(): ReactElement {
         inViewport: Boolean(
           landingRect && landingRect.top >= 0 && landingRect.top < window.innerHeight && landingRect.bottom > 0
         ),
+        mixerNarrowStripCount: starterId === "beginner" ? mixerNarrowStrips.length : 0,
+        mixerToggleContainedCount: starterId === "beginner" ? mixerToggleContainedButtons.length : 0,
+        mixerToggleCount: starterId === "beginner" ? mixerToggleButtons.length : 0,
+        mixerToggleInternalOverflow: starterId === "beginner" ? mixerToggleInternalOverflow : 0,
+        mixerTogglePressedStateCount:
+          starterId === "beginner"
+            ? mixerToggleButtons.filter((button) => button.hasAttribute("aria-pressed")).length
+            : 0,
+        mixerToggleReadableLabelCount: starterId === "beginner" ? mixerToggleReadableLabels.length : 0,
+        mixerToggleTitleCount:
+          starterId === "beginner"
+            ? mixerToggleButtons.filter((button) => (button.getAttribute("title")?.trim().length ?? 0) > 0).length
+            : 0,
+        mixerToggleUniqueAccessibleNameCount:
+          starterId === "beginner" ? new Set(mixerToggleAccessibleNames).size : 0,
         producerQueueOpen:
           document.querySelector<HTMLDetailsElement>('[data-testid="master-review-queue-tools"]')?.open ?? false,
         producerReviewOpen: document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? false,
@@ -12955,26 +13014,48 @@ export function App(): ReactElement {
             {project.mixer.map((channel) => {
               const roleSummary = mixerChannelRoleSummary(channel);
               return (
-                <div className="strip" key={channel.id} style={{ "--strip": channel.accent } as CSSProperties}>
+                <div
+                  className="strip"
+                  data-testid={`mixer-strip-${channel.id}`}
+                  key={channel.id}
+                  style={{ "--strip": channel.accent } as CSSProperties}
+                >
                 <div className="strip-top">
                   <span>{channel.name}</span>
-                  <div className="strip-toggles">
+                  <div
+                    aria-label={`${channel.name} mute and solo controls`}
+                    className="strip-toggles"
+                    data-testid={`mixer-toggles-${channel.id}`}
+                    role="group"
+                  >
                     <button
+                      aria-label={`Mute ${channel.name}`}
+                      aria-pressed={channel.muted}
                       className={channel.muted ? "mini-toggle active" : "mini-toggle"}
                       data-testid={`mixer-mute-${channel.id}`}
                       type="button"
                       onClick={() => updateMixerChannel(channel.id, { muted: !channel.muted })}
+                      title={channel.muted ? `Unmute ${channel.name}` : `Mute ${channel.name}`}
                     >
-                      M
+                      <span>Mute</span>
                     </button>
                     <button
+                      aria-label={`Solo ${channel.name}`}
+                      aria-pressed={channel.solo}
                       className={channel.solo ? "mini-toggle active solo" : "mini-toggle"}
                       data-testid={`mixer-solo-${channel.id}`}
                       disabled={channel.id === "master"}
                       type="button"
                       onClick={() => updateMixerChannel(channel.id, { solo: !channel.solo })}
+                      title={
+                        channel.id === "master"
+                          ? "Solo is unavailable on the Master channel"
+                          : channel.solo
+                            ? `Stop soloing ${channel.name}`
+                            : `Solo ${channel.name}`
+                      }
                     >
-                      S
+                      <span>Solo</span>
                     </button>
                   </div>
                 </div>

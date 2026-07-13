@@ -125,6 +125,8 @@ Sound-source wording rule: built-in drum kits, internal one-shot sounds, and any
 
 Mix/master boundary: mixing and mastering are separate product stages. Mixer work sets balance, panning, EQ, dynamics, send FX, and stem posture; mastering work sets final output posture, limiter ceiling, and export checks after the mix is usable. Product drafts must not present mastering as an automatic fix for an unfinished mix.
 
+Every mixer channel must name its direct mute and solo controls without requiring studio-shorthand knowledge. `Mute` and `Solo` remain the visible labels for both first-time and professional users; each toggle has a channel-specific accessible name, explicit pressed state, and a state-aware explanation. The unavailable Master solo control remains visibly and accessibly identified as `Solo Master` and explains why it cannot be used. Narrow channel strips place the two complete controls beneath the track name, while genuinely wide strips retain the fast one-row scan.
+
 ## Draft Intake Guardrails
 
 Core schema examples must reflect that order. Do not place `AudioClipEvent`, `audio`, or `sampler` beside core MVP event, clip, or track unions unless the user has explicitly started optional sampling-phase work. If an incoming brief includes `type MusicalEvent = ... | AudioClipEvent` or `type TrackType = ... | "audio" | "sampler"`, treat those lines as optional extension examples and rewrite the MVP union around direct musical events and built-in instrument tracks.
