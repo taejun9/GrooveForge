@@ -10473,6 +10473,43 @@ export function App(): ReactElement {
           : document.querySelector<HTMLElement>('[data-testid="review-queue"]');
       const landingRect = landingTarget?.getBoundingClientRect() ?? null;
       const navigatorRect = document.querySelector<HTMLElement>('[data-testid="workflow-navigator"]')?.getBoundingClientRect() ?? null;
+      const reviewQueue = document.querySelector<HTMLElement>('[data-testid="review-queue"]');
+      const reviewQueueRect = reviewQueue?.getBoundingClientRect() ?? null;
+      const reviewQueueFields = [
+        "review-queue-focus-status",
+        "review-queue-focus-label",
+        "review-queue-focus-detail",
+        "review-queue-priority-status",
+        "review-queue-priority-label",
+        "review-queue-priority-item",
+        "review-queue-priority-next-check",
+        "review-fix-preview-title",
+        "review-fix-preview-detail",
+        "review-fix-preview-audition",
+        "review-fix-preview-next-check"
+      ]
+        .map((testId) => document.querySelector<HTMLElement>(`[data-testid="${testId}"]`))
+        .filter((field): field is HTMLElement => field !== null);
+      const reviewQueueReadableFields = reviewQueueFields.filter((field) => {
+        const fieldRect = field.getBoundingClientRect();
+        const fieldStyle = window.getComputedStyle(field);
+        return Boolean(
+          reviewQueueRect &&
+            fieldRect.width > 0 &&
+            fieldRect.left >= reviewQueueRect.left - 1 &&
+            fieldRect.right <= reviewQueueRect.right + 1 &&
+            fieldStyle.whiteSpace !== "nowrap" &&
+            fieldStyle.overflowWrap === "anywhere"
+        );
+      });
+      const reviewQueueStackedRows = [
+        "review-queue-focus-readout",
+        "review-queue-priority",
+        "review-fix-preview"
+      ].filter((testId) => {
+        const row = document.querySelector<HTMLElement>(`[data-testid="${testId}"]`);
+        return row ? window.getComputedStyle(row).gridTemplateColumns.trim().split(/\s+/).length === 1 : false;
+      });
 
       return {
         clearOfNavigator: Boolean(landingRect && navigatorRect && landingRect.top >= navigatorRect.bottom + 8),
@@ -10483,7 +10520,20 @@ export function App(): ReactElement {
         producerQueueOpen:
           document.querySelector<HTMLDetailsElement>('[data-testid="master-review-queue-tools"]')?.open ?? false,
         producerReviewOpen: document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? false,
-        projectTitle: projectRef.current.title
+        projectTitle: projectRef.current.title,
+        reviewQueueContained: Boolean(
+          starterId === "producer" &&
+            reviewQueue &&
+            reviewQueueRect &&
+            reviewQueueRect.left >= 0 &&
+            reviewQueueRect.right <= window.innerWidth &&
+            reviewQueue.scrollWidth <= reviewQueue.clientWidth + 1
+        ),
+        reviewQueueFieldCount: starterId === "producer" ? reviewQueueFields.length : 0,
+        reviewQueueInternalOverflow:
+          starterId === "producer" && reviewQueue ? Math.max(0, reviewQueue.scrollWidth - reviewQueue.clientWidth) : 0,
+        reviewQueueReadableFieldCount: starterId === "producer" ? reviewQueueReadableFields.length : 0,
+        reviewQueueStackedRowCount: starterId === "producer" ? reviewQueueStackedRows.length : 0
       };
     };
 
