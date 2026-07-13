@@ -207,6 +207,12 @@ function checkResult(result) {
   );
   check(evidence?.layout?.patternLabOpen === false, "live desktop Pattern Lab should start collapsed");
   check(
+    evidence?.layout?.swingFeelDarkThemeReady === true &&
+      evidence?.layout?.swingFeelPressedSemanticsReady === true &&
+      evidence?.layout?.swingFeelSelectedCount === 1,
+    `live desktop Swing Feel pads should expose five dark-theme buttons with exactly one truthful selected target (theme ${evidence?.layout?.swingFeelDarkThemeReady}, semantics ${evidence?.layout?.swingFeelPressedSemanticsReady}, selected ${evidence?.layout?.swingFeelSelectedCount})`
+  );
+  check(
     evidence?.layout?.projectOwnershipReady === true,
     `live desktop should identify an editable 8-bar foundation with honest local-only save guidance (project ${evidence?.layout?.projectStatus}, safety ${evidence?.layout?.projectSafetyStatus} / ${evidence?.layout?.projectSafetyLabel} / ${evidence?.layout?.projectSafetyDetail})`
   );
@@ -1122,6 +1128,7 @@ child.on("exit", (code, signal) => {
     `- Launchpad lifecycle: initial ${result.evidence.layout.launchpadOpen ? "open" : "collapsed"}, starter collapse ${result.evidence.palette.launchpad.collapsedAfterStarter ? "yes" : "no"}, manual reopen/close ${result.evidence.palette.launchpad.manualReopen && result.evidence.palette.launchpad.manualClose ? "yes" : "no"}`
   );
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
+  console.log("- Swing Feel pads: five dark-theme controls, pressed semantics ready, one selected target");
   console.log(
     `- Note-editor-first layout: Capture & Ideas ${result.evidence.layout.captureIdeasOpen ? "open" : "collapsed"}, auto-reveal ${result.evidence.palette.captureIdeas.autoReveal ? "yes" : "no"}, note grids after capture ${result.evidence.layout.noteLanesAfterCaptureIdeas ? "yes" : "no"}`
   );

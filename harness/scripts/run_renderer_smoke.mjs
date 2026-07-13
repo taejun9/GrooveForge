@@ -456,6 +456,32 @@ function validateFirstRunRenderer(html) {
       styles.includes("scroll-margin-top: 148px;"),
     "desktop workspace landing targets should clear the sticky Workflow Navigator"
   );
+  const swingFeelPadIds = ["straight", "tight", "laid", "loose", "style"];
+  const swingFeelPadSegments = swingFeelPadIds.map((id) => {
+    const marker = html.indexOf(`data-testid="swing-feel-${id}"`);
+    const start = marker >= 0 ? html.lastIndexOf("<button", marker) : -1;
+    return start >= 0 ? html.slice(start, html.indexOf("</button>", start)) : "";
+  });
+  check(
+    swingFeelPadSegments.every((segment) => segment.includes('aria-pressed="false"') || segment.includes('aria-pressed="true"')) &&
+      swingFeelPadSegments.filter((segment) => segment.includes('aria-pressed="true"')).length === 1 &&
+      swingFeelPadSegments[4]?.includes('aria-pressed="true"') &&
+      appSource.includes("aria-pressed={selected}"),
+    "all five Swing Feel pads should expose truthful pressed semantics with only the current Style target selected"
+  );
+  check(
+    styles.includes(".swing-feel-row button {") &&
+      styles.includes("appearance: none;") &&
+      styles.includes("background: rgba(244, 239, 231, 0.045);") &&
+      styles.includes(".swing-feel-row button:hover {") &&
+      styles.includes(".swing-feel-row button:focus-visible {") &&
+      styles.includes("outline: 2px solid #82d7ff;") &&
+      styles.includes(".swing-feel-row button.selected {") &&
+      styles.includes("inset 3px 0 0 #78f0c8") &&
+      styles.includes(".swing-feel-row button.selected span,") &&
+      styles.includes("color: #b8ffe7;"),
+    "Swing Feel pads should override native light buttons with complete dark, hover, focus, selected, and text-hierarchy styling"
+  );
   const transportBandIndex = html.indexOf('data-testid="workflow-target-transport"');
   const transportStatusControlsIndex = html.indexOf('data-testid="transport-status-controls"');
   const transportEssentialsIndex = html.indexOf('data-testid="transport-essential-controls"');

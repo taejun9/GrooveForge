@@ -147,6 +147,9 @@ type LaunchSmokeLayoutEvidence = {
   selectedBlockEditorPresent: boolean;
   stepGridAfterPatternLab: boolean;
   stepGridPresent: boolean;
+  swingFeelDarkThemeReady: boolean;
+  swingFeelPressedSemanticsReady: boolean;
+  swingFeelSelectedCount: number;
   transportEssentialsBeforeProject: boolean;
   essentialShortcutMetadataReady: boolean;
   essentialShortcutTitlesReady: boolean;
@@ -1361,6 +1364,10 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const patternLab = document.querySelector('[data-testid="pattern-lab"]');
       const patternLabToggle = document.querySelector('[data-testid="pattern-lab-toggle"]');
       const stepGrid = document.querySelector('.step-grid');
+      const swingFeelButtons = Array.from(
+        document.querySelectorAll('[data-testid="swing-feel-pads"] button[data-testid^="swing-feel-"]')
+      );
+      const swingFeelSelectedButtons = swingFeelButtons.filter((button) => button.getAttribute('aria-pressed') === 'true');
       const captureIdeas = document.querySelector('[data-testid="capture-ideas"]');
       const captureIdeasToggle = document.querySelector('[data-testid="capture-ideas-toggle"]');
       const noteLanes = document.querySelector('.note-lanes');
@@ -1712,6 +1719,23 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           selectedBlockEditorPresent: Boolean(selectedBlockEditor),
           stepGridAfterPatternLab: follows(patternLab, stepGrid),
           stepGridPresent: Boolean(stepGrid),
+          swingFeelDarkThemeReady:
+            swingFeelButtons.length === 5 &&
+            swingFeelButtons.every((button) => {
+              const style = getComputedStyle(button);
+              return (
+                style.appearance === 'none' &&
+                style.backgroundColor !== 'rgb(239, 239, 239)' &&
+                style.backgroundColor !== 'rgba(0, 0, 0, 0)' &&
+                style.borderRadius === '5px'
+              );
+            }),
+          swingFeelPressedSemanticsReady:
+            swingFeelButtons.length === 5 &&
+            swingFeelButtons.every((button) => ['true', 'false'].includes(button.getAttribute('aria-pressed') ?? '')) &&
+            swingFeelSelectedButtons[0]?.getAttribute('data-testid') === 'swing-feel-style' &&
+            swingFeelSelectedButtons[0]?.classList.contains('selected') === true,
+          swingFeelSelectedCount: swingFeelSelectedButtons.length,
           essentialShortcutMetadataReady:
             quickActionsOpen?.getAttribute("aria-keyshortcuts") === "Control+K Meta+K" &&
             commandReferenceOpen?.getAttribute("aria-keyshortcuts") === "? Control+/ Meta+/" &&

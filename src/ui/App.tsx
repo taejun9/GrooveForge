@@ -11842,6 +11842,7 @@ export function App(): ReactElement {
                 const selected = normalizeSwingFeelValue(project.swing) === targetSwing;
                 return (
                   <button
+                    aria-pressed={selected}
                     className={selected ? "selected" : ""}
                     data-testid={`swing-feel-${pad.id}`}
                     key={pad.id}

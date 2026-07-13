@@ -78,6 +78,8 @@ First-run ownership state must describe the default event project as an editable
 
 Audience starter creation is an action-to-workspace route, not only a project factory. The beginner route moves viewport and programmatic focus to the direct Pattern editor; the producer route first expands the nested Review & Export and Review Queue disclosures, then moves viewport and focus to Review Queue. Starter and Workflow Navigator routes share a measured sticky-navigation clearance fallback after normal `scrollIntoView`, so nested or top-level targets remain visible across renderers. These focus targets stay outside project state and must not trigger playback, fixes, export, remote behavior, or additional project mutation.
 
+Direct preset controls in the first editing viewport must fully own their rendered state rather than inherit browser-native control chrome. Swing Feel pads therefore define dark base, hover, focus-visible, and selected surfaces plus explicit pressed semantics; this presentation layer remains separate from the existing swing project field, undo history, realtime scheduler, and export pipeline.
+
 The core project model should make composition events first-class. In the core architecture, a clip is a pattern, MIDI, or automation container, not an imported audio asset:
 
 - `Project`: version, title, BPM, key/scale, swing, tracks, arrangement, master settings.
