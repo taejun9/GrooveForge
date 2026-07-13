@@ -256,6 +256,12 @@ type LaunchSmokeAudienceStarterEvidence = LaunchSmokePaletteRouteEvidence & {
 };
 
 type LaunchSmokeStarterLandingRouteEvidence = {
+  chordToolColumnCount: number;
+  chordToolCount: number;
+  chordToolInternalOverflow: number;
+  chordToolReadableLabelCount: number;
+  chordToolRowCount: number;
+  chordToolUniqueAccessibleNameCount: number;
   clearOfNavigator: boolean;
   focusTestId: string;
   inViewport: boolean;

@@ -824,6 +824,42 @@ function validateFirstRunRenderer(html) {
       styles.includes("overflow-wrap: anywhere;"),
     "Review Queue should switch from its wide scan layout to readable wrapped rows from the component's own inline size"
   );
+  const chordToolAccessibleNames = [
+    "Audition selected chord",
+    "Move selected chord one step left",
+    "Move selected chord one step right",
+    "Duplicate selected chord to the next empty step",
+    "Duplicate selected chord to the previous beat",
+    "Duplicate selected chord to the next beat",
+    "Move selected chord voicing down",
+    "Move selected chord voicing up"
+  ];
+  const chordToolVisibleLabels = [
+    "Audition",
+    "Step left",
+    "Step right",
+    "Duplicate",
+    "Prev beat",
+    "Next beat",
+    "Voice down",
+    "Voice up"
+  ];
+  check(
+    chordToolAccessibleNames.every((label) => composePanelsSource.includes(`aria-label="${label}"`)) &&
+      chordToolVisibleLabels.every((label) => composePanelsSource.includes(`<span>${label}</span>`)) &&
+      composePanelsSource.includes('data-testid="chord-edit-tools"'),
+    "all eight selected-chord actions should expose complete visible labels and unique directional accessible names"
+  );
+  check(
+    styles.includes("container-name: chord-editor;") &&
+      styles.includes("container-type: inline-size;") &&
+      styles.includes("@container chord-editor (max-width: 780px)") &&
+      styles.includes("grid-template-columns: repeat(4, minmax(0, 1fr));") &&
+      styles.includes("min-height: 48px;") &&
+      styles.includes("text-overflow: clip;") &&
+      styles.includes("white-space: normal;"),
+    "the selected-chord toolbar should use a readable four-by-two layout when its own component is narrow"
+  );
   const swingFeelPadIds = ["straight", "tight", "laid", "loose", "style"];
   const swingFeelPadSegments = swingFeelPadIds.map((id) => {
     const marker = html.indexOf(`data-testid="swing-feel-${id}"`);

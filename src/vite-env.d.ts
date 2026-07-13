@@ -79,6 +79,12 @@ type GrooveforgeLaunchSmokeAudienceStarterEvidence = GrooveforgeLaunchSmokeRoute
 };
 
 type GrooveforgeLaunchSmokeStarterLandingRouteEvidence = {
+  chordToolColumnCount: number;
+  chordToolCount: number;
+  chordToolInternalOverflow: number;
+  chordToolReadableLabelCount: number;
+  chordToolRowCount: number;
+  chordToolUniqueAccessibleNameCount: number;
   clearOfNavigator: boolean;
   focusTestId: string;
   inViewport: boolean;
