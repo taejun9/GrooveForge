@@ -171,6 +171,8 @@ Do not list `sampler` in the default instrument panel, first-run track list, or 
 
 Genre is data, not a product silo. Trap, drill, boom bap, lofi, house, jersey, phonk, R&B, garage, and experimental behavior should live in `StyleProfile` presets and editable generation rules.
 
+The default project is an 8-bar local composition foundation, not a genre-branded long demo: it uses the existing Lo-fi profile at 82 BPM in A minor, generates matching editable Pattern A/B/C events through the same style-rule system, targets Starter Sketch with Clean Demo master posture, and labels Style as a changeable starting point across all 14 profiles. Full-song and professional producer projects remain explicit starter/template choices.
+
 ## Scheduling Rule
 
 The audio scheduler is a P0 product dependency. UI timing must not be treated as audio timing. Realtime playback uses stable musical ticks, schedules audio ahead of the render deadline, loops over musical steps, and reports current step/bar/beat back to the UI as a view of the transport.

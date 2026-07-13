@@ -405,9 +405,13 @@ async function validateProjectExportSmoke(smokeCase) {
   const {
     label,
     expectedArrangementBlocks = 8,
+    expectedArrangementTemplate = null,
     expectedBars = 8,
     expectedBpm = null,
+    expectedDeliveryTarget = null,
+    expectedGeneratedStylePatterns = false,
     expectedKey = null,
+    expectedMasterPreset = null,
     expectedMode = null,
     expectedSelectedPattern = null,
     expectedStyleId,
@@ -430,11 +434,39 @@ async function validateProjectExportSmoke(smokeCase) {
   if (expectedKey) {
     check(project.key === expectedKey, `${label} should use ${expectedKey}, got ${project.key}`);
   }
+  if (expectedDeliveryTarget) {
+    check(project.deliveryTarget === expectedDeliveryTarget, `${label} should target ${expectedDeliveryTarget}, got ${project.deliveryTarget}`);
+  }
+  if (expectedMasterPreset) {
+    check(project.masterPreset === expectedMasterPreset, `${label} should use ${expectedMasterPreset}, got ${project.masterPreset}`);
+  }
+  if (expectedGeneratedStylePatterns) {
+    check(
+      stableJson(project.patterns) === stableJson(workstation.createStylePatternSet(project.styleId, project.key)),
+      `${label} Pattern A/B/C should match the selected ${project.styleId} / ${project.key} style rules`
+    );
+    check(
+      project.sound.preset === workstation.styleSoundPreset(project.styleId),
+      `${label} sound preset should match the selected ${project.styleId} style`
+    );
+  }
   if (expectedSelectedPattern) {
     check(project.selectedPattern === expectedSelectedPattern, `${label} should use Pattern ${expectedSelectedPattern}, got ${project.selectedPattern}`);
   }
   check(bars === expectedBars, `${label} should be ${expectedBars} bars, got ${bars}`);
   check(project.arrangement.length === expectedArrangementBlocks, `${label} should have ${expectedArrangementBlocks} arrangement blocks, got ${project.arrangement.length}`);
+  if (expectedArrangementTemplate) {
+    check(
+      stableJson(project.arrangement) === stableJson(workstation.createArrangementTemplate(expectedArrangementTemplate)),
+      `${label} arrangement should match the ${expectedArrangementTemplate} template`
+    );
+  }
+  if (expectedMasterPreset) {
+    check(
+      project.masterCeilingDb === workstation.masterPresetCeilingDb(expectedMasterPreset),
+      `${label} master ceiling should match ${expectedMasterPreset}`
+    );
+  }
   check(project.mixer.every((channel) => coreTrackTypes.has(channel.id)), `${label} contains a non-core or sampling-oriented mixer track`);
   check(!JSON.stringify(project).match(/AudioClipEvent|sampler|sample import|audio clip/i), `${label} contains sampling or audio-clip language`);
 
@@ -512,13 +544,17 @@ const starterCase = {
   kind: "starter",
   label: "starter:first-run",
   project: workstation.starterProject,
-  expectedArrangementBlocks: 8,
-  expectedBars: 26,
-  expectedBpm: 145,
-  expectedKey: smokeKey,
+  expectedArrangementBlocks: 4,
+  expectedArrangementTemplate: "loop",
+  expectedBars: 8,
+  expectedBpm: 82,
+  expectedDeliveryTarget: "starter_sketch",
+  expectedGeneratedStylePatterns: true,
+  expectedKey: "A minor",
+  expectedMasterPreset: "Clean Demo",
   expectedMode: "guided",
   expectedSelectedPattern: "A",
-  expectedStyleId: "trap",
+  expectedStyleId: "lofi",
   expectedTitle: "Untitled Beat"
 };
 const styleCases = workstation.styleProfiles.map((profile) => ({

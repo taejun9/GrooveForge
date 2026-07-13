@@ -140,6 +140,10 @@ function validateLocalDraftRecoveryDeferral(shell, helpers, workstation) {
       bannerHtml.includes("set this recovery copy aside for the session"),
     "local draft recovery should offer a clearly session-scoped Not now action"
   );
+  check(
+    styles.includes(".local-draft-actions .icon-button.primary span") && styles.includes("color: #08120f;"),
+    "local draft recovery primary action text should retain dark-on-mint contrast"
+  );
   check(deferCalls === 0, "rendering local draft recovery should not invoke the defer action");
   check(
       deferredSummary.statusLabel === "Recovery set aside" &&
@@ -517,7 +521,7 @@ function validateFirstRunRenderer(html) {
       html.includes("Track state") &&
       html.includes("All playing") &&
       html.includes("Block shape") &&
-      html.includes("Split ready"),
+      html.includes("1 bar cannot split"),
     "Selected arrangement editor should visibly group Pattern, Track state, and Block shape controls in editing order"
   );
   const mobileStylesStart = styles.indexOf("@media (max-width: 620px)");
@@ -649,10 +653,13 @@ function validateFirstRunRenderer(html) {
       "Guide &amp; Review Center",
       "Open step-by-step guidance, beat checks, and delivery help",
       'value="Untitled Beat"',
-      'value="145"',
-      "F minor",
+      'value="82"',
+      "A minor",
       'data-testid="style-select"',
-      "Trap"
+      'data-testid="style-starting-point"',
+      "Starting point · 14 editable styles",
+      "Lo-fi",
+      "8 bars song loop"
     ],
     "beginner guide path": [
       'data-testid="guide-quick-start"',
@@ -742,7 +749,7 @@ function validateFirstRunRenderer(html) {
       "Track state",
       "All playing",
       "Block shape",
-      "Split ready",
+      "1 bar cannot split",
       'data-testid="block-moves"',
       'data-testid="block-moves-toggle"',
       'data-testid="block-moves-content"',
@@ -1098,7 +1105,7 @@ function validateAudienceStarterQuickActionResults(quickActions, workstation) {
         "editable events",
         "delivery Starter Sketch"
       ],
-      beforeNeedles: ["current project", "First-time composer first beat", "Trap", "F minor", "145 BPM", "editable events"],
+      beforeNeedles: ["current project", "First-time composer first beat", "Lo-fi", "A minor", "82 BPM", "8 bars", "editable events"],
       auditionNeedles: ["first-time composer starter", "First Beat Path", "Dual Audience Readiness"],
       nextNeedles: ["Audience Starter follow-up", "First Beat Path", "Audience Completion Route"]
     },
@@ -1120,7 +1127,7 @@ function validateAudienceStarterQuickActionResults(quickActions, workstation) {
         "editable events",
         "delivery Beat Store"
       ],
-      beforeNeedles: ["current project", "Professional producer studio pass", "Trap", "F minor", "145 BPM", "editable events"],
+      beforeNeedles: ["current project", "Professional producer studio pass", "Lo-fi", "A minor", "82 BPM", "8 bars", "editable events"],
       auditionNeedles: ["professional producer starter", "Review Queue", "Production Snapshot", "Export Preflight"],
       nextNeedles: ["Audience Starter follow-up", "Review Queue", "Export Preflight", "Handoff Package Check"]
     }
@@ -2286,7 +2293,7 @@ try {
     console.log("GrooveForge renderer smoke passed.");
     console.log("- Scope: first-run React workstation server render without browser, Electron window, network, imported audio, or sampling scope");
     console.log(`- Markup: ${html.length} characters from App first render`);
-    console.log("- Starter: Untitled Beat, Guided 145 BPM F minor Trap state visible");
+    console.log("- Starter: Untitled Beat, Guided 82 BPM A minor Lo-fi, 8 bars, Starter Sketch, 14 editable styles visible");
     console.log(
       "- Beginner path: Guide Quick Start, Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
     );

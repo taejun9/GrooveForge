@@ -1080,121 +1080,6 @@ const chainExpandMutedTracks: ArrangementMuteTrack[][] = [
   ["drum_rack", "bass_808", "synth"]
 ];
 
-const starterPatternA: PatternData = withDrumDynamics({
-  drumPattern: {
-    kick: [true, false, false, false, false, false, true, false, false, false, false, false, true, false, false, false],
-    clap: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
-    hat: [true, false, true, false, true, false, true, true, true, false, true, false, true, false, true, true],
-    perc: [false, false, false, true, false, false, false, false, false, true, false, false, false, false, true, false]
-  },
-  bassNotes: [
-    { step: 0, pitch: "F1", length: 2, velocity: 0.88, glide: false, probability: 1 },
-    { step: 6, pitch: "C2", length: 2, velocity: 0.92, glide: true, probability: 1 },
-    { step: 10, pitch: "Eb2", length: 2, velocity: 0.8, glide: false, probability: 1 },
-    { step: 12, pitch: "F1", length: 4, velocity: 0.9, glide: false, probability: 1 }
-  ],
-  melodyNotes: [
-    { step: 0, pitch: "F4", length: 2, velocity: 0.72, probability: 1 },
-    { step: 3, pitch: "Ab4", length: 1, velocity: 0.62, probability: 1 },
-    { step: 6, pitch: "C5", length: 2, velocity: 0.7, probability: 1 },
-    { step: 10, pitch: "Eb5", length: 1, velocity: 0.6, probability: 1 },
-    { step: 12, pitch: "C5", length: 3, velocity: 0.66, probability: 1 }
-  ],
-  chordEvents: [
-    { step: 0, root: "F", quality: "min", inversion: 0, length: 4, velocity: 0.55, probability: 1 },
-    { step: 4, root: "Db", quality: "maj", inversion: 0, length: 4, velocity: 0.46, probability: 1 },
-    { step: 8, root: "Ab", quality: "maj", inversion: 0, length: 4, velocity: 0.5, probability: 1 },
-    { step: 12, root: "Eb", quality: "maj", inversion: 0, length: 4, velocity: 0.5, probability: 1 }
-  ]
-}, { 7: 2, 15: 3 });
-
-const starterPatternB: PatternData = withDrumDynamics({
-  drumPattern: {
-    kick: [true, false, false, false, false, true, false, false, true, false, false, false, true, false, true, false],
-    clap: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
-    hat: [true, true, true, false, true, false, true, true, true, true, true, false, true, false, true, true],
-    perc: [false, false, true, false, false, false, false, true, false, false, true, false, false, true, false, false]
-  },
-  bassNotes: [
-    { step: 0, pitch: "F1", length: 2, velocity: 0.88, glide: false, probability: 1 },
-    { step: 5, pitch: "Ab1", length: 1, velocity: 0.92, glide: true, probability: 1 },
-    { step: 8, pitch: "C2", length: 2, velocity: 0.8, glide: false, probability: 1 },
-    { step: 12, pitch: "Eb2", length: 2, velocity: 0.92, glide: true, probability: 1 },
-    { step: 14, pitch: "F1", length: 2, velocity: 0.82, glide: false, probability: 1 }
-  ],
-  melodyNotes: [
-    { step: 0, pitch: "C5", length: 2, velocity: 0.7, probability: 1 },
-    { step: 2, pitch: "Eb5", length: 1, velocity: 0.62, probability: 1 },
-    { step: 6, pitch: "F5", length: 2, velocity: 0.72, probability: 1 },
-    { step: 9, pitch: "Ab4", length: 1, velocity: 0.58, probability: 1 },
-    { step: 12, pitch: "C5", length: 2, velocity: 0.66, probability: 1 }
-  ],
-  chordEvents: [
-    { step: 0, root: "F", quality: "min", inversion: 0, length: 4, velocity: 0.5, probability: 1 },
-    { step: 4, root: "C", quality: "min", inversion: 0, length: 4, velocity: 0.44, probability: 1 },
-    { step: 8, root: "Db", quality: "maj", inversion: 0, length: 4, velocity: 0.48, probability: 1 },
-    { step: 12, root: "Eb", quality: "maj", inversion: 0, length: 4, velocity: 0.5, probability: 1 }
-  ]
-}, { 1: 2, 7: 2, 15: 3 });
-
-const starterPatternC: PatternData = withDrumDynamics({
-  drumPattern: {
-    kick: [true, false, false, false, false, false, false, false, true, false, false, false, false, false, true, false],
-    clap: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
-    hat: [true, false, false, false, true, false, true, false, true, false, false, false, true, false, true, false],
-    perc: [false, false, false, false, false, false, true, false, false, false, false, true, false, false, false, true]
-  },
-  bassNotes: [
-    { step: 0, pitch: "F1", length: 4, velocity: 0.86, glide: false, probability: 1 },
-    { step: 8, pitch: "Db2", length: 4, velocity: 0.8, glide: false, probability: 1 },
-    { step: 14, pitch: "Eb2", length: 2, velocity: 0.92, glide: true, probability: 1 }
-  ],
-  melodyNotes: [
-    { step: 0, pitch: "Ab4", length: 3, velocity: 0.6, probability: 1 },
-    { step: 4, pitch: "F4", length: 2, velocity: 0.54, probability: 1 },
-    { step: 8, pitch: "Bb4", length: 3, velocity: 0.62, probability: 1 },
-    { step: 12, pitch: "C5", length: 2, velocity: 0.58, probability: 1 }
-  ],
-  chordEvents: [
-    { step: 0, root: "Db", quality: "maj", inversion: 0, length: 4, velocity: 0.48, probability: 1 },
-    { step: 4, root: "Eb", quality: "maj", inversion: 0, length: 4, velocity: 0.45, probability: 1 },
-    { step: 8, root: "F", quality: "min", inversion: 0, length: 4, velocity: 0.52, probability: 1 },
-    { step: 12, root: "C", quality: "min", inversion: 0, length: 4, velocity: 0.42, probability: 1 }
-  ]
-}, { 14: 2 });
-
-export const starterProject: ProjectState = {
-  title: "Untitled Beat",
-  mode: "guided",
-  bpm: 145,
-  key: "F minor",
-  styleId: "trap",
-  selectedPattern: "A",
-  swing: 0.08,
-  metronomeEnabled: false,
-  sound: { ...soundPresetDefaults.clean_knock },
-  patterns: {
-    A: clonePatternData(starterPatternA),
-    B: clonePatternData(starterPatternB),
-    C: clonePatternData(starterPatternC)
-  },
-  mixer: [
-    { id: "drum_rack", name: "Drums", volumeDb: -4, pan: 0, lowCut: 0.08, air: 0.24, drive: 0.16, glue: 0.26, send: 0.14, muted: false, solo: false, accent: "#78f0c8" },
-    { id: "bass_808", name: "808", volumeDb: -6, pan: 0, lowCut: 0, air: 0.1, drive: 0.22, glue: 0.18, send: 0.04, muted: false, solo: false, accent: "#ff7a4f" },
-    { id: "synth", name: "Synth", volumeDb: -8, pan: -12, lowCut: 0.18, air: 0.36, drive: 0.08, glue: 0.12, send: 0.26, muted: false, solo: false, accent: "#8aa8ff" },
-    { id: "chord", name: "Chord", volumeDb: -10, pan: 16, lowCut: 0.12, air: 0.28, drive: 0.06, glue: 0.18, send: 0.32, muted: false, solo: false, accent: "#d58cff" },
-    { id: "master", name: "Master", volumeDb: -1, pan: 0, lowCut: 0, air: 0, drive: 0, glue: 0, send: 0, muted: false, solo: false, accent: "#f0c36a" }
-  ],
-  arrangement: createArrangementTemplate("full"),
-  automation: [],
-  masterCeilingDb: masterPresetCeilingsDb["Headroom for Vocal"],
-  masterPreset: "Headroom for Vocal",
-  deliveryTarget: defaultDeliveryTarget,
-  customDeliveryTarget: { ...defaultCustomDeliveryTarget },
-  sessionBrief: { ...defaultSessionBrief },
-  snapshots: []
-};
-
 export function beatBlueprintLabel(id: BeatBlueprintId): string {
   return beatBlueprintForId(id).name;
 }
@@ -2263,6 +2148,37 @@ const stylePatternBlueprints: Record<StyleId, [PatternBlueprint, PatternBlueprin
     blueprint([1, 4, 8, 15], [6, 13], [0, 3, 5, 10, 12, 15], [2, 7, 11, 14], [1, 4, 8, 12], [5, 1, 6, 3], [2, 6, 3, 0]),
     blueprint([0, 9], [5, 14], [1, 8, 15], [4, 10], [0, 9], [6, 4], [6, 0])
   ]
+};
+
+const starterStyleId: StyleId = "lofi";
+const starterStyle = styleProfiles.find((profile) => profile.id === starterStyleId) ?? styleProfiles[0];
+
+export const starterProject: ProjectState = {
+  title: "Untitled Beat",
+  mode: "guided",
+  bpm: starterStyle.defaultBpm,
+  key: "A minor",
+  styleId: starterStyleId,
+  selectedPattern: "A",
+  swing: starterStyle.defaultSwing,
+  metronomeEnabled: false,
+  sound: soundPresetDesign(styleSoundPreset(starterStyleId)),
+  patterns: createStylePatternSet(starterStyleId, "A minor"),
+  mixer: [
+    { id: "drum_rack", name: "Drums", volumeDb: -4, pan: 0, lowCut: 0.08, air: 0.24, drive: 0.16, glue: 0.26, send: 0.14, muted: false, solo: false, accent: "#78f0c8" },
+    { id: "bass_808", name: "808", volumeDb: -6, pan: 0, lowCut: 0, air: 0.1, drive: 0.22, glue: 0.18, send: 0.04, muted: false, solo: false, accent: "#ff7a4f" },
+    { id: "synth", name: "Synth", volumeDb: -8, pan: -12, lowCut: 0.18, air: 0.36, drive: 0.08, glue: 0.12, send: 0.26, muted: false, solo: false, accent: "#8aa8ff" },
+    { id: "chord", name: "Chord", volumeDb: -10, pan: 16, lowCut: 0.12, air: 0.28, drive: 0.06, glue: 0.18, send: 0.32, muted: false, solo: false, accent: "#d58cff" },
+    { id: "master", name: "Master", volumeDb: -1, pan: 0, lowCut: 0, air: 0, drive: 0, glue: 0, send: 0, muted: false, solo: false, accent: "#f0c36a" }
+  ],
+  arrangement: createArrangementTemplate("loop"),
+  automation: [],
+  masterCeilingDb: masterPresetCeilingsDb["Clean Demo"],
+  masterPreset: "Clean Demo",
+  deliveryTarget: "starter_sketch",
+  customDeliveryTarget: { ...defaultCustomDeliveryTarget },
+  sessionBrief: { ...defaultSessionBrief },
+  snapshots: []
 };
 
 export function styleSoundPreset(styleId: StyleId): (typeof soundPresetIds)[number] {

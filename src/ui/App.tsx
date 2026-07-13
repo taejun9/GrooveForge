@@ -10790,7 +10790,10 @@ export function App(): ReactElement {
             </select>
           </label>
           <label className="field">
-            <span>Style</span>
+            <span className="style-field-label">
+              Style
+              <small data-testid="style-starting-point">Starting point · {styleProfiles.length} editable styles</small>
+            </span>
             <select
               aria-label="Style"
               data-testid="style-select"
