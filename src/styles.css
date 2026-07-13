@@ -12,6 +12,10 @@
   box-sizing: border-box;
 }
 
+details:not([open]) > :not(summary) {
+  display: none !important;
+}
+
 body {
   margin: 0;
   min-width: 0;
@@ -1535,10 +1539,6 @@ h2 {
   border-top: 1px solid rgba(244, 239, 231, 0.08);
 }
 
-.guide-quick-start-details:not([open]) > .guide-quick-start-details-content {
-  display: none;
-}
-
 @media (max-width: 720px) {
   .guide-quick-start-details-summary {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1726,10 +1726,6 @@ h2 {
   gap: 8px;
   padding: 8px;
   border-top: 1px solid rgba(244, 239, 231, 0.08);
-}
-
-.audience-session-proof-details:not([open]) > .audience-session-proof-content {
-  display: none;
 }
 
 @media (max-width: 720px) {

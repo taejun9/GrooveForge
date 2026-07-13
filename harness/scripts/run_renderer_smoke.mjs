@@ -527,6 +527,57 @@ function validateNoteGridKeyboardNavigation(html, navigation) {
   );
 }
 
+function validateClosedDetailsContainment(html) {
+  const detailsTags = html.match(/<details\b[^>]*>/g) ?? [];
+  const openDetailsTags = detailsTags.filter((tag) => /\sopen(?:=|\s|>)/.test(tag));
+  const expectedDisclosures = [
+    "first-run-launchpad",
+    "transport-session-tools",
+    "transport-export-tools",
+    "guide-quick-start-details",
+    "guidance-center",
+    "audience-session-proof-details",
+    "pattern-lab",
+    "capture-ideas",
+    "harmony-moves",
+    "sound-design-tools",
+    "block-moves",
+    "arrangement-tools",
+    "mixer-processing-drum_rack",
+    "mixer-processing-bass_808",
+    "mixer-processing-synth",
+    "mixer-processing-chord",
+    "mix-moves",
+    "mix-review-tools",
+    "master-polish-tools",
+    "master-review-tools",
+    "master-review-queue-tools",
+    "master-mix-coach-tools",
+    "handoff-status-tools",
+    "handoff-audit-tools"
+  ];
+  check(
+    styles.includes("details:not([open]) > :not(summary)") && styles.includes("display: none !important;"),
+    "closed native disclosures should globally suppress every non-summary direct child even when component layout rules set display"
+  );
+  check(
+    appSource.includes('event.target instanceof HTMLElement ? event.target.closest("summary")') &&
+      appSource.includes("focusedSummary.parentElement instanceof HTMLDetailsElement") &&
+      appSource.includes('(event.key === "Enter" || event.code === "Space")') &&
+      appSource.includes("focusedSummary.click()"),
+    "focused disclosure summaries should consume unmodified Enter/Space through one click-equivalent toggle before global playback handling"
+  );
+  check(
+    detailsTags.length === expectedDisclosures.length &&
+      expectedDisclosures.every((testId) => detailsTags.some((tag) => tag.includes(`data-testid=\"${testId}\"`))),
+    `renderer should expose the complete ${expectedDisclosures.length}-disclosure inventory under the shared containment contract`
+  );
+  check(
+    openDetailsTags.length === 1 && openDetailsTags[0]?.includes('data-testid="first-run-launchpad"'),
+    "first render should keep only the project launchpad open while every tool and guidance disclosure starts contained"
+  );
+}
+
 function validateQuickActionLoadStates(shell) {
   const baseProps = {
     actions: [],
@@ -690,9 +741,9 @@ function validateFirstRunRenderer(html) {
   check(
       styles.includes(".guide-quick-start-details-summary:focus-visible") &&
       styles.includes(".guide-quick-start-details[open] .guide-quick-start-details-chevron") &&
-      styles.includes(".guide-quick-start-details:not([open]) > .guide-quick-start-details-content") &&
+      styles.includes("details:not([open]) > :not(summary)") &&
       styles.includes(".guide-quick-start-details-content"),
-    "Guide Quick Start disclosure should retain keyboard focus, open-state, and content styling"
+    "Guide Quick Start disclosure should retain keyboard focus, open-state, shared closed containment, and content styling"
   );
   const audienceNextStepIndex = html.indexOf('data-testid="audience-next-step-rail"');
   const audienceProofDetailsIndex = html.indexOf('data-testid="audience-session-proof-details"');
@@ -716,9 +767,9 @@ function validateFirstRunRenderer(html) {
   check(
     styles.includes(".audience-session-proof-summary:focus-visible") &&
       styles.includes(".audience-session-proof-details[open] .audience-session-proof-chevron") &&
-      styles.includes(".audience-session-proof-details:not([open]) > .audience-session-proof-content") &&
+      styles.includes("details:not([open]) > :not(summary)") &&
       styles.includes(".audience-session-proof-content"),
-    "Audience Session proof disclosure should retain keyboard focus, open-state, and explicit closed-content styling"
+    "Audience Session proof disclosure should retain keyboard focus, open-state, shared closed containment, and content styling"
   );
   check(
     html.includes('<details class="first-run-launchpad" data-testid="first-run-launchpad" open="">') &&
@@ -2680,6 +2731,7 @@ try {
     html,
     await server.ssrLoadModule("/src/ui/noteGridKeyboardNavigation.ts")
   );
+  validateClosedDetailsContainment(html);
   check(
     html.includes('data-quick-actions-materialized="false"') &&
       html.includes('data-quick-actions-graph-state="deferred"'),
@@ -2768,6 +2820,7 @@ try {
     console.log("- Minimum Studio transport: secondary Session Context and Exports stay compact through 1180px entry and resize while retaining manual reopen");
     console.log("- Drum grid keyboard: one roving Tab stop, bounded arrows/Home/End, explicit pressed state, Enter/Space toggle, and visible guidance");
     console.log("- Note-grid keyboard: one Tab stop per 808/Synth grid, exhaustive spatial arrows/Home/End, pressed state, guarded Enter/Space, and guidance");
+    console.log("- Closed disclosures: 24-panel inventory shares one non-summary containment rule; only the project launchpad starts open");
     console.log(
       "- Beginner path: Guide Quick Start, Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
     );

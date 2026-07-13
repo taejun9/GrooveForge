@@ -174,6 +174,23 @@ function checkResult(result) {
   check(evidence?.hasOpenProject === true, "live desktop preload bridge should expose openProject");
   check(evidence?.rootChildCount > 0, "live desktop renderer should mount React under #root");
   check(
+    evidence?.modalFocus?.closedDetails?.totalCount === 24 &&
+      evidence?.modalFocus?.closedDetails?.initiallyOpenCount === 1 &&
+      evidence?.modalFocus?.closedDetails?.closedCount === 23 &&
+      evidence?.modalFocus?.closedDetails?.leakedContentCount === 0 &&
+      evidence?.modalFocus?.closedDetails?.leakedControlCount === 0 &&
+      evidence?.modalFocus?.closedDetails?.guideOpenReady === true &&
+      evidence?.modalFocus?.closedDetails?.guideReclosedReady === true &&
+      evidence?.modalFocus?.closedDetails?.patternLabOpenReady === true &&
+      evidence?.modalFocus?.closedDetails?.patternLabReclosedReady === true &&
+      evidence?.modalFocus?.closedDetails?.mixerOpenReady === true &&
+      evidence?.modalFocus?.closedDetails?.mixerReclosedReady === true &&
+      evidence?.modalFocus?.closedDetails?.projectStayedUnchanged === true &&
+      evidence?.modalFocus?.closedDetails?.undoPostureUnchanged === true &&
+      evidence?.modalFocus?.closedDetails?.playbackStayedStopped === true,
+    "live desktop disclosures should contain every closed panel, reopen representative surfaces with native Enter, recontain them, and preserve project posture"
+  );
+  check(
       evidence?.modalFocus?.drumGrid?.buttonCount === 64 &&
       evidence?.modalFocus?.drumGrid?.pressedSemanticsReady === true &&
       evidence?.modalFocus?.drumGrid?.rovingTabReady === true &&
@@ -1250,6 +1267,7 @@ child.on("exit", (code, signal) => {
     `- Quick Actions keyboard selection: arrows/Home/End retained search focus; Enter ran ${result.evidence.modalFocus.quickKeyboardSelectedTitle}`
   );
   console.log("- Drum grid keyboard: 64 pressed-state buttons, one roving Tab stop, bounded navigation, Enter/Space toggles, playback guard, and Undo ready");
+  console.log("- Closed disclosures: 24 panels, zero closed content/Tab leaks, native Enter reopen/reclose, and unchanged project posture ready");
   console.log("- Note-grid keyboard: one 808 and one Synth Tab stop, native spatial navigation, Enter/Space toggles, playback guard, and Undo ready");
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
   console.log("- Swing Feel pads: five dark-theme controls, pressed semantics ready, one selected target");
