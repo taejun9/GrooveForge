@@ -28024,6 +28024,8 @@ input[type="range"] {
 }
 
 .strip {
+  container-name: mixer-strip;
+  container-type: inline-size;
   display: grid;
   gap: 10px;
   min-height: 240px;
@@ -28093,7 +28095,8 @@ input[type="range"] {
 }
 
 .strip-toggles {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(48px, auto));
   gap: 5px;
 }
 
@@ -28145,9 +28148,15 @@ input[type="range"] {
 }
 
 .mini-toggle {
-  min-width: 30px;
+  min-width: 48px;
   min-height: 28px;
+  padding-inline: 7px;
   font-size: 12px;
+}
+
+.mini-toggle span {
+  display: block;
+  white-space: nowrap;
 }
 
 .mini-toggle:disabled {
@@ -28164,6 +28173,24 @@ input[type="range"] {
 .mini-toggle.active.solo {
   border-color: rgba(120, 240, 200, 0.72);
   background: #78f0c8;
+}
+
+@container mixer-strip (max-width: 190px) {
+  .strip-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 7px;
+  }
+
+  .strip-toggles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .mini-toggle {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .strip-control {
