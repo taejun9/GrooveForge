@@ -10,7 +10,7 @@ import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gu
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(import.meta.url);
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
-const timeoutMs = 420000;
+const timeoutMs = 540000;
 const failures = [];
 const expectedLiveTestIds = [
   "workflow-target-transport",
@@ -194,6 +194,24 @@ function checkResult(result) {
       evidence?.modalFocus?.switchInitialFocus === "command-reference-search-input" &&
       evidence?.modalFocus?.switchFocusRestored === true,
     "live desktop modals should focus search, select and run Quick Actions with native arrow keys and Enter, wrap real Tab/Shift+Tab, close on Escape, restore openers, and preserve the original opener across dialog handoff"
+  );
+  check(
+    evidence?.modalFocus?.dockInitialHidden === true &&
+      evidence?.modalFocus?.dockVisible === true &&
+      evidence?.modalFocus?.dockReturnedHidden === true &&
+      evidence?.modalFocus?.dockViewportReady === true &&
+      evidence?.modalFocus?.dockControlCount === 5,
+    "live desktop workspace command dock should appear only after the full header leaves view and remain fully viewport-contained"
+  );
+  check(
+      evidence?.modalFocus?.dockPositionMirrorsHeader === true &&
+      evidence?.modalFocus?.dockUndoRedoParity === true &&
+      evidence?.modalFocus?.dockShortcutMetadataReady === true &&
+      evidence?.modalFocus?.dockFocusReady === true &&
+      evidence?.modalFocus?.dockSharedPlayReady === true &&
+      evidence?.modalFocus?.dockActionsOpened === true &&
+      evidence?.modalFocus?.dockActionsFocusRestored === true,
+    "live desktop workspace command dock should mirror header state and reuse Play plus Quick Actions through native pointer/Escape input"
   );
   check(evidence?.bodyTextLength > 20000, "live desktop renderer should expose a substantial workstation surface");
   check(Array.isArray(evidence?.missingText) && evidence.missingText.length === 0, "live desktop renderer should contain all expected beginner/pro text");
@@ -1182,6 +1200,9 @@ child.on("exit", (code, signal) => {
     `- Minimum window: ${result.evidence.layout.minimumWindowViewportWidth}px viewport, ${result.evidence.layout.minimumWindowTransportHeight}px header, ${result.evidence.layout.minimumWindowHorizontalOverflow}px horizontal overflow, all direct actions visible`
   );
   console.log("- Modal focus: Quick Actions and Command Reference search entry, Tab/Shift+Tab wrap, Escape restore, and cross-dialog handoff ready");
+  console.log(
+    `- Workspace command dock: conditional show/hide ready, ${result.evidence.modalFocus.dockControlCount} controls, focusable with native Play and Actions, viewport contained`
+  );
   console.log(
     `- Quick Actions keyboard selection: arrows/Home/End retained search focus; Enter ran ${result.evidence.modalFocus.quickKeyboardSelectedTitle}`
   );

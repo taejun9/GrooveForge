@@ -252,6 +252,56 @@ function validateLazyQuickActionGraphSource(graph) {
   );
 }
 
+function validateWorkspaceCommandDockSource(html) {
+  check(
+    appSource.includes("const [workspaceCommandDockVisible, setWorkspaceCommandDockVisible] = useState(false)") &&
+      appSource.includes('typeof IntersectionObserver === "undefined"') &&
+      appSource.includes("setWorkspaceCommandDockVisible(!entry.isIntersecting)") &&
+      appSource.includes("observer.observe(transport)") &&
+      appSource.includes("return () => observer.disconnect()"),
+    "the workspace command dock should derive one local visibility state from the full transport header intersection"
+  );
+  check(
+    [
+      "workspace-command-dock",
+      "workspace-command-dock-position",
+      "workspace-command-dock-play",
+      "workspace-command-dock-actions",
+      "workspace-command-dock-undo",
+      "workspace-command-dock-redo",
+      "workspace-command-dock-save"
+    ].every((testId) => appSource.includes(`data-testid="${testId}"`)) &&
+      appSource.includes('aria-label="Workspace command dock"') &&
+      appSource.includes('role="toolbar"') &&
+      appSource.includes('data-workspace-command-dock-visible={workspaceCommandDockVisible}'),
+    "the workspace command dock should expose a labeled toolbar, live position, and stable essential-control hooks"
+  );
+  check(
+    appSource.includes('data-testid="workspace-command-dock-play"\n            onClick={togglePlayback}') &&
+      appSource.includes('data-testid="workspace-command-dock-actions"\n            onClick={openQuickActions}') &&
+      appSource.includes('data-testid="workspace-command-dock-undo"') &&
+      appSource.includes("disabled={!canUndo}\n            onClick={undoProject}") &&
+      appSource.includes('data-testid="workspace-command-dock-redo"') &&
+      appSource.includes("disabled={!canRedo}\n            onClick={redoProject}") &&
+      appSource.includes('data-testid="workspace-command-dock-save"') &&
+      appSource.includes("onClick={() => void handleSaveProject()}"),
+    "dock controls should reuse the existing Play, Actions, Undo, Redo, and Save handlers and disabled states"
+  );
+  check(
+    styles.includes(".workspace-command-dock {\n  position: fixed;") &&
+      styles.includes("width: min(660px, calc(100vw - 32px));") &&
+      styles.includes('.app-shell[data-workspace-command-dock-visible="true"] {') &&
+      styles.includes("padding-bottom: 92px;") &&
+      styles.includes('.app-shell[data-workspace-command-dock-visible="true"] :focus-visible') &&
+      styles.includes("scroll-margin-bottom: 92px;"),
+    "the fixed dock should remain viewport-bounded and reserve focus/scroll clearance in the workspace"
+  );
+  check(
+    !html.includes('data-testid="workspace-command-dock"'),
+    "the workspace command dock should stay absent from the first render while the full transport is visible"
+  );
+}
+
 function validateQuickActionLoadStates(shell) {
   const baseProps = {
     actions: [],
@@ -2395,6 +2445,7 @@ try {
   const { App } = await server.ssrLoadModule("/src/ui/App.tsx");
   const html = renderToStaticMarkup(React.createElement(App));
   validateFirstRunRenderer(html);
+  validateWorkspaceCommandDockSource(html);
   check(
     html.includes('data-quick-actions-materialized="false"') &&
       html.includes('data-quick-actions-graph-state="deferred"'),
@@ -2479,6 +2530,7 @@ try {
     console.log("- Starter: Untitled Beat, Guided 82 BPM A minor Lo-fi, 8 bars, Starter Sketch, 14 editable styles visible");
     console.log("- Project ownership: Editable 8-bar foundation, editable now, local only, explicit Save-to-keep guidance");
     console.log("- Starter landing: beginner opens the focused drum grid; producer opens the focused Review Queue; sticky navigation stays clear");
+    console.log("- Deep editor commands: conditional fixed dock reuses Play, Actions, Undo, Redo, and Save after the full transport leaves view");
     console.log(
       "- Beginner path: Guide Quick Start, Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
     );

@@ -69,6 +69,128 @@ textarea {
   min-width: 0;
 }
 
+.app-shell[data-workspace-command-dock-visible="true"] {
+  padding-bottom: 92px;
+  scroll-padding-bottom: 92px;
+}
+
+.app-shell[data-workspace-command-dock-visible="true"] :focus-visible {
+  scroll-margin-bottom: 92px;
+}
+
+.workspace-command-dock {
+  position: fixed;
+  inset-inline-start: 50%;
+  bottom: 16px;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: minmax(154px, 1fr) repeat(5, minmax(66px, auto));
+  align-items: stretch;
+  gap: 6px;
+  width: min(660px, calc(100vw - 32px));
+  min-width: 0;
+  min-height: 54px;
+  border: 1px solid rgba(130, 215, 255, 0.34);
+  border-radius: 10px;
+  background: rgba(17, 16, 15, 0.94);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.48);
+  padding: 7px;
+  transform: translateX(-50%);
+  backdrop-filter: blur(16px);
+}
+
+.workspace-command-dock-position {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  gap: 1px;
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 5px 9px;
+}
+
+.workspace-command-dock-position.good {
+  border-color: rgba(120, 240, 200, 0.24);
+  background: rgba(120, 240, 200, 0.065);
+}
+
+.workspace-command-dock-position.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.06);
+}
+
+.workspace-command-dock-position.danger {
+  border-color: rgba(255, 117, 117, 0.24);
+  background: rgba(255, 117, 117, 0.07);
+}
+
+.workspace-command-dock-position span,
+.workspace-command-dock-position strong,
+.workspace-command-dock-position small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-command-dock-position span,
+.workspace-command-dock-position small {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 9px;
+}
+
+.workspace-command-dock-position strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.workspace-command-dock-button {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 7px;
+  padding: 0 8px;
+  color: rgba(244, 239, 231, 0.82);
+}
+
+.workspace-command-dock-button span {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-command-dock-button.primary {
+  border-color: #78f0c8;
+  color: #07120f;
+  background: #78f0c8;
+}
+
+.workspace-command-dock-button.primary:hover:not(:disabled) {
+  border-color: #9af5d7;
+  color: #07120f;
+  background: #9af5d7;
+}
+
+@media (max-width: 720px) {
+  .workspace-command-dock {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    width: calc(100vw - 20px);
+    bottom: 10px;
+  }
+
+  .workspace-command-dock-position {
+    display: none;
+  }
+
+  .workspace-command-dock-button {
+    padding-inline: 4px;
+  }
+}
+
 .transport-band,
 .local-draft-recovery,
 .mode-row,
