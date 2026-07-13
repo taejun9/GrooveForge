@@ -274,6 +274,21 @@ type LaunchSmokeCommandReferenceEvidence = {
   targetText: string;
 };
 
+type LaunchSmokeModalFocusEvidence = {
+  commandBackwardWrap: boolean;
+  commandEscapeClosed: boolean;
+  commandFocusRestored: boolean;
+  commandForwardWrap: boolean;
+  commandInitialFocus: string;
+  quickBackwardWrap: boolean;
+  quickEscapeClosed: boolean;
+  quickFocusRestored: boolean;
+  quickForwardWrap: boolean;
+  quickInitialFocus: string;
+  switchFocusRestored: boolean;
+  switchInitialFocus: string;
+};
+
 type LaunchSmokeBridgeDirectEvidence = {
   buttonPresent: boolean;
   resultDestination: string;
@@ -1092,6 +1107,32 @@ function launchSmokeCommandReferenceFailures(evidence: LaunchSmokeCommandReferen
     failures.push("live Audience Starter Command Reference context should name beginner and producer next checks");
   }
 
+  return failures;
+}
+
+function launchSmokeModalFocusFailures(evidence: LaunchSmokeModalFocusEvidence): string[] {
+  const failures: string[] = [];
+  if (evidence.quickInitialFocus !== "quick-actions-search") {
+    failures.push("Quick Actions should place initial focus in command search");
+  }
+  if (!evidence.quickForwardWrap || !evidence.quickBackwardWrap) {
+    failures.push("Quick Actions should wrap real Tab and Shift+Tab inside the modal");
+  }
+  if (!evidence.quickEscapeClosed || !evidence.quickFocusRestored) {
+    failures.push("Quick Actions Escape should close the modal and restore its opener");
+  }
+  if (evidence.commandInitialFocus !== "command-reference-search-input") {
+    failures.push("Command Reference should place initial focus in reference search");
+  }
+  if (!evidence.commandForwardWrap || !evidence.commandBackwardWrap) {
+    failures.push("Command Reference should wrap real Tab and Shift+Tab inside the modal");
+  }
+  if (!evidence.commandEscapeClosed || !evidence.commandFocusRestored) {
+    failures.push("Command Reference Escape should close the modal and restore its opener");
+  }
+  if (evidence.switchInitialFocus !== "command-reference-search-input" || !evidence.switchFocusRestored) {
+    failures.push("Switching Quick Actions to Command Reference should preserve the original opener and focus lifecycle");
+  }
   return failures;
 }
 
@@ -2284,6 +2325,156 @@ function collectLaunchSmokeBridgeDirectEvidenceWithTimeout(win: BrowserWindow): 
   });
 }
 
+async function collectLaunchSmokeModalFocusEvidence(win: BrowserWindow): Promise<LaunchSmokeModalFocusEvidence> {
+  type FocusSnapshot = {
+    activeTestId: string;
+    dialogOpen: boolean;
+    firstTestId: string;
+    focusInside: boolean;
+    lastTestId: string;
+  };
+
+  const runStep = async <T,>(script: string): Promise<T> => (await win.webContents.executeJavaScript(script)) as T;
+  const snapshot = (dialogTestId: string): Promise<FocusSnapshot> =>
+    runStep<FocusSnapshot>(`
+      (() => {
+        const dialog = document.querySelector('[data-testid="${dialogTestId}"]');
+        const elements = dialog
+          ? Array.from(dialog.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'))
+              .filter((element) => element instanceof HTMLElement && element.getClientRects().length > 0 && element.getAttribute('aria-hidden') !== 'true')
+          : [];
+        const active = document.activeElement;
+        return {
+          activeTestId: active instanceof HTMLElement ? active.dataset.testid ?? '' : '',
+          dialogOpen: dialog !== null,
+          firstTestId: elements[0]?.dataset.testid ?? '',
+          focusInside: Boolean(dialog && active && dialog.contains(active)),
+          lastTestId: elements[elements.length - 1]?.dataset.testid ?? ''
+        };
+      })();
+    `);
+  const waitFor = async (condition: string, timeoutMs = 10000): Promise<void> => {
+    const ready = await runStep<boolean>(`
+      new Promise((resolve) => {
+        const started = Date.now();
+        const tick = () => {
+          if (${condition}) {
+            resolve(true);
+            return;
+          }
+          if (Date.now() - started > ${timeoutMs}) {
+            resolve(false);
+            return;
+          }
+          requestAnimationFrame(tick);
+        };
+        tick();
+      });
+    `);
+    if (!ready) {
+      throw new Error(`Timed out waiting for modal focus condition: ${condition}`);
+    }
+  };
+  const focusBoundary = (dialogTestId: string, boundary: "first" | "last"): Promise<boolean> =>
+    runStep<boolean>(`
+      (() => {
+        const dialog = document.querySelector('[data-testid="${dialogTestId}"]');
+        if (!dialog) return false;
+        const elements = Array.from(dialog.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'))
+          .filter((element) => element instanceof HTMLElement && element.getClientRects().length > 0 && element.getAttribute('aria-hidden') !== 'true');
+        const target = elements[${boundary === "first" ? "0" : "elements.length - 1"}];
+        target?.focus();
+        return document.activeElement === target;
+      })();
+    `);
+  const sendKey = async (keyCode: string, modifiers: Electron.InputEvent["modifiers"] = []): Promise<void> => {
+    win.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
+    win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+  };
+
+  await runStep(`document.querySelector('[data-testid="quick-actions-open"]')?.focus(); document.querySelector('[data-testid="quick-actions-open"]')?.click();`);
+  await waitFor(`document.activeElement?.dataset?.testid === 'quick-actions-search'`);
+  const quickInitial = await snapshot("quick-actions-dialog");
+  await focusBoundary("quick-actions-dialog", "last");
+  const quickBeforeForward = await snapshot("quick-actions-dialog");
+  await sendKey("Tab");
+  const quickAfterForward = await snapshot("quick-actions-dialog");
+  await focusBoundary("quick-actions-dialog", "first");
+  const quickBeforeBackward = await snapshot("quick-actions-dialog");
+  await sendKey("Tab", ["shift"]);
+  const quickAfterBackward = await snapshot("quick-actions-dialog");
+  await sendKey("Escape");
+  await waitFor(`document.querySelector('[data-testid="quick-actions"]') === null && document.activeElement?.dataset?.testid === 'quick-actions-open'`);
+  const quickClosed = await runStep<{ activeTestId: string; open: boolean }>(`(() => ({ activeTestId: document.activeElement?.dataset?.testid ?? '', open: document.querySelector('[data-testid="quick-actions"]') !== null }))();`);
+
+  await runStep(`document.querySelector('[data-testid="command-reference-open"]')?.focus(); document.querySelector('[data-testid="command-reference-open"]')?.click();`);
+  await waitFor(`document.activeElement?.dataset?.testid === 'command-reference-search-input'`);
+  const commandInitial = await snapshot("command-reference-dialog");
+  await focusBoundary("command-reference-dialog", "last");
+  const commandBeforeForward = await snapshot("command-reference-dialog");
+  await sendKey("Tab");
+  const commandAfterForward = await snapshot("command-reference-dialog");
+  await focusBoundary("command-reference-dialog", "first");
+  const commandBeforeBackward = await snapshot("command-reference-dialog");
+  await sendKey("Tab", ["shift"]);
+  const commandAfterBackward = await snapshot("command-reference-dialog");
+  await sendKey("Escape");
+  await waitFor(`document.querySelector('[data-testid="command-reference"]') === null && document.activeElement?.dataset?.testid === 'command-reference-open'`);
+  const commandClosed = await runStep<{ activeTestId: string; open: boolean }>(`(() => ({ activeTestId: document.activeElement?.dataset?.testid ?? '', open: document.querySelector('[data-testid="command-reference"]') !== null }))();`);
+
+  await runStep(`document.querySelector('[data-testid="quick-actions-open"]')?.focus(); document.querySelector('[data-testid="quick-actions-open"]')?.click();`);
+  await waitFor(`document.activeElement?.dataset?.testid === 'quick-actions-search'`);
+  await runStep(`document.querySelector('[data-testid="quick-actions-open-command-reference"]')?.click();`);
+  await waitFor(`document.activeElement?.dataset?.testid === 'command-reference-search-input'`);
+  const switchInitial = await snapshot("command-reference-dialog");
+  await sendKey("Escape");
+  await waitFor(`document.querySelector('[data-testid="command-reference"]') === null && document.activeElement?.dataset?.testid === 'quick-actions-open'`);
+  const switchClosed = await runStep<{ activeTestId: string; open: boolean }>(`(() => ({ activeTestId: document.activeElement?.dataset?.testid ?? '', open: document.querySelector('[data-testid="command-reference"]') !== null }))();`);
+
+  return {
+    commandBackwardWrap:
+      commandBeforeBackward.activeTestId === commandBeforeBackward.firstTestId &&
+      commandAfterBackward.activeTestId === commandBeforeBackward.lastTestId &&
+      commandAfterBackward.focusInside,
+    commandEscapeClosed: !commandClosed.open,
+    commandFocusRestored: commandClosed.activeTestId === "command-reference-open",
+    commandForwardWrap:
+      commandBeforeForward.activeTestId === commandBeforeForward.lastTestId &&
+      commandAfterForward.activeTestId === commandBeforeForward.firstTestId &&
+      commandAfterForward.focusInside,
+    commandInitialFocus: commandInitial.activeTestId,
+    quickBackwardWrap:
+      quickBeforeBackward.activeTestId === quickBeforeBackward.firstTestId &&
+      quickAfterBackward.activeTestId === quickBeforeBackward.lastTestId &&
+      quickAfterBackward.focusInside,
+    quickEscapeClosed: !quickClosed.open,
+    quickFocusRestored: quickClosed.activeTestId === "quick-actions-open",
+    quickForwardWrap:
+      quickBeforeForward.activeTestId === quickBeforeForward.lastTestId &&
+      quickAfterForward.activeTestId === quickBeforeForward.firstTestId &&
+      quickAfterForward.focusInside,
+    quickInitialFocus: quickInitial.activeTestId,
+    switchFocusRestored: !switchClosed.open && switchClosed.activeTestId === "quick-actions-open",
+    switchInitialFocus: switchInitial.activeTestId
+  };
+}
+
+function collectLaunchSmokeModalFocusEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeModalFocusEvidence> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Timed out collecting live modal focus evidence.")), 90000);
+    void collectLaunchSmokeModalFocusEvidence(win)
+      .then((evidence) => {
+        clearTimeout(timeout);
+        resolve(evidence);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+}
+
 async function collectLaunchSmokeCommandReferenceEvidence(win: BrowserWindow): Promise<LaunchSmokeCommandReferenceEvidence> {
   const readEvidenceScript = `
     (() => {
@@ -2696,15 +2887,36 @@ function installLaunchSmoke(win: BrowserWindow): void {
                     .then((starterLandingEvidence) => {
                       const evidenceWithStarterLanding = { ...evidenceWithPalette, starterLanding: starterLandingEvidence };
                       lastProgress = { phase: "starter-landing-collected", evidence: evidenceWithStarterLanding };
-                      lastProgress = { phase: "collecting-command-reference", evidence: evidenceWithStarterLanding };
-                      return collectLaunchSmokeCommandReferenceEvidenceWithTimeout(win)
+                      lastProgress = { phase: "collecting-modal-focus", evidence: evidenceWithStarterLanding };
+                      return collectLaunchSmokeModalFocusEvidenceWithTimeout(win)
+                        .then((modalFocusEvidence) => {
+                          if (finished) {
+                            return;
+                          }
+                          const modalFocusFailures = launchSmokeModalFocusFailures(modalFocusEvidence);
+                          const evidenceWithModalFocus = { ...evidenceWithStarterLanding, modalFocus: modalFocusEvidence };
+                          lastProgress = {
+                            phase: "modal-focus-collected",
+                            evidence: evidenceWithModalFocus,
+                            failures: modalFocusFailures
+                          };
+                          if (modalFocusFailures.length > 0) {
+                            fail("Production desktop modal focus lifecycle smoke failed.", {
+                              evidence: evidenceWithModalFocus,
+                              failures: modalFocusFailures
+                            });
+                            return;
+                          }
+
+                          lastProgress = { phase: "collecting-command-reference", evidence: evidenceWithModalFocus };
+                          return collectLaunchSmokeCommandReferenceEvidenceWithTimeout(win)
                         .then((commandReferenceEvidence) => {
                       if (finished) {
                         return;
                       }
 
                       const commandReferenceFailures = launchSmokeCommandReferenceFailures(commandReferenceEvidence);
-                      const evidenceWithCommandReference = { ...evidenceWithStarterLanding, commandReference: commandReferenceEvidence };
+                      const evidenceWithCommandReference = { ...evidenceWithModalFocus, commandReference: commandReferenceEvidence };
                       lastProgress = {
                         phase: "command-reference-collected",
                         evidence: evidenceWithCommandReference,
@@ -2764,6 +2976,12 @@ function installLaunchSmoke(win: BrowserWindow): void {
                         })
                         .catch((error: unknown) => {
                           fail("Production desktop Command Reference JavaScript failed.", {
+                            error: error instanceof Error ? error.message : String(error)
+                          });
+                        });
+                        })
+                        .catch((error: unknown) => {
+                          fail("Production desktop modal focus lifecycle JavaScript failed.", {
                             error: error instanceof Error ? error.message : String(error)
                           });
                         });

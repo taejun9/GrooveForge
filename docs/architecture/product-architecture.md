@@ -179,6 +179,10 @@ Extension track types for optional sampling, later:
 
 Do not list `sampler` in the default instrument panel, first-run track list, or MVP architecture diagram. It can appear only inside an explicitly marked optional sampling section until sampling-phase work is approved.
 
+## Modal Focus Rule
+
+Quick Actions and Command Reference share one UI-local modal focus lifecycle. Each dialog owns initial focus and Escape handling, uses the same visible-enabled focusable-element traversal for Tab and Shift+Tab wraparound, and exposes a focusable dialog fallback when no child control is available. The App shell records the active workstation opener only when entering the first modal, preserves it during direct modal-to-modal handoff, restores it after an explicit close, and clears it when command execution intentionally routes focus elsewhere. This state never enters project data, undo history, save/load, playback, render/export, or remote behavior.
+
 ## Genre Rule
 
 Genre is data, not a product silo. Trap, drill, boom bap, lofi, house, jersey, phonk, R&B, garage, and experimental behavior should live in `StyleProfile` presets and editable generation rules.

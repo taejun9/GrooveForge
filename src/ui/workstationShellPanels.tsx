@@ -52,6 +52,7 @@ import type {
 } from "./workstationUiModel";
 import { beatReadinessPriorityCheck, layerStarterPriorityOption, maxQuickActionPins, snapshotCompareFocusItem } from "./workstationUiModel";
 import { barCountLabel, formatLocalDraftSavedAt } from "./workstationPatternTools";
+import { useModalFocusTrap } from "./useModalFocusTrap";
 
 function quickActionGuideSuggestionReason(detail: string): string {
   const parts = quickActionGuideSuggestionNonCompletionParts(detail);
@@ -2590,6 +2591,10 @@ export function QuickActions({
   onOpenCommandReference: () => void;
   onRetryLoad: () => void;
 }): ReactElement | null {
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  useModalFocusTrap(open, dialogRef, searchInputRef);
+
   if (!open) {
     return null;
   }
@@ -2610,7 +2615,17 @@ export function QuickActions({
           aria-label="Quick Actions"
           aria-modal="true"
           className="quick-actions-panel"
+          data-testid="quick-actions-dialog"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              event.stopPropagation();
+              onClose();
+            }
+          }}
+          ref={dialogRef}
           role="dialog"
+          tabIndex={-1}
         >
           <div className="quick-actions-heading">
             <div>
@@ -2638,6 +2653,7 @@ export function QuickActions({
             placeholder={loading ? "Loading commands…" : "Commands unavailable"}
             type="search"
             value=""
+            ref={searchInputRef}
           />
           <div
             aria-live="polite"
@@ -2750,7 +2766,22 @@ export function QuickActions({
         }
       }}
     >
-      <section className="quick-actions-panel" role="dialog" aria-modal="true" aria-label="Quick Actions">
+      <section
+        aria-label="Quick Actions"
+        aria-modal="true"
+        className="quick-actions-panel"
+        data-testid="quick-actions-dialog"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            onClose();
+          }
+        }}
+        ref={dialogRef}
+        role="dialog"
+        tabIndex={-1}
+      >
         <div className="quick-actions-heading">
           <div>
             <KeyboardMusic size={18} aria-hidden="true" />
@@ -2772,14 +2803,9 @@ export function QuickActions({
         </div>
         <input
           aria-label="Search Quick Actions"
-          autoFocus
           data-testid="quick-actions-search"
           onChange={(event) => onQueryChange(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              onClose();
-            }
             if (event.key === "Enter" && firstRunnableAction) {
               event.preventDefault();
               onRun(firstRunnableAction);
@@ -2788,6 +2814,7 @@ export function QuickActions({
           placeholder="Search commands"
           type="search"
           value={query}
+          ref={searchInputRef}
         />
         {searchHints.length > 0 && (
           <div className="quick-actions-search-hints" data-testid="quick-actions-search-hints">
@@ -3678,7 +3705,9 @@ export function CommandReferenceDialog({
 }): ReactElement | null {
   const [selectedFilterId, setSelectedFilterId] = useState<CommandReferenceFilterId>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const dialogRef = useRef<HTMLElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  useModalFocusTrap(open, dialogRef, searchInputRef);
   const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase();
   const filteredSections =
     selectedFilterId === "all"
@@ -3720,7 +3749,6 @@ export function CommandReferenceDialog({
       setSearchQuery("");
       return;
     }
-    searchInputRef.current?.focus();
   }, [open]);
 
   function clearCommandReferenceSearch(): void {
@@ -3759,7 +3787,22 @@ export function CommandReferenceDialog({
         }
       }}
     >
-      <section className="command-reference-panel" role="dialog" aria-modal="true" aria-label="Command Reference">
+      <section
+        aria-label="Command Reference"
+        aria-modal="true"
+        className="command-reference-panel"
+        data-testid="command-reference-dialog"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            onClose();
+          }
+        }}
+        ref={dialogRef}
+        role="dialog"
+        tabIndex={-1}
+      >
         <div className="quick-actions-heading command-reference-heading">
           <div>
             <CircleHelp size={18} aria-hidden="true" />

@@ -7378,6 +7378,11 @@ h2 {
   padding: 6px 8px;
 }
 
+.command-reference-search:focus-within {
+  border-color: rgba(130, 215, 255, 0.72);
+  box-shadow: 0 0 0 2px rgba(130, 215, 255, 0.18);
+}
+
 .command-reference-search svg {
   color: #82d7ff;
 }

@@ -173,6 +173,21 @@ function checkResult(result) {
   check(evidence?.hasSaveProject === true, "live desktop preload bridge should expose saveProject");
   check(evidence?.hasOpenProject === true, "live desktop preload bridge should expose openProject");
   check(evidence?.rootChildCount > 0, "live desktop renderer should mount React under #root");
+  check(
+    evidence?.modalFocus?.quickInitialFocus === "quick-actions-search" &&
+      evidence?.modalFocus?.quickForwardWrap === true &&
+      evidence?.modalFocus?.quickBackwardWrap === true &&
+      evidence?.modalFocus?.quickEscapeClosed === true &&
+      evidence?.modalFocus?.quickFocusRestored === true &&
+      evidence?.modalFocus?.commandInitialFocus === "command-reference-search-input" &&
+      evidence?.modalFocus?.commandForwardWrap === true &&
+      evidence?.modalFocus?.commandBackwardWrap === true &&
+      evidence?.modalFocus?.commandEscapeClosed === true &&
+      evidence?.modalFocus?.commandFocusRestored === true &&
+      evidence?.modalFocus?.switchInitialFocus === "command-reference-search-input" &&
+      evidence?.modalFocus?.switchFocusRestored === true,
+    "live desktop modals should focus search, wrap real Tab/Shift+Tab, close on Escape, restore openers, and preserve the original opener across dialog handoff"
+  );
   check(evidence?.bodyTextLength > 20000, "live desktop renderer should expose a substantial workstation surface");
   check(Array.isArray(evidence?.missingText) && evidence.missingText.length === 0, "live desktop renderer should contain all expected beginner/pro text");
   check(evidence?.samplingTextPresent === false, "live desktop first-run surface should not expose sampling-first language");
@@ -1159,6 +1174,7 @@ child.on("exit", (code, signal) => {
   console.log(
     `- Minimum window: ${result.evidence.layout.minimumWindowViewportWidth}px viewport, ${result.evidence.layout.minimumWindowTransportHeight}px header, ${result.evidence.layout.minimumWindowHorizontalOverflow}px horizontal overflow, all direct actions visible`
   );
+  console.log("- Modal focus: Quick Actions and Command Reference search entry, Tab/Shift+Tab wrap, Escape restore, and cross-dialog handoff ready");
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
   console.log("- Swing Feel pads: five dark-theme controls, pressed semantics ready, one selected target");
   console.log(

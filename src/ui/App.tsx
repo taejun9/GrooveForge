@@ -1159,6 +1159,7 @@ export function App(): ReactElement {
   const [quickActionGraphLoadError, setQuickActionGraphLoadError] = useState<string | null>(null);
   const [quickActionGraphLoadAttempt, setQuickActionGraphLoadAttempt] = useState(0);
   const [commandReferenceOpen, setCommandReferenceOpen] = useState(false);
+  const modalReturnFocusRef = useRef<HTMLElement | null>(null);
   const [guidanceCenterOpen, setGuidanceCenterOpen] = useState(false);
   const [launchpadOpen, setLaunchpadOpen] = useState(true);
   const [quickActionQuery, setQuickActionQuery] = useState("");
@@ -8794,10 +8795,28 @@ export function App(): ReactElement {
     setReviewFixResult(createReviewFixResult(fix, targetItem.id, beforeProject, projectRef.current));
   }
 
+  function rememberModalReturnFocus(): void {
+    if (quickActionsOpen || commandReferenceOpen) {
+      return;
+    }
+    modalReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }
+
+  function restoreModalReturnFocus(): void {
+    const target = modalReturnFocusRef.current;
+    modalReturnFocusRef.current = null;
+    window.setTimeout(() => {
+      if (target?.isConnected && !target.matches(":disabled")) {
+        target.focus();
+      }
+    }, 0);
+  }
+
   function openQuickActions(): void {
     if (quickActionsOpen) {
       return;
     }
+    rememberModalReturnFocus();
     quickActionSessionRef.current = quickActionGraphFactory ? buildQuickActions() : null;
     setCommandReferenceOpen(false);
     setQuickActionQuery("");
@@ -8853,7 +8872,7 @@ export function App(): ReactElement {
     );
   }
 
-  function closeQuickActions(): void {
+  function closeQuickActions(restoreFocus = true): void {
     quickActionSessionRef.current = null;
     setQuickActionsOpen(false);
     setQuickActionQuery("");
@@ -8862,9 +8881,15 @@ export function App(): ReactElement {
     setQuickActionSearchResult(null);
     setQuickActionSearchRecoveryResult(null);
     setQuickActionScopeResult(null);
+    if (restoreFocus) {
+      restoreModalReturnFocus();
+    } else {
+      modalReturnFocusRef.current = null;
+    }
   }
 
   function openCommandReference(): void {
+    rememberModalReturnFocus();
     quickActionSessionRef.current = null;
     setQuickActionsOpen(false);
     setQuickActionQuery("");
@@ -8899,6 +8924,7 @@ export function App(): ReactElement {
 
   function closeCommandReference(): void {
     setCommandReferenceOpen(false);
+    restoreModalReturnFocus();
   }
 
   function runQuickAction(action: QuickAction): void {
@@ -8927,7 +8953,7 @@ export function App(): ReactElement {
       selectedNoteActive: selectedCaptureNoteActive,
       selectedNoteLabel: selectedCaptureNoteLabel
     });
-    closeQuickActions();
+    closeQuickActions(false);
     try {
       void Promise.resolve(action.run())
         .then(() => {
