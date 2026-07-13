@@ -350,6 +350,7 @@ interface Window {
       | Promise<GrooveforgeLaunchSmokeStarterLandingEvidence>;
     collectAudienceSessionQuickActionEvidence?: () => GrooveforgeLaunchSmokePaletteEvidence | Promise<GrooveforgeLaunchSmokePaletteEvidence>;
     collectChordCardKeyboardEvidence?: () => GrooveforgeLaunchSmokeChordCardEvidence;
+    setModeAwareToolPanels?: (mode: "guided" | "studio") => void;
   };
   __grooveforgeLaunchSmokePaletteStep?: string;
   webkitAudioContext?: typeof AudioContext;

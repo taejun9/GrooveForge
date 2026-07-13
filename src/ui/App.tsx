@@ -1102,6 +1102,16 @@ import {
 
 type QuickActionGraphFactory = typeof import("./workstationAppQuickActionGraph")["createQuickActions"];
 
+function isCompactTransportViewport(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  if (typeof window.matchMedia === "function") {
+    return window.matchMedia("(max-width: 1220px)").matches;
+  }
+  return typeof window.innerWidth === "number" && window.innerWidth <= 1220;
+}
+
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<EditHistoryEntry[]>([]);
@@ -2088,6 +2098,28 @@ export function App(): ReactElement {
   }, [project.mode]);
 
   useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+    const compactTransport = window.matchMedia("(max-width: 1220px)");
+    const collapseTransportTools = (): void => {
+      setTransportSessionOpen(false);
+      setTransportExportsOpen(false);
+    };
+    const handleTransportViewportChange = (event: MediaQueryListEvent): void => {
+      if (event.matches) {
+        collapseTransportTools();
+      }
+    };
+
+    if (compactTransport.matches) {
+      collapseTransportTools();
+    }
+    compactTransport.addEventListener("change", handleTransportViewportChange);
+    return () => compactTransport.removeEventListener("change", handleTransportViewportChange);
+  }, []);
+
+  useEffect(() => {
     if (!masterCeilingEditing) {
       setMasterCeilingDraft(project.masterCeilingDb.toFixed(1));
     }
@@ -3009,6 +3041,7 @@ export function App(): ReactElement {
 
   function updateModeAwareToolPanels(mode: ProjectState["mode"]): void {
     const advancedOpen = mode === "studio";
+    const transportAdvancedOpen = advancedOpen && !isCompactTransportViewport();
     setSoundDesignOpen(advancedOpen);
     setHarmonyMovesOpen(advancedOpen);
     setArrangementToolsOpen(advancedOpen);
@@ -3019,8 +3052,8 @@ export function App(): ReactElement {
     setMasterReviewOpen(advancedOpen);
     setMasterReviewQueueOpen(false);
     setMasterMixCoachOpen(false);
-    setTransportSessionOpen(advancedOpen);
-    setTransportExportsOpen(advancedOpen);
+    setTransportSessionOpen(transportAdvancedOpen);
+    setTransportExportsOpen(transportAdvancedOpen);
     setDeliveryStatusOpen(advancedOpen);
     setDeliveryAuditOpen(advancedOpen);
     setChannelProcessingOpen(
@@ -10421,6 +10454,9 @@ export function App(): ReactElement {
     window.__grooveforgeLaunchSmoke = {
       ...(window.__grooveforgeLaunchSmoke ?? {}),
       collectAudienceStarterLandingEvidence,
+      setModeAwareToolPanels: (mode) => {
+        flushSync(() => updateModeAwareToolPanels(mode));
+      },
       collectChordCardKeyboardEvidence: () => {
         const cards = [...document.querySelectorAll<HTMLElement>('[data-testid^="chord-slot-"]')];
         const initial = cards.find((card) => card.dataset.editorOpen === "true");
@@ -10761,6 +10797,7 @@ export function App(): ReactElement {
       delete current.collectAudienceSessionQuickActionEvidence;
       delete current.collectChordCardKeyboardEvidence;
       delete current.collectAudienceStarterLandingEvidence;
+      delete current.setModeAwareToolPanels;
       if (!current.collectAudienceRouteBridgeDirectEvidence) {
         delete window.__grooveforgeLaunchSmoke;
       }

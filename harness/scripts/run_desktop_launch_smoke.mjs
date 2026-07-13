@@ -263,6 +263,17 @@ function checkResult(result) {
       evidence?.layout?.minimumWindowViewportWidth <= 1180,
     `live desktop minimum window should keep setup, horizontal audience choices, and every direct action inside the viewport without horizontal overflow (viewport ${evidence?.layout?.minimumWindowViewportWidth}, height ${evidence?.layout?.minimumWindowTransportHeight}, overflow ${evidence?.layout?.minimumWindowHorizontalOverflow}, transport ${evidence?.layout?.minimumWindowTransportReady}, setup ${evidence?.layout?.minimumWindowSetupReady}, choices ${evidence?.layout?.minimumWindowLaunchpadHorizontalReady}, actions ${evidence?.layout?.minimumWindowDirectActionsReady})`
   );
+  check(
+    evidence?.layout?.minimumWindowWideStudioAutoExpandReady === true &&
+      evidence?.layout?.minimumWindowStudioResizeCollapseReady === true &&
+      evidence?.layout?.minimumWindowStudioCompactEntryReady === true &&
+      evidence?.layout?.minimumWindowStudioManualReopenReady === true &&
+      evidence?.layout?.minimumWindowStudioHorizontalOverflow === 0 &&
+      evidence?.layout?.minimumWindowStudioCompactHeight > 0 &&
+      evidence?.layout?.minimumWindowStudioExpandedHeight > evidence?.layout?.minimumWindowStudioCompactHeight &&
+      evidence?.layout?.minimumWindowStudioCompactHeight <= evidence?.layout?.minimumWindowTransportHeight + 1,
+    `live desktop Studio transport should auto-expand wide, collapse after resize and compact entry, remain manually reopenable, and preserve workspace height at 1180px (wide ${evidence?.layout?.minimumWindowWideStudioAutoExpandReady}, resize ${evidence?.layout?.minimumWindowStudioResizeCollapseReady}, compact ${evidence?.layout?.minimumWindowStudioCompactEntryReady}, manual ${evidence?.layout?.minimumWindowStudioManualReopenReady}, compact height ${evidence?.layout?.minimumWindowStudioCompactHeight}, expanded height ${evidence?.layout?.minimumWindowStudioExpandedHeight}, overflow ${evidence?.layout?.minimumWindowStudioHorizontalOverflow})`
+  );
   check(evidence?.layout?.patternLabOpen === false, "live desktop Pattern Lab should start collapsed");
   check(
     evidence?.layout?.swingFeelDarkThemeReady === true &&
@@ -1198,6 +1209,9 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Minimum window: ${result.evidence.layout.minimumWindowViewportWidth}px viewport, ${result.evidence.layout.minimumWindowTransportHeight}px header, ${result.evidence.layout.minimumWindowHorizontalOverflow}px horizontal overflow, all direct actions visible`
+  );
+  console.log(
+    `- Minimum Studio transport: ${result.evidence.layout.minimumWindowStudioCompactHeight}px compact vs ${result.evidence.layout.minimumWindowStudioExpandedHeight}px manual expansion, wide auto-expand and resize collapse ready`
   );
   console.log("- Modal focus: Quick Actions and Command Reference search entry, Tab/Shift+Tab wrap, Escape restore, and cross-dialog handoff ready");
   console.log(

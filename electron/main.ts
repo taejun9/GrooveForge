@@ -121,9 +121,16 @@ type LaunchSmokeLayoutEvidence = {
   minimumWindowHorizontalOverflow: number;
   minimumWindowLaunchpadHorizontalReady: boolean;
   minimumWindowSetupReady: boolean;
+  minimumWindowStudioCompactEntryReady: boolean;
+  minimumWindowStudioCompactHeight: number;
+  minimumWindowStudioExpandedHeight: number;
+  minimumWindowStudioHorizontalOverflow: number;
+  minimumWindowStudioManualReopenReady: boolean;
+  minimumWindowStudioResizeCollapseReady: boolean;
   minimumWindowTransportHeight: number;
   minimumWindowTransportReady: boolean;
   minimumWindowViewportWidth: number;
+  minimumWindowWideStudioAutoExpandReady: boolean;
   mixerProcessingOpen: boolean;
   mixerProcessingToggleVisible: boolean;
   mixerStripsBeforeMixMoves: boolean;
@@ -200,9 +207,16 @@ type LaunchSmokeMinimumWindowEvidence = Pick<
   | "minimumWindowHorizontalOverflow"
   | "minimumWindowLaunchpadHorizontalReady"
   | "minimumWindowSetupReady"
+  | "minimumWindowStudioCompactEntryReady"
+  | "minimumWindowStudioCompactHeight"
+  | "minimumWindowStudioExpandedHeight"
+  | "minimumWindowStudioHorizontalOverflow"
+  | "minimumWindowStudioManualReopenReady"
+  | "minimumWindowStudioResizeCollapseReady"
   | "minimumWindowTransportHeight"
   | "minimumWindowTransportReady"
   | "minimumWindowViewportWidth"
+  | "minimumWindowWideStudioAutoExpandReady"
 >;
 
 type LaunchSmokePaletteRouteEvidence = {
@@ -1330,9 +1344,58 @@ function collectLaunchSmokeVisualEvidenceWithTimeout(win: BrowserWindow): Promis
 async function collectLaunchSmokeMinimumWindowEvidence(
   win: BrowserWindow
 ): Promise<LaunchSmokeMinimumWindowEvidence> {
+  const minimumWindowWideStudioAutoExpandReady = await win.webContents.executeJavaScript(`
+    (() => {
+      window.__grooveforgeLaunchSmoke?.setModeAwareToolPanels?.('studio');
+      const session = document.querySelector('[data-testid="transport-session-tools"]');
+      const exports = document.querySelector('[data-testid="transport-export-tools"]');
+      return Boolean(session?.open && exports?.open);
+    })();
+  `);
   win.setSize(1180, 800);
-  await new Promise((resolve) => setTimeout(resolve, 120));
+  await new Promise((resolve) => setTimeout(resolve, 180));
   try {
+    const responsiveStudio = await win.webContents.executeJavaScript(`
+      (async () => {
+        const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const header = document.querySelector('[data-testid="workflow-target-transport"]');
+        const session = document.querySelector('[data-testid="transport-session-tools"]');
+        const exports = document.querySelector('[data-testid="transport-export-tools"]');
+        const sessionToggle = document.querySelector('[data-testid="transport-session-toggle"]');
+        const exportToggle = document.querySelector('[data-testid="transport-export-toggle"]');
+        const resizeCollapseReady = Boolean(session && exports && !session.open && !exports.open);
+
+        window.__grooveforgeLaunchSmoke?.setModeAwareToolPanels?.('studio');
+        await settle();
+        const compactEntryReady = Boolean(session && exports && !session.open && !exports.open);
+        const compactHeight = header?.getBoundingClientRect().height ?? 0;
+        const compactHorizontalOverflow = Math.max(
+          0,
+          document.documentElement.scrollWidth - document.documentElement.clientWidth
+        );
+
+        sessionToggle?.click();
+        await settle();
+        const sessionManualReady = Boolean(session?.open && !exports?.open);
+        sessionToggle?.click();
+        await settle();
+        exportToggle?.click();
+        await settle();
+        const exportsManualReady = Boolean(!session?.open && exports?.open);
+        const expandedHeight = header?.getBoundingClientRect().height ?? 0;
+
+        window.__grooveforgeLaunchSmoke?.setModeAwareToolPanels?.('guided');
+        await settle();
+        return {
+          compactEntryReady,
+          compactHeight,
+          compactHorizontalOverflow,
+          expandedHeight,
+          manualReopenReady: sessionManualReady && exportsManualReady,
+          resizeCollapseReady
+        };
+      })();
+    `);
     const evidence = await win.webContents.executeJavaScript(`
       (() => {
         window.scrollTo(0, 0);
@@ -1385,6 +1448,12 @@ async function collectLaunchSmokeMinimumWindowEvidence(
           minimumWindowSetupReady: Boolean(
             controls && controls.left >= 0 && controls.right <= innerWidth && controls.width > 0
           ),
+          minimumWindowStudioCompactEntryReady: ${JSON.stringify(responsiveStudio.compactEntryReady)},
+          minimumWindowStudioCompactHeight: ${JSON.stringify(responsiveStudio.compactHeight)},
+          minimumWindowStudioExpandedHeight: ${JSON.stringify(responsiveStudio.expandedHeight)},
+          minimumWindowStudioHorizontalOverflow: ${JSON.stringify(responsiveStudio.compactHorizontalOverflow)},
+          minimumWindowStudioManualReopenReady: ${JSON.stringify(responsiveStudio.manualReopenReady)},
+          minimumWindowStudioResizeCollapseReady: ${JSON.stringify(responsiveStudio.resizeCollapseReady)},
           minimumWindowTransportHeight: transport?.height ?? 0,
           minimumWindowTransportReady: Boolean(
             transport &&
@@ -1395,12 +1464,14 @@ async function collectLaunchSmokeMinimumWindowEvidence(
             launchpad.left >= 0 &&
             launchpad.right <= innerWidth
           ),
-          minimumWindowViewportWidth: innerWidth
+          minimumWindowViewportWidth: innerWidth,
+          minimumWindowWideStudioAutoExpandReady: ${JSON.stringify(minimumWindowWideStudioAutoExpandReady)}
         };
       })();
     `);
     return evidence as LaunchSmokeMinimumWindowEvidence;
   } finally {
+    await win.webContents.executeJavaScript(`window.__grooveforgeLaunchSmoke?.setModeAwareToolPanels?.('guided');`);
     win.setSize(1440, 960);
     await new Promise((resolve) => setTimeout(resolve, 120));
   }

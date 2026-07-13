@@ -12,6 +12,12 @@ const appSource = readFileSync(new URL("../../src/ui/App.tsx", import.meta.url),
 const graphSource = readFileSync(new URL("../../src/ui/workstationAppQuickActionGraph.ts", import.meta.url), "utf8");
 const quickActionSource = readFileSync(new URL("../../src/ui/workstationAppQuickActions.tsx", import.meta.url), "utf8");
 const shellSource = readFileSync(new URL("../../src/ui/workstationShellPanels.tsx", import.meta.url), "utf8");
+const launchBearingPackageSources = [
+  "run_desktop_package_smoke.mjs",
+  "run_desktop_adhoc_sign_smoke.mjs",
+  "run_desktop_pkg_payload_smoke.mjs",
+  "run_desktop_install_smoke.mjs"
+].map((fileName) => readFileSync(new URL(`./${fileName}`, import.meta.url), "utf8"));
 
 function check(condition, message) {
   if (!condition) {
@@ -299,6 +305,47 @@ function validateWorkspaceCommandDockSource(html) {
   check(
     !html.includes('data-testid="workspace-command-dock"'),
     "the workspace command dock should stay absent from the first render while the full transport is visible"
+  );
+}
+
+function validateCompactStudioTransportSource() {
+  check(
+    appSource.includes("function isCompactTransportViewport(): boolean") &&
+      appSource.includes('window.matchMedia("(max-width: 1220px)").matches') &&
+      appSource.includes("window.innerWidth <= 1220"),
+    "compact Studio transport behavior should share the existing 1220px responsive layout boundary"
+  );
+  check(
+    appSource.includes("const transportAdvancedOpen = advancedOpen && !isCompactTransportViewport()") &&
+      appSource.includes("setTransportSessionOpen(transportAdvancedOpen)") &&
+      appSource.includes("setTransportExportsOpen(transportAdvancedOpen)"),
+    "Studio mode should auto-expand transport disclosures only outside the compact viewport"
+  );
+  check(
+    appSource.includes('const compactTransport = window.matchMedia("(max-width: 1220px)")') &&
+      appSource.includes("if (event.matches)") &&
+      appSource.includes('compactTransport.addEventListener("change", handleTransportViewportChange)') &&
+      appSource.includes('compactTransport.removeEventListener("change", handleTransportViewportChange)') &&
+      appSource.includes("collapseTransportTools()"),
+    "crossing into the compact viewport should close both transport disclosures with a cleaned-up media listener"
+  );
+  check(
+    appSource.includes("setModeAwareToolPanels: (mode) =>") &&
+      appSource.includes("flushSync(() => updateModeAwareToolPanels(mode))") &&
+      appSource.includes("delete current.setModeAwareToolPanels"),
+    "production launch smoke should have a bounded UI-only hook for wide, resized, compact, and reset transport evidence"
+  );
+  check(
+    styles.includes("@media (min-width: 901px) and (max-width: 1220px)") &&
+      styles.includes(".command-strip .transport-session-tools") &&
+      styles.includes(".command-strip .transport-export-tools"),
+    "compact Studio behavior should retain the existing minimum-window disclosure layout and manual toggles"
+  );
+  check(
+    launchBearingPackageSources.every(
+      (source) => source.includes("const timeoutMs = 540000") && source.includes("520-second launch-smoke timeout")
+    ),
+    "launch-bearing package parents should remain bounded above the app's 520-second launch collector"
   );
 }
 
@@ -2446,6 +2493,7 @@ try {
   const html = renderToStaticMarkup(React.createElement(App));
   validateFirstRunRenderer(html);
   validateWorkspaceCommandDockSource(html);
+  validateCompactStudioTransportSource();
   check(
     html.includes('data-quick-actions-materialized="false"') &&
       html.includes('data-quick-actions-graph-state="deferred"'),
@@ -2531,6 +2579,7 @@ try {
     console.log("- Project ownership: Editable 8-bar foundation, editable now, local only, explicit Save-to-keep guidance");
     console.log("- Starter landing: beginner opens the focused drum grid; producer opens the focused Review Queue; sticky navigation stays clear");
     console.log("- Deep editor commands: conditional fixed dock reuses Play, Actions, Undo, Redo, and Save after the full transport leaves view");
+    console.log("- Minimum Studio transport: secondary Session Context and Exports stay compact through 1180px entry and resize while retaining manual reopen");
     console.log(
       "- Beginner path: Guide Quick Start, Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
     );
