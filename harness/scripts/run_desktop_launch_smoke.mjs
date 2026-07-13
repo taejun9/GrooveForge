@@ -352,7 +352,12 @@ function checkResult(result) {
       evidence?.starterLanding?.producer?.inViewport === true &&
       evidence?.starterLanding?.producer?.clearOfNavigator === true &&
       evidence?.starterLanding?.producer?.producerReviewOpen === true &&
-      evidence?.starterLanding?.producer?.producerQueueOpen === true,
+      evidence?.starterLanding?.producer?.producerQueueOpen === true &&
+      evidence?.starterLanding?.producer?.reviewQueueContained === true &&
+      evidence?.starterLanding?.producer?.reviewQueueFieldCount === 11 &&
+      evidence?.starterLanding?.producer?.reviewQueueReadableFieldCount === 11 &&
+      evidence?.starterLanding?.producer?.reviewQueueInternalOverflow === 0 &&
+      evidence?.starterLanding?.producer?.reviewQueueStackedRowCount === 3,
     `live producer starter should open and focus a visible Review Queue below the sticky Workflow Navigator (${JSON.stringify(evidence?.starterLanding?.producer ?? null)})`
   );
   check(
@@ -1270,6 +1275,7 @@ child.on("exit", (code, signal) => {
   console.log("- Closed disclosures: 24 panels, zero closed content/Tab leaks, native Enter reopen/reclose, and unchanged project posture ready");
   console.log("- Note-grid keyboard: one 808 and one Synth Tab stop, native spatial navigation, Enter/Space toggles, playback guard, and Undo ready");
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
+  console.log("- Review Queue readability: 11/11 decision fields wrapped and contained across three compact diagnostic rows");
   console.log("- Swing Feel pads: five dark-theme controls, pressed semantics ready, one selected target");
   console.log(
     `- Button theme foundation: ${result.evidence.layout.buttonThemeRepresentativeCount} representative inherited controls, ${result.evidence.layout.buttonThemeNativeSurfaceCount} native surfaces, disabled and specialist states preserved`

@@ -29225,6 +29225,8 @@ input[type="range"] {
 }
 
 .review-queue {
+  container-name: review-queue;
+  container-type: inline-size;
   display: grid;
   gap: 9px;
   border: 1px solid rgba(138, 168, 255, 0.16);
@@ -29774,6 +29776,69 @@ input[type="range"] {
 .review-queue-fix-button:disabled {
   cursor: default;
   opacity: 0.48;
+}
+
+@container review-queue (max-width: 720px) {
+  .review-queue-heading,
+  .review-queue-focus-readout,
+  .review-queue-priority,
+  .review-fix-preview,
+  .review-queue-result,
+  .review-queue-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .review-queue-heading strong {
+    text-align: start;
+  }
+
+  .review-queue-heading strong,
+  .review-queue-heading small,
+  .review-queue-focus-readout > *,
+  .review-queue-priority > *,
+  .review-fix-preview-main strong,
+  .review-fix-preview-main small,
+  .review-fix-preview-scope span,
+  .review-fix-preview-scope strong,
+  .review-fix-preview-followup span,
+  .review-fix-preview-followup small,
+  .review-queue-result-main strong,
+  .review-queue-result-main small,
+  .review-queue-result-destination span,
+  .review-queue-result-destination strong,
+  .review-queue-result-metric span,
+  .review-queue-result-metric strong,
+  .review-queue-result-followup span,
+  .review-queue-result-followup small,
+  .review-fix-result-main strong,
+  .review-fix-result-main small,
+  .review-fix-result-meta span,
+  .review-fix-result-metrics b,
+  .review-fix-result-metrics em,
+  .review-fix-result-followup b,
+  .review-fix-result-followup em,
+  .review-queue-item strong,
+  .review-queue-item small {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .review-queue-priority button {
+    width: 100%;
+  }
+
+  .review-fix-result-meta,
+  .review-fix-result-metrics,
+  .review-fix-result-followup {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .review-queue-item-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+  }
 }
 
 .export-meter {

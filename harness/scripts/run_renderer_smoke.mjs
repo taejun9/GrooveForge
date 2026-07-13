@@ -813,6 +813,17 @@ function validateFirstRunRenderer(html) {
       styles.includes("scroll-margin-top: 148px;"),
     "desktop workspace landing targets should clear the sticky Workflow Navigator"
   );
+  check(
+    styles.includes("container-name: review-queue;") &&
+      styles.includes("container-type: inline-size;") &&
+      styles.includes("@container review-queue (max-width: 720px)") &&
+      styles.includes(".review-queue-focus-readout,") &&
+      styles.includes(".review-queue-priority,") &&
+      styles.includes(".review-fix-preview,") &&
+      styles.includes("grid-template-columns: minmax(0, 1fr);") &&
+      styles.includes("overflow-wrap: anywhere;"),
+    "Review Queue should switch from its wide scan layout to readable wrapped rows from the component's own inline size"
+  );
   const swingFeelPadIds = ["straight", "tight", "laid", "loose", "style"];
   const swingFeelPadSegments = swingFeelPadIds.map((id) => {
     const marker = html.indexOf(`data-testid="swing-feel-${id}"`);

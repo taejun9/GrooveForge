@@ -85,6 +85,11 @@ type GrooveforgeLaunchSmokeStarterLandingRouteEvidence = {
   producerQueueOpen: boolean;
   producerReviewOpen: boolean;
   projectTitle: string;
+  reviewQueueContained: boolean;
+  reviewQueueFieldCount: number;
+  reviewQueueInternalOverflow: number;
+  reviewQueueReadableFieldCount: number;
+  reviewQueueStackedRowCount: number;
 };
 
 type GrooveforgeLaunchSmokeStarterLandingEvidence = {
