@@ -18,9 +18,9 @@ const iconFileName = `${appName}.icns`;
 const iconSource = path.join(root, "assets", "brand", "grooveforge-icon.svg");
 const entitlementsPath = path.join(root, "harness", "fixtures", "macos-hardened-runtime-entitlements.plist");
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
-// Keep the parent harness alive beyond the app's 400-second launch-smoke timeout
+// Keep the parent harness alive beyond the app's 520-second launch-smoke timeout
 // so a valid result or the app's structured failure can reach stdout.
-const timeoutMs = 480000;
+const timeoutMs = 540000;
 const outputRoot = path.join(root, "build", "desktop", `${appName}-${process.platform}-${process.arch}`);
 const packagedApp = path.join(outputRoot, `${appName}.app`);
 const failures = [];
