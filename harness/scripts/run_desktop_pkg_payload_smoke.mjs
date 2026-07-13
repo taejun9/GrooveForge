@@ -23,8 +23,8 @@ const payloadRoot = path.join(packageRoot, "pkg-payload-smoke", "payload");
 const reportJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-pkg-payload-smoke.json`);
 const reportMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-pkg-payload-smoke.md`);
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
-// Keep the parent harness alive beyond the app's 520-second launch-smoke timeout.
-const timeoutMs = 540000;
+// Keep the parent harness alive beyond the app's 640-second launch-smoke timeout.
+const timeoutMs = 660000;
 const failures = [];
 
 const privateEnvKeys = [

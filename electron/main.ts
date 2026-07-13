@@ -10,9 +10,10 @@ const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
 const menuCommandChannel = "grooveforge:menu-command";
 const isLaunchSmoke = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1";
 const isProjectIoSmoke = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE === "1";
+const launchSmokeDrumGridSnapshotChannel = "grooveforge:launch-smoke-drum-grid-snapshot";
 const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
-const launchSmokeTimeoutMs = 520000;
+const launchSmokeTimeoutMs = 640000;
 const projectIoSmokeTimeoutMs = launchSmokeTimeoutMs;
 
 type NativeMenuCommand =
@@ -288,6 +289,20 @@ type LaunchSmokeCommandReferenceEvidence = {
   targetText: string;
 };
 
+type LaunchSmokeDrumGridKeyboardEvidence = {
+  activationSingleToggleReady: boolean;
+  buttonCount: number;
+  enterToggleReady: boolean;
+  nativeArrowReady: boolean;
+  navigationEventCountUnchanged: boolean;
+  navigationSelectionReady: boolean;
+  playbackStayedStopped: boolean;
+  pressedSemanticsReady: boolean;
+  rovingTabReady: boolean;
+  spaceToggleReady: boolean;
+  undoRestored: boolean;
+};
+
 type LaunchSmokeModalFocusEvidence = {
   commandShortcutFromEditable: boolean;
   commandBackwardWrap: boolean;
@@ -307,6 +322,7 @@ type LaunchSmokeModalFocusEvidence = {
   dockUndoRedoParity: boolean;
   dockViewportReady: boolean;
   dockVisible: boolean;
+  drumGrid: LaunchSmokeDrumGridKeyboardEvidence;
   editableFocusRestored: boolean;
   editableQuestionTyped: boolean;
   editableValuePreserved: boolean;
@@ -329,6 +345,8 @@ type LaunchSmokeModalFocusEvidence = {
   switchFocusRestored: boolean;
   switchInitialFocus: string;
 };
+
+type LaunchSmokeModalFocusCoreEvidence = Omit<LaunchSmokeModalFocusEvidence, "drumGrid">;
 
 type LaunchSmokeBridgeDirectEvidence = {
   buttonPresent: boolean;
@@ -1153,6 +1171,25 @@ function launchSmokeCommandReferenceFailures(evidence: LaunchSmokeCommandReferen
 
 function launchSmokeModalFocusFailures(evidence: LaunchSmokeModalFocusEvidence): string[] {
   const failures: string[] = [];
+  if (
+    evidence.drumGrid.buttonCount !== 64 ||
+    !evidence.drumGrid.pressedSemanticsReady ||
+    !evidence.drumGrid.rovingTabReady ||
+    !evidence.drumGrid.nativeArrowReady ||
+    !evidence.drumGrid.navigationSelectionReady ||
+    !evidence.drumGrid.navigationEventCountUnchanged
+  ) {
+    failures.push("drum grid should expose 64 pressed-state buttons with one roving Tab stop and representative non-mutating native arrow navigation");
+  }
+  if (
+    !evidence.drumGrid.enterToggleReady ||
+    !evidence.drumGrid.spaceToggleReady ||
+    !evidence.drumGrid.activationSingleToggleReady ||
+    !evidence.drumGrid.playbackStayedStopped ||
+    !evidence.drumGrid.undoRestored
+  ) {
+    failures.push("drum grid Enter and Space should toggle exactly one selected hit through undo while leaving playback stopped");
+  }
   if (!evidence.quickShortcutFromEditable || !evidence.commandShortcutFromEditable) {
     failures.push("modified Quick Actions and Command Reference shortcuts should open from an editable workstation field");
   }
@@ -2467,10 +2504,207 @@ function collectLaunchSmokeBridgeDirectEvidenceWithTimeout(win: BrowserWindow): 
   });
 }
 
+async function collectLaunchSmokeDrumGridKeyboardEvidence(
+  win: BrowserWindow,
+  onStep: (step: string) => void = () => {}
+): Promise<LaunchSmokeDrumGridKeyboardEvidence> {
+  type DrumGridSnapshot = {
+    activeCount: number;
+    activeTestId: string;
+    buttonCount: number;
+    playing: boolean;
+    pressedSemanticsReady: boolean;
+    selectedTestId: string;
+    tabStopTestIds: string[];
+    targetPressed: boolean;
+  };
+
+  const runStep = async <T,>(script: string): Promise<T> => (await win.webContents.executeJavaScript(script)) as T;
+  const recordedSteps: DrumGridSnapshot[] = [];
+  let recorderBridgeReady = false;
+  const handleRecorderSnapshot = (event: Electron.IpcMainEvent, payload: unknown): void => {
+    if (event.sender !== win.webContents || typeof payload !== "object" || payload === null) {
+      return;
+    }
+    const candidate = payload as { snapshot?: unknown; step?: unknown };
+    if (candidate.step === 0) {
+      recorderBridgeReady = true;
+      return;
+    }
+    if (
+      typeof candidate.step === "number" &&
+      Number.isInteger(candidate.step) &&
+      candidate.step >= 1 &&
+      candidate.step <= 5 &&
+      typeof candidate.snapshot === "object" &&
+      candidate.snapshot !== null
+    ) {
+      recordedSteps[candidate.step - 1] = candidate.snapshot as DrumGridSnapshot;
+    }
+  };
+  ipcMain.on(launchSmokeDrumGridSnapshotChannel, handleRecorderSnapshot);
+  win.webContents.focus();
+  onStep("installing renderer recorder");
+  const initial = await runStep<DrumGridSnapshot>(`
+      (() => {
+        const snapshot = () => {
+          const buttons = Array.from(document.querySelectorAll('button[data-testid^="drum-step-"]'));
+          const selected = buttons.filter((button) => button.classList.contains('selected'));
+          return {
+            activeCount: buttons.filter((button) => button.getAttribute('aria-pressed') === 'true').length,
+            activeTestId: document.activeElement instanceof HTMLElement ? document.activeElement.dataset.testid ?? '' : '',
+            buttonCount: buttons.length,
+            playing: document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'true',
+            pressedSemanticsReady: buttons.every(
+              (button) =>
+                (button.getAttribute('aria-pressed') === 'true') === button.classList.contains('active')
+            ),
+            selectedTestId: selected.length === 1 ? selected[0]?.dataset.testid ?? '' : '',
+            tabStopTestIds: buttons.filter((button) => button.tabIndex === 0).map((button) => button.dataset.testid ?? ''),
+            targetPressed: document.querySelector('[data-testid="drum-step-kick-1"]')?.getAttribute('aria-pressed') === 'true'
+          };
+        };
+        const recorder = { steps: [], listener: null };
+        recorder.listener = (event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+            return;
+          }
+          setTimeout(() => {
+          const nextSnapshot = snapshot();
+          recorder.steps.push(nextSnapshot);
+          window.grooveforge?.reportLaunchSmokeDrumGridSnapshot?.({
+            step: recorder.steps.length,
+            snapshot: nextSnapshot
+          });
+          if (recorder.steps.length >= 5) {
+            document.removeEventListener('keydown', recorder.listener, true);
+          }
+          }, 0);
+        };
+        window.__grooveforgeDrumGridKeyboardSmoke = recorder;
+        document.addEventListener('keydown', recorder.listener, true);
+        document.querySelector('[data-testid="drum-step-kick-0"]')?.focus();
+        const initialSnapshot = snapshot();
+        window.grooveforge?.reportLaunchSmokeDrumGridSnapshot?.({ step: 0, snapshot: initialSnapshot });
+        return initialSnapshot;
+      })();
+    `);
+  const sendKey = async (
+    keyCode: string,
+    expectedStep: number,
+    modifiers: Electron.InputEvent["modifiers"] = []
+  ): Promise<void> => {
+    win.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
+    win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
+    const stepDeadline = Date.now() + 30000;
+    while (Date.now() < stepDeadline && !recordedSteps[expectedStep - 1]) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    if (!recordedSteps[expectedStep - 1]) {
+      throw new Error(`Native drum grid keyboard recorder did not receive step ${expectedStep} (${keyCode}).`);
+    }
+  };
+  const sendCommandKey = async (
+    keyCode: string,
+    modifiers: Electron.InputEvent["modifiers"]
+  ): Promise<void> => {
+    win.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
+    win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  };
+  const commandModifier: Electron.InputEvent["modifiers"] = process.platform === "darwin" ? ["meta"] : ["control"];
+
+  onStep("sending native navigation and activation keys");
+  await sendKey("Right", 1);
+  await sendKey("Enter", 2);
+  await sendCommandKey("Z", commandModifier);
+  await sendKey("Escape", 3);
+  await sendKey("Space", 4);
+  await sendCommandKey("Z", commandModifier);
+  await sendKey("Escape", 5);
+  onStep("collecting renderer snapshots");
+  const recorderDeadline = Date.now() + 20000;
+  while (Date.now() < recorderDeadline && recordedSteps.filter(Boolean).length < 5) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  ipcMain.removeListener(launchSmokeDrumGridSnapshotChannel, handleRecorderSnapshot);
+  const [afterRight, afterEnter, afterEnterUndo, afterSpace, afterSpaceUndo] = recordedSteps;
+  if (!afterRight || !afterEnter || !afterEnterUndo || !afterSpace || !afterSpaceUndo) {
+    throw new Error(
+      `Native drum grid keyboard recorder returned ${recordedSteps.filter(Boolean).length}/5 snapshots ` +
+        `(bridge ${recorderBridgeReady ? "ready" : "missing"}, initial focus ${initial.activeTestId || "none"}).`
+    );
+  }
+  onStep("validating renderer snapshots");
+  const navigationSnapshots = [afterRight];
+
+  const evidence: LaunchSmokeDrumGridKeyboardEvidence = {
+    activationSingleToggleReady:
+      afterEnter.activeCount === afterRight.activeCount + 1 &&
+      afterSpace.activeCount === afterRight.activeCount + 1,
+    buttonCount: initial.buttonCount,
+    enterToggleReady: afterEnter.activeTestId === "drum-step-kick-1" && afterEnter.targetPressed,
+    nativeArrowReady: initial.activeTestId === "drum-step-kick-0" && afterRight.activeTestId === "drum-step-kick-1",
+    navigationEventCountUnchanged: navigationSnapshots.every((item) => item.activeCount === initial.activeCount),
+    navigationSelectionReady: navigationSnapshots.every(
+      (item) =>
+        item.selectedTestId === item.activeTestId &&
+        item.tabStopTestIds.length === 1 &&
+        item.tabStopTestIds[0] === item.activeTestId
+    ),
+    playbackStayedStopped: [
+      initial,
+      ...navigationSnapshots,
+      afterEnter,
+      afterEnterUndo,
+      afterSpace,
+      afterSpaceUndo
+    ].every((item) => !item.playing),
+    pressedSemanticsReady: initial.pressedSemanticsReady,
+    rovingTabReady:
+      initial.tabStopTestIds.length === 1 &&
+      initial.tabStopTestIds[0] === "drum-step-kick-0" &&
+      navigationSnapshots.every((item) => item.tabStopTestIds.length === 1),
+    spaceToggleReady: afterSpace.activeTestId === "drum-step-kick-1" && afterSpace.targetPressed,
+    undoRestored:
+      !afterEnterUndo.targetPressed &&
+      !afterSpaceUndo.targetPressed &&
+      afterEnterUndo.activeCount === initial.activeCount &&
+      afterSpaceUndo.activeCount === initial.activeCount
+  };
+  onStep("restoring initial editor selection");
+  await runStep(`document.querySelector('[data-testid="chord-slot-0"]')?.focus();`);
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  return evidence;
+}
+
+function collectLaunchSmokeDrumGridKeyboardEvidenceWithTimeout(
+  win: BrowserWindow
+): Promise<LaunchSmokeDrumGridKeyboardEvidence> {
+  return new Promise((resolve, reject) => {
+    let step = "starting";
+    const timeout = setTimeout(
+      () => reject(new Error(`Timed out collecting native drum grid keyboard evidence at ${step}.`)),
+      120000
+    );
+    void collectLaunchSmokeDrumGridKeyboardEvidence(win, (nextStep) => {
+      step = nextStep;
+    })
+      .then((evidence) => {
+        clearTimeout(timeout);
+        resolve(evidence);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+}
+
 async function collectLaunchSmokeModalFocusEvidence(
   win: BrowserWindow,
   onStep: (step: string) => void = () => {}
-): Promise<LaunchSmokeModalFocusEvidence> {
+): Promise<LaunchSmokeModalFocusCoreEvidence> {
   type FocusSnapshot = {
     activeTestId: string;
     dialogOpen: boolean;
@@ -2879,7 +3113,7 @@ async function collectLaunchSmokeModalFocusEvidence(
   };
 }
 
-function collectLaunchSmokeModalFocusEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeModalFocusEvidence> {
+function collectLaunchSmokeModalFocusEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeModalFocusCoreEvidence> {
   return new Promise((resolve, reject) => {
     let step = "starting";
     const timeout = setTimeout(() => reject(new Error(`Timed out collecting live modal focus evidence at ${step}.`)), 280000);
@@ -3214,6 +3448,7 @@ function projectIoSmokeFailures(evidence: ProjectIoSmokeEvidence): string[] {
 
 function installLaunchSmoke(win: BrowserWindow): void {
   let finished = false;
+  let drumGridKeyboardEvidence: LaunchSmokeDrumGridKeyboardEvidence | null = null;
   let minimumWindowEvidence: LaunchSmokeMinimumWindowEvidence | null = null;
   let lastProgress: Record<string, unknown> = { phase: "waiting-ready-to-show" };
   const timeout = setTimeout(() => {
@@ -3260,6 +3495,26 @@ function installLaunchSmoke(win: BrowserWindow): void {
         const failures = launchSmokeFailures(evidence);
         lastProgress = { phase: "dom-collected", evidence, failures };
         if (failures.length === 0) {
+          if (!drumGridKeyboardEvidence) {
+            lastProgress = { phase: "collecting-drum-grid-keyboard", evidence };
+            return collectLaunchSmokeDrumGridKeyboardEvidenceWithTimeout(win)
+              .then((collectedEvidence) => {
+                if (finished) {
+                  return;
+                }
+                drumGridKeyboardEvidence = collectedEvidence;
+                lastProgress = {
+                  phase: "drum-grid-keyboard-collected",
+                  evidence: { ...evidence, drumGrid: collectedEvidence }
+                };
+                setTimeout(() => poll(deadline), 100);
+              })
+              .catch((error: unknown) => {
+                fail("Production desktop drum grid keyboard JavaScript failed.", {
+                  error: error instanceof Error ? error.message : String(error)
+                });
+              });
+          }
           lastProgress = { phase: "collecting-bridge-direct", evidence };
           return collectLaunchSmokeBridgeDirectEvidenceWithTimeout(win)
             .then((bridgeDirectEvidence) => {
@@ -3311,6 +3566,12 @@ function installLaunchSmoke(win: BrowserWindow): void {
                       lastProgress = { phase: "starter-landing-collected", evidence: evidenceWithStarterLanding };
                       lastProgress = { phase: "collecting-modal-focus", evidence: evidenceWithStarterLanding };
                       return collectLaunchSmokeModalFocusEvidenceWithTimeout(win)
+                        .then(
+                          (modalFocusCoreEvidence): LaunchSmokeModalFocusEvidence => ({
+                            ...modalFocusCoreEvidence,
+                            drumGrid: drumGridKeyboardEvidence as LaunchSmokeDrumGridKeyboardEvidence
+                          })
+                        )
                         .then((modalFocusEvidence) => {
                           if (finished) {
                             return;

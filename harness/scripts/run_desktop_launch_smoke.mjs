@@ -10,7 +10,7 @@ import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gu
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(import.meta.url);
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
-const timeoutMs = 540000;
+const timeoutMs = 660000;
 const failures = [];
 const expectedLiveTestIds = [
   "workflow-target-transport",
@@ -173,6 +173,20 @@ function checkResult(result) {
   check(evidence?.hasSaveProject === true, "live desktop preload bridge should expose saveProject");
   check(evidence?.hasOpenProject === true, "live desktop preload bridge should expose openProject");
   check(evidence?.rootChildCount > 0, "live desktop renderer should mount React under #root");
+  check(
+      evidence?.modalFocus?.drumGrid?.buttonCount === 64 &&
+      evidence?.modalFocus?.drumGrid?.pressedSemanticsReady === true &&
+      evidence?.modalFocus?.drumGrid?.rovingTabReady === true &&
+      evidence?.modalFocus?.drumGrid?.nativeArrowReady === true &&
+      evidence?.modalFocus?.drumGrid?.navigationSelectionReady === true &&
+      evidence?.modalFocus?.drumGrid?.navigationEventCountUnchanged === true &&
+      evidence?.modalFocus?.drumGrid?.enterToggleReady === true &&
+      evidence?.modalFocus?.drumGrid?.spaceToggleReady === true &&
+      evidence?.modalFocus?.drumGrid?.activationSingleToggleReady === true &&
+      evidence?.modalFocus?.drumGrid?.playbackStayedStopped === true &&
+      evidence?.modalFocus?.drumGrid?.undoRestored === true,
+    "live desktop drum grid should expose one roving Tab stop, pressed state, representative native arrow navigation, single Enter/Space toggles, unchanged playback, and Undo restoration"
+  );
   check(
     evidence?.modalFocus?.quickInitialFocus === "quick-actions-search" &&
       evidence?.modalFocus?.quickForwardWrap === true &&
@@ -1220,6 +1234,7 @@ child.on("exit", (code, signal) => {
   console.log(
     `- Quick Actions keyboard selection: arrows/Home/End retained search focus; Enter ran ${result.evidence.modalFocus.quickKeyboardSelectedTitle}`
   );
+  console.log("- Drum grid keyboard: 64 pressed-state buttons, one roving Tab stop, bounded navigation, Enter/Space toggles, playback guard, and Undo ready");
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
   console.log("- Swing Feel pads: five dark-theme controls, pressed semantics ready, one selected target");
   console.log(
