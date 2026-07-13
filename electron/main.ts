@@ -117,6 +117,13 @@ type LaunchSmokeLayoutEvidence = {
   launchpadHorizontalReady: boolean;
   transportSetupTopAligned: boolean;
   mixerBasicBalanceBeforeProcessing: boolean;
+  minimumWindowDirectActionsReady: boolean;
+  minimumWindowHorizontalOverflow: number;
+  minimumWindowLaunchpadHorizontalReady: boolean;
+  minimumWindowSetupReady: boolean;
+  minimumWindowTransportHeight: number;
+  minimumWindowTransportReady: boolean;
+  minimumWindowViewportWidth: number;
   mixerProcessingOpen: boolean;
   mixerProcessingToggleVisible: boolean;
   mixerStripsBeforeMixMoves: boolean;
@@ -186,6 +193,17 @@ type LaunchSmokeLayoutEvidence = {
   workflowNavigatorSticky: boolean;
   workflowNavigatorVisible: boolean;
 };
+
+type LaunchSmokeMinimumWindowEvidence = Pick<
+  LaunchSmokeLayoutEvidence,
+  | "minimumWindowDirectActionsReady"
+  | "minimumWindowHorizontalOverflow"
+  | "minimumWindowLaunchpadHorizontalReady"
+  | "minimumWindowSetupReady"
+  | "minimumWindowTransportHeight"
+  | "minimumWindowTransportReady"
+  | "minimumWindowViewportWidth"
+>;
 
 type LaunchSmokePaletteRouteEvidence = {
   actionPresent: boolean;
@@ -1195,6 +1213,85 @@ function collectLaunchSmokeVisualEvidenceWithTimeout(win: BrowserWindow): Promis
         reject(error);
       });
   });
+}
+
+async function collectLaunchSmokeMinimumWindowEvidence(
+  win: BrowserWindow
+): Promise<LaunchSmokeMinimumWindowEvidence> {
+  win.setSize(1180, 800);
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  try {
+    const evidence = await win.webContents.executeJavaScript(`
+      (() => {
+        window.scrollTo(0, 0);
+        const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect() ?? null;
+        const transport = rect('[data-testid="workflow-target-transport"]');
+        const launchpad = rect('[data-testid="first-run-launchpad"]');
+        const controls = rect('.transport-controls');
+        const beginner = rect('[data-testid="first-run-start-beat"]');
+        const producer = rect('[data-testid="first-run-producer-pass"]');
+        const requiredIds = [
+          'first-run-start-beat',
+          'first-run-producer-pass',
+          'first-run-open-project',
+          'transport-play',
+          'quick-actions-open',
+          'command-reference-open',
+          'undo-button',
+          'redo-button',
+          'project-open',
+          'project-save',
+          'transport-session-toggle',
+          'transport-export-toggle'
+        ];
+        const withinViewport = (testId) => {
+          const target = document.querySelector('[data-testid="' + testId + '"]');
+          if (!target) return false;
+          const targetRect = target.getBoundingClientRect();
+          return (
+            targetRect.width > 0 &&
+            targetRect.height > 0 &&
+            targetRect.left >= 0 &&
+            targetRect.right <= innerWidth &&
+            targetRect.top >= 0 &&
+            targetRect.bottom <= innerHeight
+          );
+        };
+        const horizontalOverflow = Math.max(
+          0,
+          document.documentElement.scrollWidth - document.documentElement.clientWidth
+        );
+        return {
+          minimumWindowDirectActionsReady: requiredIds.every(withinViewport),
+          minimumWindowHorizontalOverflow: horizontalOverflow,
+          minimumWindowLaunchpadHorizontalReady: Boolean(
+            beginner &&
+            producer &&
+            Math.abs(beginner.top - producer.top) < 1 &&
+            beginner.right < producer.left
+          ),
+          minimumWindowSetupReady: Boolean(
+            controls && controls.left >= 0 && controls.right <= innerWidth && controls.width > 0
+          ),
+          minimumWindowTransportHeight: transport?.height ?? 0,
+          minimumWindowTransportReady: Boolean(
+            transport &&
+            launchpad &&
+            horizontalOverflow === 0 &&
+            transport.left >= 0 &&
+            transport.right <= innerWidth &&
+            launchpad.left >= 0 &&
+            launchpad.right <= innerWidth
+          ),
+          minimumWindowViewportWidth: innerWidth
+        };
+      })();
+    `);
+    return evidence as LaunchSmokeMinimumWindowEvidence;
+  } finally {
+    win.setSize(1440, 960);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
 }
 
 async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmokeEvidence> {
@@ -2504,6 +2601,7 @@ function projectIoSmokeFailures(evidence: ProjectIoSmokeEvidence): string[] {
 
 function installLaunchSmoke(win: BrowserWindow): void {
   let finished = false;
+  let minimumWindowEvidence: LaunchSmokeMinimumWindowEvidence | null = null;
   let lastProgress: Record<string, unknown> = { phase: "waiting-ready-to-show" };
   const timeout = setTimeout(() => {
     if (!finished) {
@@ -2533,6 +2631,15 @@ function installLaunchSmoke(win: BrowserWindow): void {
     lastProgress = { phase: "collecting-dom" };
     void collectLaunchSmokeEvidenceWithTimeout(win)
       .then((evidence) => {
+        if (minimumWindowEvidence) {
+          evidence = {
+            ...evidence,
+            layout: {
+              ...evidence.layout,
+              ...minimumWindowEvidence
+            }
+          };
+        }
         if (finished) {
           return;
         }
@@ -2710,8 +2817,18 @@ function installLaunchSmoke(win: BrowserWindow): void {
   };
 
   win.once("ready-to-show", () => {
-    lastProgress = { phase: "ready-to-show" };
-    poll(Date.now() + launchSmokeTimeoutMs - 35000);
+    lastProgress = { phase: "collecting-minimum-window" };
+    void collectLaunchSmokeMinimumWindowEvidence(win)
+      .then((evidence) => {
+        minimumWindowEvidence = evidence;
+        lastProgress = { phase: "minimum-window-collected", evidence };
+        poll(Date.now() + launchSmokeTimeoutMs - 35000);
+      })
+      .catch((error: unknown) => {
+        fail("Production minimum-window smoke JavaScript failed.", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      });
   });
 }
 

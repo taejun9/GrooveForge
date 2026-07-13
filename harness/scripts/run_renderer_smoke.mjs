@@ -514,6 +514,22 @@ function validateFirstRunRenderer(html) {
       html.includes('data-testid="first-run-open-project"'),
     "desktop first run should use a compact two-row transport with horizontal audience choices and preserved direct project actions"
   );
+  check(
+    styles.includes("@media (min-width: 901px) and (max-width: 1220px) {") &&
+      styles.includes('"brand setup"') &&
+      styles.includes('"launch launch"') &&
+      styles.includes('"commands commands"') &&
+      styles.includes("grid-template-columns: 200px minmax(0, 1fr);") &&
+      styles.includes("grid-template-columns: 140px 64px 68px 100px minmax(0, 1fr);") &&
+      styles.includes("grid-template-columns: minmax(180px, 0.8fr) repeat(2, minmax(190px, 1fr));") &&
+      styles.includes(".command-strip .transport-essential-controls {") &&
+      styles.includes("grid-column: 2 / 4;") &&
+      styles.includes(".command-strip .transport-session-tools {") &&
+      styles.includes("grid-column: 1 / 3;") &&
+      styles.includes(".command-strip .transport-export-tools {") &&
+      styles.includes("grid-column: 3 / 5;"),
+    "the reachable minimum desktop width should use an intermediate transport layout without hiding setup, audience, command, or disclosure surfaces"
+  );
   const transportBandIndex = html.indexOf('data-testid="workflow-target-transport"');
   const transportStatusControlsIndex = html.indexOf('data-testid="transport-status-controls"');
   const transportEssentialsIndex = html.indexOf('data-testid="transport-essential-controls"');

@@ -69,6 +69,8 @@ The two first-run starter choices must complete their promise after the explicit
 
 On desktop, the first-run transport header uses a compact two-row layout: brand and setup fields align at the top, beginner and professional starter choices sit side by side below them, and the direct transport/project command strip remains visible at the right. All three project-entry actions stay available while Workflow Navigator begins inside the initial 1280×720 viewport.
 
+At the actual 1180px minimum application width, an intermediate three-row transport keeps brand/setup, the same side-by-side audience choices, and the complete command strip within the viewport. Resizing the desktop window must never introduce horizontal document scrolling or make Play, Actions, Help, Undo, Redo, Open, Save, or any project-entry action unreachable.
+
 ## Product Boundary
 
 Core product:

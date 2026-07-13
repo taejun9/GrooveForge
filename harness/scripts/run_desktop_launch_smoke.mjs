@@ -214,6 +214,15 @@ function checkResult(result) {
       evidence?.layout?.compactTransportHeight <= 300,
     `live desktop should use a compact two-row transport with horizontal audience choices and initial Workflow Navigator visibility (height ${evidence?.layout?.compactTransportHeight}, navigator top ${evidence?.layout?.initialNavigatorTop}, actions ${evidence?.layout?.compactTransportDirectActionsReady}, horizontal ${evidence?.layout?.launchpadHorizontalReady}, aligned ${evidence?.layout?.transportSetupTopAligned})`
   );
+  check(
+    evidence?.layout?.minimumWindowTransportReady === true &&
+      evidence?.layout?.minimumWindowDirectActionsReady === true &&
+      evidence?.layout?.minimumWindowLaunchpadHorizontalReady === true &&
+      evidence?.layout?.minimumWindowSetupReady === true &&
+      evidence?.layout?.minimumWindowHorizontalOverflow === 0 &&
+      evidence?.layout?.minimumWindowViewportWidth <= 1180,
+    `live desktop minimum window should keep setup, horizontal audience choices, and every direct action inside the viewport without horizontal overflow (viewport ${evidence?.layout?.minimumWindowViewportWidth}, height ${evidence?.layout?.minimumWindowTransportHeight}, overflow ${evidence?.layout?.minimumWindowHorizontalOverflow}, transport ${evidence?.layout?.minimumWindowTransportReady}, setup ${evidence?.layout?.minimumWindowSetupReady}, choices ${evidence?.layout?.minimumWindowLaunchpadHorizontalReady}, actions ${evidence?.layout?.minimumWindowDirectActionsReady})`
+  );
   check(evidence?.layout?.patternLabOpen === false, "live desktop Pattern Lab should start collapsed");
   check(
     evidence?.layout?.swingFeelDarkThemeReady === true &&
@@ -1146,6 +1155,9 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Compact transport: ${result.evidence.layout.compactTransportHeight}px header, horizontal audience choices, setup top-aligned, Workflow Navigator starts at ${result.evidence.layout.initialNavigatorTop}px`
+  );
+  console.log(
+    `- Minimum window: ${result.evidence.layout.minimumWindowViewportWidth}px viewport, ${result.evidence.layout.minimumWindowTransportHeight}px header, ${result.evidence.layout.minimumWindowHorizontalOverflow}px horizontal overflow, all direct actions visible`
   );
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
   console.log("- Swing Feel pads: five dark-theme controls, pressed semantics ready, one selected target");
