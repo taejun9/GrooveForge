@@ -319,7 +319,25 @@ type LaunchSmokeNoteGridKeyboardEvidence = {
   undoRestored: boolean;
 };
 
+type LaunchSmokeClosedDetailsEvidence = {
+  closedCount: number;
+  guideOpenReady: boolean;
+  guideReclosedReady: boolean;
+  initiallyOpenCount: number;
+  leakedControlCount: number;
+  leakedContentCount: number;
+  mixerOpenReady: boolean;
+  mixerReclosedReady: boolean;
+  patternLabOpenReady: boolean;
+  patternLabReclosedReady: boolean;
+  playbackStayedStopped: boolean;
+  projectStayedUnchanged: boolean;
+  totalCount: number;
+  undoPostureUnchanged: boolean;
+};
+
 type LaunchSmokeModalFocusEvidence = {
+  closedDetails: LaunchSmokeClosedDetailsEvidence;
   commandShortcutFromEditable: boolean;
   commandBackwardWrap: boolean;
   commandEscapeClosed: boolean;
@@ -363,7 +381,7 @@ type LaunchSmokeModalFocusEvidence = {
   switchInitialFocus: string;
 };
 
-type LaunchSmokeModalFocusCoreEvidence = Omit<LaunchSmokeModalFocusEvidence, "drumGrid" | "noteGrid">;
+type LaunchSmokeModalFocusCoreEvidence = Omit<LaunchSmokeModalFocusEvidence, "closedDetails" | "drumGrid" | "noteGrid">;
 
 type LaunchSmokeBridgeDirectEvidence = {
   buttonPresent: boolean;
@@ -1188,6 +1206,32 @@ function launchSmokeCommandReferenceFailures(evidence: LaunchSmokeCommandReferen
 
 function launchSmokeModalFocusFailures(evidence: LaunchSmokeModalFocusEvidence): string[] {
   const failures: string[] = [];
+  if (
+    evidence.closedDetails.totalCount !== 24 ||
+    evidence.closedDetails.initiallyOpenCount !== 1 ||
+    evidence.closedDetails.closedCount !== 23 ||
+    evidence.closedDetails.leakedContentCount !== 0 ||
+    evidence.closedDetails.leakedControlCount !== 0
+  ) {
+    failures.push("all 24 native disclosures should honor their initial state with zero visible or reachable content beneath the 23 closed summaries");
+  }
+  if (
+    !evidence.closedDetails.guideOpenReady ||
+    !evidence.closedDetails.guideReclosedReady ||
+    !evidence.closedDetails.patternLabOpenReady ||
+    !evidence.closedDetails.patternLabReclosedReady ||
+    !evidence.closedDetails.mixerOpenReady ||
+    !evidence.closedDetails.mixerReclosedReady
+  ) {
+    failures.push("native Enter should reopen and recontain Guide & Review Center, Pattern Lab, and nested mixer Tone & Space disclosures");
+  }
+  if (
+    !evidence.closedDetails.projectStayedUnchanged ||
+    !evidence.closedDetails.undoPostureUnchanged ||
+    !evidence.closedDetails.playbackStayedStopped
+  ) {
+    failures.push("disclosure-only keyboard toggles should leave project, undo, and playback posture unchanged");
+  }
   if (
     evidence.drumGrid.buttonCount !== 64 ||
     !evidence.drumGrid.pressedSemanticsReady ||
@@ -2541,6 +2585,163 @@ function collectLaunchSmokeBridgeDirectEvidenceWithTimeout(win: BrowserWindow): 
   });
 }
 
+async function collectLaunchSmokeClosedDetailsEvidence(
+  win: BrowserWindow,
+  onStep: (step: string) => void = () => {}
+): Promise<LaunchSmokeClosedDetailsEvidence> {
+  type DisclosureSnapshot = {
+    closedCount: number;
+    leakedControlCount: number;
+    leakedContentCount: number;
+    openCount: number;
+    playing: boolean;
+    projectFingerprint: string;
+    targetContentCount: number;
+    targetControlCount: number;
+    targetOpen: boolean;
+    totalCount: number;
+    undoDisabled: boolean;
+  };
+
+  const readSnapshot = async (targetTestId: string): Promise<DisclosureSnapshot> =>
+    (await win.webContents.executeJavaScript(`
+      (() => {
+        const target = document.querySelector('[data-testid=${JSON.stringify(targetTestId)}]');
+        const closedContent = Array.from(document.querySelectorAll('details:not([open]) > :not(summary)'));
+        const closedControls = Array.from(
+          document.querySelectorAll(
+            'details:not([open]) button, details:not([open]) input, details:not([open]) select, ' +
+              'details:not([open]) textarea, details:not([open]) [tabindex]'
+          )
+        );
+        const visible = (element) => element.getClientRects().length > 0 && getComputedStyle(element).visibility !== 'hidden';
+        const targetControls = target
+          ? Array.from(target.querySelectorAll('button, input, select, textarea, [tabindex]')).filter(
+              (element) => !element.disabled && element.tabIndex >= 0 && visible(element)
+            )
+          : [];
+        const projectFingerprint = JSON.stringify({
+          title: document.querySelector('[data-testid="project-title-input"]')?.value ?? '',
+          bpm: document.querySelector('[data-testid="transport-bpm-input"]')?.value ?? '',
+          drums: document.querySelectorAll('[data-testid^="drum-step-"][aria-pressed="true"]').length,
+          bass: document.querySelectorAll('[data-testid^="note-step-bass-"][aria-pressed="true"]').length,
+          melody: document.querySelectorAll('[data-testid^="note-step-melody-"][aria-pressed="true"]').length,
+          blocks: Array.from(document.querySelectorAll('button[data-testid^="arrangement-block-"]')).map(
+            (element) => element.textContent?.trim().replace(/\\s+/g, ' ') ?? ''
+          ),
+          mixer: Array.from(document.querySelectorAll('[data-testid^="mixer-volume-"]')).map(
+            (element) => element.value
+          )
+        });
+        return {
+          closedCount: document.querySelectorAll('details:not([open])').length,
+          leakedControlCount: closedControls.filter(
+            (element) => !element.disabled && element.tabIndex >= 0 && visible(element)
+          ).length,
+          leakedContentCount: closedContent.filter(visible).length,
+          openCount: document.querySelectorAll('details[open]').length,
+          playing: document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'true',
+          projectFingerprint,
+          targetContentCount: target
+            ? Array.from(target.children).filter((element) => element.tagName !== 'SUMMARY' && visible(element)).length
+            : 0,
+          targetControlCount: targetControls.length,
+          targetOpen: target instanceof HTMLDetailsElement && target.open,
+          totalCount: document.querySelectorAll('details').length,
+          undoDisabled: document.querySelector('[data-testid="undo-button"]')?.disabled === true
+        };
+      })();
+    `)) as DisclosureSnapshot;
+
+  const toggleWithNativeEnter = async (targetTestId: string, expectedOpen: boolean): Promise<DisclosureSnapshot> => {
+    const focused = (await win.webContents.executeJavaScript(`
+      (() => {
+        const target = document.querySelector('[data-testid=${JSON.stringify(targetTestId)}]');
+        const summary = target?.querySelector(':scope > summary');
+        if (!(summary instanceof HTMLElement)) {
+          return false;
+        }
+        summary.focus();
+        return document.activeElement === summary;
+      })();
+    `)) as boolean;
+    if (!focused) {
+      throw new Error(`Could not focus disclosure summary ${targetTestId}.`);
+    }
+    win.webContents.focus();
+    win.webContents.sendInputEvent({ type: "keyDown", keyCode: "Enter" });
+    win.webContents.sendInputEvent({ type: "keyUp", keyCode: "Enter" });
+    const deadline = Date.now() + 30000;
+    let snapshot = await readSnapshot(targetTestId);
+    while (Date.now() < deadline && snapshot.targetOpen !== expectedOpen) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      snapshot = await readSnapshot(targetTestId);
+    }
+    if (snapshot.targetOpen !== expectedOpen) {
+      throw new Error(`Native Enter did not set ${targetTestId} open=${expectedOpen}.`);
+    }
+    return snapshot;
+  };
+
+  onStep("reading initial closed disclosures");
+  const initial = await readSnapshot("guidance-center");
+  onStep("opening and closing Guide & Review Center");
+  const guideOpen = await toggleWithNativeEnter("guidance-center", true);
+  const guideClosed = await toggleWithNativeEnter("guidance-center", false);
+  onStep("opening and closing Pattern Lab");
+  const patternOpen = await toggleWithNativeEnter("pattern-lab", true);
+  const patternClosed = await toggleWithNativeEnter("pattern-lab", false);
+  onStep("opening and closing nested mixer processing");
+  const mixerOpen = await toggleWithNativeEnter("mixer-processing-drum_rack", true);
+  const mixerClosed = await toggleWithNativeEnter("mixer-processing-drum_rack", false);
+  const snapshots = [initial, guideOpen, guideClosed, patternOpen, patternClosed, mixerOpen, mixerClosed];
+  const reclosedSnapshots = [guideClosed, patternClosed, mixerClosed];
+
+  return {
+    closedCount: initial.closedCount,
+    guideOpenReady: guideOpen.targetOpen && guideOpen.targetContentCount > 0 && guideOpen.targetControlCount >= 150,
+    guideReclosedReady:
+      !guideClosed.targetOpen && guideClosed.targetContentCount === 0 && guideClosed.targetControlCount === 0,
+    initiallyOpenCount: initial.openCount,
+    leakedControlCount: Math.max(initial.leakedControlCount, ...reclosedSnapshots.map((item) => item.leakedControlCount)),
+    leakedContentCount: Math.max(initial.leakedContentCount, ...reclosedSnapshots.map((item) => item.leakedContentCount)),
+    mixerOpenReady: mixerOpen.targetOpen && mixerOpen.targetContentCount > 0 && mixerOpen.targetControlCount >= 10,
+    mixerReclosedReady:
+      !mixerClosed.targetOpen && mixerClosed.targetContentCount === 0 && mixerClosed.targetControlCount === 0,
+    patternLabOpenReady:
+      patternOpen.targetOpen && patternOpen.targetContentCount > 0 && patternOpen.targetControlCount >= 40,
+    patternLabReclosedReady:
+      !patternClosed.targetOpen && patternClosed.targetContentCount === 0 && patternClosed.targetControlCount === 0,
+    playbackStayedStopped: snapshots.every((item) => !item.playing),
+    projectStayedUnchanged: snapshots.every((item) => item.projectFingerprint === initial.projectFingerprint),
+    totalCount: initial.totalCount,
+    undoPostureUnchanged: snapshots.every((item) => item.undoDisabled === initial.undoDisabled)
+  };
+}
+
+function collectLaunchSmokeClosedDetailsEvidenceWithTimeout(
+  win: BrowserWindow
+): Promise<LaunchSmokeClosedDetailsEvidence> {
+  return new Promise((resolve, reject) => {
+    let step = "starting";
+    const timeout = setTimeout(
+      () => reject(new Error(`Timed out collecting native closed disclosure evidence at ${step}.`)),
+      120000
+    );
+    void collectLaunchSmokeClosedDetailsEvidence(win, (nextStep) => {
+      step = nextStep;
+    })
+      .then((evidence) => {
+        clearTimeout(timeout);
+        resolve(evidence);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+}
+
 async function collectLaunchSmokeDrumGridKeyboardEvidence(
   win: BrowserWindow,
   onStep: (step: string) => void = () => {}
@@ -3717,6 +3918,7 @@ function projectIoSmokeFailures(evidence: ProjectIoSmokeEvidence): string[] {
 
 function installLaunchSmoke(win: BrowserWindow): void {
   let finished = false;
+  let closedDetailsEvidence: LaunchSmokeClosedDetailsEvidence | null = null;
   let drumGridKeyboardEvidence: LaunchSmokeDrumGridKeyboardEvidence | null = null;
   let noteGridKeyboardEvidence: LaunchSmokeNoteGridKeyboardEvidence | null = null;
   let minimumWindowEvidence: LaunchSmokeMinimumWindowEvidence | null = null;
@@ -3765,6 +3967,26 @@ function installLaunchSmoke(win: BrowserWindow): void {
         const failures = launchSmokeFailures(evidence);
         lastProgress = { phase: "dom-collected", evidence, failures };
         if (failures.length === 0) {
+          if (!closedDetailsEvidence) {
+            lastProgress = { phase: "collecting-closed-details", evidence };
+            return collectLaunchSmokeClosedDetailsEvidenceWithTimeout(win)
+              .then((collectedEvidence) => {
+                if (finished) {
+                  return;
+                }
+                closedDetailsEvidence = collectedEvidence;
+                lastProgress = {
+                  phase: "closed-details-collected",
+                  evidence: { ...evidence, closedDetails: collectedEvidence }
+                };
+                setTimeout(() => poll(deadline), 100);
+              })
+              .catch((error: unknown) => {
+                fail("Production desktop closed disclosure JavaScript failed.", {
+                  error: error instanceof Error ? error.message : String(error)
+                });
+              });
+          }
           if (!drumGridKeyboardEvidence) {
             lastProgress = { phase: "collecting-drum-grid-keyboard", evidence };
             return collectLaunchSmokeDrumGridKeyboardEvidenceWithTimeout(win)
@@ -3859,6 +4081,7 @@ function installLaunchSmoke(win: BrowserWindow): void {
                         .then(
                           (modalFocusCoreEvidence): LaunchSmokeModalFocusEvidence => ({
                             ...modalFocusCoreEvidence,
+                            closedDetails: closedDetailsEvidence as LaunchSmokeClosedDetailsEvidence,
                             drumGrid: drumGridKeyboardEvidence as LaunchSmokeDrumGridKeyboardEvidence,
                             noteGrid: noteGridKeyboardEvidence as LaunchSmokeNoteGridKeyboardEvidence
                           })

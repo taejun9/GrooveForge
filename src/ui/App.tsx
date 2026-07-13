@@ -2292,6 +2292,23 @@ export function App(): ReactElement {
       return;
     }
 
+    const focusedSummary = event.target instanceof HTMLElement ? event.target.closest("summary") : null;
+    if (
+      focusedSummary instanceof HTMLElement &&
+      focusedSummary.parentElement instanceof HTMLDetailsElement &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
+      (event.key === "Enter" || event.code === "Space")
+    ) {
+      event.preventDefault();
+      if (!event.repeat) {
+        focusedSummary.click();
+      }
+      return;
+    }
+
     if (editableTarget) {
       return;
     }
