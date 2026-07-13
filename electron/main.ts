@@ -109,6 +109,13 @@ type LaunchSmokeLayoutEvidence = {
   launchpadContentVisible: boolean;
   launchpadOpen: boolean;
   launchpadToggleVisible: boolean;
+  compactTransportDirectActionsReady: boolean;
+  compactTransportHeight: number;
+  compactTransportReady: boolean;
+  initialNavigatorStartsInViewport: boolean;
+  initialNavigatorTop: number;
+  launchpadHorizontalReady: boolean;
+  transportSetupTopAligned: boolean;
   mixerBasicBalanceBeforeProcessing: boolean;
   mixerProcessingOpen: boolean;
   mixerProcessingToggleVisible: boolean;
@@ -1439,6 +1446,21 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
       const launchpad = document.querySelector('[data-testid="first-run-launchpad"]');
       const launchpadToggle = document.querySelector('[data-testid="first-run-launchpad-toggle"]');
       const launchpadContent = document.querySelector('[data-testid="first-run-launchpad-content"]');
+      const transportBand = document.querySelector('[data-testid="workflow-target-transport"]');
+      const brandLockup = document.querySelector('.brand-lockup');
+      const transportControls = document.querySelector('.transport-controls');
+      const beginnerStarter = document.querySelector('[data-testid="first-run-start-beat"]');
+      const producerStarter = document.querySelector('[data-testid="first-run-producer-pass"]');
+      const firstRunOpenProject = document.querySelector('[data-testid="first-run-open-project"]');
+      window.scrollTo(0, 0);
+      const initialTransportBandRect = transportBand?.getBoundingClientRect();
+      const initialWorkflowNavigatorRect = workflowNavigator?.getBoundingClientRect();
+      const initialLaunchpadContentRect = launchpadContent?.getBoundingClientRect();
+      const initialBrandLockupRect = brandLockup?.getBoundingClientRect();
+      const initialTransportControlsRect = transportControls?.getBoundingClientRect();
+      const initialBeginnerStarterRect = beginnerStarter?.getBoundingClientRect();
+      const initialProducerStarterRect = producerStarter?.getBoundingClientRect();
+      const initialViewportHeight = innerHeight;
       const transportStatusControls = document.querySelector('[data-testid="transport-status-controls"]');
       const transportEssentialControls = document.querySelector('[data-testid="transport-essential-controls"]');
       const transportPlay = document.querySelector('[data-testid="transport-play"]');
@@ -1689,6 +1711,42 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           launchpadContentVisible: Boolean(launchpadContent && launchpadContent.getBoundingClientRect().height > 0),
           launchpadOpen: Boolean(launchpad?.open),
           launchpadToggleVisible: Boolean(launchpadToggle && launchpadToggle.getBoundingClientRect().height > 0),
+          compactTransportDirectActionsReady: [
+            beginnerStarter,
+            producerStarter,
+            firstRunOpenProject,
+            transportPlay,
+            quickActionsOpen,
+            commandReferenceOpen,
+            undoButton,
+            redoButton,
+            projectOpen,
+            projectSave
+          ].every((element) => Boolean(element && element.getBoundingClientRect().height > 0)),
+          compactTransportHeight: initialTransportBandRect?.height ?? 0,
+          compactTransportReady: Boolean(
+            initialTransportBandRect &&
+            initialTransportBandRect.height <= 300 &&
+            initialLaunchpadContentRect &&
+            initialLaunchpadContentRect.width > initialLaunchpadContentRect.height
+          ),
+          initialNavigatorStartsInViewport: Boolean(
+            initialWorkflowNavigatorRect &&
+            initialWorkflowNavigatorRect.top >= 0 &&
+            initialWorkflowNavigatorRect.top < initialViewportHeight
+          ),
+          initialNavigatorTop: initialWorkflowNavigatorRect?.top ?? 0,
+          launchpadHorizontalReady: Boolean(
+            initialBeginnerStarterRect &&
+            initialProducerStarterRect &&
+            Math.abs(initialBeginnerStarterRect.top - initialProducerStarterRect.top) < 1 &&
+            initialBeginnerStarterRect.right < initialProducerStarterRect.left
+          ),
+          transportSetupTopAligned: Boolean(
+            initialBrandLockupRect &&
+            initialTransportControlsRect &&
+            Math.abs(initialBrandLockupRect.top - initialTransportControlsRect.top) < 1
+          ),
           mixerBasicBalanceBeforeProcessing: follows(mixerVolume, mixerProcessing),
           mixerProcessingOpen: Boolean(mixerProcessing?.open),
           mixerProcessingToggleVisible: Boolean(mixerProcessingToggle && mixerProcessingToggle.getBoundingClientRect().height > 0),

@@ -500,6 +500,20 @@ function validateFirstRunRenderer(html) {
       html.includes('data-testid="session-brief-starter-starter"'),
     "the low-specificity button foundation should theme formerly native first-viewport and deep-workflow controls without replacing component styles"
   );
+  check(
+    styles.includes('"brand setup commands"') &&
+      styles.includes('"launch launch commands"') &&
+      styles.includes("grid-template-columns: 220px minmax(0, 1fr) 340px;") &&
+      styles.includes(".brand-start {\n    display: contents;") &&
+      styles.includes("grid-template-columns: 150px 68px 72px 110px minmax(0, 1fr);") &&
+      styles.includes("grid-template-columns: minmax(180px, 0.85fr) repeat(2, minmax(190px, 1fr));") &&
+      styles.includes(".command-strip .transport-essential-controls,") &&
+      styles.includes("grid-template-columns: repeat(4, minmax(0, 1fr));") &&
+      html.includes('data-testid="first-run-start-beat"') &&
+      html.includes('data-testid="first-run-producer-pass"') &&
+      html.includes('data-testid="first-run-open-project"'),
+    "desktop first run should use a compact two-row transport with horizontal audience choices and preserved direct project actions"
+  );
   const transportBandIndex = html.indexOf('data-testid="workflow-target-transport"');
   const transportStatusControlsIndex = html.indexOf('data-testid="transport-status-controls"');
   const transportEssentialsIndex = html.indexOf('data-testid="transport-essential-controls"');

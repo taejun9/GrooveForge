@@ -205,6 +205,15 @@ function checkResult(result) {
       evidence?.layout?.launchpadActionCount === 3,
     "live desktop first-run launchpad should start open with a visible toggle and all three project-entry actions"
   );
+  check(
+    evidence?.layout?.compactTransportReady === true &&
+      evidence?.layout?.compactTransportDirectActionsReady === true &&
+      evidence?.layout?.launchpadHorizontalReady === true &&
+      evidence?.layout?.transportSetupTopAligned === true &&
+      evidence?.layout?.initialNavigatorStartsInViewport === true &&
+      evidence?.layout?.compactTransportHeight <= 300,
+    `live desktop should use a compact two-row transport with horizontal audience choices and initial Workflow Navigator visibility (height ${evidence?.layout?.compactTransportHeight}, navigator top ${evidence?.layout?.initialNavigatorTop}, actions ${evidence?.layout?.compactTransportDirectActionsReady}, horizontal ${evidence?.layout?.launchpadHorizontalReady}, aligned ${evidence?.layout?.transportSetupTopAligned})`
+  );
   check(evidence?.layout?.patternLabOpen === false, "live desktop Pattern Lab should start collapsed");
   check(
     evidence?.layout?.swingFeelDarkThemeReady === true &&
@@ -1134,6 +1143,9 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Launchpad lifecycle: initial ${result.evidence.layout.launchpadOpen ? "open" : "collapsed"}, starter collapse ${result.evidence.palette.launchpad.collapsedAfterStarter ? "yes" : "no"}, manual reopen/close ${result.evidence.palette.launchpad.manualReopen && result.evidence.palette.launchpad.manualClose ? "yes" : "no"}`
+  );
+  console.log(
+    `- Compact transport: ${result.evidence.layout.compactTransportHeight}px header, horizontal audience choices, setup top-aligned, Workflow Navigator starts at ${result.evidence.layout.initialNavigatorTop}px`
   );
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
   console.log("- Swing Feel pads: five dark-theme controls, pressed semantics ready, one selected target");

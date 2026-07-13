@@ -4647,6 +4647,138 @@ h2 {
 }
 
 @media (min-width: 1221px) {
+  .transport-band {
+    grid-template-areas:
+      "brand setup commands"
+      "launch launch commands";
+    grid-template-columns: 220px minmax(0, 1fr) 340px;
+    align-items: start;
+    gap: 12px 18px;
+  }
+
+  .brand-start {
+    display: contents;
+  }
+
+  .brand-lockup {
+    grid-area: brand;
+    min-height: 55px;
+  }
+
+  .transport-controls {
+    display: grid;
+    grid-area: setup;
+    grid-template-columns: 150px 68px 72px 110px minmax(0, 1fr);
+    align-items: end;
+    min-height: 55px;
+  }
+
+  .transport-controls .field.title-field,
+  .transport-controls .field.compact,
+  .transport-controls .tempo-nudge-pads {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .transport-controls .tempo-nudge-pads {
+    flex-basis: auto;
+  }
+
+  .transport-controls .field input,
+  .transport-controls .field select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .first-run-launchpad {
+    grid-area: launch;
+    max-width: none;
+  }
+
+  .first-run-launchpad-content {
+    grid-template-columns: minmax(180px, 0.85fr) repeat(2, minmax(190px, 1fr));
+    grid-template-rows: auto auto auto minmax(32px, auto);
+    align-items: stretch;
+  }
+
+  .first-run-launchpad-heading,
+  .first-run-launchpad-content > strong,
+  .first-run-launchpad-content > small,
+  .first-run-launchpad-open {
+    grid-column: 1;
+  }
+
+  .first-run-launchpad-heading {
+    grid-row: 1;
+  }
+
+  .first-run-launchpad-content > strong {
+    grid-row: 2;
+  }
+
+  .first-run-launchpad-content > small {
+    grid-row: 3;
+  }
+
+  .first-run-launchpad-open {
+    grid-row: 4;
+    justify-content: flex-start;
+  }
+
+  .first-run-launchpad-action {
+    min-height: 0;
+  }
+
+  .first-run-launchpad-action.primary {
+    grid-column: 2;
+    grid-row: 1 / -1;
+  }
+
+  .first-run-launchpad-action:not(.primary) {
+    grid-column: 3;
+    grid-row: 1 / -1;
+  }
+
+  .command-strip {
+    display: grid;
+    grid-area: commands;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    width: 340px;
+  }
+
+  .command-strip .transport-status-controls,
+  .command-strip .transport-essential-controls,
+  .command-strip .project-essential-controls {
+    display: grid;
+    grid-column: 1 / -1;
+    justify-content: stretch;
+  }
+
+  .command-strip .transport-status-controls {
+    grid-template-columns: minmax(92px, 0.72fr) minmax(0, 1.28fr);
+  }
+
+  .command-strip .transport-essential-controls,
+  .command-strip .project-essential-controls {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .command-strip .playback-mode-row {
+    grid-column: 1 / -1;
+  }
+
+  .command-strip .icon-button {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 7px;
+  }
+
+  .command-strip .transport-session-tools,
+  .command-strip .transport-export-tools {
+    min-width: 0;
+  }
+
   .app-shell > .workflow-navigator {
     position: sticky;
     top: 12px;

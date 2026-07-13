@@ -67,6 +67,8 @@ The actual default `starterProject` must embody that promise before any audience
 
 The two first-run starter choices must complete their promise after the explicit click rather than only replace project data. `Start an 8-bar beat` names and lands on the focusable Pattern editor with the drum grid visible; `Start a studio pass` names and lands on the focusable Review Queue with Review & Export and Review Queue expanded. Both visible and Quick Actions starter commands reuse this route, while neither route auto-plays, applies fixes, or changes data beyond the selected starter creation.
 
+On desktop, the first-run transport header uses a compact two-row layout: brand and setup fields align at the top, beginner and professional starter choices sit side by side below them, and the direct transport/project command strip remains visible at the right. All three project-entry actions stay available while Workflow Navigator begins inside the initial 1280×720 viewport.
+
 ## Product Boundary
 
 Core product:
