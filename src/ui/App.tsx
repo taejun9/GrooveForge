@@ -32,9 +32,15 @@ import {
   Waves,
   X
 } from "lucide-react";
-import type { ChangeEvent, CSSProperties, ReactElement, ReactNode, Ref } from "react";
+import type { ChangeEvent, CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactElement, ReactNode, Ref } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import {
+  drumGridEntryStep,
+  drumGridNavigationTarget,
+  isDrumGridActivationKey,
+  isDrumGridNavigationKey
+} from "./drumGridKeyboardNavigation";
 import { deliveryBundleZipFileName, exportDeliveryBundleZip } from "../audio/deliveryBundle";
 import { exportMidi, midiFileName } from "../audio/midi";
 import {
@@ -1818,6 +1824,7 @@ export function App(): ReactElement {
   const selectedDrumActive = selectedDrumStep
     ? currentPattern.drumPattern[selectedDrumStep.lane][selectedDrumStep.step]
     : false;
+  const drumGridTabStop = drumGridEntryStep(selectedDrumStep);
   const selectedChord =
     selectedChordIndex === null ? undefined : currentPattern.chordEvents[selectedChordIndex];
   const selectedNoteBeatDuplicateStep = (() => {
@@ -4861,6 +4868,24 @@ export function App(): ReactElement {
             : pattern.hatRepeats
       };
     });
+  }
+
+  function handleDrumGridKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, lane: DrumLane, step: number): void {
+    if (isDrumGridActivationKey(event.key)) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.click();
+      return;
+    }
+    if (!isDrumGridNavigationKey(event.key)) {
+      return;
+    }
+    event.preventDefault();
+    const target = drumGridNavigationTarget({ lane, step }, event.key);
+    setSelectedDrumStep(target);
+    setSelectedNote(null);
+    setSelectedChordIndex(null);
+    document.querySelector<HTMLButtonElement>(`[data-testid="drum-step-${target.lane}-${target.step}"]`)?.focus();
   }
 
   function updateSelectedDrumVelocity(velocity: number): void {
@@ -11912,7 +11937,16 @@ export function App(): ReactElement {
           {patternFillResult && <PatternFillResultStrip result={patternFillResult} />}
             </div>
           </details>
-          <div className="step-grid">
+          <p className="drum-grid-keyboard-help" id="drum-grid-keyboard-help">
+            Arrow keys move · Enter or Space toggles
+          </p>
+          <div
+            aria-describedby="drum-grid-keyboard-help"
+            aria-label="Drum step sequencer"
+            className="step-grid"
+            data-testid="drum-step-grid"
+            role="group"
+          >
             {(Object.keys(drumLabels) as DrumLane[]).map((lane) => (
               <div className="step-row" key={lane}>
                 <div className="lane-name">{drumLabels[lane]}</div>
@@ -11944,6 +11978,7 @@ export function App(): ReactElement {
                   return (
                     <button
                       aria-label={`${drumLabels[lane]} step ${step + 1}${ariaDetails ? ` ${ariaDetails}` : ""}`}
+                      aria-pressed={active}
                       className={[
                         "step",
                         active ? "active" : "",
@@ -11955,11 +11990,15 @@ export function App(): ReactElement {
                       data-testid={`drum-step-${lane}-${step}`}
                       key={step}
                       onClick={() => toggleStep(lane, step)}
+                      onKeyDown={(event) => handleDrumGridKeyDown(event, lane, step)}
                       style={
                         {
                           "--lane-color": laneColor(lane),
                           "--step-velocity": `${Math.round(velocity * 100)}%`
                         } as CSSProperties
+                      }
+                      tabIndex={
+                        drumGridTabStop.lane === lane && drumGridTabStop.step === step ? 0 : -1
                       }
                       type="button"
                     >

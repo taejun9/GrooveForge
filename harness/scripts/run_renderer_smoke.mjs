@@ -343,9 +343,96 @@ function validateCompactStudioTransportSource() {
   );
   check(
     launchBearingPackageSources.every(
-      (source) => source.includes("const timeoutMs = 540000") && source.includes("520-second launch-smoke timeout")
+      (source) => source.includes("const timeoutMs = 660000") && source.includes("640-second launch-smoke timeout")
     ),
-    "launch-bearing package parents should remain bounded above the app's 520-second launch collector"
+    "launch-bearing package parents should remain bounded above the app's 640-second launch collector"
+  );
+}
+
+function validateDrumGridKeyboardNavigation(html, navigation) {
+  const drumStepTags = html.match(/<button[^>]*data-testid="drum-step-[^"]+"[^>]*>/g) ?? [];
+  const tabStops = drumStepTags.filter((tag) => tag.includes('tabindex="0"'));
+  const removedTabStops = drumStepTags.filter((tag) => tag.includes('tabindex="-1"'));
+  check(drumStepTags.length === 64, `drum keyboard grid should render 64 direct step buttons, got ${drumStepTags.length}`);
+  check(
+    drumStepTags.every((tag) => tag.includes('aria-pressed="true"') || tag.includes('aria-pressed="false"')),
+    "every drum step should expose an explicit pressed state"
+  );
+  check(
+    tabStops.length === 1 && tabStops[0]?.includes('data-testid="drum-step-kick-0"') && removedTabStops.length === 63,
+    "unselected drum grid should expose only Kick step 1 in the page Tab order"
+  );
+  check(
+    html.includes('data-testid="drum-step-grid"') &&
+      html.includes('aria-label="Drum step sequencer"') &&
+      html.includes('aria-describedby="drum-grid-keyboard-help"') &&
+      html.includes('Arrow keys move · Enter or Space toggles'),
+    "drum grid should expose one named group with visible and accessible keyboard guidance"
+  );
+  check(
+    appSource.includes("function handleDrumGridKeyDown") &&
+      appSource.includes("isDrumGridActivationKey(event.key)") &&
+      appSource.includes("event.stopPropagation()") &&
+      appSource.includes("event.currentTarget.click()") &&
+      appSource.includes("drumGridNavigationTarget({ lane, step }, event.key)") &&
+      appSource.includes("setSelectedNote(null)") &&
+      appSource.includes("setSelectedChordIndex(null)"),
+    "drum grid keyboard handler should consume activation, reuse the click path, and keep directional selection exclusive"
+  );
+  check(
+    navigation.isDrumGridActivationKey("Enter") &&
+      navigation.isDrumGridActivationKey(" ") &&
+      !navigation.isDrumGridActivationKey("ArrowRight") &&
+      navigation.isDrumGridNavigationKey("ArrowRight") &&
+      navigation.isDrumGridNavigationKey("Home") &&
+      !navigation.isDrumGridNavigationKey("Enter"),
+    "drum grid should keep activation keys separate from navigation keys"
+  );
+  const entry = navigation.drumGridEntryStep(null);
+  const leftBoundary = navigation.drumGridNavigationTarget({ lane: "kick", step: 0 }, "ArrowLeft");
+  const rightBoundary = navigation.drumGridNavigationTarget({ lane: "kick", step: 15 }, "ArrowRight");
+  const upBoundary = navigation.drumGridNavigationTarget({ lane: "kick", step: 8 }, "ArrowUp");
+  const downBoundary = navigation.drumGridNavigationTarget({ lane: "perc", step: 8 }, "ArrowDown");
+  const downMove = navigation.drumGridNavigationTarget({ lane: "clap", step: 6 }, "ArrowDown");
+  const homeMove = navigation.drumGridNavigationTarget({ lane: "hat", step: 9 }, "Home");
+  const endMove = navigation.drumGridNavigationTarget({ lane: "hat", step: 9 }, "End");
+  check(entry.lane === "kick" && entry.step === 0, "drum grid should enter at Kick step 1 before an explicit selection");
+  check(
+    leftBoundary.lane === "kick" && leftBoundary.step === 0 &&
+      rightBoundary.lane === "kick" && rightBoundary.step === 15 &&
+      upBoundary.lane === "kick" && upBoundary.step === 8 &&
+      downBoundary.lane === "perc" && downBoundary.step === 8,
+    "drum grid arrow navigation should stay bounded at every outer edge"
+  );
+  check(
+    downMove.lane === "hat" && downMove.step === 6 &&
+      homeMove.lane === "hat" && homeMove.step === 0 &&
+      endMove.lane === "hat" && endMove.step === 15,
+    "drum grid should preserve step on vertical moves and support lane-local Home/End"
+  );
+  for (const [laneIndex, lane] of navigation.drumGridLaneOrder.entries()) {
+    for (let step = 0; step < 16; step += 1) {
+      const current = { lane, step };
+      const expectedTargets = {
+        ArrowLeft: { lane, step: Math.max(0, step - 1) },
+        ArrowRight: { lane, step: Math.min(15, step + 1) },
+        ArrowUp: { lane: navigation.drumGridLaneOrder[Math.max(0, laneIndex - 1)], step },
+        ArrowDown: { lane: navigation.drumGridLaneOrder[Math.min(3, laneIndex + 1)], step },
+        Home: { lane, step: 0 },
+        End: { lane, step: 15 }
+      };
+      for (const [key, expected] of Object.entries(expectedTargets)) {
+        const target = navigation.drumGridNavigationTarget(current, key);
+        check(
+          target.lane === expected.lane && target.step === expected.step,
+          `drum grid ${key} should map ${lane} step ${step + 1} to ${expected.lane} step ${expected.step + 1}`
+        );
+      }
+    }
+  }
+  check(
+    styles.includes(".drum-grid-keyboard-help") && styles.includes("text-align: right"),
+    "drum grid keyboard guidance should retain a compact dedicated presentation"
   );
 }
 
@@ -2494,6 +2581,10 @@ try {
   validateFirstRunRenderer(html);
   validateWorkspaceCommandDockSource(html);
   validateCompactStudioTransportSource();
+  validateDrumGridKeyboardNavigation(
+    html,
+    await server.ssrLoadModule("/src/ui/drumGridKeyboardNavigation.ts")
+  );
   check(
     html.includes('data-quick-actions-materialized="false"') &&
       html.includes('data-quick-actions-graph-state="deferred"'),
@@ -2580,6 +2671,7 @@ try {
     console.log("- Starter landing: beginner opens the focused drum grid; producer opens the focused Review Queue; sticky navigation stays clear");
     console.log("- Deep editor commands: conditional fixed dock reuses Play, Actions, Undo, Redo, and Save after the full transport leaves view");
     console.log("- Minimum Studio transport: secondary Session Context and Exports stay compact through 1180px entry and resize while retaining manual reopen");
+    console.log("- Drum grid keyboard: one roving Tab stop, bounded arrows/Home/End, explicit pressed state, Enter/Space toggle, and visible guidance");
     console.log(
       "- Beginner path: Guide Quick Start, Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
     );

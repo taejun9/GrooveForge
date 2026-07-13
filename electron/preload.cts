@@ -30,6 +30,11 @@ contextBridge.exposeInMainWorld("grooveforge", {
   platform: process.platform,
   appKind: "desktop",
   launchSmoke: process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1",
+  reportLaunchSmokeDrumGridSnapshot: (payload: unknown) => {
+    if (process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1") {
+      ipcRenderer.send("grooveforge:launch-smoke-drum-grid-snapshot", payload);
+    }
+  },
   saveProject: (contents: string, defaultName: string) =>
     ipcRenderer.invoke("grooveforge:save-project", { contents, defaultName }) as Promise<{ canceled: boolean; filePath?: string }>,
   openProject: () =>
