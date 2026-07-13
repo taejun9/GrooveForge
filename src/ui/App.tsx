@@ -1162,6 +1162,7 @@ export function App(): ReactElement {
   const modalReturnFocusRef = useRef<HTMLElement | null>(null);
   const [guidanceCenterOpen, setGuidanceCenterOpen] = useState(false);
   const [launchpadOpen, setLaunchpadOpen] = useState(true);
+  const [workspaceCommandDockVisible, setWorkspaceCommandDockVisible] = useState(false);
   const [quickActionQuery, setQuickActionQuery] = useState("");
   const [quickActionSearchHintResult, setQuickActionSearchHintResult] = useState<QuickActionSearchHintResult | null>(null);
   const [quickActionSearchResult, setQuickActionSearchResult] = useState<QuickActionSearchResult | null>(null);
@@ -1976,6 +1977,20 @@ export function App(): ReactElement {
       setStudioToneResetResult(null);
     }
   }, [project.sound.preset]);
+
+  useEffect(() => {
+    const transport = transportPanelRef.current;
+    if (!transport || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      setWorkspaceCommandDockVisible(!entry.isIntersecting);
+    });
+    observer.observe(transport);
+
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     setEditorAuditionResult(null);
@@ -10769,6 +10784,7 @@ export function App(): ReactElement {
   return (
     <main
       className="app-shell"
+      data-workspace-command-dock-visible={workspaceCommandDockVisible}
       data-quick-actions-graph-state={
         quickActionGraphFactory ? "ready" : quickActionGraphLoadError ? "error" : quickActionsRequested ? "loading" : "deferred"
       }
@@ -11161,6 +11177,83 @@ export function App(): ReactElement {
           </details>
         </div>
       </header>
+
+      {workspaceCommandDockVisible && (
+        <div
+          aria-label="Workspace command dock"
+          className="workspace-command-dock"
+          data-testid="workspace-command-dock"
+          role="toolbar"
+        >
+          <div
+            className={`workspace-command-dock-position ${transportPositionReadout.tone}`}
+            data-testid="workspace-command-dock-position"
+            title={transportPositionReadout.detailTitle}
+          >
+            <span>{transportPositionReadout.statusLabel}</span>
+            <strong>{transportPositionReadout.roleLabel}</strong>
+            <small>{transportPositionReadout.detailLabel}</small>
+          </div>
+          <button
+            aria-keyshortcuts="Space"
+            aria-pressed={isPlaying}
+            className="workspace-command-dock-button primary"
+            data-testid="workspace-command-dock-play"
+            onClick={togglePlayback}
+            title={`${isPlaying ? "Stop" : "Play"} ${transportLoopLabel(transportLoopScope).toLowerCase()} loop (Space)`}
+            type="button"
+          >
+            {isPlaying ? <CircleStop size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
+            <span>{isPlaying ? "Stop" : "Play"}</span>
+          </button>
+          <button
+            aria-keyshortcuts="Control+K Meta+K"
+            className="workspace-command-dock-button"
+            data-testid="workspace-command-dock-actions"
+            onClick={openQuickActions}
+            title="Open Quick Actions (Ctrl/Cmd+K)"
+            type="button"
+          >
+            <KeyboardMusic size={16} aria-hidden="true" />
+            <span>Actions</span>
+          </button>
+          <button
+            aria-keyshortcuts="Control+Z Meta+Z"
+            className="workspace-command-dock-button"
+            data-testid="workspace-command-dock-undo"
+            disabled={!canUndo}
+            onClick={undoProject}
+            title="Undo last edit (Ctrl/Cmd+Z)"
+            type="button"
+          >
+            <Undo2 size={16} aria-hidden="true" />
+            <span>Undo</span>
+          </button>
+          <button
+            aria-keyshortcuts="Control+Y Meta+Y Control+Shift+Z Meta+Shift+Z"
+            className="workspace-command-dock-button"
+            data-testid="workspace-command-dock-redo"
+            disabled={!canRedo}
+            onClick={redoProject}
+            title="Redo last undone edit (Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y)"
+            type="button"
+          >
+            <Redo2 size={16} aria-hidden="true" />
+            <span>Redo</span>
+          </button>
+          <button
+            aria-keyshortcuts="Control+S Meta+S"
+            className="workspace-command-dock-button"
+            data-testid="workspace-command-dock-save"
+            onClick={() => void handleSaveProject()}
+            title="Save project (Ctrl/Cmd+S)"
+            type="button"
+          >
+            <Save size={16} aria-hidden="true" />
+            <span>Save</span>
+          </button>
+        </div>
+      )}
 
       <QuickActions
         actions={filteredQuickActions}

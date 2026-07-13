@@ -12,7 +12,7 @@ const isLaunchSmoke = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1";
 const isProjectIoSmoke = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE === "1";
 const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
-const launchSmokeTimeoutMs = 400000;
+const launchSmokeTimeoutMs = 520000;
 const projectIoSmokeTimeoutMs = launchSmokeTimeoutMs;
 
 type NativeMenuCommand =
@@ -281,6 +281,18 @@ type LaunchSmokeModalFocusEvidence = {
   commandFocusRestored: boolean;
   commandForwardWrap: boolean;
   commandInitialFocus: string;
+  dockActionsOpened: boolean;
+  dockActionsFocusRestored: boolean;
+  dockControlCount: number;
+  dockFocusReady: boolean;
+  dockInitialHidden: boolean;
+  dockPositionMirrorsHeader: boolean;
+  dockReturnedHidden: boolean;
+  dockSharedPlayReady: boolean;
+  dockShortcutMetadataReady: boolean;
+  dockUndoRedoParity: boolean;
+  dockViewportReady: boolean;
+  dockVisible: boolean;
   editableFocusRestored: boolean;
   editableQuestionTyped: boolean;
   editableValuePreserved: boolean;
@@ -1171,6 +1183,26 @@ function launchSmokeModalFocusFailures(evidence: LaunchSmokeModalFocusEvidence):
   }
   if (evidence.switchInitialFocus !== "command-reference-search-input" || !evidence.switchFocusRestored) {
     failures.push("Switching Quick Actions to Command Reference should preserve the original opener and focus lifecycle");
+  }
+  if (!evidence.dockInitialHidden || !evidence.dockVisible || !evidence.dockReturnedHidden) {
+    failures.push("workspace command dock should appear only after the full transport leaves view and hide again on return");
+  }
+  if (!evidence.dockViewportReady || evidence.dockControlCount !== 5) {
+    failures.push("workspace command dock should stay fully inside the desktop viewport with five essential controls");
+  }
+  if (
+    !evidence.dockPositionMirrorsHeader ||
+    !evidence.dockUndoRedoParity ||
+    !evidence.dockShortcutMetadataReady ||
+    !evidence.dockFocusReady
+  ) {
+    failures.push("workspace command dock should mirror transport posture, Undo/Redo availability, and shortcut metadata");
+  }
+  if (!evidence.dockSharedPlayReady) {
+    failures.push("workspace command dock native pointer input should reuse the full transport Play/Stop state");
+  }
+  if (!evidence.dockActionsOpened || !evidence.dockActionsFocusRestored) {
+    failures.push("workspace command dock native pointer/Escape input should open Quick Actions and restore dock focus");
   }
   return failures;
 }
@@ -2450,6 +2482,22 @@ async function collectLaunchSmokeModalFocusEvidence(
     win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
     await new Promise((resolve) => setTimeout(resolve, 80));
   };
+  const sendClick = async (testId: string): Promise<void> => {
+    const point = await runStep<{ x: number; y: number }>(`
+      (() => {
+        const target = document.querySelector('[data-testid="${testId}"]');
+        const rect = target?.getBoundingClientRect();
+        return { x: rect ? Math.round(rect.left + rect.width / 2) : -1, y: rect ? Math.round(rect.top + rect.height / 2) : -1 };
+      })();
+    `);
+    if (point.x < 0 || point.y < 0) {
+      throw new Error(`Could not locate native click target ${testId}.`);
+    }
+    win.webContents.sendInputEvent({ type: "mouseMove", x: point.x, y: point.y });
+    win.webContents.sendInputEvent({ type: "mouseDown", x: point.x, y: point.y, button: "left", clickCount: 1 });
+    win.webContents.sendInputEvent({ type: "mouseUp", x: point.x, y: point.y, button: "left", clickCount: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+  };
 
   const commandModifier: Electron.InputEvent["modifiers"] = process.platform === "darwin" ? ["meta"] : ["control"];
   const editableTitleBefore = await runStep<string>(`
@@ -2601,6 +2649,99 @@ async function collectLaunchSmokeModalFocusEvidence(
     }))();
   `);
 
+  onStep("checking persistent workspace command dock");
+  const dockInitialHidden = await runStep<boolean>(
+    `document.querySelector('[data-testid="workspace-command-dock"]') === null`
+  );
+  await runStep(`
+    new Promise((resolve) => {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+  `);
+  await waitFor(`document.querySelector('[data-testid="workspace-command-dock"]') !== null`);
+  const dockSnapshot = await runStep<{
+    controlCount: number;
+    positionMirrorsHeader: boolean;
+    shortcutMetadataReady: boolean;
+    undoRedoParity: boolean;
+    viewportReady: boolean;
+    visible: boolean;
+  }>(`
+    (() => {
+      const dock = document.querySelector('[data-testid="workspace-command-dock"]');
+      const dockPosition = document.querySelector('[data-testid="workspace-command-dock-position"]');
+      const headerPosition = document.querySelector('[data-testid="transport-position-readout"]');
+      const dockUndo = document.querySelector('[data-testid="workspace-command-dock-undo"]');
+      const dockRedo = document.querySelector('[data-testid="workspace-command-dock-redo"]');
+      const headerUndo = document.querySelector('[data-testid="undo-button"]');
+      const headerRedo = document.querySelector('[data-testid="redo-button"]');
+      const controls = dock ? Array.from(dock.querySelectorAll('button')) : [];
+      const rect = dock?.getBoundingClientRect() ?? null;
+      return {
+        controlCount: controls.length,
+        positionMirrorsHeader: Boolean(
+          dockPosition && headerPosition && dockPosition.textContent?.trim() === headerPosition.textContent?.trim()
+        ),
+        shortcutMetadataReady: controls.every((control) => (control.getAttribute('aria-keyshortcuts') ?? '').length > 0),
+        undoRedoParity: Boolean(
+          dockUndo instanceof HTMLButtonElement &&
+          dockRedo instanceof HTMLButtonElement &&
+          headerUndo instanceof HTMLButtonElement &&
+          headerRedo instanceof HTMLButtonElement &&
+          dockUndo.disabled === headerUndo.disabled &&
+          dockRedo.disabled === headerRedo.disabled
+        ),
+        viewportReady: Boolean(
+          rect && rect.width > 0 && rect.height > 0 && rect.left >= 0 && rect.right <= innerWidth &&
+          rect.top >= 0 && rect.bottom <= innerHeight
+        ),
+        visible: Boolean(dock && rect && rect.width > 0 && rect.height > 0)
+      };
+    })();
+  `);
+  const dockFocusReady = await runStep<boolean>(`
+    (() => {
+      const target = document.querySelector('[data-testid="workspace-command-dock-play"]');
+      target?.focus();
+      return document.activeElement === target;
+    })();
+  `);
+  await sendClick("workspace-command-dock-play");
+  await waitFor(
+    `document.querySelector('[data-testid="workspace-command-dock-play"]')?.getAttribute('aria-pressed') === 'true' && document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'true'`
+  );
+  const dockSharedPlayReady = await runStep<boolean>(`
+    document.querySelector('[data-testid="workspace-command-dock-play"]')?.textContent?.trim() === 'Stop' &&
+      document.querySelector('[data-testid="transport-play"]')?.textContent?.trim() === 'Stop'
+  `);
+  await sendClick("workspace-command-dock-play");
+  await waitFor(
+    `document.querySelector('[data-testid="workspace-command-dock-play"]')?.getAttribute('aria-pressed') === 'false' && document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'false'`
+  );
+  await sendClick("workspace-command-dock-actions");
+  await waitFor(`document.activeElement?.dataset?.testid === 'quick-actions-search'`);
+  const dockActionsOpened = await runStep<boolean>(
+    `document.querySelector('[data-testid="quick-actions"]') !== null`
+  );
+  await sendKey("Escape");
+  await waitFor(
+    `document.querySelector('[data-testid="quick-actions"]') === null && document.activeElement?.dataset?.testid === 'workspace-command-dock-actions'`
+  );
+  const dockActionsFocusRestored = await runStep<boolean>(
+    `document.activeElement?.dataset?.testid === 'workspace-command-dock-actions'`
+  );
+  await runStep(`
+    new Promise((resolve) => {
+      window.scrollTo(0, 0);
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+  `);
+  await waitFor(`document.querySelector('[data-testid="workspace-command-dock"]') === null`);
+  const dockReturnedHidden = await runStep<boolean>(
+    `document.querySelector('[data-testid="workspace-command-dock"]') === null`
+  );
+
   onStep("modal focus evidence complete");
   return {
     commandShortcutFromEditable,
@@ -2615,6 +2756,18 @@ async function collectLaunchSmokeModalFocusEvidence(
       commandAfterForward.activeTestId === commandBeforeForward.firstTestId &&
       commandAfterForward.focusInside,
     commandInitialFocus: commandInitial.activeTestId,
+    dockActionsOpened,
+    dockActionsFocusRestored,
+    dockControlCount: dockSnapshot.controlCount,
+    dockFocusReady,
+    dockInitialHidden,
+    dockPositionMirrorsHeader: dockSnapshot.positionMirrorsHeader,
+    dockReturnedHidden,
+    dockSharedPlayReady,
+    dockShortcutMetadataReady: dockSnapshot.shortcutMetadataReady,
+    dockUndoRedoParity: dockSnapshot.undoRedoParity,
+    dockViewportReady: dockSnapshot.viewportReady,
+    dockVisible: dockSnapshot.visible,
     editableFocusRestored: editableFinal.activeTestId === "project-title-input",
     editableQuestionTyped,
     editableValuePreserved: editableFinal.title === editableTitleBefore,
@@ -2658,7 +2811,7 @@ async function collectLaunchSmokeModalFocusEvidence(
 function collectLaunchSmokeModalFocusEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeModalFocusEvidence> {
   return new Promise((resolve, reject) => {
     let step = "starting";
-    const timeout = setTimeout(() => reject(new Error(`Timed out collecting live modal focus evidence at ${step}.`)), 240000);
+    const timeout = setTimeout(() => reject(new Error(`Timed out collecting live modal focus evidence at ${step}.`)), 280000);
     void collectLaunchSmokeModalFocusEvidence(win, (nextStep) => {
       step = nextStep;
     })
