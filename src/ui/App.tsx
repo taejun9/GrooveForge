@@ -1109,6 +1109,13 @@ import {
 
 type QuickActionGraphFactory = typeof import("./workstationAppQuickActionGraph")["createQuickActions"];
 
+const tempoNudgePadVisibleLabels: Record<TempoNudgePadId, string> = {
+  down: "-1 BPM",
+  up: "+1 BPM",
+  half: "Half",
+  double: "Double"
+};
+
 function isCompactTransportViewport(): boolean {
   if (typeof window === "undefined") {
     return false;
@@ -1660,6 +1667,16 @@ export function App(): ReactElement {
   const metronomeActionLabel = project.metronomeEnabled ? "Turn off" : "Turn on";
   const metronomeDetailLabel = `${metronomeStateLabel} · ${project.bpm} BPM`;
   const metronomeAccessibleLabel = `Metronome ${metronomeStateLabel.toLowerCase()}, ${project.bpm} BPM. ${metronomeActionLabel}`;
+  const tempoNudgePadPresentations = tempoNudgePads.map((pad) => {
+    const targetBpm = tempoNudgePadBpm(project.bpm, pad.id);
+    return {
+      pad,
+      targetBpm,
+      visibleLabel: tempoNudgePadVisibleLabels[pad.id],
+      accessibleLabel: `${pad.title}, ${project.bpm} to ${targetBpm} BPM`,
+      title: `${pad.title}: ${project.bpm} → ${targetBpm} BPM`
+    };
+  });
   const tapTempoReadout = createTapTempoReadoutSummary(project.bpm, tapTempo);
   const localDraftStatusLabel = localDraftSavedAt ? `Draft ${formatLocalDraftSavedAt(localDraftSavedAt)}` : "Draft local";
   const projectSafetyReadout = createProjectSafetyReadoutSummary(
@@ -10587,6 +10604,64 @@ export function App(): ReactElement {
       const expectedMetronomeAccessibleName = expectedMetronomeState && expectedMetronomeBpm
         ? `Metronome ${expectedMetronomeState.toLowerCase()}, ${expectedMetronomeBpm} BPM. ${expectedMetronomeAction}`
         : "";
+      const tempoNudgeGroup = document.querySelector<HTMLElement>('[data-testid="tempo-nudge-pads"]');
+      const tempoNudgeButtons = tempoNudgeGroup
+        ? [...tempoNudgeGroup.querySelectorAll<HTMLButtonElement>("button")]
+        : [];
+      const tempoNudgeGroupRect = tempoNudgeGroup?.getBoundingClientRect() ?? null;
+      const expectedTempoNudgeBpm = Number(expectedMetronomeBpm);
+      const expectedTempoNudgePads = Number.isFinite(expectedTempoNudgeBpm)
+        ? tempoNudgePads.map((pad) => {
+            const targetBpm = tempoNudgePadBpm(expectedTempoNudgeBpm, pad.id);
+            return {
+              accessibleLabel: `${pad.title}, ${expectedTempoNudgeBpm} to ${targetBpm} BPM`,
+              targetBpm,
+              testId: tempoNudgePadTestId(pad.id),
+              title: `${pad.title}: ${expectedTempoNudgeBpm} → ${targetBpm} BPM`,
+              visibleLabel: tempoNudgePadVisibleLabels[pad.id]
+            };
+          })
+        : [];
+      const tempoNudgeAccessibleNames = tempoNudgeButtons
+        .map((button) => button.getAttribute("aria-label")?.trim() ?? "")
+        .filter((label) => label.length > 0);
+      const tempoNudgeReadableLabels = tempoNudgeButtons.filter((button) => {
+        const label = button.querySelector<HTMLElement>(":scope > strong");
+        const detail = button.querySelector<HTMLElement>(":scope > small");
+        return Boolean(
+          label &&
+            detail &&
+            label.clientWidth > 0 &&
+            label.scrollWidth <= label.clientWidth + 1 &&
+            detail.clientWidth > 0 &&
+            detail.scrollWidth <= detail.clientWidth + 1
+        );
+      });
+      const tempoNudgeContainedButtons = tempoNudgeButtons.filter((button) => {
+        const buttonRect = button.getBoundingClientRect();
+        return Boolean(
+          tempoNudgeGroupRect &&
+            buttonRect.height >= 24 &&
+            buttonRect.left >= tempoNudgeGroupRect.left - 1 &&
+            buttonRect.right <= tempoNudgeGroupRect.right + 1 &&
+            buttonRect.top >= tempoNudgeGroupRect.top - 1 &&
+            buttonRect.bottom <= tempoNudgeGroupRect.bottom + 1
+        );
+      });
+      const tempoNudgeColumnCount = tempoNudgeGroup
+        ? window.getComputedStyle(tempoNudgeGroup).gridTemplateColumns.trim().split(/\s+/).length
+        : 0;
+      const tempoNudgeRowCount = new Set(
+        tempoNudgeButtons.map((button) => Math.round(button.getBoundingClientRect().top))
+      ).size;
+      const tempoNudgeStateCopyReady =
+        expectedTempoNudgePads.length === 4 &&
+        expectedTempoNudgePads.every(
+          (expected, index) =>
+            tempoNudgeButtons[index]?.dataset.testid === expected.testId &&
+            tempoNudgeButtons[index]?.querySelector(":scope > strong")?.textContent?.trim() === expected.visibleLabel &&
+            tempoNudgeButtons[index]?.querySelector(":scope > small")?.textContent?.trim() === `${expected.targetBpm} BPM`
+        );
       const metronomeReadable = Boolean(
         metronomeLabel &&
           metronomeDetail &&
@@ -11019,6 +11094,37 @@ export function App(): ReactElement {
           metronomeDetail?.textContent?.trim() === `${expectedMetronomeState} · ${expectedMetronomeBpm} BPM`,
         metronomeTitleCount:
           starterId === "beginner" && (metronomeButton?.getAttribute("title")?.trim().length ?? 0) > 0 ? 1 : 0,
+        tempoNudgeAccessibleNameCount:
+          starterId === "beginner" &&
+          expectedTempoNudgePads.every(
+            (expected, index) => tempoNudgeButtons[index]?.getAttribute("aria-label") === expected.accessibleLabel
+          )
+            ? tempoNudgeAccessibleNames.length
+            : 0,
+        tempoNudgeColumnCount: starterId === "beginner" ? tempoNudgeColumnCount : 0,
+        tempoNudgeContainedCount: starterId === "beginner" ? tempoNudgeContainedButtons.length : 0,
+        tempoNudgeControlCount: starterId === "beginner" ? tempoNudgeButtons.length : 0,
+        tempoNudgeFocusableCount:
+          starterId === "beginner"
+            ? tempoNudgeButtons.filter((button) => button.tabIndex === 0 && button.disabled === false).length
+            : 0,
+        tempoNudgeInternalOverflow:
+          starterId === "beginner" && tempoNudgeGroup
+            ? Math.max(0, tempoNudgeGroup.scrollWidth - tempoNudgeGroup.clientWidth)
+            : 0,
+        tempoNudgeReadableLabelCount: starterId === "beginner" ? tempoNudgeReadableLabels.length : 0,
+        tempoNudgeRoleReady:
+          starterId === "beginner" &&
+          tempoNudgeGroup?.getAttribute("role") === "group" &&
+          tempoNudgeGroup.getAttribute("aria-label") === "Tempo nudge pads",
+        tempoNudgeRowCount: starterId === "beginner" ? tempoNudgeRowCount : 0,
+        tempoNudgeStateCopyReady: starterId === "beginner" ? tempoNudgeStateCopyReady : false,
+        tempoNudgeTitleReadyCount:
+          starterId === "beginner"
+            ? expectedTempoNudgePads.filter(
+                (expected, index) => tempoNudgeButtons[index]?.getAttribute("title") === expected.title
+              ).length
+            : 0,
         mixerNarrowStripCount: starterId === "beginner" ? mixerNarrowStrips.length : 0,
         mixerToggleContainedCount: starterId === "beginner" ? mixerToggleContainedButtons.length : 0,
         mixerToggleCount: starterId === "beginner" ? mixerToggleButtons.length : 0,
@@ -11586,16 +11692,23 @@ export function App(): ReactElement {
               onChange={(event) => updateProjectBpm(Number(event.target.value) || projectRef.current.bpm)}
             />
           </label>
-          <div className="tempo-nudge-pads" aria-label="Tempo nudge pads" data-testid="tempo-nudge-pads">
-            {tempoNudgePads.map((pad) => (
+          <div
+            className="tempo-nudge-pads"
+            aria-label="Tempo nudge pads"
+            data-testid="tempo-nudge-pads"
+            role="group"
+          >
+            {tempoNudgePadPresentations.map(({ accessibleLabel, pad, targetBpm, title, visibleLabel }) => (
               <button
+                aria-label={accessibleLabel}
                 data-testid={tempoNudgePadTestId(pad.id)}
                 key={pad.id}
                 onClick={() => applyTempoNudgePad(pad)}
-                title={pad.title}
+                title={title}
                 type="button"
               >
-                {pad.label}
+                <strong>{visibleLabel}</strong>
+                <small>{targetBpm} BPM</small>
               </button>
             ))}
           </div>

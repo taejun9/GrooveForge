@@ -131,6 +131,17 @@ type GrooveforgeLaunchSmokeStarterLandingRouteEvidence = {
   metronomeReadableLabelCount: number;
   metronomeStateCopyReady: boolean;
   metronomeTitleCount: number;
+  tempoNudgeAccessibleNameCount: number;
+  tempoNudgeColumnCount: number;
+  tempoNudgeContainedCount: number;
+  tempoNudgeControlCount: number;
+  tempoNudgeFocusableCount: number;
+  tempoNudgeInternalOverflow: number;
+  tempoNudgeReadableLabelCount: number;
+  tempoNudgeRoleReady: boolean;
+  tempoNudgeRowCount: number;
+  tempoNudgeStateCopyReady: boolean;
+  tempoNudgeTitleReadyCount: number;
   mixerNarrowStripCount: number;
   mixerToggleContainedCount: number;
   mixerToggleCount: number;

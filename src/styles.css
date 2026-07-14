@@ -759,10 +759,10 @@ h2 {
 .tempo-nudge-pads {
   display: grid;
   align-self: end;
-  flex: 0 0 82px;
-  width: 82px;
-  min-width: 82px;
-  min-height: 36px;
+  flex: 0 0 104px;
+  width: 104px;
+  min-width: 104px;
+  min-height: 54px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
 }
@@ -1104,10 +1104,35 @@ h2 {
 }
 
 .tempo-nudge-pads button {
-  min-height: 16px;
-  padding: 0 4px;
-  font-size: 11px;
-  line-height: 1;
+  display: grid;
+  align-content: center;
+  justify-items: stretch;
+  gap: 0;
+  min-width: 0;
+  min-height: 25px;
+  padding: 1px 3px;
+  overflow: hidden;
+  text-align: center;
+}
+
+.tempo-nudge-pads button strong,
+.tempo-nudge-pads button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.tempo-nudge-pads button strong {
+  font-size: 9px;
+  line-height: 1.05;
+}
+
+.tempo-nudge-pads button small {
+  color: rgba(244, 239, 231, 0.56);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.05;
 }
 
 .icon-button.primary {
@@ -4856,7 +4881,7 @@ h2 {
   .transport-controls {
     display: grid;
     grid-area: setup;
-    grid-template-columns: 150px 68px 72px 110px minmax(0, 1fr);
+    grid-template-columns: 127px 68px 104px 100px minmax(0, 1fr);
     align-items: end;
     min-height: 55px;
   }
@@ -4876,6 +4901,14 @@ h2 {
   .transport-controls .field select {
     width: 100%;
     min-width: 0;
+  }
+
+  .transport-controls .style-field-label {
+    gap: 2px;
+  }
+
+  .transport-controls .style-field-label small {
+    font-size: 9px;
   }
 
   .first-run-launchpad {
@@ -5005,7 +5038,7 @@ h2 {
   .transport-controls {
     display: grid;
     grid-area: setup;
-    grid-template-columns: 140px 64px 68px 100px minmax(0, 1fr);
+    grid-template-columns: 140px 64px 104px 100px minmax(0, 1fr);
     align-items: end;
     min-height: 55px;
   }
