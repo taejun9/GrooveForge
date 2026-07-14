@@ -1141,6 +1141,30 @@ function validateFirstRunRenderer(html) {
       styles.includes('.metronome-toggle[aria-pressed="true"] small {'),
     "Metronome should keep a contained readable two-line command-strip treatment with explicit active-state detail"
   );
+  const tapTempoMarker = html.indexOf('data-testid="tap-tempo-button"');
+  const tapTempoButtonStart = tapTempoMarker >= 0 ? html.lastIndexOf("<button", tapTempoMarker) : -1;
+  const tapTempoSegment =
+    tapTempoButtonStart >= 0 ? html.slice(tapTempoButtonStart, html.indexOf("</button>", tapTempoButtonStart)) : "";
+  check(
+    html.includes("<small>Tap Tempo · Undo/Keys</small>") &&
+      tapTempoSegment.includes('aria-label="Tap Tempo, current project 82 BPM. Start with two or more taps"') &&
+      tapTempoSegment.includes('class="icon-button tap-tempo-button"') &&
+      tapTempoSegment.includes('title="Tap Tempo: current project 82 BPM · Tap two or more times to set tempo"') &&
+      tapTempoSegment.includes('<span class="tap-tempo-button-copy">') &&
+      tapTempoSegment.includes("<strong>Tap Tempo</strong>") &&
+      tapTempoSegment.includes("<small>Start · 82 BPM</small>"),
+    "Tap Tempo should be discoverable from the closed Session Context summary and expose complete live start-state copy, naming, and title"
+  );
+  check(
+    styles.includes(".tap-tempo-button {") &&
+      styles.includes("min-width: 140px;") &&
+      styles.includes(".tap-tempo-button-copy {") &&
+      styles.includes(".tap-tempo-button-copy strong,") &&
+      styles.includes(".tap-tempo-button-copy small {") &&
+      styles.includes(".tap-tempo-button-copy strong {") &&
+      styles.includes(".tap-tempo-button-copy small {"),
+    "Tap Tempo should keep a contained readable two-line direct-control treatment"
+  );
   const tempoNudgeMarker = html.indexOf('data-testid="tempo-nudge-pads"');
   const tempoNudgeStart = tempoNudgeMarker >= 0 ? html.lastIndexOf("<div", tempoNudgeMarker) : -1;
   const tempoNudgeEnd = tempoNudgeStart >= 0 ? html.indexOf("</div>", tempoNudgeStart) : -1;
@@ -1632,7 +1656,7 @@ function validateFirstRunRenderer(html) {
       'data-testid="transport-export-content"',
       'data-testid="export-wav"',
       "Session Context",
-      "Tempo, edit history, and input posture",
+      "Tap Tempo · Undo/Keys",
       "Exports",
       "WAV, stems, MIDI, sheet, and bundle"
     ],

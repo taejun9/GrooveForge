@@ -1678,6 +1678,37 @@ export function App(): ReactElement {
     };
   });
   const tapTempoReadout = createTapTempoReadoutSummary(project.bpm, tapTempo);
+  const tapTempoButtonPresentation = (() => {
+    if (tapTempo.bpm !== null) {
+      const tapCountLabel = `${tapTempo.taps} taps`;
+      if (tapTempo.applied) {
+        return {
+          accessibleLabel: `Tap Tempo, ${tapCountLabel} applied at ${tapTempo.bpm} BPM. Tap again to refine`,
+          detailLabel: `Set · ${tapTempo.bpm} BPM`,
+          title: `Tap Tempo: ${tapCountLabel} applied at ${tapTempo.bpm} BPM · Tap again to refine`
+        };
+      }
+      return {
+        accessibleLabel: `Tap Tempo, ${tapCountLabel} averaging ${tapTempo.bpm} BPM, current project ${project.bpm} BPM. Tap again or pause to apply`,
+        detailLabel: `Tap again · ${tapTempo.bpm} BPM`,
+        title: `Tap Tempo: ${tapCountLabel} averaging ${tapTempo.bpm} BPM · current project ${project.bpm} BPM · Tap again or pause to apply`
+      };
+    }
+
+    if (tapTempo.taps === 1) {
+      return {
+        accessibleLabel: `Tap Tempo, 1 tap captured, current project ${project.bpm} BPM. Tap again within 3 seconds`,
+        detailLabel: `Tap again · ${project.bpm} BPM`,
+        title: `Tap Tempo: 1 tap captured · current project ${project.bpm} BPM · Tap again within 3 seconds`
+      };
+    }
+
+    return {
+      accessibleLabel: `Tap Tempo, current project ${project.bpm} BPM. Start with two or more taps`,
+      detailLabel: `Start · ${project.bpm} BPM`,
+      title: `Tap Tempo: current project ${project.bpm} BPM · Tap two or more times to set tempo`
+    };
+  })();
   const localDraftStatusLabel = localDraftSavedAt ? `Draft ${formatLocalDraftSavedAt(localDraftSavedAt)}` : "Draft local";
   const projectSafetyReadout = createProjectSafetyReadoutSummary(
     localDraftRecovery,
@@ -10604,6 +10635,53 @@ export function App(): ReactElement {
       const expectedMetronomeAccessibleName = expectedMetronomeState && expectedMetronomeBpm
         ? `Metronome ${expectedMetronomeState.toLowerCase()}, ${expectedMetronomeBpm} BPM. ${expectedMetronomeAction}`
         : "";
+      const transportSessionDetails = document.querySelector<HTMLDetailsElement>(
+        '[data-testid="transport-session-tools"]'
+      );
+      const transportSessionSummaryDetail = transportSessionDetails?.querySelector<HTMLElement>(
+        ':scope > summary small'
+      );
+      const transportSessionInitiallyOpen = transportSessionDetails?.open ?? false;
+      if (starterId === "beginner" && transportSessionDetails && !transportSessionInitiallyOpen) {
+        transportSessionDetails.open = true;
+      }
+      const transportSessionContent = transportSessionDetails?.querySelector<HTMLElement>(
+        '[data-testid="transport-session-content"]'
+      );
+      const transportSessionContentRect = transportSessionContent?.getBoundingClientRect() ?? null;
+      const tapTempoButton = transportSessionDetails?.querySelector<HTMLButtonElement>(
+        '[data-testid="tap-tempo-button"]'
+      );
+      const tapTempoButtonLabel = tapTempoButton?.querySelector<HTMLElement>(":scope strong") ?? null;
+      const tapTempoButtonDetail = tapTempoButton?.querySelector<HTMLElement>(":scope small") ?? null;
+      const tapTempoButtonRect = tapTempoButton?.getBoundingClientRect() ?? null;
+      const expectedTapTempoAccessibleName = expectedMetronomeBpm
+        ? `Tap Tempo, current project ${expectedMetronomeBpm} BPM. Start with two or more taps`
+        : "";
+      const expectedTapTempoTitle = expectedMetronomeBpm
+        ? `Tap Tempo: current project ${expectedMetronomeBpm} BPM · Tap two or more times to set tempo`
+        : "";
+      const tapTempoReadable = Boolean(
+        tapTempoButtonLabel &&
+          tapTempoButtonDetail &&
+          tapTempoButtonLabel.clientWidth > 0 &&
+          tapTempoButtonLabel.scrollWidth <= tapTempoButtonLabel.clientWidth + 1 &&
+          tapTempoButtonDetail.clientWidth > 0 &&
+          tapTempoButtonDetail.scrollWidth <= tapTempoButtonDetail.clientWidth + 1
+      );
+      const tapTempoContained = Boolean(
+        tapTempoButtonRect &&
+          transportSessionContentRect &&
+          tapTempoButtonRect.height >= 38 &&
+          tapTempoButtonRect.left >= transportSessionContentRect.left - 1 &&
+          tapTempoButtonRect.right <= transportSessionContentRect.right + 1 &&
+          tapTempoButtonRect.top >= transportSessionContentRect.top - 1 &&
+          tapTempoButtonRect.bottom <= transportSessionContentRect.bottom + 1
+      );
+      if (transportSessionDetails) {
+        transportSessionDetails.open = transportSessionInitiallyOpen;
+      }
+      const tapTempoSessionStateRestored = transportSessionDetails?.open === transportSessionInitiallyOpen;
       const tempoNudgeGroup = document.querySelector<HTMLElement>('[data-testid="tempo-nudge-pads"]');
       const tempoNudgeButtons = tempoNudgeGroup
         ? [...tempoNudgeGroup.querySelectorAll<HTMLButtonElement>("button")]
@@ -11094,6 +11172,32 @@ export function App(): ReactElement {
           metronomeDetail?.textContent?.trim() === `${expectedMetronomeState} · ${expectedMetronomeBpm} BPM`,
         metronomeTitleCount:
           starterId === "beginner" && (metronomeButton?.getAttribute("title")?.trim().length ?? 0) > 0 ? 1 : 0,
+        tapTempoAccessibleNameReady:
+          starterId === "beginner" &&
+          expectedTapTempoAccessibleName.length > 0 &&
+          tapTempoButton?.getAttribute("aria-label") === expectedTapTempoAccessibleName,
+        tapTempoContainedCount: starterId === "beginner" && tapTempoContained ? 1 : 0,
+        tapTempoControlCount: starterId === "beginner" && tapTempoButton ? 1 : 0,
+        tapTempoFocusReady:
+          starterId === "beginner" && tapTempoButton?.tabIndex === 0 && tapTempoButton.disabled === false,
+        tapTempoInternalOverflow:
+          starterId === "beginner" && tapTempoButton
+            ? Math.max(0, tapTempoButton.scrollWidth - tapTempoButton.clientWidth)
+            : 0,
+        tapTempoReadableLabelCount: starterId === "beginner" && tapTempoReadable ? 1 : 0,
+        tapTempoSessionStateRestored: starterId === "beginner" && tapTempoSessionStateRestored,
+        tapTempoStateCopyReady:
+          starterId === "beginner" &&
+          expectedMetronomeBpm.length > 0 &&
+          tapTempoButtonLabel?.textContent?.trim() === "Tap Tempo" &&
+          tapTempoButtonDetail?.textContent?.trim() === `Start · ${expectedMetronomeBpm} BPM`,
+        tapTempoSummaryDiscoveryReady:
+          starterId === "beginner" &&
+          transportSessionSummaryDetail?.textContent?.trim() === "Tap Tempo · Undo/Keys",
+        tapTempoTitleReady:
+          starterId === "beginner" &&
+          expectedTapTempoTitle.length > 0 &&
+          tapTempoButton?.getAttribute("title") === expectedTapTempoTitle,
         tempoNudgeAccessibleNameCount:
           starterId === "beginner" &&
           expectedTempoNudgePads.every(
@@ -11923,20 +12027,24 @@ export function App(): ReactElement {
               <Gauge size={16} aria-hidden="true" />
               <span>
                 <strong>Session Context</strong>
-                <small>Tempo, edit history, and input posture</small>
+                <small>Tap Tempo · Undo/Keys</small>
               </span>
               <ArrowDown size={14} aria-hidden="true" />
             </summary>
             <div className="transport-tools-content" data-testid="transport-session-content">
               <button
+                aria-label={tapTempoButtonPresentation.accessibleLabel}
                 className="icon-button tap-tempo-button"
                 data-testid="tap-tempo-button"
                 type="button"
-                title="Tap repeatedly to set the project BPM"
+                title={tapTempoButtonPresentation.title}
                 onClick={tapProjectTempo}
               >
                 <Gauge size={18} aria-hidden="true" />
-                <span>Tap</span>
+                <span className="tap-tempo-button-copy">
+                  <strong>Tap Tempo</strong>
+                  <small>{tapTempoButtonPresentation.detailLabel}</small>
+                </span>
               </button>
               <div
                 className={`tap-tempo-readout ${tapTempoReadout.tone}`}

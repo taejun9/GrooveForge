@@ -131,6 +131,16 @@ type GrooveforgeLaunchSmokeStarterLandingRouteEvidence = {
   metronomeReadableLabelCount: number;
   metronomeStateCopyReady: boolean;
   metronomeTitleCount: number;
+  tapTempoAccessibleNameReady: boolean;
+  tapTempoContainedCount: number;
+  tapTempoControlCount: number;
+  tapTempoFocusReady: boolean;
+  tapTempoInternalOverflow: number;
+  tapTempoReadableLabelCount: number;
+  tapTempoSessionStateRestored: boolean;
+  tapTempoStateCopyReady: boolean;
+  tapTempoSummaryDiscoveryReady: boolean;
+  tapTempoTitleReady: boolean;
   tempoNudgeAccessibleNameCount: number;
   tempoNudgeColumnCount: number;
   tempoNudgeContainedCount: number;
