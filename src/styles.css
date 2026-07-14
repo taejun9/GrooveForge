@@ -1058,6 +1058,47 @@ h2 {
   padding: 0 12px;
 }
 
+.icon-button.metronome-toggle {
+  display: grid;
+  align-content: center;
+  justify-content: stretch;
+  justify-items: stretch;
+  gap: 1px;
+  min-width: 0;
+  padding: 3px 5px;
+  text-align: center;
+  overflow: hidden;
+}
+
+.command-strip .icon-button.metronome-toggle {
+  padding-inline: 4px;
+}
+
+.metronome-toggle strong,
+.metronome-toggle small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.metronome-toggle strong {
+  font-size: 10px;
+  line-height: 1.05;
+}
+
+.metronome-toggle small {
+  color: rgba(244, 239, 231, 0.54);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+.metronome-toggle.selected small,
+.metronome-toggle[aria-pressed="true"] small {
+  color: rgba(120, 240, 200, 0.78);
+}
+
 .tap-tempo-button {
   min-width: 64px;
 }

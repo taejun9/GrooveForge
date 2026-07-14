@@ -1119,6 +1119,28 @@ function validateFirstRunRenderer(html) {
       styles.includes("grid-template-columns: repeat(4, minmax(64px, 1fr));"),
     "Transport loop scope should retain a contained readable four-column scan with comfortable two-line controls"
   );
+  const metronomeMarker = html.indexOf('data-testid="metronome-toggle"');
+  const metronomeButtonStart = metronomeMarker >= 0 ? html.lastIndexOf("<button", metronomeMarker) : -1;
+  const metronomeSegment =
+    metronomeButtonStart >= 0 ? html.slice(metronomeButtonStart, html.indexOf("</button>", metronomeButtonStart)) : "";
+  check(
+    metronomeSegment.includes('aria-label="Metronome off, 82 BPM. Turn on"') &&
+      metronomeSegment.includes('aria-pressed="false"') &&
+      metronomeSegment.includes('class="icon-button metronome-toggle ') &&
+      metronomeSegment.includes('title="Turn metronome on"') &&
+      metronomeSegment.includes("<strong>Metronome</strong>") &&
+      metronomeSegment.includes("<small>Off · 82 BPM</small>"),
+    "Metronome should expose its complete name, current state, BPM, next action, pressed state, and retained title"
+  );
+  check(
+    styles.includes(".icon-button.metronome-toggle {") &&
+      styles.includes(".command-strip .icon-button.metronome-toggle {") &&
+      styles.includes(".metronome-toggle strong,") &&
+      styles.includes(".metronome-toggle small {") &&
+      styles.includes(".metronome-toggle.selected small,") &&
+      styles.includes('.metronome-toggle[aria-pressed="true"] small {'),
+    "Metronome should keep a contained readable two-line command-strip treatment with explicit active-state detail"
+  );
   const transportBandIndex = html.indexOf('data-testid="workflow-target-transport"');
   const transportStatusControlsIndex = html.indexOf('data-testid="transport-status-controls"');
   const transportEssentialsIndex = html.indexOf('data-testid="transport-essential-controls"');

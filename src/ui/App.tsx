@@ -1656,6 +1656,10 @@ export function App(): ReactElement {
       )}`
     : "adjacent block handoff unavailable";
   const patternLoopTargetLabel = `${project.selectedPattern} · ${patternEventCount(currentPattern)}`;
+  const metronomeStateLabel = project.metronomeEnabled ? "On" : "Off";
+  const metronomeActionLabel = project.metronomeEnabled ? "Turn off" : "Turn on";
+  const metronomeDetailLabel = `${metronomeStateLabel} · ${project.bpm} BPM`;
+  const metronomeAccessibleLabel = `Metronome ${metronomeStateLabel.toLowerCase()}, ${project.bpm} BPM. ${metronomeActionLabel}`;
   const tapTempoReadout = createTapTempoReadoutSummary(project.bpm, tapTempo);
   const localDraftStatusLabel = localDraftSavedAt ? `Draft ${formatLocalDraftSavedAt(localDraftSavedAt)}` : "Draft local";
   const projectSafetyReadout = createProjectSafetyReadoutSummary(
@@ -10564,6 +10568,33 @@ export function App(): ReactElement {
           '[data-testid="arrangement-pattern-controls"] .arrangement-control-group-heading small'
         )?.textContent?.trim() ?? ""
       ].every((label) => label.length > 0 && !label.includes("events events"));
+      const metronomeButton = document.querySelector<HTMLButtonElement>('[data-testid="metronome-toggle"]');
+      const metronomeLabel = metronomeButton?.querySelector<HTMLElement>(":scope strong") ?? null;
+      const metronomeDetail = metronomeButton?.querySelector<HTMLElement>(":scope small") ?? null;
+      const metronomeRect = metronomeButton?.getBoundingClientRect() ?? null;
+      const transportEssentialControls = document.querySelector<HTMLElement>(
+        '[data-testid="transport-essential-controls"]'
+      );
+      const transportEssentialRect = transportEssentialControls?.getBoundingClientRect() ?? null;
+      const metronomePressedState = metronomeButton?.getAttribute("aria-pressed") ?? "";
+      const expectedMetronomeState =
+        metronomePressedState === "true" ? "On" : metronomePressedState === "false" ? "Off" : "";
+      const expectedMetronomeAction = metronomePressedState === "true" ? "Turn off" : "Turn on";
+      const bpmField = [...document.querySelectorAll<HTMLLabelElement>("label.field.compact")].find(
+        (field) => field.querySelector(":scope > span")?.textContent?.trim() === "BPM"
+      );
+      const expectedMetronomeBpm = bpmField?.querySelector<HTMLInputElement>('input[type="number"]')?.value ?? "";
+      const expectedMetronomeAccessibleName = expectedMetronomeState && expectedMetronomeBpm
+        ? `Metronome ${expectedMetronomeState.toLowerCase()}, ${expectedMetronomeBpm} BPM. ${expectedMetronomeAction}`
+        : "";
+      const metronomeReadable = Boolean(
+        metronomeLabel &&
+          metronomeDetail &&
+          metronomeLabel.clientWidth > 0 &&
+          metronomeLabel.scrollWidth <= metronomeLabel.clientWidth + 1 &&
+          metronomeDetail.clientWidth > 0 &&
+          metronomeDetail.scrollWidth <= metronomeDetail.clientWidth + 1
+      );
       const patternTabGroup = document.querySelector<HTMLElement>(".pattern-tabs");
       const patternTabButtons = patternTabGroup
         ? [...patternTabGroup.querySelectorAll<HTMLButtonElement>("button")]
@@ -10956,6 +10987,38 @@ export function App(): ReactElement {
             : 0,
         loopScopeUniqueAccessibleNameCount:
           starterId === "beginner" ? new Set(loopScopeAccessibleNames).size : 0,
+        metronomeAccessibleNameReady:
+          starterId === "beginner" &&
+          expectedMetronomeAccessibleName.length > 0 &&
+          metronomeButton?.getAttribute("aria-label") === expectedMetronomeAccessibleName,
+        metronomeContainedCount:
+          starterId === "beginner" &&
+          metronomeRect &&
+          transportEssentialRect &&
+          metronomeRect.height >= 38 &&
+          metronomeRect.left >= transportEssentialRect.left - 1 &&
+          metronomeRect.right <= transportEssentialRect.right + 1
+            ? 1
+            : 0,
+        metronomeControlCount: starterId === "beginner" && metronomeButton ? 1 : 0,
+        metronomeFocusReady:
+          starterId === "beginner" && metronomeButton?.tabIndex === 0 && metronomeButton.disabled === false,
+        metronomeInternalOverflow:
+          starterId === "beginner" && metronomeButton
+            ? Math.max(0, metronomeButton.scrollWidth - metronomeButton.clientWidth)
+            : 0,
+        metronomePressedStateReady:
+          starterId === "beginner" &&
+          /^(true|false)$/.test(metronomePressedState),
+        metronomeReadableLabelCount: starterId === "beginner" && metronomeReadable ? 1 : 0,
+        metronomeStateCopyReady:
+          starterId === "beginner" &&
+          expectedMetronomeState.length > 0 &&
+          expectedMetronomeBpm.length > 0 &&
+          metronomeLabel?.textContent?.trim() === "Metronome" &&
+          metronomeDetail?.textContent?.trim() === `${expectedMetronomeState} · ${expectedMetronomeBpm} BPM`,
+        metronomeTitleCount:
+          starterId === "beginner" && (metronomeButton?.getAttribute("title")?.trim().length ?? 0) > 0 ? 1 : 0,
         mixerNarrowStripCount: starterId === "beginner" ? mixerNarrowStrips.length : 0,
         mixerToggleContainedCount: starterId === "beginner" ? mixerToggleContainedButtons.length : 0,
         mixerToggleCount: starterId === "beginner" ? mixerToggleButtons.length : 0,
@@ -11642,15 +11705,16 @@ export function App(): ReactElement {
             </button>
           </div>
           <button
+            aria-label={metronomeAccessibleLabel}
             aria-pressed={project.metronomeEnabled}
-            className={`icon-button ${project.metronomeEnabled ? "selected" : ""}`}
+            className={`icon-button metronome-toggle ${project.metronomeEnabled ? "selected" : ""}`}
             data-testid="metronome-toggle"
             type="button"
             title={project.metronomeEnabled ? "Turn metronome off" : "Turn metronome on"}
             onClick={toggleMetronome}
           >
-            <Gauge size={18} aria-hidden="true" />
-            <span>Click</span>
+            <strong>Metronome</strong>
+            <small>{metronomeDetailLabel}</small>
           </button>
           <button
             aria-keyshortcuts="Control+K Meta+K"

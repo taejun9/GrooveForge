@@ -122,6 +122,15 @@ type GrooveforgeLaunchSmokeStarterLandingRouteEvidence = {
   loopScopeStateCopyReady: boolean;
   loopScopeTitleCount: number;
   loopScopeUniqueAccessibleNameCount: number;
+  metronomeAccessibleNameReady: boolean;
+  metronomeContainedCount: number;
+  metronomeControlCount: number;
+  metronomeFocusReady: boolean;
+  metronomeInternalOverflow: number;
+  metronomePressedStateReady: boolean;
+  metronomeReadableLabelCount: number;
+  metronomeStateCopyReady: boolean;
+  metronomeTitleCount: number;
   mixerNarrowStripCount: number;
   mixerToggleContainedCount: number;
   mixerToggleCount: number;
