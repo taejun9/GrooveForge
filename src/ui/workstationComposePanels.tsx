@@ -230,20 +230,42 @@ export function DrumStepInspector({
           ))}
         </div>
       )}
-      <div className="drum-clipboard-row" aria-label="Drum hit clipboard">
-        <button data-testid="drum-audition" disabled={!selectedStep || !active} onClick={onAudition} title="Audition selected drum hit" type="button">
+      <div className="drum-clipboard-row" aria-label="Selected drum hit tools">
+        <button
+          aria-label="Audition selected drum hit"
+          data-testid="drum-audition"
+          disabled={!selectedStep || !active}
+          onClick={onAudition}
+          title="Audition selected drum hit"
+          type="button"
+        >
           <Play size={14} aria-hidden="true" />
-          <span>Aud</span>
-        </button>
-        <button data-testid="drum-copy" disabled={!selectedStep || !active} onClick={onCopy} title="Copy selected drum hit shape" type="button">
-          <Copy size={14} aria-hidden="true" />
-          <span>Copy</span>
-        </button>
-        <button data-testid="drum-paste" disabled={!drumClipboard} onClick={onPaste} title="Paste copied hit to the next empty step" type="button">
-          <Plus size={14} aria-hidden="true" />
-          <span>Paste</span>
+          <span>Audition</span>
         </button>
         <button
+          aria-label="Copy selected drum hit shape"
+          data-testid="drum-copy"
+          disabled={!selectedStep || !active}
+          onClick={onCopy}
+          title="Copy selected drum hit shape"
+          type="button"
+        >
+          <Copy size={14} aria-hidden="true" />
+          <span>Copy hit</span>
+        </button>
+        <button
+          aria-label="Paste copied drum hit to the next empty step"
+          data-testid="drum-paste"
+          disabled={!drumClipboard}
+          onClick={onPaste}
+          title="Paste copied hit to the next empty step"
+          type="button"
+        >
+          <Plus size={14} aria-hidden="true" />
+          <span>Paste next</span>
+        </button>
+        <button
+          aria-label="Duplicate selected drum hit to the previous beat"
           data-testid="drum-duplicate-previous-beat"
           disabled={!selectedStep || !active || previousBeatDuplicateStep === null}
           onClick={onDuplicatePreviousBeat}
@@ -255,9 +277,10 @@ export function DrumStepInspector({
           type="button"
         >
           <ArrowLeft size={14} aria-hidden="true" />
-          <span>Prev</span>
+          <span>Previous beat</span>
         </button>
         <button
+          aria-label="Duplicate selected drum hit to the next beat"
           data-testid="drum-duplicate-beat"
           disabled={!selectedStep || !active || beatDuplicateStep === null}
           onClick={onDuplicateBeat}
@@ -265,7 +288,7 @@ export function DrumStepInspector({
           type="button"
         >
           <ArrowRight size={14} aria-hidden="true" />
-          <span>Next</span>
+          <span>Next beat</span>
         </button>
         <small data-testid="drum-clipboard-detail">{drumClipboard ? `Clipboard ${clipboardLabel}` : "Clipboard empty"}</small>
       </div>

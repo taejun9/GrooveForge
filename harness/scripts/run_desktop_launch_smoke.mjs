@@ -355,6 +355,14 @@ function checkResult(result) {
       evidence?.starterLanding?.beginner?.chordToolColumnCount === 4 &&
       evidence?.starterLanding?.beginner?.chordToolRowCount === 2 &&
       evidence?.starterLanding?.beginner?.chordToolInternalOverflow === 0 &&
+      evidence?.starterLanding?.beginner?.drumToolControlCount === 5 &&
+      evidence?.starterLanding?.beginner?.drumToolReadableLabelCount === 5 &&
+      evidence?.starterLanding?.beginner?.drumToolUniqueAccessibleNameCount === 5 &&
+      evidence?.starterLanding?.beginner?.drumToolContainedCount === 5 &&
+      evidence?.starterLanding?.beginner?.drumToolInternalOverflow === 0 &&
+      evidence?.starterLanding?.beginner?.drumToolColumnCount === 5 &&
+      evidence?.starterLanding?.beginner?.drumToolRowCount === 1 &&
+      evidence?.starterLanding?.beginner?.drumToolSelectedHit === true &&
       evidence?.starterLanding?.beginner?.mixerToggleCount === 10 &&
       evidence?.starterLanding?.beginner?.mixerToggleReadableLabelCount === 10 &&
       evidence?.starterLanding?.beginner?.mixerToggleUniqueAccessibleNameCount === 10 &&
@@ -1303,6 +1311,7 @@ child.on("exit", (code, signal) => {
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
   console.log("- Arrangement move controls: 2/2 readable directional labels, unique selected-block names, and contained actions");
   console.log("- Chord edit tools: 8/8 readable labels, eight unique accessible names, and a contained four-by-two narrow layout");
+  console.log("- Drum edit tools: 5/5 readable labels, five unique accessible names, and a contained five-column direct layout");
   console.log("- Note edit tools: 10/10 readable labels, ten unique accessible names, and a contained five-by-two narrow layout");
   console.log("- Mixer toggles: 10/10 readable Mute/Solo labels, unique channel names, pressed semantics, and five contained narrow strips");
   console.log("- Review Queue readability: 11/11 decision fields wrapped and contained across three compact diagnostic rows");

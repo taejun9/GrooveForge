@@ -909,6 +909,30 @@ function validateFirstRunRenderer(html) {
       styles.includes("white-space: normal;"),
     "the selected-note toolbar should use a readable five-by-two layout when its own inspector is narrow"
   );
+  const drumToolAccessibleNames = [
+    "Audition selected drum hit",
+    "Copy selected drum hit shape",
+    "Paste copied drum hit to the next empty step",
+    "Duplicate selected drum hit to the previous beat",
+    "Duplicate selected drum hit to the next beat"
+  ];
+  const drumToolVisibleLabels = ["Audition", "Copy hit", "Paste next", "Previous beat", "Next beat"];
+  check(
+    drumToolAccessibleNames.every((label) => composePanelsSource.includes(`aria-label="${label}"`)) &&
+      drumToolVisibleLabels.every((label) => composePanelsSource.includes(`<span>${label}</span>`)) &&
+      composePanelsSource.includes('aria-label="Selected drum hit tools"'),
+    "all five selected-drum actions should expose complete visible labels and unique action-specific accessible names"
+  );
+  check(
+    styles.includes(".drum-clipboard-row button {") &&
+      styles.includes("align-items: stretch;") &&
+      styles.includes("grid-template-columns: minmax(0, 1fr);") &&
+      styles.includes("min-height: 48px;") &&
+      styles.includes(".drum-clipboard-row button span {") &&
+      styles.includes("text-overflow: clip;") &&
+      styles.includes("white-space: normal;"),
+    "the selected-drum toolbar should keep five readable columns with comfortable wrapped controls"
+  );
   check(
     appSource.includes('aria-label={`Mute ${channel.name}`}') &&
       appSource.includes('aria-label={`Solo ${channel.name}`}') &&
