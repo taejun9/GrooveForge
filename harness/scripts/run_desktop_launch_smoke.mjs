@@ -363,6 +363,15 @@ function checkResult(result) {
       evidence?.starterLanding?.beginner?.drumToolColumnCount === 5 &&
       evidence?.starterLanding?.beginner?.drumToolRowCount === 1 &&
       evidence?.starterLanding?.beginner?.drumToolSelectedHit === true &&
+      evidence?.starterLanding?.beginner?.groovePresetControlCount === 4 &&
+      evidence?.starterLanding?.beginner?.groovePresetReadableLabelCount === 4 &&
+      evidence?.starterLanding?.beginner?.groovePresetUniqueAccessibleNameCount === 4 &&
+      evidence?.starterLanding?.beginner?.groovePresetTitleCount === 4 &&
+      evidence?.starterLanding?.beginner?.groovePresetContainedCount === 4 &&
+      evidence?.starterLanding?.beginner?.groovePresetContextReady === true &&
+      evidence?.starterLanding?.beginner?.groovePresetColumnCount === 4 &&
+      evidence?.starterLanding?.beginner?.groovePresetRowCount === 1 &&
+      evidence?.starterLanding?.beginner?.groovePresetInternalOverflow === 0 &&
       evidence?.starterLanding?.beginner?.mixerToggleCount === 10 &&
       evidence?.starterLanding?.beginner?.mixerToggleReadableLabelCount === 10 &&
       evidence?.starterLanding?.beginner?.mixerToggleUniqueAccessibleNameCount === 10 &&
@@ -1312,6 +1321,7 @@ child.on("exit", (code, signal) => {
   console.log("- Arrangement move controls: 2/2 readable directional labels, unique selected-block names, and contained actions");
   console.log("- Chord edit tools: 8/8 readable labels, eight unique accessible names, and a contained four-by-two narrow layout");
   console.log("- Drum edit tools: 5/5 readable labels, five unique accessible names, and a contained five-column direct layout");
+  console.log("- Pattern groove presets: 4/4 readable feel descriptions, four unique Pattern-scoped names/titles, direct Undo context, and a contained four-column layout");
   console.log("- Note edit tools: 10/10 readable labels, ten unique accessible names, and a contained five-by-two narrow layout");
   console.log("- Mixer toggles: 10/10 readable Mute/Solo labels, unique channel names, pressed semantics, and five contained narrow strips");
   console.log("- Review Queue readability: 11/11 decision fields wrapped and contained across three compact diagnostic rows");

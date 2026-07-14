@@ -19584,18 +19584,67 @@ h2 {
 .groove-row {
   display: grid;
   gap: 5px;
+  min-width: 0;
 }
 
-.groove-row > div {
+.groove-row-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.groove-row-heading strong {
+  color: #82d7ff;
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.groove-row > small {
+  color: #b8b1a7;
+  font-size: 0.65rem;
+  line-height: 1.35;
+}
+
+.groove-actions {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 5px;
+  align-items: stretch;
+  min-width: 0;
 }
 
-.groove-row button {
+.groove-actions button {
+  display: grid;
+  align-content: center;
+  gap: 2px;
   min-width: 0;
-  min-height: 30px;
-  padding: 0 5px;
+  min-height: 48px;
+  padding: 6px 5px;
+  text-align: left;
+}
+
+.groove-actions button strong,
+.groove-actions button span {
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.groove-actions button strong {
+  color: #f4efe7;
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+.groove-actions button span {
+  color: #b8b1a7;
+  font-size: 0.61rem;
+  line-height: 1.15;
 }
 
 .swing-feel-row {

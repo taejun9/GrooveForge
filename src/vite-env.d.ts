@@ -100,6 +100,15 @@ type GrooveforgeLaunchSmokeStarterLandingRouteEvidence = {
   drumToolSelectedHit: boolean;
   drumToolUniqueAccessibleNameCount: number;
   focusTestId: string;
+  groovePresetColumnCount: number;
+  groovePresetContainedCount: number;
+  groovePresetContextReady: boolean;
+  groovePresetControlCount: number;
+  groovePresetInternalOverflow: number;
+  groovePresetReadableLabelCount: number;
+  groovePresetRowCount: number;
+  groovePresetTitleCount: number;
+  groovePresetUniqueAccessibleNameCount: number;
   inViewport: boolean;
   mixerNarrowStripCount: number;
   mixerToggleContainedCount: number;

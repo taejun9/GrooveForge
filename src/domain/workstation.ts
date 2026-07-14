@@ -378,6 +378,12 @@ export const drumGroovePresetLabels: Record<DrumGroovePreset, string> = {
   push: "Push",
   reset: "Reset"
 };
+export const drumGroovePresetDetails: Record<DrumGroovePreset, string> = {
+  tight: "Controlled timing",
+  pocket: "Laid-back backbeat",
+  push: "Early energy",
+  reset: "Default feel"
+};
 export const chordProgressionPresetLabels: Record<ChordProgressionPreset, string> = {
   moody: "Moody",
   lift: "Lift",
@@ -1697,6 +1703,10 @@ export function sidechainGainForStep(pattern: PatternData, step: number, amount:
 
 export function drumGroovePresetLabel(preset: DrumGroovePreset): string {
   return drumGroovePresetLabels[preset];
+}
+
+export function drumGroovePresetDetail(preset: DrumGroovePreset): string {
+  return drumGroovePresetDetails[preset];
 }
 
 export function applyDrumGroovePreset(pattern: PatternData, preset: DrumGroovePreset): PatternData {
