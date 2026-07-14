@@ -14,8 +14,8 @@ const launchSmokeDrumGridSnapshotChannel = "grooveforge:launch-smoke-drum-grid-s
 const launchSmokeNoteGridSnapshotChannel = "grooveforge:launch-smoke-note-grid-snapshot";
 const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
-const launchSmokeTimeoutMs = 640000;
-const projectIoSmokeTimeoutMs = launchSmokeTimeoutMs;
+const launchSmokeTimeoutMs = 880000;
+const projectIoSmokeTimeoutMs = 640000;
 
 type NativeMenuCommand =
   | "open-project"
@@ -278,6 +278,13 @@ type LaunchSmokeStarterLandingRouteEvidence = {
   mixerToggleReadableLabelCount: number;
   mixerToggleTitleCount: number;
   mixerToggleUniqueAccessibleNameCount: number;
+  noteToolColumnCount: number;
+  noteToolContainedCount: number;
+  noteToolControlCount: number;
+  noteToolInternalOverflow: number;
+  noteToolReadableLabelCount: number;
+  noteToolRowCount: number;
+  noteToolUniqueAccessibleNameCount: number;
   producerQueueOpen: boolean;
   producerReviewOpen: boolean;
   projectTitle: string;

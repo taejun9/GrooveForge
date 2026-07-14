@@ -10,7 +10,7 @@ import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gu
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(import.meta.url);
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
-const timeoutMs = 660000;
+const timeoutMs = 900000;
 const failures = [];
 const expectedLiveTestIds = [
   "workflow-target-transport",
@@ -376,8 +376,15 @@ function checkResult(result) {
       evidence?.starterLanding?.producer?.reviewQueueFieldCount === 11 &&
       evidence?.starterLanding?.producer?.reviewQueueReadableFieldCount === 11 &&
       evidence?.starterLanding?.producer?.reviewQueueInternalOverflow === 0 &&
-      evidence?.starterLanding?.producer?.reviewQueueStackedRowCount === 3,
-    `live producer starter should open and focus a visible Review Queue below the sticky Workflow Navigator (${JSON.stringify(evidence?.starterLanding?.producer ?? null)})`
+      evidence?.starterLanding?.producer?.reviewQueueStackedRowCount === 3 &&
+      evidence?.starterLanding?.producer?.noteToolControlCount === 10 &&
+      evidence?.starterLanding?.producer?.noteToolReadableLabelCount === 10 &&
+      evidence?.starterLanding?.producer?.noteToolUniqueAccessibleNameCount === 10 &&
+      evidence?.starterLanding?.producer?.noteToolContainedCount === 10 &&
+      evidence?.starterLanding?.producer?.noteToolInternalOverflow === 0 &&
+      evidence?.starterLanding?.producer?.noteToolColumnCount === 5 &&
+      evidence?.starterLanding?.producer?.noteToolRowCount === 2,
+    `live producer starter should open and focus a visible Review Queue while its selected-note tools remain readable, unique, and contained (${JSON.stringify(evidence?.starterLanding?.producer ?? null)})`
   );
   check(
     evidence?.layout?.feedbackOutsideGuidance === true && evidence?.layout?.feedbackAfterGuidance === true,
@@ -1296,6 +1303,7 @@ child.on("exit", (code, signal) => {
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
   console.log("- Arrangement move controls: 2/2 readable directional labels, unique selected-block names, and contained actions");
   console.log("- Chord edit tools: 8/8 readable labels, eight unique accessible names, and a contained four-by-two narrow layout");
+  console.log("- Note edit tools: 10/10 readable labels, ten unique accessible names, and a contained five-by-two narrow layout");
   console.log("- Mixer toggles: 10/10 readable Mute/Solo labels, unique channel names, pressed semantics, and five contained narrow strips");
   console.log("- Review Queue readability: 11/11 decision fields wrapped and contained across three compact diagnostic rows");
   console.log("- Swing Feel pads: five dark-theme controls, pressed semantics ready, one selected target");

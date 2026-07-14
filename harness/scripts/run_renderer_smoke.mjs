@@ -869,6 +869,46 @@ function validateFirstRunRenderer(html) {
       styles.includes("white-space: normal;"),
     "the selected-chord toolbar should use a readable four-by-two layout when its own component is narrow"
   );
+  const noteToolAccessibleNames = [
+    "Move selected note one step left",
+    "Move selected note one step right",
+    "Move selected note down in scale",
+    "Move selected note up in scale",
+    "Move selected note down an octave",
+    "Move selected note up an octave",
+    "Duplicate selected note to the next empty step",
+    "Duplicate selected note to the previous beat",
+    "Duplicate selected note to the next beat",
+    "Audition selected 808 or Synth note"
+  ];
+  const noteToolVisibleLabels = [
+    "Step left",
+    "Step right",
+    "Pitch down",
+    "Pitch up",
+    "Octave down",
+    "Octave up",
+    "Duplicate",
+    "Prev beat",
+    "Next beat",
+    "Audition"
+  ];
+  check(
+    noteToolAccessibleNames.every((label) => composePanelsSource.includes(`aria-label="${label}"`)) &&
+      noteToolVisibleLabels.every((label) => composePanelsSource.includes(`<span>${label}</span>`)) &&
+      composePanelsSource.includes('aria-label="Selected note tools"'),
+    "all ten selected-note actions should expose complete visible labels and unique action-specific accessible names"
+  );
+  check(
+    styles.includes("container-name: note-inspector;") &&
+      styles.includes("container-type: inline-size;") &&
+      styles.includes("@container note-inspector (max-width: 780px)") &&
+      styles.includes("grid-template-columns: repeat(5, minmax(0, 1fr));") &&
+      styles.includes("min-height: 48px;") &&
+      styles.includes("text-overflow: clip;") &&
+      styles.includes("white-space: normal;"),
+    "the selected-note toolbar should use a readable five-by-two layout when its own inspector is narrow"
+  );
   check(
     appSource.includes('aria-label={`Mute ${channel.name}`}') &&
       appSource.includes('aria-label={`Solo ${channel.name}`}') &&
