@@ -1342,6 +1342,7 @@ export function App(): ReactElement {
   const workflowNavigatorPanelRef = useRef<HTMLElement | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
   const composePanelRef = useRef<HTMLElement | null>(null);
+  const patternTabRefs = useRef<Record<PatternSlot, HTMLButtonElement | null>>({ A: null, B: null, C: null });
   const soundPanelRef = useRef<HTMLElement | null>(null);
   const arrangePanelRef = useRef<HTMLElement | null>(null);
   const mixPanelRef = useRef<HTMLElement | null>(null);
@@ -3240,6 +3241,32 @@ export function App(): ReactElement {
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(0);
+  }
+
+  function handlePatternTabKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, pattern: PatternSlot): void {
+    const currentIndex = patternSlots.indexOf(pattern);
+    let targetIndex: number | null = null;
+
+    if (event.key === "ArrowLeft") {
+      targetIndex = (currentIndex - 1 + patternSlots.length) % patternSlots.length;
+    } else if (event.key === "ArrowRight") {
+      targetIndex = (currentIndex + 1) % patternSlots.length;
+    } else if (event.key === "Home") {
+      targetIndex = 0;
+    } else if (event.key === "End") {
+      targetIndex = patternSlots.length - 1;
+    }
+
+    if (targetIndex === null) {
+      return;
+    }
+
+    event.preventDefault();
+    const targetPattern = patternSlots[targetIndex];
+    if (targetPattern !== pattern) {
+      selectPattern(targetPattern);
+    }
+    patternTabRefs.current[targetPattern]?.focus();
   }
 
   function followAudiblePattern(): void {
@@ -10474,6 +10501,50 @@ export function App(): ReactElement {
           : document.querySelector<HTMLElement>('[data-testid="review-queue"]');
       const landingRect = landingTarget?.getBoundingClientRect() ?? null;
       const navigatorRect = document.querySelector<HTMLElement>('[data-testid="workflow-navigator"]')?.getBoundingClientRect() ?? null;
+      const patternTabGroup = document.querySelector<HTMLElement>(".pattern-tabs");
+      const patternTabButtons = patternTabGroup
+        ? [...patternTabGroup.querySelectorAll<HTMLButtonElement>("button")]
+        : [];
+      const patternTabGroupRect = patternTabGroup?.getBoundingClientRect() ?? null;
+      const patternTabAccessibleNames = patternTabButtons
+        .map((button) => button.getAttribute("aria-label")?.trim() ?? "")
+        .filter((label) => label.length > 0);
+      const patternTabReadableLabels = patternTabButtons.filter((button) => {
+        const label = button.querySelector<HTMLElement>(":scope > span");
+        const detail = button.querySelector<HTMLElement>(":scope > small");
+        return Boolean(
+          label &&
+            detail &&
+            label.clientWidth > 0 &&
+            label.scrollWidth <= label.clientWidth + 1 &&
+            detail.clientWidth > 0 &&
+            detail.scrollWidth <= detail.clientWidth + 1
+        );
+      });
+      const patternTabContainedButtons = patternTabButtons.filter((button) => {
+        const buttonRect = button.getBoundingClientRect();
+        return Boolean(
+          patternTabGroupRect &&
+            buttonRect.height >= 48 &&
+            buttonRect.left >= patternTabGroupRect.left - 1 &&
+            buttonRect.right <= patternTabGroupRect.right + 1
+        );
+      });
+      const patternTabColumnCount = patternTabGroup
+        ? window.getComputedStyle(patternTabGroup).gridTemplateColumns.trim().split(/\s+/).length
+        : 0;
+      const patternTabRowCount = new Set(
+        patternTabButtons.map((button) => Math.round(button.getBoundingClientRect().top))
+      ).size;
+      const patternTabStateCopyReady =
+        patternTabButtons.every(
+          (button, index) =>
+            button.querySelector(":scope > span")?.textContent?.trim() === `Pattern ${patternSlots[index]}` &&
+            /\bevents?$/.test(button.querySelector(":scope > small > em")?.textContent?.trim() ?? "")
+        ) &&
+        patternTabButtons.filter((button) => button.dataset.editing === "true").every((button) =>
+          button.querySelector(":scope > small > strong")?.textContent?.trim().startsWith("Editing")
+        );
       const chordToolGroup = document.querySelector<HTMLElement>('[data-testid="chord-edit-tools"]');
       const chordToolButtons = chordToolGroup
         ? [...chordToolGroup.querySelectorAll<HTMLButtonElement>("button")]
@@ -10811,6 +10882,33 @@ export function App(): ReactElement {
             : 0,
         mixerToggleUniqueAccessibleNameCount:
           starterId === "beginner" ? new Set(mixerToggleAccessibleNames).size : 0,
+        patternTabColumnCount: starterId === "beginner" ? patternTabColumnCount : 0,
+        patternTabContainedCount: starterId === "beginner" ? patternTabContainedButtons.length : 0,
+        patternTabControlCount: starterId === "beginner" ? patternTabButtons.length : 0,
+        patternTabInternalOverflow:
+          starterId === "beginner" && patternTabGroup
+            ? Math.max(0, patternTabGroup.scrollWidth - patternTabGroup.clientWidth)
+            : 0,
+        patternTabReadableLabelCount: starterId === "beginner" ? patternTabReadableLabels.length : 0,
+        patternTabRoleReady:
+          starterId === "beginner" &&
+          patternTabGroup?.getAttribute("role") === "tablist" &&
+          patternTabGroup.getAttribute("aria-orientation") === "horizontal" &&
+          patternTabButtons.every((button) => button.getAttribute("role") === "tab"),
+        patternTabRovingTabStopCount:
+          starterId === "beginner" ? patternTabButtons.filter((button) => button.tabIndex === 0).length : 0,
+        patternTabRowCount: starterId === "beginner" ? patternTabRowCount : 0,
+        patternTabSelectedCount:
+          starterId === "beginner"
+            ? patternTabButtons.filter((button) => button.getAttribute("aria-selected") === "true").length
+            : 0,
+        patternTabStateCopyReady: starterId === "beginner" ? patternTabStateCopyReady : false,
+        patternTabTitleCount:
+          starterId === "beginner"
+            ? patternTabButtons.filter((button) => (button.getAttribute("title")?.trim().length ?? 0) > 0).length
+            : 0,
+        patternTabUniqueAccessibleNameCount:
+          starterId === "beginner" ? new Set(patternTabAccessibleNames).size : 0,
         noteToolColumnCount: starterId === "producer" ? noteToolColumnCount : 0,
         noteToolContainedCount: starterId === "producer" ? noteToolContainedButtons.length : 0,
         noteToolControlCount: starterId === "producer" ? noteToolButtons.length : 0,
@@ -12138,24 +12236,44 @@ export function App(): ReactElement {
           tabIndex={-1}
         >
           <PanelTitle icon={<Drum size={18} />} title="Drums" meta="16 step rack" />
-          <div className="pattern-tabs" aria-label="Pattern">
+          <div
+            aria-label="Edit Pattern A, B, or C"
+            aria-orientation="horizontal"
+            className="pattern-tabs"
+            role="tablist"
+          >
             {patternSlots.map((pattern) => {
               const selected = project.selectedPattern === pattern;
               const playing = playingPattern === pattern;
+              const eventLabel = patternEventCount(project.patterns[pattern]);
+              const visibleState = selected && playing ? "Editing + playing" : selected ? "Editing" : playing ? "Playing" : "";
+              const accessibleState = selected && playing ? "editing and playing" : selected ? "editing" : playing ? "playing" : "";
               return (
                 <button
+                  aria-label={`Pattern ${pattern}${accessibleState ? `, ${accessibleState}` : ""}, ${eventLabel}`}
                   aria-keyshortcuts={String(patternSlots.indexOf(pattern) + 1)}
+                  aria-selected={selected}
                   key={pattern}
                   aria-current={playing ? "step" : undefined}
                   className={["pattern-tab", selected ? "selected" : "", playing ? "playing" : ""].filter(Boolean).join(" ")}
+                  data-editing={selected ? "true" : "false"}
                   data-playing={playing ? "true" : "false"}
                   data-testid={`pattern-tab-${pattern}`}
+                  onKeyDown={(event) => handlePatternTabKeyDown(event, pattern)}
+                  ref={(element) => {
+                    patternTabRefs.current[pattern] = element;
+                  }}
+                  role="tab"
+                  tabIndex={selected ? 0 : -1}
                   type="button"
                   title={`Edit Pattern ${pattern} (${patternSlots.indexOf(pattern) + 1})`}
                   onClick={() => selectPattern(pattern)}
                 >
-                  <span>{pattern}</span>
-                  <small>{playing ? "Playing" : patternEventCount(project.patterns[pattern])}</small>
+                  <span>Pattern {pattern}</span>
+                  <small>
+                    {visibleState && <strong>{visibleState}</strong>}
+                    <em>{eventLabel}</em>
+                  </small>
                 </button>
               );
             })}

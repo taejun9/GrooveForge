@@ -118,6 +118,18 @@ type GrooveforgeLaunchSmokeStarterLandingRouteEvidence = {
   mixerToggleReadableLabelCount: number;
   mixerToggleTitleCount: number;
   mixerToggleUniqueAccessibleNameCount: number;
+  patternTabColumnCount: number;
+  patternTabContainedCount: number;
+  patternTabControlCount: number;
+  patternTabInternalOverflow: number;
+  patternTabReadableLabelCount: number;
+  patternTabRoleReady: boolean;
+  patternTabRovingTabStopCount: number;
+  patternTabRowCount: number;
+  patternTabSelectedCount: number;
+  patternTabStateCopyReady: boolean;
+  patternTabTitleCount: number;
+  patternTabUniqueAccessibleNameCount: number;
   noteToolColumnCount: number;
   noteToolContainedCount: number;
   noteToolControlCount: number;

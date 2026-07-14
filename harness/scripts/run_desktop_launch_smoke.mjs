@@ -379,7 +379,19 @@ function checkResult(result) {
       evidence?.starterLanding?.beginner?.mixerToggleTitleCount === 10 &&
       evidence?.starterLanding?.beginner?.mixerToggleContainedCount === 10 &&
       evidence?.starterLanding?.beginner?.mixerNarrowStripCount === 5 &&
-      evidence?.starterLanding?.beginner?.mixerToggleInternalOverflow === 0,
+      evidence?.starterLanding?.beginner?.mixerToggleInternalOverflow === 0 &&
+      evidence?.starterLanding?.beginner?.patternTabControlCount === 3 &&
+      evidence?.starterLanding?.beginner?.patternTabReadableLabelCount === 3 &&
+      evidence?.starterLanding?.beginner?.patternTabUniqueAccessibleNameCount === 3 &&
+      evidence?.starterLanding?.beginner?.patternTabTitleCount === 3 &&
+      evidence?.starterLanding?.beginner?.patternTabContainedCount === 3 &&
+      evidence?.starterLanding?.beginner?.patternTabRoleReady === true &&
+      evidence?.starterLanding?.beginner?.patternTabSelectedCount === 1 &&
+      evidence?.starterLanding?.beginner?.patternTabRovingTabStopCount === 1 &&
+      evidence?.starterLanding?.beginner?.patternTabStateCopyReady === true &&
+      evidence?.starterLanding?.beginner?.patternTabColumnCount === 3 &&
+      evidence?.starterLanding?.beginner?.patternTabRowCount === 1 &&
+      evidence?.starterLanding?.beginner?.patternTabInternalOverflow === 0,
     `live beginner starter should focus a visible Pattern editor below the sticky Workflow Navigator (${JSON.stringify(evidence?.starterLanding?.beginner ?? null)})`
   );
   check(
@@ -1322,6 +1334,7 @@ child.on("exit", (code, signal) => {
   console.log("- Chord edit tools: 8/8 readable labels, eight unique accessible names, and a contained four-by-two narrow layout");
   console.log("- Drum edit tools: 5/5 readable labels, five unique accessible names, and a contained five-column direct layout");
   console.log("- Pattern groove presets: 4/4 readable feel descriptions, four unique Pattern-scoped names/titles, direct Undo context, and a contained four-column layout");
+  console.log("- Pattern tabs: 3/3 complete labels and unique state-aware names, one selected roving tab stop, and a contained three-column layout");
   console.log("- Note edit tools: 10/10 readable labels, ten unique accessible names, and a contained five-by-two narrow layout");
   console.log("- Mixer toggles: 10/10 readable Mute/Solo labels, unique channel names, pressed semantics, and five contained narrow strips");
   console.log("- Review Queue readability: 11/11 decision fields wrapped and contained across three compact diagnostic rows");
