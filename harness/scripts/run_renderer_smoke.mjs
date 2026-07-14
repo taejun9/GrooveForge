@@ -1046,7 +1046,7 @@ function validateFirstRunRenderer(html) {
       styles.includes('"launch launch commands"') &&
       styles.includes("grid-template-columns: 220px minmax(0, 1fr) 340px;") &&
       styles.includes(".brand-start {\n    display: contents;") &&
-      styles.includes("grid-template-columns: 150px 68px 72px 110px minmax(0, 1fr);") &&
+      styles.includes("grid-template-columns: 127px 68px 104px 100px minmax(0, 1fr);") &&
       styles.includes("grid-template-columns: minmax(180px, 0.85fr) repeat(2, minmax(190px, 1fr));") &&
       styles.includes(".command-strip .transport-essential-controls,") &&
       styles.includes("grid-template-columns: repeat(4, minmax(0, 1fr));") &&
@@ -1061,7 +1061,7 @@ function validateFirstRunRenderer(html) {
       styles.includes('"launch launch"') &&
       styles.includes('"commands commands"') &&
       styles.includes("grid-template-columns: 200px minmax(0, 1fr);") &&
-      styles.includes("grid-template-columns: 140px 64px 68px 100px minmax(0, 1fr);") &&
+      styles.includes("grid-template-columns: 140px 64px 104px 100px minmax(0, 1fr);") &&
       styles.includes("grid-template-columns: minmax(180px, 0.8fr) repeat(2, minmax(190px, 1fr));") &&
       styles.includes(".command-strip .transport-essential-controls {") &&
       styles.includes("grid-column: 2 / 4;") &&
@@ -1140,6 +1140,44 @@ function validateFirstRunRenderer(html) {
       styles.includes(".metronome-toggle.selected small,") &&
       styles.includes('.metronome-toggle[aria-pressed="true"] small {'),
     "Metronome should keep a contained readable two-line command-strip treatment with explicit active-state detail"
+  );
+  const tempoNudgeMarker = html.indexOf('data-testid="tempo-nudge-pads"');
+  const tempoNudgeStart = tempoNudgeMarker >= 0 ? html.lastIndexOf("<div", tempoNudgeMarker) : -1;
+  const tempoNudgeEnd = tempoNudgeStart >= 0 ? html.indexOf("</div>", tempoNudgeStart) : -1;
+  const tempoNudgeSegment = tempoNudgeEnd >= 0 ? html.slice(tempoNudgeStart, tempoNudgeEnd) : "";
+  const expectedTempoNudgeMarkup = [
+    ["tempo-nudge-down", "Lower tempo by 1 BPM, 82 to 81 BPM", "Lower tempo by 1 BPM: 82 → 81 BPM", "-1 BPM", "81 BPM"],
+    ["tempo-nudge-up", "Raise tempo by 1 BPM, 82 to 83 BPM", "Raise tempo by 1 BPM: 82 → 83 BPM", "+1 BPM", "83 BPM"],
+    ["tempo-nudge-half", "Set half-time BPM, 82 to 60 BPM", "Set half-time BPM: 82 → 60 BPM", "Half", "60 BPM"],
+    ["tempo-nudge-double", "Set double-time BPM, 82 to 164 BPM", "Set double-time BPM: 82 → 164 BPM", "Double", "164 BPM"]
+  ];
+  check(
+    tempoNudgeSegment.includes('aria-label="Tempo nudge pads"') &&
+      tempoNudgeSegment.includes('role="group"') &&
+      expectedTempoNudgeMarkup.every(([testId, accessibleName, title, label, target]) => {
+        const marker = tempoNudgeSegment.indexOf(`data-testid="${testId}"`);
+        const buttonStart = marker >= 0 ? tempoNudgeSegment.lastIndexOf("<button", marker) : -1;
+        const buttonEnd = buttonStart >= 0 ? tempoNudgeSegment.indexOf("</button>", buttonStart) : -1;
+        const buttonSegment = buttonEnd >= 0 ? tempoNudgeSegment.slice(buttonStart, buttonEnd) : "";
+        return (
+          buttonSegment.includes(`aria-label="${accessibleName}"`) &&
+          buttonSegment.includes(`title="${title}"`) &&
+          buttonSegment.includes(`<strong>${label}</strong>`) &&
+          buttonSegment.includes(`<small>${target}</small>`)
+        );
+      }),
+    "Tempo Nudge pads should expose complete actions, current-to-target accessible names, exact target BPM, retained ids, and target-aware titles"
+  );
+  check(
+    styles.includes(".tempo-nudge-pads {") &&
+      styles.includes("min-width: 104px;") &&
+      styles.includes("min-height: 54px;") &&
+      styles.includes(".tempo-nudge-pads button strong,") &&
+      styles.includes(".tempo-nudge-pads button small {") &&
+      styles.includes("min-height: 25px;") &&
+      styles.includes("grid-template-columns: 127px 68px 104px 100px minmax(0, 1fr);") &&
+      styles.includes("grid-template-columns: 140px 64px 104px 100px minmax(0, 1fr);"),
+    "Tempo Nudge pads should retain a contained readable two-by-two setup-row treatment at wide and minimum desktop widths"
   );
   const transportBandIndex = html.indexOf('data-testid="workflow-target-transport"');
   const transportStatusControlsIndex = html.indexOf('data-testid="transport-status-controls"');
