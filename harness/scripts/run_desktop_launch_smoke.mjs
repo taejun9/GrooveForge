@@ -393,6 +393,16 @@ function checkResult(result) {
       evidence?.starterLanding?.beginner?.metronomeContainedCount === 1 &&
       evidence?.starterLanding?.beginner?.metronomeFocusReady === true &&
       evidence?.starterLanding?.beginner?.metronomeInternalOverflow === 0 &&
+      evidence?.starterLanding?.beginner?.tapTempoControlCount === 1 &&
+      evidence?.starterLanding?.beginner?.tapTempoReadableLabelCount === 1 &&
+      evidence?.starterLanding?.beginner?.tapTempoAccessibleNameReady === true &&
+      evidence?.starterLanding?.beginner?.tapTempoTitleReady === true &&
+      evidence?.starterLanding?.beginner?.tapTempoStateCopyReady === true &&
+      evidence?.starterLanding?.beginner?.tapTempoSummaryDiscoveryReady === true &&
+      evidence?.starterLanding?.beginner?.tapTempoContainedCount === 1 &&
+      evidence?.starterLanding?.beginner?.tapTempoFocusReady === true &&
+      evidence?.starterLanding?.beginner?.tapTempoSessionStateRestored === true &&
+      evidence?.starterLanding?.beginner?.tapTempoInternalOverflow === 0 &&
       evidence?.starterLanding?.beginner?.tempoNudgeControlCount === 4 &&
       evidence?.starterLanding?.beginner?.tempoNudgeReadableLabelCount === 4 &&
       evidence?.starterLanding?.beginner?.tempoNudgeAccessibleNameCount === 4 &&
@@ -1368,6 +1378,7 @@ child.on("exit", (code, signal) => {
   console.log("- Pattern groove presets: 4/4 readable feel descriptions, four unique Pattern-scoped names/titles, direct Undo context, and a contained four-column layout");
   console.log("- Transport loop scope: 4/4 live targets and unique names, one pressed scope, corrected event grammar, and a contained four-column layout");
   console.log("- Metronome: complete visible name, live On/Off and BPM detail, state-aware accessible action, pressed semantics, and contained focusable control");
+  console.log("- Tap Tempo: closed-summary discovery, complete direct name, live start/BPM detail, state-aware name/title, and contained focusable control");
   console.log("- Tempo Nudge pads: 4/4 complete actions, live target BPM details, unique current-to-target names/titles, and a contained focusable two-by-two layout");
   console.log("- Pattern tabs: 3/3 complete labels and unique state-aware names, one selected roving tab stop, and a contained three-column layout");
   console.log("- Note edit tools: 10/10 readable labels, ten unique accessible names, and a contained five-by-two narrow layout");
