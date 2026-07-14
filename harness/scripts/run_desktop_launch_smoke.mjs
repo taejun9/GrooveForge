@@ -372,6 +372,18 @@ function checkResult(result) {
       evidence?.starterLanding?.beginner?.groovePresetColumnCount === 4 &&
       evidence?.starterLanding?.beginner?.groovePresetRowCount === 1 &&
       evidence?.starterLanding?.beginner?.groovePresetInternalOverflow === 0 &&
+      evidence?.starterLanding?.beginner?.loopScopeControlCount === 4 &&
+      evidence?.starterLanding?.beginner?.loopScopeReadableLabelCount === 4 &&
+      evidence?.starterLanding?.beginner?.loopScopeUniqueAccessibleNameCount === 4 &&
+      evidence?.starterLanding?.beginner?.loopScopeTitleCount === 4 &&
+      evidence?.starterLanding?.beginner?.loopScopeContainedCount === 4 &&
+      evidence?.starterLanding?.beginner?.loopScopeRoleReady === true &&
+      evidence?.starterLanding?.beginner?.loopScopePressedCount === 1 &&
+      evidence?.starterLanding?.beginner?.loopScopeStateCopyReady === true &&
+      evidence?.starterLanding?.beginner?.loopScopeGrammarReady === true &&
+      evidence?.starterLanding?.beginner?.loopScopeColumnCount === 4 &&
+      evidence?.starterLanding?.beginner?.loopScopeRowCount === 1 &&
+      evidence?.starterLanding?.beginner?.loopScopeInternalOverflow === 0 &&
       evidence?.starterLanding?.beginner?.mixerToggleCount === 10 &&
       evidence?.starterLanding?.beginner?.mixerToggleReadableLabelCount === 10 &&
       evidence?.starterLanding?.beginner?.mixerToggleUniqueAccessibleNameCount === 10 &&
@@ -1334,6 +1346,7 @@ child.on("exit", (code, signal) => {
   console.log("- Chord edit tools: 8/8 readable labels, eight unique accessible names, and a contained four-by-two narrow layout");
   console.log("- Drum edit tools: 5/5 readable labels, five unique accessible names, and a contained five-column direct layout");
   console.log("- Pattern groove presets: 4/4 readable feel descriptions, four unique Pattern-scoped names/titles, direct Undo context, and a contained four-column layout");
+  console.log("- Transport loop scope: 4/4 live targets and unique names, one pressed scope, corrected event grammar, and a contained four-column layout");
   console.log("- Pattern tabs: 3/3 complete labels and unique state-aware names, one selected roving tab stop, and a contained three-column layout");
   console.log("- Note edit tools: 10/10 readable labels, ten unique accessible names, and a contained five-by-two narrow layout");
   console.log("- Mixer toggles: 10/10 readable Mute/Solo labels, unique channel names, pressed semantics, and five contained narrow strips");
