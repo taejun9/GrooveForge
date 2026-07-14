@@ -21161,6 +21161,8 @@ input[type="range"] {
   gap: 10px;
   border-top: 1px solid rgba(244, 239, 231, 0.1);
   padding-top: 12px;
+  container-name: note-inspector;
+  container-type: inline-size;
 }
 
 .inspector-heading {
@@ -21247,6 +21249,32 @@ input[type="range"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@container note-inspector (max-width: 780px) {
+  .note-action-row {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .note-action-row button {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: center;
+    gap: 2px;
+    min-height: 48px;
+    padding: 4px;
+  }
+
+  .note-action-row button svg {
+    justify-self: center;
+  }
+
+  .note-action-row button span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    line-height: 1.1;
+  }
 }
 
 .note-clipboard-row button:disabled {

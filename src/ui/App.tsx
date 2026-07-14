@@ -10573,6 +10573,46 @@ export function App(): ReactElement {
         (maximum, strip) => Math.max(maximum, strip.scrollWidth - strip.clientWidth),
         0
       );
+      const noteToolGroup = document.querySelector<HTMLElement>(".note-action-row");
+      const noteToolButtons = noteToolGroup
+        ? [...noteToolGroup.querySelectorAll<HTMLButtonElement>("button")]
+        : [];
+      const noteToolGroupRect = noteToolGroup?.getBoundingClientRect() ?? null;
+      const noteToolAccessibleNames = noteToolButtons
+        .map((button) => button.getAttribute("aria-label")?.trim() ?? "")
+        .filter((label) => label.length > 0);
+      const noteToolReadableLabels = noteToolButtons.filter((button) => {
+        const label = button.querySelector<HTMLElement>("span");
+        const labelStyle = label ? window.getComputedStyle(label) : null;
+        return Boolean(
+          label &&
+            labelStyle &&
+            label.clientWidth > 0 &&
+            label.clientHeight > 0 &&
+            label.scrollWidth <= label.clientWidth + 1 &&
+            label.scrollHeight <= label.clientHeight + 1 &&
+            labelStyle.whiteSpace !== "nowrap" &&
+            labelStyle.textOverflow === "clip"
+        );
+      });
+      const noteToolContainedButtons = noteToolButtons.filter((button) => {
+        const buttonRect = button.getBoundingClientRect();
+        return Boolean(
+          noteToolGroupRect &&
+            buttonRect.height >= 48 &&
+            buttonRect.left >= noteToolGroupRect.left - 1 &&
+            buttonRect.right <= noteToolGroupRect.right + 1
+        );
+      });
+      const noteToolColumnCount = noteToolGroup
+        ? window.getComputedStyle(noteToolGroup).gridTemplateColumns.trim().split(/\s+/).length
+        : 0;
+      const noteToolRowCount = new Set(
+        noteToolButtons.map((button) => Math.round(button.getBoundingClientRect().top))
+      ).size;
+      const noteToolInternalOverflow = noteToolGroup
+        ? Math.max(0, noteToolGroup.scrollWidth - noteToolGroup.clientWidth)
+        : 0;
       const reviewQueue = document.querySelector<HTMLElement>('[data-testid="review-queue"]');
       const reviewQueueRect = reviewQueue?.getBoundingClientRect() ?? null;
       const reviewQueueFields = [
@@ -10648,6 +10688,14 @@ export function App(): ReactElement {
             : 0,
         mixerToggleUniqueAccessibleNameCount:
           starterId === "beginner" ? new Set(mixerToggleAccessibleNames).size : 0,
+        noteToolColumnCount: starterId === "producer" ? noteToolColumnCount : 0,
+        noteToolContainedCount: starterId === "producer" ? noteToolContainedButtons.length : 0,
+        noteToolControlCount: starterId === "producer" ? noteToolButtons.length : 0,
+        noteToolInternalOverflow: starterId === "producer" ? noteToolInternalOverflow : 0,
+        noteToolReadableLabelCount: starterId === "producer" ? noteToolReadableLabels.length : 0,
+        noteToolRowCount: starterId === "producer" ? noteToolRowCount : 0,
+        noteToolUniqueAccessibleNameCount:
+          starterId === "producer" ? new Set(noteToolAccessibleNames).size : 0,
         producerQueueOpen:
           document.querySelector<HTMLDetailsElement>('[data-testid="master-review-queue-tools"]')?.open ?? false,
         producerReviewOpen: document.querySelector<HTMLDetailsElement>('[data-testid="master-review-tools"]')?.open ?? false,
@@ -10674,6 +10722,20 @@ export function App(): ReactElement {
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       const beginner = readAudienceStarterLanding("beginner");
       createAudienceStarter("producer");
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      const producerPattern = projectRef.current.patterns[projectRef.current.selectedPattern];
+      const producerBassNote = producerPattern.bassNotes[0];
+      const producerMelodyNote = producerPattern.melodyNotes[0];
+      flushSync(() => {
+        setSelectedNote(
+          producerBassNote
+            ? { track: "bass", step: producerBassNote.step, pitch: producerBassNote.pitch }
+            : producerMelodyNote
+              ? { track: "melody", step: producerMelodyNote.step, pitch: producerMelodyNote.pitch }
+              : null
+        );
+      });
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       const producer = readAudienceStarterLanding("producer");

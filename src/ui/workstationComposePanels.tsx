@@ -1433,35 +1433,78 @@ export function NoteInspector({
             </div>
           )}
           <div className="note-action-row" aria-label="Selected note tools">
-            <button data-testid="note-nudge-left" onClick={() => onStepMove(-1)} title="Move selected note one step left" type="button">
+            <button
+              aria-label="Move selected note one step left"
+              data-testid="note-nudge-left"
+              onClick={() => onStepMove(-1)}
+              title="Move selected note one step left"
+              type="button"
+            >
               <ArrowLeft size={14} aria-hidden="true" />
-              <span>Step</span>
-            </button>
-            <button data-testid="note-nudge-right" onClick={() => onStepMove(1)} title="Move selected note one step right" type="button">
-              <ArrowRight size={14} aria-hidden="true" />
-              <span>Step</span>
-            </button>
-            <button data-testid="note-pitch-down" onClick={() => onPitchMove(-1)} title="Move selected note down in scale" type="button">
-              <ArrowDown size={14} aria-hidden="true" />
-              <span>Pitch</span>
-            </button>
-            <button data-testid="note-pitch-up" onClick={() => onPitchMove(1)} title="Move selected note up in scale" type="button">
-              <ArrowUp size={14} aria-hidden="true" />
-              <span>Pitch</span>
-            </button>
-            <button data-testid="note-octave-down" onClick={() => onOctaveMove(-1)} title="Move selected note down an octave" type="button">
-              <ArrowDown size={14} aria-hidden="true" />
-              <span>Oct</span>
-            </button>
-            <button data-testid="note-octave-up" onClick={() => onOctaveMove(1)} title="Move selected note up an octave" type="button">
-              <ArrowUp size={14} aria-hidden="true" />
-              <span>Oct</span>
-            </button>
-            <button data-testid="note-duplicate" onClick={onDuplicate} title="Duplicate selected note to the next empty step" type="button">
-              <Copy size={14} aria-hidden="true" />
-              <span>Dup</span>
+              <span>Step left</span>
             </button>
             <button
+              aria-label="Move selected note one step right"
+              data-testid="note-nudge-right"
+              onClick={() => onStepMove(1)}
+              title="Move selected note one step right"
+              type="button"
+            >
+              <ArrowRight size={14} aria-hidden="true" />
+              <span>Step right</span>
+            </button>
+            <button
+              aria-label="Move selected note down in scale"
+              data-testid="note-pitch-down"
+              onClick={() => onPitchMove(-1)}
+              title="Move selected note down in scale"
+              type="button"
+            >
+              <ArrowDown size={14} aria-hidden="true" />
+              <span>Pitch down</span>
+            </button>
+            <button
+              aria-label="Move selected note up in scale"
+              data-testid="note-pitch-up"
+              onClick={() => onPitchMove(1)}
+              title="Move selected note up in scale"
+              type="button"
+            >
+              <ArrowUp size={14} aria-hidden="true" />
+              <span>Pitch up</span>
+            </button>
+            <button
+              aria-label="Move selected note down an octave"
+              data-testid="note-octave-down"
+              onClick={() => onOctaveMove(-1)}
+              title="Move selected note down an octave"
+              type="button"
+            >
+              <ArrowDown size={14} aria-hidden="true" />
+              <span>Octave down</span>
+            </button>
+            <button
+              aria-label="Move selected note up an octave"
+              data-testid="note-octave-up"
+              onClick={() => onOctaveMove(1)}
+              title="Move selected note up an octave"
+              type="button"
+            >
+              <ArrowUp size={14} aria-hidden="true" />
+              <span>Octave up</span>
+            </button>
+            <button
+              aria-label="Duplicate selected note to the next empty step"
+              data-testid="note-duplicate"
+              onClick={onDuplicate}
+              title="Duplicate selected note to the next empty step"
+              type="button"
+            >
+              <Copy size={14} aria-hidden="true" />
+              <span>Duplicate</span>
+            </button>
+            <button
+              aria-label="Duplicate selected note to the previous beat"
               data-testid="note-duplicate-previous-beat"
               disabled={previousBeatDuplicateStep === null}
               onClick={onDuplicatePreviousBeat}
@@ -1473,9 +1516,10 @@ export function NoteInspector({
               type="button"
             >
               <ArrowLeft size={14} aria-hidden="true" />
-              <span>Prev</span>
+              <span>Prev beat</span>
             </button>
             <button
+              aria-label="Duplicate selected note to the next beat"
               data-testid="note-duplicate-beat"
               disabled={beatDuplicateStep === null}
               onClick={onDuplicateBeat}
@@ -1483,11 +1527,17 @@ export function NoteInspector({
               type="button"
             >
               <ArrowRight size={14} aria-hidden="true" />
-              <span>Next</span>
+              <span>Next beat</span>
             </button>
-            <button data-testid="note-audition" onClick={onAudition} title="Audition selected 808 or Synth note" type="button">
+            <button
+              aria-label="Audition selected 808 or Synth note"
+              data-testid="note-audition"
+              onClick={onAudition}
+              title="Audition selected 808 or Synth note"
+              type="button"
+            >
               <Play size={14} aria-hidden="true" />
-              <span>Aud</span>
+              <span>Audition</span>
             </button>
           </div>
           <div className="inspector-grid">
