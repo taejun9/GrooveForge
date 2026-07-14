@@ -79,6 +79,11 @@ type GrooveforgeLaunchSmokeAudienceStarterEvidence = GrooveforgeLaunchSmokeRoute
 };
 
 type GrooveforgeLaunchSmokeStarterLandingRouteEvidence = {
+  arrangementMoveContainedCount: number;
+  arrangementMoveControlCount: number;
+  arrangementMoveInternalOverflow: number;
+  arrangementMoveReadableLabelCount: number;
+  arrangementMoveUniqueAccessibleNameCount: number;
   chordToolColumnCount: number;
   chordToolCount: number;
   chordToolInternalOverflow: number;
