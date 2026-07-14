@@ -1642,6 +1642,20 @@ export function App(): ReactElement {
     selectedArrangementStartBar,
     arrangementTransitionLoopTarget
   );
+  const songLoopTargetLabel = `All ${barCountLabel(arrangementTotalBars(project))}`;
+  const songLoopAccessibleTarget = `${barCountLabel(arrangementTotalBars(project))} timeline`;
+  const blockLoopTargetLabel = selectedArrangementBlock
+    ? `${selectedArrangementBlock.section} · ${barCountLabel(selectedArrangementBlock.bars)}`
+    : "Select block";
+  const turnLoopTargetLabel = arrangementTransitionLoopTarget
+    ? arrangementTransitionLoopTarget.transition.value.replace(" -> ", " → ")
+    : "Select handoff";
+  const turnLoopAccessibleTarget = arrangementTransitionLoopTarget
+    ? `${arrangementTransitionLoopTarget.transition.value.replace(" -> ", " to ")}, ${barCountLabel(
+        arrangementTransitionLoopTarget.bars
+      )}`
+    : "adjacent block handoff unavailable";
+  const patternLoopTargetLabel = `${project.selectedPattern} · ${patternEventCount(currentPattern)}`;
   const tapTempoReadout = createTapTempoReadoutSummary(project.bpm, tapTempo);
   const localDraftStatusLabel = localDraftSavedAt ? `Draft ${formatLocalDraftSavedAt(localDraftSavedAt)}` : "Draft local";
   const projectSafetyReadout = createProjectSafetyReadoutSummary(
@@ -10501,6 +10515,55 @@ export function App(): ReactElement {
           : document.querySelector<HTMLElement>('[data-testid="review-queue"]');
       const landingRect = landingTarget?.getBoundingClientRect() ?? null;
       const navigatorRect = document.querySelector<HTMLElement>('[data-testid="workflow-navigator"]')?.getBoundingClientRect() ?? null;
+      const loopScopeGroup = document.querySelector<HTMLElement>(".playback-mode-row");
+      const loopScopeButtons = loopScopeGroup
+        ? [...loopScopeGroup.querySelectorAll<HTMLButtonElement>("button")]
+        : [];
+      const loopScopeGroupRect = loopScopeGroup?.getBoundingClientRect() ?? null;
+      const loopScopeAccessibleNames = loopScopeButtons
+        .map((button) => button.getAttribute("aria-label")?.trim() ?? "")
+        .filter((label) => label.length > 0);
+      const loopScopeReadableLabels = loopScopeButtons.filter((button) => {
+        const label = button.querySelector<HTMLElement>(":scope > strong");
+        const detail = button.querySelector<HTMLElement>(":scope > small");
+        return Boolean(
+          label &&
+            detail &&
+            label.clientWidth > 0 &&
+            label.scrollWidth <= label.clientWidth + 1 &&
+            detail.clientWidth > 0 &&
+            detail.scrollWidth <= detail.clientWidth + 1
+        );
+      });
+      const loopScopeContainedButtons = loopScopeButtons.filter((button) => {
+        const buttonRect = button.getBoundingClientRect();
+        return Boolean(
+          loopScopeGroupRect &&
+            buttonRect.height >= 48 &&
+            buttonRect.left >= loopScopeGroupRect.left - 1 &&
+            buttonRect.right <= loopScopeGroupRect.right + 1
+        );
+      });
+      const loopScopeColumnCount = loopScopeGroup
+        ? window.getComputedStyle(loopScopeGroup).gridTemplateColumns.trim().split(/\s+/).length
+        : 0;
+      const loopScopeRowCount = new Set(
+        loopScopeButtons.map((button) => Math.round(button.getBoundingClientRect().top))
+      ).size;
+      const loopScopeStateCopyReady =
+        ["Song", "Block", "Turn", "Pattern"].every(
+          (label, index) =>
+            loopScopeButtons[index]?.querySelector(":scope > strong")?.textContent?.trim() === label &&
+            (loopScopeButtons[index]?.querySelector(":scope > small")?.textContent?.trim().length ?? 0) > 0
+        ) &&
+        loopScopeButtons[2]?.querySelector(":scope > small")?.textContent?.includes("→") === true &&
+        /\bevents?$/.test(loopScopeButtons[3]?.querySelector(":scope > small")?.textContent?.trim() ?? "");
+      const loopScopeGrammarReady = [
+        document.querySelector<HTMLElement>(".pattern-lab-context")?.textContent?.trim() ?? "",
+        document.querySelector<HTMLElement>(
+          '[data-testid="arrangement-pattern-controls"] .arrangement-control-group-heading small'
+        )?.textContent?.trim() ?? ""
+      ].every((label) => label.length > 0 && !label.includes("events events"));
       const patternTabGroup = document.querySelector<HTMLElement>(".pattern-tabs");
       const patternTabButtons = patternTabGroup
         ? [...patternTabGroup.querySelectorAll<HTMLButtonElement>("button")]
@@ -10867,6 +10930,32 @@ export function App(): ReactElement {
         inViewport: Boolean(
           landingRect && landingRect.top >= 0 && landingRect.top < window.innerHeight && landingRect.bottom > 0
         ),
+        loopScopeColumnCount: starterId === "beginner" ? loopScopeColumnCount : 0,
+        loopScopeContainedCount: starterId === "beginner" ? loopScopeContainedButtons.length : 0,
+        loopScopeControlCount: starterId === "beginner" ? loopScopeButtons.length : 0,
+        loopScopeGrammarReady: starterId === "beginner" ? loopScopeGrammarReady : false,
+        loopScopeInternalOverflow:
+          starterId === "beginner" && loopScopeGroup
+            ? Math.max(0, loopScopeGroup.scrollWidth - loopScopeGroup.clientWidth)
+            : 0,
+        loopScopePressedCount:
+          starterId === "beginner"
+            ? loopScopeButtons.filter((button) => button.getAttribute("aria-pressed") === "true").length
+            : 0,
+        loopScopeReadableLabelCount: starterId === "beginner" ? loopScopeReadableLabels.length : 0,
+        loopScopeRoleReady:
+          starterId === "beginner" &&
+          loopScopeGroup?.getAttribute("role") === "group" &&
+          loopScopeGroup.getAttribute("aria-label") === "Choose audition loop scope" &&
+          loopScopeButtons.every((button) => /^(true|false)$/.test(button.getAttribute("aria-pressed") ?? "")),
+        loopScopeRowCount: starterId === "beginner" ? loopScopeRowCount : 0,
+        loopScopeStateCopyReady: starterId === "beginner" ? loopScopeStateCopyReady : false,
+        loopScopeTitleCount:
+          starterId === "beginner"
+            ? loopScopeButtons.filter((button) => (button.getAttribute("title")?.trim().length ?? 0) > 0).length
+            : 0,
+        loopScopeUniqueAccessibleNameCount:
+          starterId === "beginner" ? new Set(loopScopeAccessibleNames).size : 0,
         mixerNarrowStripCount: starterId === "beginner" ? mixerNarrowStrips.length : 0,
         mixerToggleContainedCount: starterId === "beginner" ? mixerToggleContainedButtons.length : 0,
         mixerToggleCount: starterId === "beginner" ? mixerToggleButtons.length : 0,
@@ -11492,8 +11581,10 @@ export function App(): ReactElement {
           </div>
           </div>
           <div className="transport-essential-controls" data-testid="transport-essential-controls">
-          <div className="segmented playback-mode-row" aria-label="Transport loop">
+          <div className="segmented playback-mode-row" aria-label="Choose audition loop scope" role="group">
             <button
+              aria-label={`Song loop, ${songLoopAccessibleTarget}${transportLoopScope === "arrangement" ? ", selected" : ""}`}
+              aria-pressed={transportLoopScope === "arrangement"}
               className={transportLoopScope === "arrangement" ? "selected" : ""}
               data-testid="playback-mode-arrangement"
               disabled={isPlaying && transportLoopScope !== "arrangement"}
@@ -11501,9 +11592,12 @@ export function App(): ReactElement {
               title="Loop the full arrangement timeline"
               type="button"
             >
-              Song
+              <strong>Song</strong>
+              <small>{songLoopTargetLabel}</small>
             </button>
             <button
+              aria-label={`Block loop, ${blockLoopTargetLabel}${transportLoopScope === "block" ? ", selected" : ""}`}
+              aria-pressed={transportLoopScope === "block"}
               className={transportLoopScope === "block" ? "selected" : ""}
               data-testid="transport-loop-block"
               disabled={isPlaying && transportLoopScope !== "block"}
@@ -11511,9 +11605,12 @@ export function App(): ReactElement {
               title="Loop the selected arrangement block"
               type="button"
             >
-              Block
+              <strong>Block</strong>
+              <small>{blockLoopTargetLabel}</small>
             </button>
             <button
+              aria-label={`Turn loop, ${turnLoopAccessibleTarget}${transportLoopScope === "transition" ? ", selected" : ""}`}
+              aria-pressed={transportLoopScope === "transition"}
               className={transportLoopScope === "transition" ? "selected" : ""}
               data-testid="transport-loop-transition"
               disabled={(isPlaying && transportLoopScope !== "transition") || !arrangementTransitionLoopTarget}
@@ -11525,9 +11622,14 @@ export function App(): ReactElement {
               }
               type="button"
             >
-              Turn
+              <strong>Turn</strong>
+              <small>{turnLoopTargetLabel}</small>
             </button>
             <button
+              aria-label={`Pattern loop, Pattern ${project.selectedPattern}, ${patternEventCount(currentPattern)}${
+                transportLoopScope === "pattern" ? ", selected" : ""
+              }`}
+              aria-pressed={transportLoopScope === "pattern"}
               className={transportLoopScope === "pattern" ? "selected" : ""}
               data-testid="playback-mode-pattern"
               disabled={isPlaying && transportLoopScope !== "pattern"}
@@ -11535,7 +11637,8 @@ export function App(): ReactElement {
               title="Loop the selected Pattern A/B/C"
               type="button"
             >
-              Pattern
+              <strong>Pattern</strong>
+              <small>{patternLoopTargetLabel}</small>
             </button>
           </div>
           <button
@@ -12321,7 +12424,7 @@ export function App(): ReactElement {
                 <small>Compare, generate, clone, vary, stack, and add fills</small>
               </span>
               <span className="pattern-lab-context">
-                Pattern {project.selectedPattern} · {patternEventCount(currentPattern)} events
+                Pattern {project.selectedPattern} · {patternEventCount(currentPattern)}
               </span>
               <ArrowDown className="pattern-lab-chevron" size={16} aria-hidden="true" />
             </summary>
@@ -12985,7 +13088,7 @@ export function App(): ReactElement {
                 <div className="arrangement-control-group-heading">
                   <span>Pattern</span>
                   <small>
-                    {selectedArrangementBlock.pattern} · {patternEventCount(project.patterns[selectedArrangementBlock.pattern])} events
+                    {selectedArrangementBlock.pattern} · {patternEventCount(project.patterns[selectedArrangementBlock.pattern])}
                   </small>
                 </div>
                 <div className="block-pattern-row" aria-label="Block pattern">

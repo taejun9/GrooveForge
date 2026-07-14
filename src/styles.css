@@ -1229,9 +1229,38 @@ h2 {
   grid-template-columns: repeat(4, minmax(64px, 1fr));
 }
 
-.playback-mode-row button {
-  min-height: 38px;
-  padding: 0 10px;
+.segmented.playback-mode-row button {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 5px 6px;
+  overflow: hidden;
+}
+
+.playback-mode-row button strong,
+.playback-mode-row button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.playback-mode-row button strong {
+  font-size: 12px;
+  line-height: 1.05;
+}
+
+.playback-mode-row button small {
+  color: rgba(244, 239, 231, 0.52);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+.playback-mode-row button.selected small {
+  color: rgba(17, 16, 15, 0.64);
 }
 
 .segmented button,

@@ -110,6 +110,18 @@ type GrooveforgeLaunchSmokeStarterLandingRouteEvidence = {
   groovePresetTitleCount: number;
   groovePresetUniqueAccessibleNameCount: number;
   inViewport: boolean;
+  loopScopeColumnCount: number;
+  loopScopeContainedCount: number;
+  loopScopeControlCount: number;
+  loopScopeGrammarReady: boolean;
+  loopScopeInternalOverflow: number;
+  loopScopePressedCount: number;
+  loopScopeReadableLabelCount: number;
+  loopScopeRoleReady: boolean;
+  loopScopeRowCount: number;
+  loopScopeStateCopyReady: boolean;
+  loopScopeTitleCount: number;
+  loopScopeUniqueAccessibleNameCount: number;
   mixerNarrowStripCount: number;
   mixerToggleContainedCount: number;
   mixerToggleCount: number;

@@ -1071,6 +1071,54 @@ function validateFirstRunRenderer(html) {
       styles.includes("grid-column: 3 / 5;"),
     "the reachable minimum desktop width should use an intermediate transport layout without hiding setup, audience, command, or disclosure surfaces"
   );
+  const loopScopeSegments = [
+    "playback-mode-arrangement",
+    "transport-loop-block",
+    "transport-loop-transition",
+    "playback-mode-pattern"
+  ].map((testId) => {
+    const marker = html.indexOf(`data-testid="${testId}"`);
+    const start = marker >= 0 ? html.lastIndexOf("<button", marker) : -1;
+    return start >= 0 ? html.slice(start, html.indexOf("</button>", start)) : "";
+  });
+  const loopScopeAccessibleNames = loopScopeSegments
+    .map((segment) => segment.match(/aria-label="([^"]+)"/)?.[1] ?? "")
+    .filter(Boolean);
+  check(
+    html.includes('aria-label="Choose audition loop scope"') &&
+      html.includes('class="segmented playback-mode-row"') &&
+      html.includes('role="group"') &&
+      loopScopeSegments.every(
+        (segment) =>
+          segment.includes("aria-label=") &&
+          segment.includes("aria-pressed=") &&
+          segment.includes("title=") &&
+          segment.includes("<strong>") &&
+          segment.includes("<small>")
+      ) &&
+      loopScopeSegments[0].includes('aria-pressed="true"') &&
+      loopScopeSegments.slice(1).every((segment) => segment.includes('aria-pressed="false"')) &&
+      loopScopeAccessibleNames.length === 4 &&
+      new Set(loopScopeAccessibleNames).size === 4 &&
+      html.includes("8 bars timeline") &&
+      html.includes("<small>All 8 bars</small>") &&
+      html.includes("Intro · 1 bar") &&
+      html.includes("Intro → Verse") &&
+      html.includes("A · 21 events") &&
+      !html.includes("events events"),
+    "Transport loop scope should expose four complete live targets, unique names, one pressed scope, and correct event-count grammar"
+  );
+  check(
+    styles.includes(".playback-mode-row button {") &&
+      styles.includes("min-height: 48px;") &&
+      styles.includes(".playback-mode-row button strong,") &&
+      styles.includes(".playback-mode-row button small {") &&
+      styles.includes("text-overflow: clip;") &&
+      styles.includes("white-space: nowrap;") &&
+      styles.includes(".playback-mode-row button.selected small {") &&
+      styles.includes("grid-template-columns: repeat(4, minmax(64px, 1fr));"),
+    "Transport loop scope should retain a contained readable four-column scan with comfortable two-line controls"
+  );
   const transportBandIndex = html.indexOf('data-testid="workflow-target-transport"');
   const transportStatusControlsIndex = html.indexOf('data-testid="transport-status-controls"');
   const transportEssentialsIndex = html.indexOf('data-testid="transport-essential-controls"');
