@@ -384,6 +384,15 @@ function checkResult(result) {
       evidence?.starterLanding?.beginner?.loopScopeColumnCount === 4 &&
       evidence?.starterLanding?.beginner?.loopScopeRowCount === 1 &&
       evidence?.starterLanding?.beginner?.loopScopeInternalOverflow === 0 &&
+      evidence?.starterLanding?.beginner?.metronomeControlCount === 1 &&
+      evidence?.starterLanding?.beginner?.metronomeReadableLabelCount === 1 &&
+      evidence?.starterLanding?.beginner?.metronomeAccessibleNameReady === true &&
+      evidence?.starterLanding?.beginner?.metronomePressedStateReady === true &&
+      evidence?.starterLanding?.beginner?.metronomeStateCopyReady === true &&
+      evidence?.starterLanding?.beginner?.metronomeTitleCount === 1 &&
+      evidence?.starterLanding?.beginner?.metronomeContainedCount === 1 &&
+      evidence?.starterLanding?.beginner?.metronomeFocusReady === true &&
+      evidence?.starterLanding?.beginner?.metronomeInternalOverflow === 0 &&
       evidence?.starterLanding?.beginner?.mixerToggleCount === 10 &&
       evidence?.starterLanding?.beginner?.mixerToggleReadableLabelCount === 10 &&
       evidence?.starterLanding?.beginner?.mixerToggleUniqueAccessibleNameCount === 10 &&
@@ -1347,6 +1356,7 @@ child.on("exit", (code, signal) => {
   console.log("- Drum edit tools: 5/5 readable labels, five unique accessible names, and a contained five-column direct layout");
   console.log("- Pattern groove presets: 4/4 readable feel descriptions, four unique Pattern-scoped names/titles, direct Undo context, and a contained four-column layout");
   console.log("- Transport loop scope: 4/4 live targets and unique names, one pressed scope, corrected event grammar, and a contained four-column layout");
+  console.log("- Metronome: complete visible name, live On/Off and BPM detail, state-aware accessible action, pressed semantics, and contained focusable control");
   console.log("- Pattern tabs: 3/3 complete labels and unique state-aware names, one selected roving tab stop, and a contained three-column layout");
   console.log("- Note edit tools: 10/10 readable labels, ten unique accessible names, and a contained five-by-two narrow layout");
   console.log("- Mixer toggles: 10/10 readable Mute/Solo labels, unique channel names, pressed semantics, and five contained narrow strips");
