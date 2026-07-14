@@ -344,6 +344,11 @@ function checkResult(result) {
       evidence?.starterLanding?.beginner?.focusTestId === "workflow-target-compose" &&
       evidence?.starterLanding?.beginner?.inViewport === true &&
       evidence?.starterLanding?.beginner?.clearOfNavigator === true &&
+      evidence?.starterLanding?.beginner?.arrangementMoveControlCount === 2 &&
+      evidence?.starterLanding?.beginner?.arrangementMoveReadableLabelCount === 2 &&
+      evidence?.starterLanding?.beginner?.arrangementMoveUniqueAccessibleNameCount === 2 &&
+      evidence?.starterLanding?.beginner?.arrangementMoveContainedCount === 2 &&
+      evidence?.starterLanding?.beginner?.arrangementMoveInternalOverflow === 0 &&
       evidence?.starterLanding?.beginner?.chordToolCount === 8 &&
       evidence?.starterLanding?.beginner?.chordToolReadableLabelCount === 8 &&
       evidence?.starterLanding?.beginner?.chordToolUniqueAccessibleNameCount === 8 &&
@@ -1289,6 +1294,7 @@ child.on("exit", (code, signal) => {
   console.log("- Closed disclosures: 24 panels, zero closed content/Tab leaks, native Enter reopen/reclose, and unchanged project posture ready");
   console.log("- Note-grid keyboard: one 808 and one Synth Tab stop, native spatial navigation, Enter/Space toggles, playback guard, and Undo ready");
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
+  console.log("- Arrangement move controls: 2/2 readable directional labels, unique selected-block names, and contained actions");
   console.log("- Chord edit tools: 8/8 readable labels, eight unique accessible names, and a contained four-by-two narrow layout");
   console.log("- Mixer toggles: 10/10 readable Mute/Solo labels, unique channel names, pressed semantics, and five contained narrow strips");
   console.log("- Review Queue readability: 11/11 decision fields wrapped and contained across three compact diagnostic rows");

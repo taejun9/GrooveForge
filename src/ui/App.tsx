@@ -10504,6 +10504,31 @@ export function App(): ReactElement {
       const chordToolColumnCount = chordToolGroup
         ? window.getComputedStyle(chordToolGroup).gridTemplateColumns.trim().split(/\s+/).length
         : 0;
+      const arrangementMoveGroup = document.querySelector<HTMLElement>(".arrangement-actions");
+      const arrangementMoveButtons = [
+        ...document.querySelectorAll<HTMLButtonElement>(
+          '[data-testid="arrangement-move-left"], [data-testid="arrangement-move-right"]'
+        )
+      ];
+      const arrangementMoveAccessibleNames = arrangementMoveButtons
+        .map((button) => button.getAttribute("aria-label")?.trim() ?? "")
+        .filter((label) => label.length > 0);
+      const arrangementMoveReadableLabels = arrangementMoveButtons.filter((button) => {
+        const label = button.querySelector<HTMLElement>("span");
+        return Boolean(label && label.clientWidth > 0 && label.scrollWidth <= label.clientWidth + 1);
+      });
+      const arrangementMoveContainedButtons = arrangementMoveButtons.filter((button) => {
+        const groupRect = arrangementMoveGroup?.getBoundingClientRect() ?? null;
+        const buttonRect = button.getBoundingClientRect();
+        return Boolean(
+          groupRect &&
+            buttonRect.left >= groupRect.left - 1 &&
+            buttonRect.right <= groupRect.right + 1
+        );
+      });
+      const arrangementMoveInternalOverflow = arrangementMoveGroup
+        ? Math.max(0, arrangementMoveGroup.scrollWidth - arrangementMoveGroup.clientWidth)
+        : 0;
       const mixerToggleButtons = [
         ...document.querySelectorAll<HTMLButtonElement>(
           '[data-testid^="mixer-mute-"], [data-testid^="mixer-solo-"]'
@@ -10587,6 +10612,12 @@ export function App(): ReactElement {
       });
 
       return {
+        arrangementMoveContainedCount: starterId === "beginner" ? arrangementMoveContainedButtons.length : 0,
+        arrangementMoveControlCount: starterId === "beginner" ? arrangementMoveButtons.length : 0,
+        arrangementMoveInternalOverflow: starterId === "beginner" ? arrangementMoveInternalOverflow : 0,
+        arrangementMoveReadableLabelCount: starterId === "beginner" ? arrangementMoveReadableLabels.length : 0,
+        arrangementMoveUniqueAccessibleNameCount:
+          starterId === "beginner" ? new Set(arrangementMoveAccessibleNames).size : 0,
         chordToolColumnCount: starterId === "beginner" ? chordToolColumnCount : 0,
         chordToolCount: starterId === "beginner" ? chordToolButtons.length : 0,
         chordToolInternalOverflow:
@@ -12767,6 +12798,7 @@ export function App(): ReactElement {
               </div>
               <div className="arrangement-actions" aria-label="Arrangement structure actions">
                 <button
+                  aria-label="Move selected arrangement block left"
                   data-testid="arrangement-move-left"
                   disabled={selectedArrangementIndex === 0}
                   onClick={() => moveArrangementBlock(-1)}
@@ -12774,9 +12806,10 @@ export function App(): ReactElement {
                   type="button"
                 >
                   <ArrowLeft size={15} aria-hidden="true" />
-                  <span>Move</span>
+                  <span>Move left</span>
                 </button>
                 <button
+                  aria-label="Move selected arrangement block right"
                   data-testid="arrangement-move-right"
                   disabled={selectedArrangementIndex >= project.arrangement.length - 1}
                   onClick={() => moveArrangementBlock(1)}
@@ -12784,7 +12817,7 @@ export function App(): ReactElement {
                   type="button"
                 >
                   <ArrowRight size={15} aria-hidden="true" />
-                  <span>Move</span>
+                  <span>Move right</span>
                 </button>
                 <button
                   data-testid="arrangement-duplicate"

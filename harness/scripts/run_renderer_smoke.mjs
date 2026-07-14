@@ -824,6 +824,15 @@ function validateFirstRunRenderer(html) {
       styles.includes("overflow-wrap: anywhere;"),
     "Review Queue should switch from its wide scan layout to readable wrapped rows from the component's own inline size"
   );
+  check(
+    appSource.includes('aria-label="Move selected arrangement block left"') &&
+      appSource.includes('aria-label="Move selected arrangement block right"') &&
+      appSource.includes("<span>Move left</span>") &&
+      appSource.includes("<span>Move right</span>") &&
+      appSource.includes('data-testid="arrangement-move-left"') &&
+      appSource.includes('data-testid="arrangement-move-right"'),
+    "both arrangement move controls should expose complete directional labels and unique selected-block accessible names"
+  );
   const chordToolAccessibleNames = [
     "Audition selected chord",
     "Move selected chord one step left",
