@@ -675,7 +675,7 @@ Chance badge work must keep badges read-only, show below-100% drum, 808, melody,
 
 Drum microtiming work must migrate old patterns, preserve per-step timing offsets across Pattern A/B/C copy, save/load, undo/redo, realtime playback, WAV export, and stem export, and keep offsets as local musical event data rather than imported audio.
 
-Groove humanize work must be deterministic, operate on selected Pattern A/B/C velocity and microtiming event data, preserve pattern independence, keep results manually editable, and avoid remote AI or sampling dependencies.
+Groove humanize work must be deterministic, operate on selected Pattern A/B/C velocity and microtiming event data, preserve pattern independence, keep results manually editable, and avoid remote AI or sampling dependencies. The visible Tight, Pocket, Push, and Reset controls must retain their existing order, ids, callbacks, project-status wording, selection clearing, and Undo path while showing distinct feel descriptions, the selected Pattern scope, editable velocity/timing and Undo comparison guidance, four stable unique Pattern-scoped accessible names and titles, at least 48px control height, one contained four-column row, and zero internal overflow at the narrow drum editor width. The surface must not expose selected-state semantics that could become false after manual edits. Renderer smoke must cover the semantic copy and CSS contract; production Electron must measure all four descriptions, names, titles, columns, rows, height, and containment on the live Beginner starter.
 
 Style groove work must apply key-aware editable Pattern A/B/C event data, BPM, swing, and built-in sound preset changes without introducing imported audio or bypassing undo/redo.
 

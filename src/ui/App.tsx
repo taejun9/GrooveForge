@@ -135,6 +135,7 @@ import {
   drumStepTimingMs,
   drumStepVelocity,
   drumGroovePresetIds,
+  drumGroovePresetDetail,
   drumGroovePresetLabel,
   defaultSessionBrief,
   expandPatternChainArrangement,
@@ -10615,6 +10616,64 @@ export function App(): ReactElement {
         : 0;
       const drumToolSelectedHit =
         document.querySelector<HTMLElement>('[data-testid="drum-step-readout"]')?.textContent?.trim().startsWith("Kick 1 ") ?? false;
+      const groovePresetSurface = document.querySelector<HTMLElement>('[data-testid="pattern-groove-presets"]');
+      const groovePresetGroup = groovePresetSurface?.querySelector<HTMLElement>(".groove-actions") ?? null;
+      const groovePresetButtons = groovePresetGroup
+        ? [...groovePresetGroup.querySelectorAll<HTMLButtonElement>("button")]
+        : [];
+      const groovePresetGroupRect = groovePresetGroup?.getBoundingClientRect() ?? null;
+      const groovePresetAccessibleNames = groovePresetButtons
+        .map((button) => button.getAttribute("aria-label")?.trim() ?? "")
+        .filter((label) => label.length > 0);
+      const groovePresetReadableLabels = groovePresetButtons.filter((button) => {
+        const label = button.querySelector<HTMLElement>("strong");
+        const detail = button.querySelector<HTMLElement>("span");
+        const labelStyle = label ? window.getComputedStyle(label) : null;
+        const detailStyle = detail ? window.getComputedStyle(detail) : null;
+        return Boolean(
+          label &&
+            detail &&
+            labelStyle &&
+            detailStyle &&
+            label.clientWidth > 0 &&
+            label.clientHeight > 0 &&
+            detail.clientWidth > 0 &&
+            detail.clientHeight > 0 &&
+            label.scrollWidth <= label.clientWidth + 1 &&
+            label.scrollHeight <= label.clientHeight + 1 &&
+            detail.scrollWidth <= detail.clientWidth + 1 &&
+            detail.scrollHeight <= detail.clientHeight + 1 &&
+            labelStyle.whiteSpace !== "nowrap" &&
+            detailStyle.whiteSpace !== "nowrap" &&
+            labelStyle.textOverflow === "clip" &&
+            detailStyle.textOverflow === "clip"
+        );
+      });
+      const groovePresetContainedButtons = groovePresetButtons.filter((button) => {
+        const buttonRect = button.getBoundingClientRect();
+        return Boolean(
+          groovePresetGroupRect &&
+            buttonRect.height >= 48 &&
+            buttonRect.left >= groovePresetGroupRect.left - 1 &&
+            buttonRect.right <= groovePresetGroupRect.right + 1
+        );
+      });
+      const groovePresetColumnCount = groovePresetGroup
+        ? window.getComputedStyle(groovePresetGroup).gridTemplateColumns.trim().split(/\s+/).length
+        : 0;
+      const groovePresetRowCount = new Set(
+        groovePresetButtons.map((button) => Math.round(button.getBoundingClientRect().top))
+      ).size;
+      const groovePresetInternalOverflow = groovePresetGroup
+        ? Math.max(0, groovePresetGroup.scrollWidth - groovePresetGroup.clientWidth)
+        : 0;
+      const groovePresetContextReady =
+        groovePresetSurface?.querySelector<HTMLElement>("#pattern-groove-label")?.textContent?.trim() ===
+          "Pattern groove" &&
+        groovePresetSurface?.querySelector<HTMLElement>(".groove-row-heading strong")?.textContent?.trim() ===
+          "Pattern A" &&
+        groovePresetSurface?.querySelector<HTMLElement>("#pattern-groove-help")?.textContent?.trim() ===
+          "Applies editable velocity + timing. Use Undo to compare.";
       const noteToolGroup = document.querySelector<HTMLElement>(".note-action-row");
       const noteToolButtons = noteToolGroup
         ? [...noteToolGroup.querySelectorAll<HTMLButtonElement>("button")]
@@ -10721,6 +10780,19 @@ export function App(): ReactElement {
         drumToolUniqueAccessibleNameCount:
           starterId === "beginner" ? new Set(drumToolAccessibleNames).size : 0,
         focusTestId: document.activeElement instanceof HTMLElement ? document.activeElement.dataset.testid ?? "" : "",
+        groovePresetColumnCount: starterId === "beginner" ? groovePresetColumnCount : 0,
+        groovePresetContainedCount: starterId === "beginner" ? groovePresetContainedButtons.length : 0,
+        groovePresetContextReady: starterId === "beginner" ? groovePresetContextReady : false,
+        groovePresetControlCount: starterId === "beginner" ? groovePresetButtons.length : 0,
+        groovePresetInternalOverflow: starterId === "beginner" ? groovePresetInternalOverflow : 0,
+        groovePresetReadableLabelCount: starterId === "beginner" ? groovePresetReadableLabels.length : 0,
+        groovePresetRowCount: starterId === "beginner" ? groovePresetRowCount : 0,
+        groovePresetTitleCount:
+          starterId === "beginner"
+            ? groovePresetButtons.filter((button) => (button.getAttribute("title")?.trim().length ?? 0) > 0).length
+            : 0,
+        groovePresetUniqueAccessibleNameCount:
+          starterId === "beginner" ? new Set(groovePresetAccessibleNames).size : 0,
         inViewport: Boolean(
           landingRect && landingRect.top >= 0 && landingRect.top < window.innerHeight && landingRect.bottom > 0
         ),
@@ -12374,19 +12446,43 @@ export function App(): ReactElement {
               })}
             </div>
             {swingFeelResult && <SwingFeelResultStrip result={swingFeelResult} />}
-            <div className="groove-row" aria-label="Groove humanize">
-              <span>Groove</span>
-              <div>
-                {drumGroovePresetIds.map((preset) => (
-                  <button
-                    data-testid={`groove-preset-${preset}`}
-                    key={preset}
-                    onClick={() => applySelectedDrumGroove(preset)}
-                    type="button"
-                  >
-                    {drumGroovePresetLabel(preset)}
-                  </button>
-                ))}
+            <div
+              aria-describedby="pattern-groove-help"
+              aria-labelledby="pattern-groove-label"
+              className="groove-row"
+              data-testid="pattern-groove-presets"
+            >
+              <div className="groove-row-heading">
+                <span id="pattern-groove-label">Pattern groove</span>
+                <strong>Pattern {project.selectedPattern}</strong>
+              </div>
+              <small id="pattern-groove-help">Applies editable velocity + timing. Use Undo to compare.</small>
+              <div
+                aria-label={`Pattern ${project.selectedPattern} groove presets`}
+                className="groove-actions"
+                role="group"
+              >
+                {drumGroovePresetIds.map((preset) => {
+                  const label = drumGroovePresetLabel(preset);
+                  const detail = drumGroovePresetDetail(preset);
+                  const actionLabel =
+                    preset === "reset"
+                      ? `Reset Pattern ${project.selectedPattern} drum groove to default velocity and timing`
+                      : `Apply ${label} drum groove to Pattern ${project.selectedPattern}: ${detail}`;
+                  return (
+                    <button
+                      aria-label={actionLabel}
+                      data-testid={`groove-preset-${preset}`}
+                      key={preset}
+                      onClick={() => applySelectedDrumGroove(preset)}
+                      title={actionLabel}
+                      type="button"
+                    >
+                      <strong>{label}</strong>
+                      <span>{detail}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <DrumStepInspector

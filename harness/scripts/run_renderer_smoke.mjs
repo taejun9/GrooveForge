@@ -982,6 +982,47 @@ function validateFirstRunRenderer(html) {
       styles.includes("color: #b8ffe7;"),
     "Swing Feel pads should override native light buttons with complete dark, hover, focus, selected, and text-hierarchy styling"
   );
+  const groovePresetIds = ["tight", "pocket", "push", "reset"];
+  const groovePresetSegments = groovePresetIds.map((id) => {
+    const marker = html.indexOf(`data-testid="groove-preset-${id}"`);
+    const start = marker >= 0 ? html.lastIndexOf("<button", marker) : -1;
+    return start >= 0 ? html.slice(start, html.indexOf("</button>", start)) : "";
+  });
+  const groovePresetAccessibleNames = groovePresetSegments
+    .map((segment) => segment.match(/aria-label="([^"]+)"/)?.[1] ?? "")
+    .filter(Boolean);
+  check(
+    html.includes('data-testid="pattern-groove-presets"') &&
+      html.includes("Pattern groove") &&
+      html.includes("Pattern A") &&
+      html.includes("Applies editable velocity + timing. Use Undo to compare.") &&
+      html.includes("Controlled timing") &&
+      html.includes("Laid-back backbeat") &&
+      html.includes("Early energy") &&
+      html.includes("Default feel") &&
+      groovePresetSegments.every(
+        (segment) =>
+          segment.includes("aria-label=") &&
+          segment.includes("title=") &&
+          segment.includes("<strong>") &&
+          segment.includes("<span>")
+      ) &&
+      groovePresetAccessibleNames.length === 4 &&
+      new Set(groovePresetAccessibleNames).size === 4,
+    "all four Pattern groove presets should explain their feel, selected-Pattern scope, editability, Undo path, and unique actions"
+  );
+  check(
+    styles.includes(".groove-actions {") &&
+      styles.includes("grid-template-columns: repeat(4, minmax(0, 1fr));") &&
+      styles.includes("align-items: stretch;") &&
+      styles.includes(".groove-actions button {") &&
+      styles.includes("min-height: 48px;") &&
+      styles.includes(".groove-actions button strong,") &&
+      styles.includes("overflow-wrap: anywhere;") &&
+      styles.includes("text-overflow: clip;") &&
+      styles.includes("white-space: normal;"),
+    "Pattern groove presets should retain a contained four-column direct scan with comfortable wrapped controls"
+  );
   check(
     styles.includes(":where(button) {") &&
       styles.includes("appearance: none;") &&
