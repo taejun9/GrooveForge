@@ -91,6 +91,14 @@ type GrooveforgeLaunchSmokeStarterLandingRouteEvidence = {
   chordToolRowCount: number;
   chordToolUniqueAccessibleNameCount: number;
   clearOfNavigator: boolean;
+  drumToolColumnCount: number;
+  drumToolContainedCount: number;
+  drumToolControlCount: number;
+  drumToolInternalOverflow: number;
+  drumToolReadableLabelCount: number;
+  drumToolRowCount: number;
+  drumToolSelectedHit: boolean;
+  drumToolUniqueAccessibleNameCount: number;
   focusTestId: string;
   inViewport: boolean;
   mixerNarrowStripCount: number;

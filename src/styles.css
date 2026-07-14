@@ -19815,17 +19815,22 @@ input[type="range"] {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 5px;
-  align-items: center;
+  align-items: stretch;
 }
 
 .drum-clipboard-row button {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
   min-width: 0;
-  min-height: 30px;
-  align-items: center;
+  min-height: 48px;
   justify-content: center;
-  gap: 4px;
-  padding: 0 5px;
+  gap: 2px;
+  padding: 4px;
+}
+
+.drum-clipboard-row button svg {
+  justify-self: center;
 }
 
 .drum-clipboard-row button:disabled {
@@ -19837,14 +19842,22 @@ input[type="range"] {
 .drum-clipboard-row small {
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.drum-clipboard-row button span {
+  overflow: visible;
+  text-align: center;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.1;
 }
 
 .drum-clipboard-row small {
   grid-column: 1 / -1;
   color: #aba193;
   font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .note-lanes {

@@ -10573,6 +10573,48 @@ export function App(): ReactElement {
         (maximum, strip) => Math.max(maximum, strip.scrollWidth - strip.clientWidth),
         0
       );
+      const drumToolGroup = document.querySelector<HTMLElement>(".drum-clipboard-row");
+      const drumToolButtons = drumToolGroup
+        ? [...drumToolGroup.querySelectorAll<HTMLButtonElement>("button")]
+        : [];
+      const drumToolGroupRect = drumToolGroup?.getBoundingClientRect() ?? null;
+      const drumToolAccessibleNames = drumToolButtons
+        .map((button) => button.getAttribute("aria-label")?.trim() ?? "")
+        .filter((label) => label.length > 0);
+      const drumToolReadableLabels = drumToolButtons.filter((button) => {
+        const label = button.querySelector<HTMLElement>("span");
+        const labelStyle = label ? window.getComputedStyle(label) : null;
+        return Boolean(
+          label &&
+            labelStyle &&
+            label.clientWidth > 0 &&
+            label.clientHeight > 0 &&
+            label.scrollWidth <= label.clientWidth + 1 &&
+            label.scrollHeight <= label.clientHeight + 1 &&
+            labelStyle.whiteSpace !== "nowrap" &&
+            labelStyle.textOverflow === "clip"
+        );
+      });
+      const drumToolContainedButtons = drumToolButtons.filter((button) => {
+        const buttonRect = button.getBoundingClientRect();
+        return Boolean(
+          drumToolGroupRect &&
+            buttonRect.height >= 48 &&
+            buttonRect.left >= drumToolGroupRect.left - 1 &&
+            buttonRect.right <= drumToolGroupRect.right + 1
+        );
+      });
+      const drumToolColumnCount = drumToolGroup
+        ? window.getComputedStyle(drumToolGroup).gridTemplateColumns.trim().split(/\s+/).length
+        : 0;
+      const drumToolRowCount = new Set(
+        drumToolButtons.map((button) => Math.round(button.getBoundingClientRect().top))
+      ).size;
+      const drumToolInternalOverflow = drumToolGroup
+        ? Math.max(0, drumToolGroup.scrollWidth - drumToolGroup.clientWidth)
+        : 0;
+      const drumToolSelectedHit =
+        document.querySelector<HTMLElement>('[data-testid="drum-step-readout"]')?.textContent?.trim().startsWith("Kick 1 ") ?? false;
       const noteToolGroup = document.querySelector<HTMLElement>(".note-action-row");
       const noteToolButtons = noteToolGroup
         ? [...noteToolGroup.querySelectorAll<HTMLButtonElement>("button")]
@@ -10669,6 +10711,15 @@ export function App(): ReactElement {
         chordToolUniqueAccessibleNameCount:
           starterId === "beginner" ? new Set(chordToolAccessibleNames).size : 0,
         clearOfNavigator: Boolean(landingRect && navigatorRect && landingRect.top >= navigatorRect.bottom + 8),
+        drumToolColumnCount: starterId === "beginner" ? drumToolColumnCount : 0,
+        drumToolContainedCount: starterId === "beginner" ? drumToolContainedButtons.length : 0,
+        drumToolControlCount: starterId === "beginner" ? drumToolButtons.length : 0,
+        drumToolInternalOverflow: starterId === "beginner" ? drumToolInternalOverflow : 0,
+        drumToolReadableLabelCount: starterId === "beginner" ? drumToolReadableLabels.length : 0,
+        drumToolRowCount: starterId === "beginner" ? drumToolRowCount : 0,
+        drumToolSelectedHit: starterId === "beginner" ? drumToolSelectedHit : false,
+        drumToolUniqueAccessibleNameCount:
+          starterId === "beginner" ? new Set(drumToolAccessibleNames).size : 0,
         focusTestId: document.activeElement instanceof HTMLElement ? document.activeElement.dataset.testid ?? "" : "",
         inViewport: Boolean(
           landingRect && landingRect.top >= 0 && landingRect.top < window.innerHeight && landingRect.bottom > 0
@@ -10718,6 +10769,7 @@ export function App(): ReactElement {
 
     const collectAudienceStarterLandingEvidence = async (): Promise<GrooveforgeLaunchSmokeStarterLandingEvidence> => {
       createAudienceStarter("beginner");
+      setSelectedDrumStep({ lane: "kick", step: 0 });
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       const beginner = readAudienceStarterLanding("beginner");
