@@ -1130,6 +1130,49 @@ function validateFirstRunRenderer(html) {
     ),
     "Pattern A/B/C tabs should expose 1/2/3 shortcut semantics and tooltips"
   );
+  const patternTabSegments = ["A", "B", "C"].map((pattern) => {
+    const marker = html.indexOf(`data-testid="pattern-tab-${pattern}"`);
+    const start = marker >= 0 ? html.lastIndexOf("<button", marker) : -1;
+    return start >= 0 ? html.slice(start, html.indexOf("</button>", start)) : "";
+  });
+  const patternTabAccessibleNames = patternTabSegments
+    .map((segment) => segment.match(/aria-label="([^"]+)"/)?.[1] ?? "")
+    .filter(Boolean);
+  check(
+    html.includes('aria-label="Edit Pattern A, B, or C"') &&
+      html.includes('aria-orientation="horizontal"') &&
+      html.includes('class="pattern-tabs" role="tablist"') &&
+      patternTabSegments.every(
+        (segment, index) =>
+          segment.includes('role="tab"') &&
+          segment.includes(`Pattern ${["A", "B", "C"][index]}`) &&
+          segment.includes("event") &&
+          segment.includes("aria-selected=") &&
+          segment.includes("data-editing=")
+      ) &&
+      patternTabAccessibleNames.length === 3 &&
+      new Set(patternTabAccessibleNames).size === 3 &&
+      patternTabSegments[0].includes('aria-selected="true"') &&
+      patternTabSegments[0].includes('tabindex="0"') &&
+      patternTabSegments.slice(1).every((segment) => segment.includes('aria-selected="false"') && segment.includes('tabindex="-1"')),
+    "Pattern A/B/C should render as a complete, uniquely named tablist with one selected roving tab stop"
+  );
+  check(
+    appSource.includes("function handlePatternTabKeyDown") &&
+      ["ArrowLeft", "ArrowRight", "Home", "End"].every((key) => appSource.includes(`event.key === \"${key}\"`)) &&
+      appSource.includes("event.preventDefault()") &&
+      appSource.includes("selectPattern(targetPattern)") &&
+      appSource.includes("patternTabRefs.current[targetPattern]?.focus()"),
+    "Pattern tabs should wrap and automatically select/focus with ArrowLeft, ArrowRight, Home, and End"
+  );
+  check(
+    styles.includes(".pattern-tabs button {") &&
+      styles.includes("min-height: 48px;") &&
+      styles.includes(".pattern-tabs button small strong,") &&
+      styles.includes("text-overflow: clip;") &&
+      styles.includes("white-space: nowrap;"),
+    "Pattern tabs should retain a comfortable contained three-column scan with complete state copy"
+  );
   const patternPlaybackIndex = html.indexOf('data-testid="pattern-playback-readout"');
   const patternLabIndex = html.indexOf('data-testid="pattern-lab"');
   const drumGridIndex = html.indexOf('class="step-grid"');
