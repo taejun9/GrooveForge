@@ -11,6 +11,7 @@ import {
   noteEventShouldPlay,
   normalizeArrangementBars,
   patternForSlot,
+  projectFileStem,
   projectStepDurationSeconds,
   stepsPerBar
 } from "../domain/workstation";
@@ -263,12 +264,8 @@ export function createMidiFile(project: ProjectState): Uint8Array {
   return new Uint8Array([...header, ...trackChunks.flat()]);
 }
 
-function projectSlug(project: ProjectState): string {
-  return project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "grooveforge";
-}
-
 export function midiFileName(project: ProjectState): string {
-  return `${projectSlug(project)}-arrangement.mid`;
+  return `${projectFileStem(project)}-arrangement.mid`;
 }
 
 export function exportMidi(project: ProjectState): string {
