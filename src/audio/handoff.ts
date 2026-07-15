@@ -2,6 +2,7 @@ import {
   activeDeliveryTarget,
   arrangementMuteTrackLabel,
   arrangementTotalBars,
+  normalizeProjectTitle,
   patternSlots,
   projectFileName,
   styleProfiles
@@ -67,7 +68,7 @@ export function createHandoffSheet(
     "GrooveForge Handoff Sheet",
     "",
     "Project",
-    `Title: ${project.title}`,
+    `Title: ${normalizeProjectTitle(project.title)}`,
     `Style: ${styleName}`,
     `BPM: ${project.bpm}`,
     `Key: ${project.key}`,

@@ -152,6 +152,7 @@ import {
   melodyPitchLanes,
   maxProjectSnapshotNameLength,
   maxProjectSnapshots,
+  maxProjectTitleLength,
   minDeliveryTargetBars,
   minDeliveryTargetStemGoal,
   minArrangementBars,
@@ -170,6 +171,7 @@ import {
   normalizeEventProbability,
   normalizeHatRepeat,
   normalizeMixerEq,
+  normalizeProjectTitle,
   normalizeProjectSnapshotName,
   parseProjectFile,
   patternSlots,
@@ -188,6 +190,7 @@ import {
   scalePitches,
   scalePitchNames,
   serializeProjectFile,
+  sanitizeProjectTitleInput,
   SessionBrief,
   saveProjectSnapshot,
   soundPresetDesign,
@@ -11915,8 +11918,19 @@ export function App(): ReactElement {
             <input
               data-testid="project-title-input"
               type="text"
+              maxLength={maxProjectTitleLength * 2}
               value={project.title}
-              onChange={(event) => updateProject((current) => ({ ...current, title: event.target.value }))}
+              onChange={(event) => {
+                const title = sanitizeProjectTitleInput(event.target.value);
+                updateProject((current) => (current.title === title ? current : { ...current, title }));
+              }}
+              onBlur={() => {
+                const title = normalizeProjectTitle(projectRef.current.title);
+                updateProject(
+                  (current) => (current.title === title ? current : { ...current, title }),
+                  "Normalized project title"
+                );
+              }}
             />
           </label>
           <label className="field compact">

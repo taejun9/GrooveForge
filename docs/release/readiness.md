@@ -6,6 +6,8 @@ Run `npm run quick-actions:bundle-smoke` after `npm run build` to prove that the
 
 ## Release Gate
 
+Project-title integrity is locally ready when renderer smoke proves bounded input-time safety and blur-time finalization, runtime smoke proves the 80-code-point Unicode-aware title contract across import/save/snapshots/Handoff/Delivery Manifest, and sample-audio QA decodes the additional `서울-야간-비트-demo.wav` generated from malformed imported title metadata. The sample report schema is version 5 and covers 27 playable WAV artifacts. This is local product evidence only; it records no private project data and makes no external-distribution claim.
+
 Run the local release gate before a completion report:
 
 ```sh
