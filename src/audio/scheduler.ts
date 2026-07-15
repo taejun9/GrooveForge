@@ -14,6 +14,8 @@ import {
   hatRepeatCount,
   masterAutomationGainAtStep,
   normalizeArrangementBars,
+  normalizeArrangementPlaybackRange,
+  normalizePatternEventLength,
   noteEventShouldPlay,
   noteToFrequency,
   BassNote,
@@ -508,7 +510,7 @@ function scheduleStep(
         context,
         destination,
         time,
-        note.length * stepDuration * (0.74 + sound.bassDecay * 0.52),
+        normalizePatternEventLength(note.length, note.step) * stepDuration * (0.74 + sound.bassDecay * 0.52),
         noteToFrequency(note.pitch),
         energyGain *
           note.velocity *
@@ -535,7 +537,7 @@ function scheduleStep(
         context,
         destination,
         time,
-        note.length * stepDuration * (0.8 + sound.synthRelease * 0.42),
+        normalizePatternEventLength(note.length, note.step) * stepDuration * (0.8 + sound.synthRelease * 0.42),
         noteToFrequency(note.pitch),
         energyGain * note.velocity * 0.12 * synthMix.gain,
         synthOscillator(sound),
@@ -561,7 +563,7 @@ function scheduleStep(
           context,
           destination,
           time,
-          chord.length * stepDuration * (0.9 + sound.synthRelease * 0.24),
+          normalizePatternEventLength(chord.length, chord.step) * stepDuration * (0.9 + sound.synthRelease * 0.24),
           noteToFrequency(pitch),
           energyGain * chord.velocity * 0.08 * chordMix.gain,
           "triangle",
@@ -656,7 +658,7 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
   } else if (target.kind === "note" && target.track === "bass") {
     const note = target.note as BassNote;
     const bassMix = channelMix(project, "bass_808");
-    const duration = note.length * stepDuration * (0.74 + sound.bassDecay * 0.52);
+    const duration = normalizePatternEventLength(note.length, note.step) * stepDuration * (0.74 + sound.bassDecay * 0.52);
     scheduleTone(
       context,
       destination,
@@ -679,7 +681,7 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
   } else if (target.kind === "note") {
     const note = target.note as MelodyNote;
     const synthMix = channelMix(project, "synth");
-    const duration = note.length * stepDuration * (0.8 + sound.synthRelease * 0.42);
+    const duration = normalizePatternEventLength(note.length, note.step) * stepDuration * (0.8 + sound.synthRelease * 0.42);
     scheduleTone(
       context,
       destination,
@@ -702,7 +704,10 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
   } else {
     const chordMix = channelMix(project, "chord");
     const pitches = chordPitches(target.chord);
-    const duration = target.chord.length * stepDuration * (0.9 + sound.synthRelease * 0.24);
+    const duration =
+      normalizePatternEventLength(target.chord.length, target.chord.step) *
+      stepDuration *
+      (0.9 + sound.synthRelease * 0.24);
     for (const [voiceIndex, pitch] of pitches.entries()) {
       const spread = pitches.length <= 1 ? 0 : (voiceIndex / (pitches.length - 1)) * 2 - 1;
       scheduleTone(
@@ -783,10 +788,15 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
     const nowMs = performance.now();
     while (nextStepAtMs < nowMs + scheduleAheadMs) {
       const currentProject = getProject();
-      const bars = options.bars ?? (mode === "arrangement" ? arrangementTotalBars(currentProject) : 2);
+      const requestedBars = options.bars ?? (mode === "arrangement" ? arrangementTotalBars(currentProject) : 2);
+      const playbackRange = normalizeArrangementPlaybackRange(
+        requestedBars,
+        mode === "arrangement" ? options.startBar ?? 0 : 0
+      );
+      const bars = playbackRange.bars;
       const loopSteps = loopStepCount(bars);
       const totalBars = Math.max(1, bars);
-      const startBar = mode === "arrangement" ? Math.max(0, options.startBar ?? 0) : 0;
+      const startBar = playbackRange.startBar;
       const stepDuration = projectStepDurationSeconds(currentProject);
       const ceiling = dbToGain(currentProject.masterCeilingDb);
       const snapshot = snapshotForStep(currentProject, nextStep, loopSteps, totalBars, mode, startBar);

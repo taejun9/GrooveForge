@@ -388,6 +388,85 @@ function validateProjectPitchSafety() {
   };
 }
 
+function validateTimelineBoundarySafety() {
+  const sourceProject = structuredClone(workstation.starterProject);
+  sourceProject.title = "Recovered Timeline Safety Beat";
+  const sourceBlock = sourceProject.arrangement[0];
+  sourceProject.arrangement = Array.from({ length: 100 }, (_, index) => ({
+    ...sourceBlock,
+    section: index % 2 === 0 ? "Verse" : "Hook",
+    pattern: workstation.patternSlots[index % workstation.patternSlots.length],
+    bars: workstation.maxArrangementBars,
+    mutedTracks: [...sourceBlock.mutedTracks]
+  }));
+  sourceProject.patterns.A.bassNotes[0] = { ...sourceProject.patterns.A.bassNotes[0], step: 15, length: 16 };
+  sourceProject.patterns.A.melodyNotes[0] = { ...sourceProject.patterns.A.melodyNotes[0], step: 14, length: 16 };
+  sourceProject.patterns.A.chordEvents[0] = { ...sourceProject.patterns.A.chordEvents[0], step: 15, length: 16 };
+  const snapshot = workstation.createProjectSnapshot(workstation.starterProject, "2026-07-16T00:00:00.000Z");
+  snapshot.project.arrangement = structuredClone(sourceProject.arrangement);
+  snapshot.project.patterns.A.bassNotes[0] = { ...snapshot.project.patterns.A.bassNotes[0], step: 15, length: 16 };
+  sourceProject.snapshots = [snapshot];
+
+  const wrapped = JSON.stringify({
+    app: "GrooveForge",
+    fileVersion: workstation.projectFileVersion,
+    savedAt: "2026-07-16T00:00:00.000Z",
+    project: sourceProject
+  });
+  const parsed = workstation.parseProjectFile(wrapped);
+  const bareParsed = workstation.parseProjectFile(JSON.stringify(sourceProject));
+  const serializedFile = safeJsonParse(workstation.serializeProjectFile(sourceProject), "timeline-boundary-safety");
+  const legacyFile = legacySinglePatternProjectFile();
+  legacyFile.project.arrangement = structuredClone(sourceProject.arrangement);
+  legacyFile.project.bassNotes[0] = { ...legacyFile.project.bassNotes[0], step: 15, length: 16 };
+  legacyFile.project.melodyNotes[0] = { ...legacyFile.project.melodyNotes[0], step: 14, length: 16 };
+  legacyFile.project.chordEvents[0] = { ...legacyFile.project.chordEvents[0], step: 15, length: 16 };
+  const legacyParsed = workstation.parseProjectFile(JSON.stringify(legacyFile));
+  const directMidi = midi.createMidiFile(sourceProject);
+
+  check(workstation.arrangementTotalBars(sourceProject) === workstation.maxProjectArrangementBars, "timeline-boundary-safety: direct total bars should cap at the project maximum");
+  check(workstation.arrangementTotalSteps(sourceProject) === workstation.maxProjectArrangementBars * workstation.stepsPerBar, "timeline-boundary-safety: direct total steps should cap with total bars");
+  check(workstation.arrangementTotalBars(parsed) === workstation.maxProjectArrangementBars, "timeline-boundary-safety: imported arrangement should cap at 64 bars");
+  check(parsed.arrangement.length === workstation.maxProjectArrangementBars / workstation.maxArrangementBars, "timeline-boundary-safety: full 16-bar blocks should stop at the total boundary");
+  check(parsed.arrangement.at(-1)?.section === "Hook", "timeline-boundary-safety: imported blocks should preserve source order through the boundary");
+  check(parsed.patterns.A.bassNotes[0]?.length === 1, "timeline-boundary-safety: bass event should end inside step 16");
+  check(parsed.patterns.A.melodyNotes[0]?.length === 2, "timeline-boundary-safety: melody event should end inside step 16");
+  check(parsed.patterns.A.chordEvents[0]?.length === 1, "timeline-boundary-safety: chord event should end inside step 16");
+  check(parsed.snapshots[0]?.project.arrangement.length === 4, "timeline-boundary-safety: snapshot arrangement should use the same total boundary");
+  check(parsed.snapshots[0]?.project.patterns.A.bassNotes[0]?.length === 1, "timeline-boundary-safety: snapshot event should use the same end boundary");
+  check(legacyParsed.arrangement.length === 4, "timeline-boundary-safety: legacy arrangement should use the same total boundary");
+  check(legacyParsed.patterns.A.bassNotes[0]?.length === 1, "timeline-boundary-safety: legacy bass event should use the same end boundary");
+  check(legacyParsed.patterns.A.melodyNotes[0]?.length === 2, "timeline-boundary-safety: legacy melody event should use the same end boundary");
+  check(legacyParsed.patterns.A.chordEvents[0]?.length === 1, "timeline-boundary-safety: legacy chord event should use the same end boundary");
+  check(stableJson(bareParsed) === stableJson(parsed), "timeline-boundary-safety: wrapped and bare repair should match");
+  check(serializedFile?.project?.arrangement?.length === 4, "timeline-boundary-safety: serialization should persist only the bounded arrangement");
+  check(serializedFile?.project?.patterns?.A?.bassNotes?.[0]?.length === 1, "timeline-boundary-safety: serialization should persist bounded event length");
+  check(sourceProject.arrangement.length === 100, "timeline-boundary-safety: parsing and serialization should not mutate the caller arrangement");
+  check(sourceProject.patterns.A.bassNotes[0].length === 16, "timeline-boundary-safety: parsing and serialization should not mutate caller event length");
+  check(workstation.normalizePatternEventLength(16, 15) === 1, "timeline-boundary-safety: parser-bypass event duration should clamp to the remaining step");
+  check(stableJson(workstation.normalizeArrangementPlaybackRange(16, 63)) === stableJson({ bars: 1, startBar: 63 }), "timeline-boundary-safety: realtime range should fit inside the remaining project bar");
+  check(stableJson(workstation.normalizeArrangementPlaybackRange(Number.NaN, Number.POSITIVE_INFINITY)) === stableJson({ bars: 1, startBar: 0 }), "timeline-boundary-safety: non-finite realtime range should recover safely");
+  check(ascii(directMidi, 0, 4) === "MThd", "timeline-boundary-safety: direct MIDI export should survive oversized bypass state");
+
+  const partialBoundary = workstation.normalizeProjectArrangement([
+    { ...sourceBlock, bars: 16 },
+    { ...sourceBlock, bars: 16 },
+    { ...sourceBlock, bars: 16 },
+    { ...sourceBlock, bars: 15 },
+    { ...sourceBlock, bars: 16 }
+  ]);
+  check(partialBoundary.length === 5 && partialBoundary.at(-1)?.bars === 1, "timeline-boundary-safety: boundary block should trim to the remaining bar without reordering");
+
+  return {
+    sourceBars: 100 * workstation.maxArrangementBars,
+    repairedBars: workstation.arrangementTotalBars(parsed),
+    blocks: parsed.arrangement.length,
+    eventLengths: `${parsed.patterns.A.bassNotes[0]?.length}/${parsed.patterns.A.melodyNotes[0]?.length}/${parsed.patterns.A.chordEvents[0]?.length}`,
+    paths: 5,
+    midiBytes: directMidi.byteLength
+  };
+}
+
 function projectEventCounts(project) {
   return workstation.patternSlots.map((slot) => {
     const pattern = project.patterns[slot];
@@ -856,6 +935,7 @@ const unicodeFileIdentitySummary = validateUnicodeFileIdentity();
 const projectTitleIntegritySummary = validateProjectTitleIntegrity();
 const projectImportSafetySummary = validateProjectImportSafety();
 const projectPitchSafetySummary = validateProjectPitchSafety();
+const timelineBoundarySafetySummary = validateTimelineBoundarySafety();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -878,6 +958,7 @@ console.log(`- Unicode file identity: ${unicodeFileIdentitySummary.cases} distin
 console.log(`- Project title integrity: ${projectTitleIntegritySummary.normalizedTitle}, ${projectTitleIntegritySummary.fileStem}, ${projectTitleIntegritySummary.maxCodePoints} code-point bound`);
 console.log(`- Project import safety: ${projectImportSafetySummary.bpm} BPM / ${projectImportSafetySummary.key} / swing ${projectImportSafetySummary.swing} / ceiling ${projectImportSafetySummary.masterCeilingDb} dB / mixer ${projectImportSafetySummary.mixerRange} dB / rejected boundaries ${projectImportSafetySummary.rejected}/4`);
 console.log(`- Project pitch safety: ${projectPitchSafetySummary.range} / ${projectPitchSafetySummary.frequencies} Hz / normalized paths ${projectPitchSafetySummary.paths}/5 / malformed rejections ${projectPitchSafetySummary.rejected}/2 / MIDI ${projectPitchSafetySummary.midiBytes} bytes`);
+console.log(`- Timeline boundary safety: ${timelineBoundarySafetySummary.sourceBars}->${timelineBoundarySafetySummary.repairedBars} bars / ${timelineBoundarySafetySummary.blocks} blocks / event lengths ${timelineBoundarySafetySummary.eventLengths} / normalized paths ${timelineBoundarySafetySummary.paths}/5 / MIDI ${timelineBoundarySafetySummary.midiBytes} bytes`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

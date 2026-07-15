@@ -16,6 +16,7 @@ import {
   projectFileStem,
   projectStepDurationSeconds,
   normalizeArrangementBars,
+  normalizePatternEventLength,
   sidechainGainForStep,
 } from "../domain/workstation";
 import type { ArrangementBlock, ArrangementMuteTrack, ProjectState, SoundDesign, TrackType } from "../domain/workstation";
@@ -459,7 +460,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
         buffer,
         sendBuffer,
         (barOffset + note.step) * step,
-        note.length * step * (0.74 + sound.bassDecay * 0.52),
+        normalizePatternEventLength(note.length, note.step) * step * (0.74 + sound.bassDecay * 0.52),
         noteToFrequency(note.pitch),
         bassMix,
         energyGain *
@@ -478,7 +479,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
         buffer,
         sendBuffer,
         (barOffset + note.step) * step,
-        note.length * step * (0.8 + sound.synthRelease * 0.42),
+        normalizePatternEventLength(note.length, note.step) * step * (0.8 + sound.synthRelease * 0.42),
         noteToFrequency(note.pitch),
         synthMix,
         energyGain * note.velocity * 0.22,
@@ -502,7 +503,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
           buffer,
           sendBuffer,
           (barOffset + chord.step) * step,
-          chord.length * step * (0.9 + sound.synthRelease * 0.24),
+          normalizePatternEventLength(chord.length, chord.step) * step * (0.9 + sound.synthRelease * 0.24),
           noteToFrequency(pitch),
           voiceMix,
           energyGain * chord.velocity * 0.14,

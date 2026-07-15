@@ -261,6 +261,7 @@ export const steps = Array.from({ length: 16 }, (_, index) => index);
 export const stepsPerBar = 16;
 export const minArrangementBars = 1;
 export const maxArrangementBars = 16;
+export const maxProjectArrangementBars = 64;
 export const minDrumTimingMs = -35;
 export const maxDrumTimingMs = 35;
 export const projectFileVersion = 1;
@@ -288,7 +289,7 @@ export const maxSessionBriefNotesLength = 240;
 export const maxCustomDeliveryTargetNameLength = 32;
 export const maxCustomDeliveryTargetFocusLength = 72;
 export const minDeliveryTargetBars = 1;
-export const maxDeliveryTargetBars = 64;
+export const maxDeliveryTargetBars = maxProjectArrangementBars;
 export const minDeliveryTargetStemGoal = 1;
 export const maxDeliveryTargetStemGoal = 4;
 export const drumLanes: DrumLane[] = ["kick", "clap", "hat", "perc"];
@@ -1466,12 +1467,34 @@ export function arrangementBlockMutesTrack(block: ArrangementBlock | undefined, 
 }
 
 export function arrangementTotalBars(project: ProjectState): number {
-  return project.arrangement.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  return boundedArrangementTotalBars(project.arrangement);
 }
 
 export function arrangementTotalSteps(project: Pick<ProjectCoreState, "arrangement">): number {
-  const bars = project.arrangement.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  const bars = boundedArrangementTotalBars(project.arrangement);
   return Math.max(stepsPerBar, bars * stepsPerBar);
+}
+
+function boundedArrangementTotalBars(arrangement: Pick<ArrangementBlock, "bars">[]): number {
+  let total = 0;
+  for (const block of arrangement) {
+    total += normalizeArrangementBars(block.bars);
+    if (total >= maxProjectArrangementBars) {
+      return maxProjectArrangementBars;
+    }
+  }
+  return total;
+}
+
+export function normalizeArrangementPlaybackRange(bars: unknown, startBar: unknown): { bars: number; startBar: number } {
+  const normalizedStartBar = Number.isFinite(startBar)
+    ? Math.min(maxProjectArrangementBars - 1, Math.max(0, Math.round(Number(startBar))))
+    : 0;
+  const requestedBars = Number.isFinite(bars) ? Math.max(1, Math.round(Number(bars))) : 1;
+  return {
+    bars: Math.min(maxProjectArrangementBars - normalizedStartBar, requestedBars),
+    startBar: normalizedStartBar
+  };
 }
 
 export function createMasterAutomationPreset(
@@ -1991,13 +2014,15 @@ function setDrumStep(
   }
 }
 
-function clampEventLength(length: number, step: number): number {
+export function normalizePatternEventLength(length: unknown, step: unknown): number {
   if (!Number.isFinite(length)) {
     return 1;
   }
-  const normalizedStep = normalizeStep(step);
-  return Math.min(stepsPerBar - normalizedStep, Math.max(1, Math.round(length)));
+  const normalizedStep = normalizeStep(Number(step));
+  return Math.min(stepsPerBar - normalizedStep, Math.max(1, Math.round(Number(length))));
 }
+
+const clampEventLength = normalizePatternEventLength;
 
 function sortBassNotes(notes: BassNote[]): BassNote[] {
   return [...notes].sort((first, second) => first.step - second.step || first.pitch.localeCompare(second.pitch));
@@ -2279,7 +2304,7 @@ function patternFromBlueprint(key: string, pattern: PatternBlueprint): PatternDa
     bassNotes: pattern.bass.map((note) => ({
       step: note.step,
       pitch: pitchFromDegree(key, note.degree, note.octave),
-      length: note.length,
+      length: normalizePatternEventLength(note.length, note.step),
       velocity: normalizeNoteVelocity(note.velocity),
       glide: note.glide ?? false,
       probability: 1
@@ -2287,7 +2312,7 @@ function patternFromBlueprint(key: string, pattern: PatternBlueprint): PatternDa
     melodyNotes: pattern.melody.map((note) => ({
       step: note.step,
       pitch: pitchFromDegree(key, note.degree, note.octave),
-      length: note.length,
+      length: normalizePatternEventLength(note.length, note.step),
       velocity: note.velocity ?? 0.64,
       probability: 1
     })),
@@ -2296,7 +2321,7 @@ function patternFromBlueprint(key: string, pattern: PatternBlueprint): PatternDa
       root: rootFromDegree(key, chord.degree),
       quality: chord.quality ?? chordQualityFromDegree(key, chord.degree),
       inversion: 0,
-      length: chord.length,
+      length: normalizePatternEventLength(chord.length, chord.step),
       velocity: chord.velocity,
       probability: 1
     }))
@@ -2361,11 +2386,7 @@ function normalizeStep(value: number): number {
 }
 
 function normalizeChordLength(length: number, step: number): number {
-  if (!Number.isFinite(length)) {
-    return 1;
-  }
-  const normalizedStep = normalizeStep(step);
-  return Math.min(stepsPerBar - normalizedStep, Math.max(1, Math.round(length)));
+  return normalizePatternEventLength(length, step);
 }
 
 function normalizeChordVelocity(velocity: number): number {
@@ -2996,14 +3017,24 @@ function normalizeMixerChannels(channels: MixerChannelInput[]): MixerChannel[] {
   }));
 }
 
-function normalizeArrangement(arrangement: ArrangementBlockInput[]): ArrangementBlock[] {
-  return arrangement.map((block) => ({
-    section: block.section,
-    pattern: block.pattern,
-    energy: normalizeArrangementEnergy(block.energy),
-    bars: normalizeArrangementBars(block.bars),
-    mutedTracks: normalizeArrangementMutedTracks(block.mutedTracks)
-  }));
+export function normalizeProjectArrangement(arrangement: ArrangementBlockInput[]): ArrangementBlock[] {
+  const normalized: ArrangementBlock[] = [];
+  let remainingBars = maxProjectArrangementBars;
+  for (const block of arrangement) {
+    if (remainingBars <= 0) {
+      break;
+    }
+    const bars = Math.min(remainingBars, normalizeArrangementBars(block.bars));
+    normalized.push({
+      section: block.section,
+      pattern: block.pattern,
+      energy: normalizeArrangementEnergy(block.energy),
+      bars,
+      mutedTracks: normalizeArrangementMutedTracks(block.mutedTracks)
+    });
+    remainingBars -= bars;
+  }
+  return normalized;
 }
 
 function normalizeDrumVelocities(value: DrumVelocities | undefined, drumPattern: DrumPattern): DrumVelocities {
@@ -3046,6 +3077,7 @@ function normalizeBassNotes(notes: BassNoteInput[]): BassNote[] {
   return notes.map((note) => ({
     ...note,
     pitch: normalizeProjectPitch(note.pitch),
+    length: normalizePatternEventLength(note.length, note.step),
     velocity: normalizeNoteVelocity(note.velocity),
     probability: normalizeEventProbability(note.probability ?? 1)
   }));
@@ -3055,6 +3087,7 @@ function normalizeMelodyNotes(notes: MelodyNoteInput[]): MelodyNote[] {
   return notes.map((note) => ({
     ...note,
     pitch: normalizeProjectPitch(note.pitch),
+    length: normalizePatternEventLength(note.length, note.step),
     velocity: normalizeNoteVelocity(note.velocity, 0.64),
     probability: normalizeEventProbability(note.probability ?? 1)
   }));
@@ -3065,6 +3098,7 @@ function normalizeChordEvents(events: ChordEventInput[] | undefined): ChordEvent
     events?.map((event) => ({
       ...event,
       inversion: normalizeChordInversion(event.inversion),
+      length: normalizePatternEventLength(event.length, event.step),
       probability: normalizeEventProbability(event.probability ?? 1)
     })) ?? []
   );
@@ -3146,7 +3180,7 @@ function normalizeProjectCoreState(value: ProjectCoreStateInput): ProjectCoreSta
     sound: normalizeSoundDesign(value.sound),
     patterns: normalizePatternMap(value.patterns),
     mixer: normalizeMixerChannels(value.mixer),
-    arrangement: normalizeArrangement(value.arrangement),
+    arrangement: normalizeProjectArrangement(value.arrangement),
     automation: normalizeAutomationEvents(value.automation),
     masterCeilingDb: normalizeMasterCeilingDb(value.masterCeilingDb)
   };
@@ -3256,7 +3290,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
         C: clonePatternData(legacyPattern)
       },
       mixer: normalizeMixerChannels(value.mixer),
-      arrangement: normalizeArrangement(value.arrangement),
+      arrangement: normalizeProjectArrangement(value.arrangement),
       automation: normalizeAutomationEvents(value.automation),
       masterCeilingDb: normalizeMasterCeilingDb(value.masterCeilingDb),
       masterPreset: value.masterPreset,

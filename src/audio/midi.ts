@@ -10,6 +10,7 @@ import {
   hatRepeatCount,
   noteEventShouldPlay,
   normalizeArrangementBars,
+  normalizePatternEventLength,
   normalizeProjectPitch,
   patternForSlot,
   projectFileStem,
@@ -203,7 +204,13 @@ export function createMidiFile(project: ProjectState): Uint8Array {
         if (midiNote === null || !noteEventShouldPlay("bass", note, absoluteStep)) {
           continue;
         }
-        addNote(tracks.bass, barTick + note.step * ticksPerStep, note.length * ticksPerStep, midiNote, note.velocity * energy);
+        addNote(
+          tracks.bass,
+          barTick + note.step * ticksPerStep,
+          normalizePatternEventLength(note.length, note.step) * ticksPerStep,
+          midiNote,
+          note.velocity * energy
+        );
       }
     }
 
@@ -214,7 +221,13 @@ export function createMidiFile(project: ProjectState): Uint8Array {
         if (midiNote === null || !noteEventShouldPlay("melody", note, absoluteStep)) {
           continue;
         }
-        addNote(tracks.synth, barTick + note.step * ticksPerStep, note.length * ticksPerStep, midiNote, note.velocity * energy);
+        addNote(
+          tracks.synth,
+          barTick + note.step * ticksPerStep,
+          normalizePatternEventLength(note.length, note.step) * ticksPerStep,
+          midiNote,
+          note.velocity * energy
+        );
       }
     }
 
@@ -227,7 +240,13 @@ export function createMidiFile(project: ProjectState): Uint8Array {
         for (const pitch of chordPitches(chord)) {
           const midiNote = noteNameToMidi(pitch);
           if (midiNote !== null) {
-            addNote(tracks.chords, barTick + chord.step * ticksPerStep, chord.length * ticksPerStep, midiNote, chord.velocity * energy);
+            addNote(
+              tracks.chords,
+              barTick + chord.step * ticksPerStep,
+              normalizePatternEventLength(chord.length, chord.step) * ticksPerStep,
+              midiNote,
+              chord.velocity * energy
+            );
           }
         }
       }

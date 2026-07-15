@@ -153,6 +153,7 @@ import {
   maxProjectSnapshotNameLength,
   maxProjectSnapshots,
   maxProjectFileBytes,
+  maxProjectArrangementBars,
   maxProjectTitleLength,
   minDeliveryTargetBars,
   minDeliveryTargetStemGoal,
@@ -1615,6 +1616,13 @@ export function App(): ReactElement {
     playingArrangementIndex
   );
   const selectedArrangementBars = selectedArrangementBlock ? normalizeArrangementBars(selectedArrangementBlock.bars) : 1;
+  const selectedArrangementMaximumBars = Math.min(
+    maxArrangementBars,
+    Math.max(
+      minArrangementBars,
+      maxProjectArrangementBars - (arrangementTotalBars(project) - selectedArrangementBars)
+    )
+  );
   const selectedArrangementStartBar = arrangementStartBar(project, selectedArrangementIndex);
   const transportLoopMode = transportLoopScope === "pattern" ? "pattern" : "arrangement";
   const transportLoopBars =
@@ -4085,11 +4093,19 @@ export function App(): ReactElement {
       if (!block) {
         return current;
       }
+      const currentBlockBars = normalizeArrangementBars(block.bars);
+      const maximumBlockBars = Math.max(
+        minArrangementBars,
+        maxProjectArrangementBars - (arrangementTotalBars(current) - currentBlockBars)
+      );
       const nextBlock: ArrangementBlock = {
         ...block,
         ...update,
         energy: update.energy === undefined ? block.energy : normalizeArrangementEnergy(update.energy),
-        bars: update.bars === undefined ? block.bars : normalizeArrangementBars(update.bars),
+        bars:
+          update.bars === undefined
+            ? block.bars
+            : Math.min(maximumBlockBars, normalizeArrangementBars(update.bars)),
         mutedTracks:
           update.mutedTracks === undefined
             ? block.mutedTracks
@@ -4714,23 +4730,38 @@ export function App(): ReactElement {
     const beforeProject = projectRef.current;
     const beforeIndex = selectedArrangementIndex;
     const afterIndex = Math.min(beforeIndex + 1, beforeProject.arrangement.length);
+    const beforeSource = beforeProject.arrangement[beforeIndex] ?? beforeProject.arrangement[0];
+    const beforeRemainingBars = maxProjectArrangementBars - arrangementTotalBars(beforeProject);
+    const duplicateStatus =
+      beforeSource && normalizeArrangementBars(beforeSource.bars) > beforeRemainingBars
+        ? `Duplicated arrangement block within ${maxProjectArrangementBars}-bar limit`
+        : "Duplicated arrangement block";
     const changed = updateProject((current) => {
       const source = current.arrangement[selectedArrangementIndex] ?? current.arrangement[0];
       if (!source) {
         return current;
       }
+      const remainingBars = maxProjectArrangementBars - arrangementTotalBars(current);
+      if (remainingBars <= 0) {
+        return current;
+      }
       const nextIndex = Math.min(selectedArrangementIndex + 1, current.arrangement.length);
+      const duplicatedBlock: ArrangementBlock = {
+        ...source,
+        bars: Math.min(remainingBars, normalizeArrangementBars(source.bars)),
+        mutedTracks: [...source.mutedTracks]
+      };
       setSelectedArrangementIndex(nextIndex);
       return {
         ...current,
         selectedPattern: source.pattern,
         arrangement: [
           ...current.arrangement.slice(0, nextIndex),
-          { ...source, mutedTracks: [...source.mutedTracks] },
+          duplicatedBlock,
           ...current.arrangement.slice(nextIndex)
         ]
       };
-    }, "Duplicated arrangement block");
+    }, duplicateStatus);
     if (changed) {
       setSelectedNote(null);
       setSelectedDrumStep(null);
@@ -4738,6 +4769,9 @@ export function App(): ReactElement {
       setSelectedBlockEditResult(createSelectedBlockEditResult("duplicate", beforeProject, projectRef.current, beforeIndex, afterIndex));
     } else {
       setSelectedBlockEditResult(null);
+      if (arrangementTotalBars(projectRef.current) >= maxProjectArrangementBars) {
+        setProjectStatus(`Arrangement is limited to ${maxProjectArrangementBars} bars`);
+      }
     }
   }
 
@@ -4770,15 +4804,24 @@ export function App(): ReactElement {
     const beforeProject = projectRef.current;
     const beforeIndex = selectedArrangementIndex;
     const afterIndex = Math.min(beforeIndex + 1, beforeProject.arrangement.length);
+    const beforeRemainingBars = maxProjectArrangementBars - arrangementTotalBars(beforeProject);
+    const pasteStatus =
+      normalizeArrangementBars(clipboard.bars) > beforeRemainingBars
+        ? `Pasted arrangement block within ${maxProjectArrangementBars}-bar limit`
+        : "Pasted arrangement block";
     const changed = updateProject((current) => {
       const selectedBlock = current.arrangement[selectedArrangementIndex];
       if (!selectedBlock) {
         return current;
       }
+      const remainingBars = maxProjectArrangementBars - arrangementTotalBars(current);
+      if (remainingBars <= 0) {
+        return current;
+      }
       const nextIndex = Math.min(selectedArrangementIndex + 1, current.arrangement.length);
       const pastedBlock: ArrangementBlock = {
         ...clipboard,
-        bars: normalizeArrangementBars(clipboard.bars),
+        bars: Math.min(remainingBars, normalizeArrangementBars(clipboard.bars)),
         energy: normalizeArrangementEnergy(clipboard.energy),
         mutedTracks: normalizeArrangementMutedTracks(clipboard.mutedTracks)
       };
@@ -4793,7 +4836,7 @@ export function App(): ReactElement {
           ...current.arrangement.slice(nextIndex)
         ]
       };
-    }, "Pasted arrangement block");
+    }, pasteStatus);
     if (changed) {
       setSelectedNote(null);
       setSelectedDrumStep(null);
@@ -4801,7 +4844,11 @@ export function App(): ReactElement {
       setSelectedBlockEditResult(createSelectedBlockEditResult("paste", beforeProject, projectRef.current, beforeIndex, afterIndex));
     } else {
       setSelectedBlockEditResult(null);
-      setProjectStatus("Select an arrangement block");
+      setProjectStatus(
+        arrangementTotalBars(projectRef.current) >= maxProjectArrangementBars
+          ? `Arrangement is limited to ${maxProjectArrangementBars} bars`
+          : "Select an arrangement block"
+      );
     }
   }
 
@@ -13618,12 +13665,19 @@ export function App(): ReactElement {
                     data-testid="arrangement-bars-input"
                     type="number"
                     min={minArrangementBars}
-                    max={maxArrangementBars}
+                    max={selectedArrangementMaximumBars}
                     step={1}
                     value={selectedArrangementBlock.bars}
-                    onChange={(event) =>
-                      updateArrangementBlock(selectedArrangementIndex, { bars: Number(event.target.value) })
-                    }
+                    onChange={(event) => {
+                      const requestedBars = Number(event.target.value);
+                      updateArrangementBlock(
+                        selectedArrangementIndex,
+                        { bars: requestedBars },
+                        requestedBars > selectedArrangementMaximumBars
+                          ? `Arrangement is limited to ${maxProjectArrangementBars} bars`
+                          : "Unsaved changes"
+                      );
+                    }}
                   />
                 </label>
                 <label>
