@@ -122,6 +122,21 @@ type GrooveforgeLaunchSmokeStarterLandingRouteEvidence = {
   loopScopeStateCopyReady: boolean;
   loopScopeTitleCount: number;
   loopScopeUniqueAccessibleNameCount: number;
+  transportPlaybackAccessibleNameReady: boolean;
+  transportPlaybackContainedCount: number;
+  transportPlaybackControlCount: number;
+  transportPlaybackDetailClientWidth: number;
+  transportPlaybackDetailScrollWidth: number;
+  transportPlaybackFocusReady: boolean;
+  transportPlaybackHeight: number;
+  transportPlaybackInternalOverflow: number;
+  transportPlaybackLabelClientWidth: number;
+  transportPlaybackLabelScrollWidth: number;
+  transportPlaybackPressedStateReady: boolean;
+  transportPlaybackReadableLabelCount: number;
+  transportPlaybackStateCopyReady: boolean;
+  transportPlaybackTitleReady: boolean;
+  transportPlaybackWidth: number;
   metronomeAccessibleNameReady: boolean;
   metronomeContainedCount: number;
   metronomeControlCount: number;
@@ -456,6 +471,7 @@ interface Window {
     collectChordCardKeyboardEvidence?: () => GrooveforgeLaunchSmokeChordCardEvidence;
     setModeAwareToolPanels?: (mode: "guided" | "studio") => void;
   };
+  __grooveforgeLaunchSmokeStarterLandingStep?: string;
   __grooveforgeLaunchSmokePaletteStep?: string;
   webkitAudioContext?: typeof AudioContext;
 }

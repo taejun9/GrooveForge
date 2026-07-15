@@ -1245,7 +1245,7 @@ function validateFirstRunRenderer(html) {
   check(
     html.includes('title="Open Quick Actions (Ctrl/Cmd+K)"') &&
       html.includes('title="Open Command Reference (? or Ctrl/Cmd+/)"') &&
-      html.includes('title="Play song loop (Space)"') &&
+      html.includes('title="Play Song loop · 8 bars timeline · 82 BPM · Space"') &&
       html.includes('title="Undo last edit (Ctrl/Cmd+Z)"') &&
       html.includes('title="Redo last undone edit (Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y)"') &&
       html.includes('title="Open project (Ctrl/Cmd+O)"') &&
@@ -1255,6 +1255,33 @@ function validateFirstRunRenderer(html) {
   check(
     html.includes('data-testid="transport-play"') && html.includes('aria-pressed="false"'),
     "initial Play control should expose its stopped pressed state"
+  );
+  const transportPlayStart = transportPlayIndex >= 0 ? html.lastIndexOf("<button", transportPlayIndex) : -1;
+  const transportPlaySegment =
+    transportPlayStart >= 0 ? html.slice(transportPlayStart, html.indexOf("</button>", transportPlayStart)) : "";
+  check(
+    transportPlaySegment.includes('aria-label="Play Song loop, 8 bars timeline, 82 BPM"') &&
+      transportPlaySegment.includes('class="icon-button primary transport-play-toggle"') &&
+      transportPlaySegment.includes('title="Play Song loop · 8 bars timeline · 82 BPM · Space"') &&
+      transportPlaySegment.includes('<span class="transport-play-copy">') &&
+      transportPlaySegment.includes("<strong>Play</strong>") &&
+      transportPlaySegment.includes("<small>Song · 8 bars</small>"),
+    "Play should expose complete direct Song-loop target, BPM, next-action naming, and two-line visible copy"
+  );
+  check(
+    styles.includes(".icon-button.transport-play-toggle {") &&
+      styles.includes("min-width: 112px;") &&
+      styles.includes("width: 340px;") &&
+      styles.includes("grid-template-columns: repeat(3, 68px) 112px;") &&
+      styles.includes(
+        ".command-strip .transport-essential-controls > .icon-button:not(.metronome-toggle):not(.transport-play-toggle) {"
+      ) &&
+      styles.includes(".transport-play-copy {") &&
+      styles.includes(".transport-play-copy strong,") &&
+      styles.includes(".transport-play-copy small {") &&
+      styles.includes(".transport-play-copy strong {") &&
+      styles.includes(".transport-play-copy small {"),
+    "Play should keep a contained readable two-line direct-control treatment"
   );
   check(
     ["A", "B", "C"].every((pattern, index) =>

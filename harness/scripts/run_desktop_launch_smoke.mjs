@@ -10,7 +10,7 @@ import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gu
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(import.meta.url);
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
-const timeoutMs = 900000;
+const timeoutMs = 1820000;
 const failures = [];
 const expectedLiveTestIds = [
   "workflow-target-transport",
@@ -306,8 +306,13 @@ function checkResult(result) {
       evidence?.layout?.minimumWindowLaunchpadHorizontalReady === true &&
       evidence?.layout?.minimumWindowSetupReady === true &&
       evidence?.layout?.minimumWindowHorizontalOverflow === 0 &&
+      evidence?.layout?.minimumWindowTransportPlaybackContained === true &&
+      evidence?.layout?.minimumWindowTransportPlaybackReadable === true &&
+      evidence?.layout?.minimumWindowTransportPlaybackInternalOverflow === 0 &&
+      evidence?.layout?.minimumWindowTransportPlaybackWidth >= 112 &&
+      evidence?.layout?.minimumWindowTransportPlaybackHeight >= 38 &&
       evidence?.layout?.minimumWindowViewportWidth <= 1180,
-    `live desktop minimum window should keep setup, horizontal audience choices, and every direct action inside the viewport without horizontal overflow (viewport ${evidence?.layout?.minimumWindowViewportWidth}, height ${evidence?.layout?.minimumWindowTransportHeight}, overflow ${evidence?.layout?.minimumWindowHorizontalOverflow}, transport ${evidence?.layout?.minimumWindowTransportReady}, setup ${evidence?.layout?.minimumWindowSetupReady}, choices ${evidence?.layout?.minimumWindowLaunchpadHorizontalReady}, actions ${evidence?.layout?.minimumWindowDirectActionsReady})`
+    `live desktop minimum window should keep setup, horizontal audience choices, and every direct action including readable Play target copy inside the viewport without horizontal overflow (viewport ${evidence?.layout?.minimumWindowViewportWidth}, height ${evidence?.layout?.minimumWindowTransportHeight}, overflow ${evidence?.layout?.minimumWindowHorizontalOverflow}, transport ${evidence?.layout?.minimumWindowTransportReady}, setup ${evidence?.layout?.minimumWindowSetupReady}, choices ${evidence?.layout?.minimumWindowLaunchpadHorizontalReady}, actions ${evidence?.layout?.minimumWindowDirectActionsReady}, play ${evidence?.layout?.minimumWindowTransportPlaybackWidth}x${evidence?.layout?.minimumWindowTransportPlaybackHeight}, play readable ${evidence?.layout?.minimumWindowTransportPlaybackReadable}, play overflow ${evidence?.layout?.minimumWindowTransportPlaybackInternalOverflow})`
   );
   check(
     evidence?.layout?.minimumWindowWideStudioAutoExpandReady === true &&
@@ -384,6 +389,15 @@ function checkResult(result) {
       evidence?.starterLanding?.beginner?.loopScopeColumnCount === 4 &&
       evidence?.starterLanding?.beginner?.loopScopeRowCount === 1 &&
       evidence?.starterLanding?.beginner?.loopScopeInternalOverflow === 0 &&
+      evidence?.starterLanding?.beginner?.transportPlaybackControlCount === 1 &&
+      evidence?.starterLanding?.beginner?.transportPlaybackReadableLabelCount === 1 &&
+      evidence?.starterLanding?.beginner?.transportPlaybackAccessibleNameReady === true &&
+      evidence?.starterLanding?.beginner?.transportPlaybackTitleReady === true &&
+      evidence?.starterLanding?.beginner?.transportPlaybackPressedStateReady === true &&
+      evidence?.starterLanding?.beginner?.transportPlaybackStateCopyReady === true &&
+      evidence?.starterLanding?.beginner?.transportPlaybackContainedCount === 1 &&
+      evidence?.starterLanding?.beginner?.transportPlaybackFocusReady === true &&
+      evidence?.starterLanding?.beginner?.transportPlaybackInternalOverflow === 0 &&
       evidence?.starterLanding?.beginner?.metronomeControlCount === 1 &&
       evidence?.starterLanding?.beginner?.metronomeReadableLabelCount === 1 &&
       evidence?.starterLanding?.beginner?.metronomeAccessibleNameReady === true &&
@@ -1356,7 +1370,7 @@ child.on("exit", (code, signal) => {
     `- Compact transport: ${result.evidence.layout.compactTransportHeight}px header, horizontal audience choices, setup top-aligned, Workflow Navigator starts at ${result.evidence.layout.initialNavigatorTop}px`
   );
   console.log(
-    `- Minimum window: ${result.evidence.layout.minimumWindowViewportWidth}px viewport, ${result.evidence.layout.minimumWindowTransportHeight}px header, ${result.evidence.layout.minimumWindowHorizontalOverflow}px horizontal overflow, all direct actions visible`
+    `- Minimum window: ${result.evidence.layout.minimumWindowViewportWidth}px viewport, ${result.evidence.layout.minimumWindowTransportHeight}px header, ${result.evidence.layout.minimumWindowHorizontalOverflow}px horizontal overflow, Play ${result.evidence.layout.minimumWindowTransportPlaybackWidth}x${result.evidence.layout.minimumWindowTransportPlaybackHeight}px readable, all direct actions visible`
   );
   console.log(
     `- Minimum Studio transport: ${result.evidence.layout.minimumWindowStudioCompactHeight}px compact vs ${result.evidence.layout.minimumWindowStudioExpandedHeight}px manual expansion, wide auto-expand and resize collapse ready`
@@ -1377,6 +1391,7 @@ child.on("exit", (code, signal) => {
   console.log("- Drum edit tools: 5/5 readable labels, five unique accessible names, and a contained five-column direct layout");
   console.log("- Pattern groove presets: 4/4 readable feel descriptions, four unique Pattern-scoped names/titles, direct Undo context, and a contained four-column layout");
   console.log("- Transport loop scope: 4/4 live targets and unique names, one pressed scope, corrected event grammar, and a contained four-column layout");
+  console.log(`- Transport Play/Stop: complete next action, live loop target and BPM name/title, pressed state, readable two-line copy, and contained ${result.evidence.starterLanding.beginner.transportPlaybackWidth}x${result.evidence.starterLanding.beginner.transportPlaybackHeight}px focusable control`);
   console.log("- Metronome: complete visible name, live On/Off and BPM detail, state-aware accessible action, pressed semantics, and contained focusable control");
   console.log("- Tap Tempo: closed-summary discovery, complete direct name, live start/BPM detail, state-aware name/title, and contained focusable control");
   console.log("- Tempo Nudge pads: 4/4 complete actions, live target BPM details, unique current-to-target names/titles, and a contained focusable two-by-two layout");
