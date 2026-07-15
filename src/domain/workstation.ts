@@ -264,6 +264,8 @@ export const maxArrangementBars = 16;
 export const minDrumTimingMs = -35;
 export const maxDrumTimingMs = 35;
 export const projectFileVersion = 1;
+export const defaultProjectTitle = "Untitled Beat";
+export const maxProjectTitleLength = 80;
 export const maxProjectSnapshots = 6;
 export const maxProjectSnapshotNameLength = 32;
 export const maxSessionBriefFieldLength = 64;
@@ -2582,6 +2584,19 @@ function cloneProjectCore(project: ProjectCoreState): ProjectCoreState {
 
 const maxProjectFileStemBytes = 120;
 const reservedWindowsFileStem = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+const unsafeProjectTitleCharacters =
+  /[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u200b\u200e\u200f\u2028-\u202e\u2060-\u206f\ufeff]/gu;
+
+export function sanitizeProjectTitleInput(value: string): string {
+  const visible = value.normalize("NFKC").replace(unsafeProjectTitleCharacters, " ").replace(/\s/gu, " ");
+  return Array.from(visible).slice(0, maxProjectTitleLength).join("");
+}
+
+export function normalizeProjectTitle(value: unknown): string {
+  const normalized =
+    typeof value === "string" ? sanitizeProjectTitleInput(value).replace(/\s+/gu, " ").trim() : "";
+  return normalized || defaultProjectTitle;
+}
 
 function utf8ByteLength(value: string): number {
   let bytes = 0;
@@ -2604,8 +2619,7 @@ function truncateUtf8(value: string, maxBytes: number): string {
 }
 
 export function projectFileStem(project: Pick<ProjectState, "title">): string {
-  const normalized = project.title
-    .normalize("NFKC")
+  const normalized = normalizeProjectTitle(project.title)
     .toLocaleLowerCase("und")
     .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "");
@@ -2621,11 +2635,22 @@ export function projectFileName(project: ProjectState): string {
 }
 
 export function serializeProjectFile(project: ProjectState): string {
+  const durableProject: ProjectState = {
+    ...project,
+    title: normalizeProjectTitle(project.title),
+    snapshots: project.snapshots.map((snapshot) => ({
+      ...snapshot,
+      project: {
+        ...snapshot.project,
+        title: normalizeProjectTitle(snapshot.project.title)
+      }
+    }))
+  };
   const file: ProjectFile = {
     app: "GrooveForge",
     fileVersion: projectFileVersion,
     savedAt: new Date().toISOString(),
-    project
+    project: durableProject
   };
   return `${JSON.stringify(file, null, 2)}\n`;
 }
@@ -3026,6 +3051,7 @@ function normalizeAutomationValue(value: unknown): number {
 function normalizeProjectCoreState(value: ProjectCoreStateInput): ProjectCoreState {
   return {
     ...value,
+    title: normalizeProjectTitle(value.title),
     metronomeEnabled: value.metronomeEnabled ?? false,
     deliveryTarget: normalizeDeliveryTargetId(value.deliveryTarget),
     customDeliveryTarget: normalizeCustomDeliveryTarget(value.customDeliveryTarget),
@@ -3127,7 +3153,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
       chordEvents: value.chordEvents
     });
     return {
-      title: value.title,
+      title: normalizeProjectTitle(value.title),
       mode: value.mode,
       bpm: value.bpm,
       key: value.key,

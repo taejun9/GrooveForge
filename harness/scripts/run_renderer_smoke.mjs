@@ -1249,6 +1249,14 @@ function validateFirstRunRenderer(html) {
     "essential transport and project controls should expose a stable editable field hook and their existing desktop shortcuts"
   );
   check(
+    appSource.includes("sanitizeProjectTitleInput(event.target.value)") &&
+      appSource.includes("normalizeProjectTitle(projectRef.current.title)") &&
+      appSource.includes("maxLength={maxProjectTitleLength * 2}") &&
+      /maxLength="160"/.test(html) &&
+      appSource.includes('"Normalized project title"'),
+    "project title input should sanitize while typing, preserve the Unicode code-point budget, and finalize on blur"
+  );
+  check(
     html.includes('title="Open Quick Actions (Ctrl/Cmd+K)"') &&
       html.includes('title="Open Command Reference (? or Ctrl/Cmd+/)"') &&
       html.includes('title="Play Song loop · 8 bars timeline · 82 BPM · Space"') &&

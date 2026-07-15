@@ -1,4 +1,11 @@
-import { activeDeliveryTarget, arrangementTotalBars, projectFileName, projectFileStem, serializeProjectFile } from "../domain/workstation";
+import {
+  activeDeliveryTarget,
+  arrangementTotalBars,
+  normalizeProjectTitle,
+  projectFileName,
+  projectFileStem,
+  serializeProjectFile
+} from "../domain/workstation";
 import type { ProjectState } from "../domain/workstation";
 import { downloadBlob } from "../platform/downloads";
 import { createHandoffSheet, handoffSheetFileName } from "./handoff";
@@ -289,7 +296,7 @@ export function createDeliveryBundleManifest(
   return {
     app: "GrooveForge",
     bundleVersion: 1,
-    title: project.title,
+    title: normalizeProjectTitle(project.title),
     projectFileName: projectFileName(project),
     bundleFileName,
     deliveryTarget: activeDeliveryTarget(project).name,
@@ -317,7 +324,7 @@ export function createDeliveryBundleManifestMarkdown(manifest: DeliveryBundleMan
   return [
     "# GrooveForge Delivery Bundle Manifest",
     "",
-    `Project: ${manifest.title}`,
+    `Project: ${normalizeProjectTitle(manifest.title)}`,
     `Delivery target: ${manifest.deliveryTarget}`,
     `Bundle: ${manifest.bundleFileName}`,
     `Artifacts: ${manifest.artifactCount}`,

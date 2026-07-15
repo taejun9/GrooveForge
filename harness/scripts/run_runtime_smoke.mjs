@@ -157,6 +157,68 @@ function validateUnicodeFileIdentity() {
   return { cases: identityCases.length, deliverablesPerCase: identityCases[0].fileNames.length, boundedBytes: new TextEncoder().encode(boundedStem).byteLength };
 }
 
+function validateProjectTitleIntegrity() {
+  const malformedTitle = "  서울\n야간\t비트\u0000  ";
+  const expectedTitle = "서울 야간 비트";
+  const { snapshots: _snapshots, ...snapshotProject } = workstation.starterProject;
+  const malformedProject = {
+    ...workstation.starterProject,
+    title: malformedTitle,
+    snapshots: [
+      {
+        id: "snapshot-title-integrity-1",
+        name: "Title integrity",
+        createdAt: "2026-07-15T00:00:00.000Z",
+        project: { ...snapshotProject, title: "  스냅샷\n제목\u0000  " }
+      }
+    ]
+  };
+  const wrapped = JSON.stringify({
+    app: "GrooveForge",
+    fileVersion: workstation.projectFileVersion,
+    savedAt: "2026-07-15T00:00:00.000Z",
+    project: malformedProject
+  });
+  const parsed = workstation.parseProjectFile(wrapped);
+  check(parsed.title === expectedTitle, "project-title-integrity: import should normalize multiline/control title metadata");
+  check(parsed.snapshots[0]?.project.title === "스냅샷 제목", "project-title-integrity: imported snapshot titles should use the same normalization contract");
+
+  const serialized = workstation.serializeProjectFile(malformedProject);
+  const serializedFile = safeJsonParse(serialized, "project-title-integrity");
+  check(serializedFile?.project?.title === expectedTitle, "project-title-integrity: durable serialization should normalize the active title before writing");
+  check(serializedFile?.project?.snapshots?.[0]?.project?.title === "스냅샷 제목", "project-title-integrity: durable serialization should normalize snapshot titles before writing");
+  check(workstation.parseProjectFile(serialized).title === expectedTitle, "project-title-integrity: normalized title should survive save/load roundtrip");
+  check(workstation.projectFileStem(parsed) === "서울-야간-비트", "project-title-integrity: normalized Korean title should own the shared filename stem");
+
+  const analysis = render.analyzeExport(parsed);
+  const stemAnalyses = render.analyzeStemExports(parsed);
+  const handoffText = handoff.createHandoffSheet(malformedProject, analysis, stemAnalyses);
+  check(handoffText.split("\n").filter((line) => line.startsWith("Title:")).length === 1, "project-title-integrity: Handoff should contain exactly one Title line");
+  check(handoffText.includes(`Title: ${expectedTitle}\nStyle:`), "project-title-integrity: Handoff Title should be one normalized line before Style");
+  check(!handoffText.includes("\u0000"), "project-title-integrity: Handoff should not retain NUL title data");
+
+  const manifest = deliveryBundle.createDeliveryBundleManifest(malformedProject, "서울-야간-비트-delivery-bundle.zip", []);
+  const manifestMarkdown = deliveryBundle.createDeliveryBundleManifestMarkdown(manifest);
+  check(manifest.title === expectedTitle, "project-title-integrity: Delivery Manifest JSON should use the normalized title");
+  check(manifestMarkdown.includes(`Project: ${expectedTitle}\nDelivery target:`), "project-title-integrity: Delivery Manifest Markdown should keep Project metadata on one line");
+  check(!manifestMarkdown.includes("\u0000"), "project-title-integrity: Delivery Manifest Markdown should not retain NUL title data");
+  const directManifestMarkdown = deliveryBundle.createDeliveryBundleManifestMarkdown({ ...manifest, title: malformedTitle });
+  check(directManifestMarkdown.includes(`Project: ${expectedTitle}\nDelivery target:`), "project-title-integrity: direct Manifest Markdown creation should normalize its title defensively");
+
+  check(workstation.normalizeProjectTitle(" \t\n ") === workstation.defaultProjectTitle, "project-title-integrity: whitespace-only titles should use Untitled Beat");
+  check(workstation.projectFileStem({ title: " \t\n " }) === "untitled-beat", "project-title-integrity: blank durable title fallback should own a stable filename stem");
+  check(workstation.normalizeProjectTitle("Cafe\u0301 東京 👩‍🎤") === "Café 東京 👩‍🎤", "project-title-integrity: accents, Japanese, and ZWJ emoji should remain readable");
+  check(workstation.sanitizeProjectTitleInput("New ") === "New ", "project-title-integrity: input-time safety should preserve a trailing space while typing another word");
+  const bounded = workstation.normalizeProjectTitle("한".repeat(10000));
+  check(Array.from(bounded).length === workstation.maxProjectTitleLength, "project-title-integrity: imported titles should be bounded by Unicode code points");
+
+  return {
+    normalizedTitle: parsed.title,
+    fileStem: workstation.projectFileStem(parsed),
+    maxCodePoints: workstation.maxProjectTitleLength
+  };
+}
+
 function projectEventCounts(project) {
   return workstation.patternSlots.map((slot) => {
     const pattern = project.patterns[slot];
@@ -622,6 +684,7 @@ for (const smokeCase of smokeCases) {
 const downloadSmokeProject = workstation.parseProjectFile(workstation.serializeProjectFile(starterCase.project));
 const downloadSmokeSummary = validateDownloadPathSmoke(downloadSmokeProject);
 const unicodeFileIdentitySummary = validateUnicodeFileIdentity();
+const projectTitleIntegritySummary = validateProjectTitleIntegrity();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -641,6 +704,7 @@ console.log(`- Project roundtrips: ${summaries.length}/${smokeCases.length} .gro
 console.log(`- Handoff sheets: ${summaries.length}/${smokeCases.length} text deliverables verified`);
 console.log(`- Download path: ${downloadSmokeSummary.clicked}/${downloadSmokeSummary.expected} mocked Blob URL downloads verified (${downloadSmokeSummary.fileNames.join(", ")})`);
 console.log(`- Unicode file identity: ${unicodeFileIdentitySummary.cases} distinct titles x ${unicodeFileIdentitySummary.deliverablesPerCase} deliverables, bounded stem ${unicodeFileIdentitySummary.boundedBytes}/120 UTF-8 bytes`);
+console.log(`- Project title integrity: ${projectTitleIntegritySummary.normalizedTitle}, ${projectTitleIntegritySummary.fileStem}, ${projectTitleIntegritySummary.maxCodePoints} code-point bound`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);
