@@ -264,8 +264,21 @@ export const maxArrangementBars = 16;
 export const minDrumTimingMs = -35;
 export const maxDrumTimingMs = 35;
 export const projectFileVersion = 1;
+export const maxProjectFileCharacters = 1_500_000;
+export const maxProjectFileBytes = maxProjectFileCharacters * 4;
 export const defaultProjectTitle = "Untitled Beat";
 export const maxProjectTitleLength = 80;
+export const minProjectBpm = 60;
+export const maxProjectBpm = 220;
+export const minProjectSwing = 0;
+export const maxProjectSwing = 0.24;
+export const minMixerVolumeDb = -36;
+export const maxMixerVolumeDb = 3;
+export const minMixerPan = -100;
+export const maxMixerPan = 100;
+export const minMasterCeilingDb = -6;
+export const maxMasterCeilingDb = 0;
+export const projectKeys = ["F minor", "F# minor", "A minor", "C minor", "D minor", "E minor", "G minor", "C major", "D dorian"] as const;
 export const maxProjectSnapshots = 6;
 export const maxProjectSnapshotNameLength = 32;
 export const maxSessionBriefFieldLength = 64;
@@ -1323,17 +1336,11 @@ function applyDeliveryTargetMixer(sourceMixer: MixerChannel[], target: DeliveryT
 }
 
 function clampVolumeDb(value: number): number {
-  if (!Number.isFinite(value)) {
-    return -6;
-  }
-  return Math.min(3, Math.max(-36, Math.round(value * 10) / 10));
+  return normalizeMixerVolumeDb(value);
 }
 
 function clampPanValue(value: number): number {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-  return Math.min(100, Math.max(-100, Math.round(value)));
+  return normalizeMixerPan(value);
 }
 
 export function chordProgressionPresetLabel(preset: ChordProgressionPreset): string {
@@ -2635,34 +2642,82 @@ export function projectFileName(project: ProjectState): string {
 }
 
 export function serializeProjectFile(project: ProjectState): string {
-  const durableProject: ProjectState = {
-    ...project,
-    title: normalizeProjectTitle(project.title),
-    snapshots: project.snapshots.map((snapshot) => ({
-      ...snapshot,
-      project: {
-        ...snapshot.project,
-        title: normalizeProjectTitle(snapshot.project.title)
-      }
-    }))
-  };
+  const durableProject = normalizeProjectState(project);
+  if (!durableProject) {
+    throw new Error("Invalid GrooveForge project state.");
+  }
   const file: ProjectFile = {
     app: "GrooveForge",
     fileVersion: projectFileVersion,
     savedAt: new Date().toISOString(),
     project: durableProject
   };
-  return `${JSON.stringify(file, null, 2)}\n`;
+  const contents = `${JSON.stringify(file, null, 2)}\n`;
+  if (contents.length > maxProjectFileCharacters) {
+    throw new Error(`GrooveForge project file exceeds the ${maxProjectFileCharacters.toLocaleString("en-US")} character safety limit.`);
+  }
+  return contents;
 }
 
 export function parseProjectFile(contents: string): ProjectState {
+  if (contents.length > maxProjectFileCharacters) {
+    throw new Error(`GrooveForge project file exceeds the ${maxProjectFileCharacters.toLocaleString("en-US")} character safety limit.`);
+  }
   const parsed: unknown = JSON.parse(contents);
-  const candidate = isRecord(parsed) && parsed.app === "GrooveForge" && isRecord(parsed.project) ? parsed.project : parsed;
+  let candidate = parsed;
+  if (isRecord(parsed) && parsed.app === "GrooveForge") {
+    if (parsed.fileVersion !== projectFileVersion) {
+      throw new Error(`Unsupported GrooveForge project file version: ${String(parsed.fileVersion ?? "missing")}.`);
+    }
+    if (!isRecord(parsed.project)) {
+      throw new Error("Invalid GrooveForge project file wrapper.");
+    }
+    candidate = parsed.project;
+  }
   const project = normalizeProjectState(candidate);
   if (!project) {
     throw new Error("Invalid GrooveForge project file.");
   }
   return project;
+}
+
+export function normalizeProjectBpm(value: unknown): number {
+  if (!isFiniteNumber(value)) {
+    return 82;
+  }
+  return Math.min(maxProjectBpm, Math.max(minProjectBpm, Math.round(value)));
+}
+
+export function normalizeProjectSwing(value: unknown): number {
+  if (!isFiniteNumber(value)) {
+    return minProjectSwing;
+  }
+  return Math.min(maxProjectSwing, Math.max(minProjectSwing, Math.round(value * 100) / 100));
+}
+
+export function normalizeProjectKey(value: unknown): string {
+  return isOneOf(value, projectKeys) ? value : "A minor";
+}
+
+export function normalizeMixerVolumeDb(value: unknown): number {
+  if (!isFiniteNumber(value)) {
+    return -6;
+  }
+  return Math.min(maxMixerVolumeDb, Math.max(minMixerVolumeDb, Math.round(value * 10) / 10));
+}
+
+export function normalizeMixerPan(value: unknown): number {
+  if (!isFiniteNumber(value)) {
+    return 0;
+  }
+  return Math.min(maxMixerPan, Math.max(minMixerPan, Math.round(value)));
+}
+
+export function normalizeMasterCeilingDb(value: unknown): number {
+  if (!isFiniteNumber(value)) {
+    return -1;
+  }
+  return Math.min(maxMasterCeilingDb, Math.max(minMasterCeilingDb, Math.round(value * 10) / 10));
 }
 
 export function dbToGain(db: number): number {
@@ -2906,6 +2961,8 @@ function normalizePatternMap(patterns: Record<PatternSlot, PatternDataInput>): R
 function normalizeMixerChannels(channels: MixerChannelInput[]): MixerChannel[] {
   return channels.map((channel) => ({
     ...channel,
+    volumeDb: normalizeMixerVolumeDb(channel.volumeDb),
+    pan: normalizeMixerPan(channel.pan),
     lowCut: normalizeMixerEq(channel.lowCut ?? 0),
     air: normalizeMixerEq(channel.air ?? 0),
     drive: normalizeMixerEq(channel.drive ?? 0),
@@ -3052,6 +3109,9 @@ function normalizeProjectCoreState(value: ProjectCoreStateInput): ProjectCoreSta
   return {
     ...value,
     title: normalizeProjectTitle(value.title),
+    bpm: normalizeProjectBpm(value.bpm),
+    key: normalizeProjectKey(value.key),
+    swing: normalizeProjectSwing(value.swing),
     metronomeEnabled: value.metronomeEnabled ?? false,
     deliveryTarget: normalizeDeliveryTargetId(value.deliveryTarget),
     customDeliveryTarget: normalizeCustomDeliveryTarget(value.customDeliveryTarget),
@@ -3060,7 +3120,8 @@ function normalizeProjectCoreState(value: ProjectCoreStateInput): ProjectCoreSta
     patterns: normalizePatternMap(value.patterns),
     mixer: normalizeMixerChannels(value.mixer),
     arrangement: normalizeArrangement(value.arrangement),
-    automation: normalizeAutomationEvents(value.automation)
+    automation: normalizeAutomationEvents(value.automation),
+    masterCeilingDb: normalizeMasterCeilingDb(value.masterCeilingDb)
   };
 }
 
@@ -3155,11 +3216,11 @@ function normalizeProjectState(value: unknown): ProjectState | null {
     return {
       title: normalizeProjectTitle(value.title),
       mode: value.mode,
-      bpm: value.bpm,
-      key: value.key,
+      bpm: normalizeProjectBpm(value.bpm),
+      key: normalizeProjectKey(value.key),
       styleId: value.styleId,
       selectedPattern: value.selectedPattern,
-      swing: value.swing,
+      swing: normalizeProjectSwing(value.swing),
       metronomeEnabled: value.metronomeEnabled ?? false,
       sound: normalizeSoundDesign(value.sound),
       patterns: {
@@ -3170,7 +3231,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
       mixer: normalizeMixerChannels(value.mixer),
       arrangement: normalizeArrangement(value.arrangement),
       automation: normalizeAutomationEvents(value.automation),
-      masterCeilingDb: value.masterCeilingDb,
+      masterCeilingDb: normalizeMasterCeilingDb(value.masterCeilingDb),
       masterPreset: value.masterPreset,
       deliveryTarget: normalizeDeliveryTargetId(value.deliveryTarget),
       customDeliveryTarget: normalizeCustomDeliveryTarget(value.customDeliveryTarget),
@@ -3504,8 +3565,6 @@ function isMixerChannelInput(value: unknown): value is MixerChannelInput {
     typeof value.name === "string" &&
     isFiniteNumber(value.volumeDb) &&
     isFiniteNumber(value.pan) &&
-    value.pan >= -100 &&
-    value.pan <= 100 &&
     isOptionalUnit(value.lowCut) &&
     isOptionalUnit(value.air) &&
     isOptionalUnit(value.drive) &&

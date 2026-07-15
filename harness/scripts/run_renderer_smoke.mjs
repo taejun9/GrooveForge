@@ -34,6 +34,44 @@ function checkExcludes(text, needle, label) {
   check(!text.toLowerCase().includes(needle.toLowerCase()), `${label} should not include ${needle}`);
 }
 
+function validateProjectFileLoadErrorStatus(uiModel) {
+  check(
+    uiModel.projectFileLoadErrorStatus(new Error("Unsupported GrooveForge project file version: 99.")) ===
+      "Project version is unsupported; update GrooveForge or use the app version that saved it",
+    "future project versions should show an actionable update/version recovery message"
+  );
+  check(
+    uiModel.projectFileLoadErrorStatus(new Error("GrooveForge project file exceeds the 1,500,000 character safety limit.")) ===
+      "Project file is too large to open safely",
+    "oversized project files should show a specific safe-open message"
+  );
+  check(
+    uiModel.projectFileLoadErrorStatus(new Error("GrooveForge project file exceeds the 6,000,000 byte native read safety limit.")) ===
+      "Project file is too large to open safely",
+    "native oversized project files should reuse the safe-open message"
+  );
+  check(
+    uiModel.projectFileLoadErrorStatus(new SyntaxError("Unexpected token")) === "Invalid project file",
+    "malformed JSON should retain the concise invalid-project message"
+  );
+  check(
+    uiModel.projectFileLoadErrorStatus(new Error("EACCES"), "Open failed") === "Open failed",
+    "non-parser native and File.text failures should preserve the open-failed fallback"
+  );
+  check(
+    appSource.includes("setProjectStatus(projectFileLoadErrorStatus(error))"),
+    "project loading should route parser failures through the actionable status helper"
+  );
+  check(
+    /async function handleSaveProject\(\): Promise<void> \{\s*try \{\s*const contents = serializeProjectFile\(project\);/u.test(appSource),
+    "project serialization should stay inside the Save failure boundary"
+  );
+  check(
+    appSource.includes("file.size > maxProjectFileBytes"),
+    "browser project import should reject oversized bytes before File.text()"
+  );
+}
+
 function validateDemandMaterialization(palette) {
   let factoryCalls = 0;
   const factory = () => {
@@ -3119,6 +3157,7 @@ const server = await createServer({
 
 try {
   const { App } = await server.ssrLoadModule("/src/ui/App.tsx");
+  validateProjectFileLoadErrorStatus(await server.ssrLoadModule("/src/ui/workstationUiModel.ts"));
   const html = renderToStaticMarkup(React.createElement(App));
   validateFirstRunRenderer(html);
   validateWorkspaceCommandDockSource(html);

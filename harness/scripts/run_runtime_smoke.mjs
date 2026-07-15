@@ -219,6 +219,101 @@ function validateProjectTitleIntegrity() {
   };
 }
 
+function validateProjectImportSafety() {
+  const unsafeProject = {
+    ...workstation.starterProject,
+    title: "Recovered Import Safety Beat",
+    bpm: -120,
+    key: "Not a supported key",
+    swing: 4,
+    masterCeilingDb: 18,
+    mixer: workstation.starterProject.mixer.map((channel, index) => ({
+      ...channel,
+      volumeDb: index === 0 ? 900 : index === 1 ? -900 : channel.id === "master" ? 900 : channel.volumeDb,
+      pan: index === 0 ? 900 : index === 1 ? -900 : channel.pan
+    })),
+    snapshots: []
+  };
+  const wrapped = JSON.stringify({
+    app: "GrooveForge",
+    fileVersion: workstation.projectFileVersion,
+    savedAt: "2026-07-15T00:00:00.000Z",
+    project: unsafeProject
+  });
+  const parsed = workstation.parseProjectFile(wrapped);
+  const bareParsed = workstation.parseProjectFile(JSON.stringify(unsafeProject));
+  const serialized = workstation.serializeProjectFile(unsafeProject);
+  const serializedFile = safeJsonParse(serialized, "project-import-safety");
+
+  check(parsed.bpm === workstation.minProjectBpm, "project-import-safety: negative BPM should clamp to the domain minimum");
+  check(parsed.key === "A minor", "project-import-safety: unsupported keys should recover to A minor");
+  check(parsed.swing === workstation.maxProjectSwing, "project-import-safety: excessive swing should clamp to the domain maximum");
+  check(parsed.masterCeilingDb === workstation.maxMasterCeilingDb, "project-import-safety: positive master ceiling should clamp to 0 dB");
+  check(parsed.mixer[0]?.volumeDb === workstation.maxMixerVolumeDb, "project-import-safety: excessive channel gain should clamp to +3 dB");
+  check(parsed.mixer[1]?.volumeDb === workstation.minMixerVolumeDb, "project-import-safety: excessive channel cut should clamp to -36 dB");
+  check(parsed.mixer[0]?.pan === workstation.maxMixerPan, "project-import-safety: excessive right pan should clamp to +100");
+  check(parsed.mixer[1]?.pan === workstation.minMixerPan, "project-import-safety: excessive left pan should clamp to -100");
+  check(parsed.mixer.find((channel) => channel.id === "master")?.volumeDb === workstation.maxMixerVolumeDb, "project-import-safety: master output should use the same safe mixer bound");
+  check(workstation.projectStepDurationSeconds(parsed) > 0, "project-import-safety: repaired imports must always produce positive step duration");
+  check(stableJson(bareParsed) === stableJson(parsed), "project-import-safety: wrapped and bare unsafe project data should canonicalize identically");
+  check(serializedFile?.fileVersion === workstation.projectFileVersion, "project-import-safety: serialization should write the current file version");
+  check(serializedFile?.project?.bpm === workstation.minProjectBpm, "project-import-safety: durable serialization should canonicalize BPM before writing");
+  check(serializedFile?.project?.mixer?.[0]?.volumeDb === workstation.maxMixerVolumeDb, "project-import-safety: durable serialization should canonicalize mixer gain before writing");
+  check(unsafeProject.bpm === -120, "project-import-safety: parsing and serialization should not mutate the caller's source project");
+
+  const rejected = [];
+  for (const [label, contents, expectedMessage] of [
+    [
+      "future-version",
+      JSON.stringify({ app: "GrooveForge", fileVersion: workstation.projectFileVersion + 1, savedAt: "future", project: unsafeProject }),
+      "Unsupported GrooveForge project file version"
+    ],
+    [
+      "missing-version",
+      JSON.stringify({ app: "GrooveForge", savedAt: "missing", project: unsafeProject }),
+      "Unsupported GrooveForge project file version"
+    ],
+    [
+      "oversized-source",
+      " ".repeat(workstation.maxProjectFileCharacters + 1),
+      "character safety limit"
+    ]
+  ]) {
+    try {
+      workstation.parseProjectFile(contents);
+      failures.push(`project-import-safety:${label} should be rejected`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      check(message.includes(expectedMessage), `project-import-safety:${label} should explain the rejected boundary`);
+      rejected.push(label);
+    }
+  }
+
+  try {
+    workstation.serializeProjectFile({
+      ...workstation.starterProject,
+      mixer: workstation.starterProject.mixer.map((channel, index) => ({
+        ...channel,
+        name: index === 0 ? "x".repeat(workstation.maxProjectFileCharacters) : channel.name
+      }))
+    });
+    failures.push("project-import-safety:oversized-serialization should be rejected");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    check(message.includes("character safety limit"), "project-import-safety:oversized-serialization should explain the rejected boundary");
+    rejected.push("oversized-serialization");
+  }
+
+  return {
+    bpm: parsed.bpm,
+    key: parsed.key,
+    swing: parsed.swing,
+    masterCeilingDb: parsed.masterCeilingDb,
+    mixerRange: `${parsed.mixer[1]?.volumeDb}..${parsed.mixer[0]?.volumeDb}`,
+    rejected: rejected.length
+  };
+}
+
 function projectEventCounts(project) {
   return workstation.patternSlots.map((slot) => {
     const pattern = project.patterns[slot];
@@ -685,6 +780,7 @@ const downloadSmokeProject = workstation.parseProjectFile(workstation.serializeP
 const downloadSmokeSummary = validateDownloadPathSmoke(downloadSmokeProject);
 const unicodeFileIdentitySummary = validateUnicodeFileIdentity();
 const projectTitleIntegritySummary = validateProjectTitleIntegrity();
+const projectImportSafetySummary = validateProjectImportSafety();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -705,6 +801,7 @@ console.log(`- Handoff sheets: ${summaries.length}/${smokeCases.length} text del
 console.log(`- Download path: ${downloadSmokeSummary.clicked}/${downloadSmokeSummary.expected} mocked Blob URL downloads verified (${downloadSmokeSummary.fileNames.join(", ")})`);
 console.log(`- Unicode file identity: ${unicodeFileIdentitySummary.cases} distinct titles x ${unicodeFileIdentitySummary.deliverablesPerCase} deliverables, bounded stem ${unicodeFileIdentitySummary.boundedBytes}/120 UTF-8 bytes`);
 console.log(`- Project title integrity: ${projectTitleIntegritySummary.normalizedTitle}, ${projectTitleIntegritySummary.fileStem}, ${projectTitleIntegritySummary.maxCodePoints} code-point bound`);
+console.log(`- Project import safety: ${projectImportSafetySummary.bpm} BPM / ${projectImportSafetySummary.key} / swing ${projectImportSafetySummary.swing} / ceiling ${projectImportSafetySummary.masterCeilingDb} dB / mixer ${projectImportSafetySummary.mixerRange} dB / rejected boundaries ${projectImportSafetySummary.rejected}/4`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

@@ -141,9 +141,11 @@ import {
   melodyPitchLanes,
   maxProjectSnapshotNameLength,
   maxProjectSnapshots,
+  maxProjectSwing,
   minDeliveryTargetBars,
   minDeliveryTargetStemGoal,
   minArrangementBars,
+  minProjectSwing,
   minDrumTimingMs,
   maxArrangementBars,
   maxDrumTimingMs,
@@ -160,6 +162,7 @@ import {
   normalizeHatRepeat,
   normalizeMixerEq,
   normalizeProjectSnapshotName,
+  normalizeProjectSwing,
   parseProjectFile,
   patternSlots,
   patternChainIds,
@@ -1073,11 +1076,10 @@ export type EditHistoryEntry = {
   label: string;
 };
 
-export const minProjectSwing = 0;
-export const maxProjectSwing = 0.24;
+export { minProjectSwing, maxProjectSwing };
 
 export function normalizeSwingFeelValue(value: number): number {
-  return Math.min(maxProjectSwing, Math.max(minProjectSwing, Math.round(value * 100) / 100));
+  return normalizeProjectSwing(value);
 }
 
 export function swingFeelPadSwing(pad: SwingFeelPadDefinition, project: ProjectState): number {
