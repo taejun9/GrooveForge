@@ -35,6 +35,8 @@ main
   -> remove worktree
 ```
 
+`npm run sample-audio:qa` writes playable full mixes and four stems for the built-in first-time-composer and professional-producer projects plus one decoded full-mix WAV for every supported style profile. It validates canonical stereo 44.1kHz/16-bit PCM, duration, audibility, renderer peak/RMS agreement, ceiling safety, full-scale exclusion, distinct audience stems, and byte-identical immediate rerenders. Its render-isolation matrix also proves that non-target mixer volume, pan, mute, solo, EQ, Drive/Glue, and Space-send edits, selected-Pattern UI state, and unrelated Melody note edits do not change the Drums stem, while target Drums mixer and relevant hat-noise sound edits still do; a Drums-only solo mix must equal the same-state Drums stem. All WAV, JSON, and Markdown evidence stays ignored under `build/desktop`.
+
 ## Agent Readability
 
 Agents should be able to answer these questions from repo files alone:
