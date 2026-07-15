@@ -24,6 +24,7 @@ These rules should be enforced by the local harness where practical.
 - QA and review are separate loops.
 - Review starts only after QA completes.
 - Failed validation must be reported and fixed or explicitly documented.
+- `npm run sample-audio:qa` must generate the first-time-composer Guided Lo-fi and professional-producer Studio House mixes plus all four stems from built-in editable events, decode their canonical WAV PCM, and verify format, duration, audibility, peak/RMS analysis agreement, ceiling safety, stem distinction, and byte-identical immediate rerenders. Generated audio remains ignored under `build/desktop` and does not replace human listening review.
 - Completion reviews go in `docs/reviews/` and should summarize QA, findings, residual risk, and follow-ups.
 - Strict quality scans must ignore local `.worktree/` checkouts while still checking committed docs and completed plan/review artifacts.
 
@@ -56,6 +57,7 @@ npm run renderer:smoke
 npm run workflow:smoke
 npm run persona:smoke
 npm run harness:smoke
+npm run sample-audio:qa
 npm run desktop:local-delivery-package-smoke
 npm run desktop:local-package-reopen-smoke
 npm run desktop:local-delivery-zip-smoke

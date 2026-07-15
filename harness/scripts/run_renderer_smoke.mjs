@@ -295,6 +295,12 @@ function validateWorkspaceCommandDockSource(html) {
     "dock controls should reuse the existing Play, Actions, Undo, Redo, and Save handlers and disabled states"
   );
   check(
+    appSource.includes(
+      "controllerRef.current?.stop();\n      controllerRef.current = null;\n      setPlaybackPosition(null);\n      setIsPlaying(false);\n      return;"
+    ),
+    "explicit Stop should update shared header and dock playback state immediately while the audio controller closes"
+  );
+  check(
     styles.includes(".workspace-command-dock {\n  position: fixed;") &&
       styles.includes("width: min(660px, calc(100vw - 32px));") &&
       styles.includes('.app-shell[data-workspace-command-dock-visible="true"] {') &&

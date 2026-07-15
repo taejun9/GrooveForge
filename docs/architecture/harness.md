@@ -59,6 +59,7 @@ npm run renderer:smoke
 npm run workflow:smoke
 npm run persona:smoke
 npm run harness:smoke
+npm run sample-audio:qa
 npm run desktop:local-delivery-package-smoke
 npm run desktop:local-package-reopen-smoke
 npm run desktop:local-delivery-zip-smoke
