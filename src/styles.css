@@ -1058,6 +1058,42 @@ h2 {
   padding: 0 12px;
 }
 
+.icon-button.transport-play-toggle {
+  justify-content: flex-start;
+  gap: 6px;
+  min-width: 112px;
+  padding-inline: 8px;
+  overflow: hidden;
+}
+
+.transport-play-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  text-align: start;
+}
+
+.transport-play-copy strong,
+.transport-play-copy small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.transport-play-copy strong {
+  font-size: 10px;
+  line-height: 1.05;
+}
+
+.transport-play-copy small {
+  color: currentColor;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.05;
+  opacity: 0.68;
+}
+
 .icon-button.metronome-toggle {
   display: grid;
   align-content: center;
@@ -5010,7 +5046,10 @@ h2 {
     grid-template-columns: minmax(92px, 0.72fr) minmax(0, 1.28fr);
   }
 
-  .command-strip .transport-essential-controls,
+  .command-strip .transport-essential-controls {
+    grid-template-columns: repeat(3, 68px) 112px;
+  }
+
   .command-strip .project-essential-controls {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -5023,6 +5062,17 @@ h2 {
     width: 100%;
     min-width: 0;
     padding-inline: 7px;
+  }
+
+  .command-strip .transport-essential-controls > .icon-button:not(.metronome-toggle):not(.transport-play-toggle) {
+    gap: 4px;
+    padding-inline: 4px;
+    font-size: 9px;
+  }
+
+  .command-strip .transport-essential-controls > .icon-button:not(.metronome-toggle):not(.transport-play-toggle) svg {
+    width: 16px;
+    height: 16px;
   }
 
   .command-strip .transport-session-tools,

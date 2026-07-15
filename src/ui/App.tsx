@@ -1663,6 +1663,61 @@ export function App(): ReactElement {
       )}`
     : "adjacent block handoff unavailable";
   const patternLoopTargetLabel = `${project.selectedPattern} · ${patternEventCount(currentPattern)}`;
+  const transportPlaybackTarget = (() => {
+    if (transportLoopScope === "block") {
+      if (!selectedArrangementBlock) {
+        return {
+          detailLabel: "Block · unavailable",
+          accessibleTarget: "selected block unavailable",
+          titleTarget: "selected block unavailable"
+        };
+      }
+      const bars = barCountLabel(selectedArrangementBlock.bars);
+      return {
+        detailLabel: `Block · ${selectedArrangementBlock.section}`,
+        accessibleTarget: `${selectedArrangementBlock.section}, ${bars}, Pattern ${selectedArrangementBlock.pattern}`,
+        titleTarget: `${selectedArrangementBlock.section} · ${bars} · Pattern ${selectedArrangementBlock.pattern}`
+      };
+    }
+
+    if (transportLoopScope === "transition") {
+      if (!arrangementTransitionLoopTarget) {
+        return {
+          detailLabel: "Turn · unavailable",
+          accessibleTarget: "adjacent block handoff unavailable",
+          titleTarget: "adjacent block handoff unavailable"
+        };
+      }
+      const transition = arrangementTransitionLoopTarget.transition.value.replace(" -> ", " to ");
+      const bars = barCountLabel(arrangementTransitionLoopTarget.bars);
+      return {
+        detailLabel: `Turn · ${bars}`,
+        accessibleTarget: `${transition}, ${bars}`,
+        titleTarget: `${transition} · ${bars}`
+      };
+    }
+
+    if (transportLoopScope === "pattern") {
+      return {
+        detailLabel: `Pattern · ${project.selectedPattern}`,
+        accessibleTarget: `Pattern ${project.selectedPattern}, ${barCountLabel(2)}`,
+        titleTarget: `Pattern ${project.selectedPattern} · ${barCountLabel(2)}`
+      };
+    }
+
+    const bars = barCountLabel(arrangementTotalBars(project));
+    return {
+      detailLabel: `Song · ${bars}`,
+      accessibleTarget: `${bars} timeline`,
+      titleTarget: `${bars} timeline`
+    };
+  })();
+  const transportPlaybackAction = isPlaying ? "Stop" : "Play";
+  const transportPlaybackScopeLabel = transportLoopLabel(transportLoopScope);
+  const transportPlaybackAccessibleLabel = isPlaying
+    ? `Stop ${transportPlaybackScopeLabel} loop playback, ${transportPlaybackTarget.accessibleTarget}, ${project.bpm} BPM`
+    : `Play ${transportPlaybackScopeLabel} loop, ${transportPlaybackTarget.accessibleTarget}, ${project.bpm} BPM`;
+  const transportPlaybackTitle = `${transportPlaybackAction} ${transportPlaybackScopeLabel} loop · ${transportPlaybackTarget.titleTarget} · ${project.bpm} BPM · Space`;
   const metronomeStateLabel = project.metronomeEnabled ? "On" : "Off";
   const metronomeActionLabel = project.metronomeEnabled ? "Turn off" : "Turn on";
   const metronomeDetailLabel = `${metronomeStateLabel} · ${project.bpm} BPM`;
@@ -10624,6 +10679,28 @@ export function App(): ReactElement {
         '[data-testid="transport-essential-controls"]'
       );
       const transportEssentialRect = transportEssentialControls?.getBoundingClientRect() ?? null;
+      const transportPlaybackButton = document.querySelector<HTMLButtonElement>('[data-testid="transport-play"]');
+      const transportPlaybackLabel = transportPlaybackButton?.querySelector<HTMLElement>(":scope strong") ?? null;
+      const transportPlaybackDetail = transportPlaybackButton?.querySelector<HTMLElement>(":scope small") ?? null;
+      const transportPlaybackRect = transportPlaybackButton?.getBoundingClientRect() ?? null;
+      const transportPlaybackPressedState = transportPlaybackButton?.getAttribute("aria-pressed") ?? "";
+      const transportPlaybackReadable = Boolean(
+        transportPlaybackLabel &&
+          transportPlaybackDetail &&
+          transportPlaybackLabel.clientWidth > 0 &&
+          transportPlaybackLabel.scrollWidth <= transportPlaybackLabel.clientWidth + 1 &&
+          transportPlaybackDetail.clientWidth > 0 &&
+          transportPlaybackDetail.scrollWidth <= transportPlaybackDetail.clientWidth + 1
+      );
+      const transportPlaybackContained = Boolean(
+        transportPlaybackRect &&
+          transportEssentialRect &&
+          transportPlaybackRect.height >= 38 &&
+          transportPlaybackRect.left >= transportEssentialRect.left - 1 &&
+          transportPlaybackRect.right <= transportEssentialRect.right + 1 &&
+          transportPlaybackRect.top >= transportEssentialRect.top - 1 &&
+          transportPlaybackRect.bottom <= transportEssentialRect.bottom + 1
+      );
       const metronomePressedState = metronomeButton?.getAttribute("aria-pressed") ?? "";
       const expectedMetronomeState =
         metronomePressedState === "true" ? "On" : metronomePressedState === "false" ? "Off" : "";
@@ -10632,6 +10709,16 @@ export function App(): ReactElement {
         (field) => field.querySelector(":scope > span")?.textContent?.trim() === "BPM"
       );
       const expectedMetronomeBpm = bpmField?.querySelector<HTMLInputElement>('input[type="number"]')?.value ?? "";
+      const expectedTransportPlaybackBars =
+        loopScopeButtons[0]?.querySelector<HTMLElement>(":scope > small")?.textContent?.trim().replace(/^All /, "") ?? "";
+      const expectedTransportPlaybackAccessibleName =
+        expectedTransportPlaybackBars && expectedMetronomeBpm
+          ? `Play Song loop, ${expectedTransportPlaybackBars} timeline, ${expectedMetronomeBpm} BPM`
+          : "";
+      const expectedTransportPlaybackTitle =
+        expectedTransportPlaybackBars && expectedMetronomeBpm
+          ? `Play Song loop · ${expectedTransportPlaybackBars} timeline · ${expectedMetronomeBpm} BPM · Space`
+          : "";
       const expectedMetronomeAccessibleName = expectedMetronomeState && expectedMetronomeBpm
         ? `Metronome ${expectedMetronomeState.toLowerCase()}, ${expectedMetronomeBpm} BPM. ${expectedMetronomeAction}`
         : "";
@@ -11140,6 +11227,44 @@ export function App(): ReactElement {
             : 0,
         loopScopeUniqueAccessibleNameCount:
           starterId === "beginner" ? new Set(loopScopeAccessibleNames).size : 0,
+        transportPlaybackAccessibleNameReady:
+          starterId === "beginner" &&
+          expectedTransportPlaybackAccessibleName.length > 0 &&
+          transportPlaybackButton?.getAttribute("aria-label") === expectedTransportPlaybackAccessibleName,
+        transportPlaybackContainedCount:
+          starterId === "beginner" && transportPlaybackContained ? 1 : 0,
+        transportPlaybackControlCount: starterId === "beginner" && transportPlaybackButton ? 1 : 0,
+        transportPlaybackDetailClientWidth:
+          starterId === "beginner" ? transportPlaybackDetail?.clientWidth ?? 0 : 0,
+        transportPlaybackDetailScrollWidth:
+          starterId === "beginner" ? transportPlaybackDetail?.scrollWidth ?? 0 : 0,
+        transportPlaybackFocusReady:
+          starterId === "beginner" &&
+          transportPlaybackButton?.tabIndex === 0 &&
+          transportPlaybackButton.disabled === false,
+        transportPlaybackHeight: starterId === "beginner" ? transportPlaybackRect?.height ?? 0 : 0,
+        transportPlaybackInternalOverflow:
+          starterId === "beginner" && transportPlaybackButton
+            ? Math.max(0, transportPlaybackButton.scrollWidth - transportPlaybackButton.clientWidth)
+            : 0,
+        transportPlaybackLabelClientWidth:
+          starterId === "beginner" ? transportPlaybackLabel?.clientWidth ?? 0 : 0,
+        transportPlaybackLabelScrollWidth:
+          starterId === "beginner" ? transportPlaybackLabel?.scrollWidth ?? 0 : 0,
+        transportPlaybackPressedStateReady:
+          starterId === "beginner" && transportPlaybackPressedState === "false",
+        transportPlaybackReadableLabelCount:
+          starterId === "beginner" && transportPlaybackReadable ? 1 : 0,
+        transportPlaybackStateCopyReady:
+          starterId === "beginner" &&
+          expectedTransportPlaybackBars.length > 0 &&
+          transportPlaybackLabel?.textContent?.trim() === "Play" &&
+          transportPlaybackDetail?.textContent?.trim() === `Song · ${expectedTransportPlaybackBars}`,
+        transportPlaybackTitleReady:
+          starterId === "beginner" &&
+          expectedTransportPlaybackTitle.length > 0 &&
+          transportPlaybackButton?.getAttribute("title") === expectedTransportPlaybackTitle,
+        transportPlaybackWidth: starterId === "beginner" ? transportPlaybackRect?.width ?? 0 : 0,
         metronomeAccessibleNameReady:
           starterId === "beginner" &&
           expectedMetronomeAccessibleName.length > 0 &&
@@ -11300,12 +11425,17 @@ export function App(): ReactElement {
     };
 
     const collectAudienceStarterLandingEvidence = async (): Promise<GrooveforgeLaunchSmokeStarterLandingEvidence> => {
+      window.__grooveforgeLaunchSmokeStarterLandingStep = "building-beginner";
       createAudienceStarter("beginner");
       setSelectedDrumStep({ lane: "kick", step: 0 });
+      window.__grooveforgeLaunchSmokeStarterLandingStep = "settling-beginner";
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      window.__grooveforgeLaunchSmokeStarterLandingStep = "reading-beginner";
       const beginner = readAudienceStarterLanding("beginner");
+      window.__grooveforgeLaunchSmokeStarterLandingStep = "building-producer";
       createAudienceStarter("producer");
+      window.__grooveforgeLaunchSmokeStarterLandingStep = "settling-producer";
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       const producerPattern = projectRef.current.patterns[projectRef.current.selectedPattern];
@@ -11322,7 +11452,9 @@ export function App(): ReactElement {
       });
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      window.__grooveforgeLaunchSmokeStarterLandingStep = "reading-producer";
       const producer = readAudienceStarterLanding("producer");
+      window.__grooveforgeLaunchSmokeStarterLandingStep = "complete";
       return { beginner, producer };
     };
 
@@ -11956,16 +12088,20 @@ export function App(): ReactElement {
             <span>Help</span>
           </button>
           <button
+            aria-label={transportPlaybackAccessibleLabel}
             aria-keyshortcuts="Space"
             aria-pressed={isPlaying}
-            className="icon-button primary"
+            className="icon-button primary transport-play-toggle"
             data-testid="transport-play"
             type="button"
-            title={`${isPlaying ? "Stop" : "Play"} ${transportLoopLabel(transportLoopScope).toLowerCase()} loop (Space)`}
+            title={transportPlaybackTitle}
             onClick={togglePlayback}
           >
             {isPlaying ? <CircleStop size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
-            <span>{isPlaying ? "Stop" : "Play"}</span>
+            <span className="transport-play-copy">
+              <strong>{transportPlaybackAction}</strong>
+              <small>{transportPlaybackTarget.detailLabel}</small>
+            </span>
           </button>
           </div>
           <div className="project-essential-controls" data-testid="project-essential-controls">
@@ -12133,12 +12269,13 @@ export function App(): ReactElement {
             <small>{transportPositionReadout.detailLabel}</small>
           </div>
           <button
+            aria-label={transportPlaybackAccessibleLabel}
             aria-keyshortcuts="Space"
             aria-pressed={isPlaying}
             className="workspace-command-dock-button primary"
             data-testid="workspace-command-dock-play"
             onClick={togglePlayback}
-            title={`${isPlaying ? "Stop" : "Play"} ${transportLoopLabel(transportLoopScope).toLowerCase()} loop (Space)`}
+            title={transportPlaybackTitle}
             type="button"
           >
             {isPlaying ? <CircleStop size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}

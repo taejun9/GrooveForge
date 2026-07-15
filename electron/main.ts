@@ -14,7 +14,7 @@ const launchSmokeDrumGridSnapshotChannel = "grooveforge:launch-smoke-drum-grid-s
 const launchSmokeNoteGridSnapshotChannel = "grooveforge:launch-smoke-note-grid-snapshot";
 const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
-const launchSmokeTimeoutMs = 880000;
+const launchSmokeTimeoutMs = 1800000;
 const projectIoSmokeTimeoutMs = 640000;
 
 type NativeMenuCommand =
@@ -130,6 +130,11 @@ type LaunchSmokeLayoutEvidence = {
   minimumWindowStudioManualReopenReady: boolean;
   minimumWindowStudioResizeCollapseReady: boolean;
   minimumWindowTransportHeight: number;
+  minimumWindowTransportPlaybackContained: boolean;
+  minimumWindowTransportPlaybackHeight: number;
+  minimumWindowTransportPlaybackInternalOverflow: number;
+  minimumWindowTransportPlaybackReadable: boolean;
+  minimumWindowTransportPlaybackWidth: number;
   minimumWindowTransportReady: boolean;
   minimumWindowViewportWidth: number;
   minimumWindowWideStudioAutoExpandReady: boolean;
@@ -216,6 +221,11 @@ type LaunchSmokeMinimumWindowEvidence = Pick<
   | "minimumWindowStudioManualReopenReady"
   | "minimumWindowStudioResizeCollapseReady"
   | "minimumWindowTransportHeight"
+  | "minimumWindowTransportPlaybackContained"
+  | "minimumWindowTransportPlaybackHeight"
+  | "minimumWindowTransportPlaybackInternalOverflow"
+  | "minimumWindowTransportPlaybackReadable"
+  | "minimumWindowTransportPlaybackWidth"
   | "minimumWindowTransportReady"
   | "minimumWindowViewportWidth"
   | "minimumWindowWideStudioAutoExpandReady"
@@ -1585,6 +1595,10 @@ async function collectLaunchSmokeMinimumWindowEvidence(
           0,
           document.documentElement.scrollWidth - document.documentElement.clientWidth
         );
+        const transportPlayback = document.querySelector('[data-testid="transport-play"]');
+        const transportPlaybackRect = transportPlayback?.getBoundingClientRect() ?? null;
+        const transportPlaybackLabel = transportPlayback?.querySelector(':scope strong') ?? null;
+        const transportPlaybackDetail = transportPlayback?.querySelector(':scope small') ?? null;
         return {
           minimumWindowDirectActionsReady: requiredIds.every(withinViewport),
           minimumWindowHorizontalOverflow: horizontalOverflow,
@@ -1604,6 +1618,27 @@ async function collectLaunchSmokeMinimumWindowEvidence(
           minimumWindowStudioManualReopenReady: ${JSON.stringify(responsiveStudio.manualReopenReady)},
           minimumWindowStudioResizeCollapseReady: ${JSON.stringify(responsiveStudio.resizeCollapseReady)},
           minimumWindowTransportHeight: transport?.height ?? 0,
+          minimumWindowTransportPlaybackContained: Boolean(
+            transportPlaybackRect &&
+            transportPlaybackRect.height >= 38 &&
+            transportPlaybackRect.left >= 0 &&
+            transportPlaybackRect.right <= innerWidth &&
+            transportPlaybackRect.top >= 0 &&
+            transportPlaybackRect.bottom <= innerHeight
+          ),
+          minimumWindowTransportPlaybackHeight: transportPlaybackRect?.height ?? 0,
+          minimumWindowTransportPlaybackInternalOverflow: transportPlayback
+            ? Math.max(0, transportPlayback.scrollWidth - transportPlayback.clientWidth)
+            : 0,
+          minimumWindowTransportPlaybackReadable: Boolean(
+            transportPlaybackLabel &&
+            transportPlaybackDetail &&
+            transportPlaybackLabel.clientWidth > 0 &&
+            transportPlaybackLabel.scrollWidth <= transportPlaybackLabel.clientWidth + 1 &&
+            transportPlaybackDetail.clientWidth > 0 &&
+            transportPlaybackDetail.scrollWidth <= transportPlaybackDetail.clientWidth + 1
+          ),
+          minimumWindowTransportPlaybackWidth: transportPlaybackRect?.width ?? 0,
           minimumWindowTransportReady: Boolean(
             transport &&
             launchpad &&
@@ -2282,7 +2317,7 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           essentialShortcutTitlesReady:
             quickActionsOpen?.getAttribute("title") === "Open Quick Actions (Ctrl/Cmd+K)" &&
             commandReferenceOpen?.getAttribute("title") === "Open Command Reference (? or Ctrl/Cmd+/)" &&
-            transportPlay?.getAttribute("title")?.endsWith("loop (Space)") === true &&
+            transportPlay?.getAttribute("title") === "Play Song loop · 8 bars timeline · 82 BPM · Space" &&
             undoButton?.getAttribute("title") === "Undo last edit (Ctrl/Cmd+Z)" &&
             redoButton?.getAttribute("title") === "Redo last undone edit (Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y)" &&
             projectOpen?.getAttribute("title") === "Open project (Ctrl/Cmd+O)" &&
@@ -2514,7 +2549,12 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
 
 function collectLaunchSmokeStarterLandingEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeStarterLandingEvidence> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Timed out collecting Audience Starter landing evidence.")), 90000);
+    const timeout = setTimeout(() => {
+      void win.webContents
+        .executeJavaScript(`window.__grooveforgeLaunchSmokeStarterLandingStep ?? "unknown"`)
+        .then((step: unknown) => reject(new Error(`Timed out collecting Audience Starter landing evidence at ${String(step)}.`)))
+        .catch(() => reject(new Error("Timed out collecting Audience Starter landing evidence.")));
+    }, 150000);
     void collectLaunchSmokeStarterLandingEvidence(win)
       .then((evidence) => {
         clearTimeout(timeout);
@@ -2833,12 +2873,8 @@ async function collectLaunchSmokeDrumGridKeyboardEvidence(
             targetPressed: document.querySelector('[data-testid="drum-step-kick-1"]')?.getAttribute('aria-pressed') === 'true'
           };
         };
-        const recorder = { steps: [], listener: null };
-        recorder.listener = (event) => {
-          if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
-            return;
-          }
-          setTimeout(() => {
+        const recorder = { steps: [], listener: null, capture: null };
+        recorder.capture = () => {
           const nextSnapshot = snapshot();
           recorder.steps.push(nextSnapshot);
           window.grooveforge?.reportLaunchSmokeDrumGridSnapshot?.({
@@ -2848,7 +2884,12 @@ async function collectLaunchSmokeDrumGridKeyboardEvidence(
           if (recorder.steps.length >= 5) {
             document.removeEventListener('keydown', recorder.listener, true);
           }
-          }, 0);
+        };
+        recorder.listener = (event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+            return;
+          }
+          setTimeout(recorder.capture, 0);
         };
         window.__grooveforgeDrumGridKeyboardSmoke = recorder;
         document.addEventListener('keydown', recorder.listener, true);
@@ -2881,16 +2922,26 @@ async function collectLaunchSmokeDrumGridKeyboardEvidence(
     win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
     await new Promise((resolve) => setTimeout(resolve, 500));
   };
+  const captureCommandResult = async (expectedStep: number): Promise<void> => {
+    await win.webContents.executeJavaScript(`window.__grooveforgeDrumGridKeyboardSmoke?.capture?.()`);
+    const stepDeadline = Date.now() + 30000;
+    while (Date.now() < stepDeadline && !recordedSteps[expectedStep - 1]) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    if (!recordedSteps[expectedStep - 1]) {
+      throw new Error(`Native drum grid keyboard recorder did not capture command result step ${expectedStep}.`);
+    }
+  };
   const commandModifier: Electron.InputEvent["modifiers"] = process.platform === "darwin" ? ["meta"] : ["control"];
 
   onStep("sending native navigation and activation keys");
   await sendKey("Right", 1);
   await sendKey("Enter", 2);
   await sendCommandKey("Z", commandModifier);
-  await sendKey("Escape", 3);
+  await captureCommandResult(3);
   await sendKey("Space", 4);
   await sendCommandKey("Z", commandModifier);
-  await sendKey("Escape", 5);
+  await captureCommandResult(5);
   onStep("collecting renderer snapshots");
   const recorderDeadline = Date.now() + 20000;
   while (Date.now() < recorderDeadline && recordedSteps.filter(Boolean).length < 5) {
@@ -3046,22 +3097,23 @@ async function collectLaunchSmokeNoteGridKeyboardEvidence(
             targetPressed: selected.length === 1 && selected[0]?.getAttribute('aria-pressed') === 'true'
           };
         };
-        const recorder = { steps: [], listener: null };
+        const recorder = { steps: [], listener: null, capture: null };
+        recorder.capture = () => {
+          const nextSnapshot = snapshot();
+          recorder.steps.push(nextSnapshot);
+          window.grooveforge?.reportLaunchSmokeNoteGridSnapshot?.({
+            step: recorder.steps.length,
+            snapshot: nextSnapshot
+          });
+          if (recorder.steps.length >= 6) {
+            document.removeEventListener('keydown', recorder.listener, true);
+          }
+        };
         recorder.listener = (event) => {
           if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
             return;
           }
-          setTimeout(() => {
-            const nextSnapshot = snapshot();
-            recorder.steps.push(nextSnapshot);
-            window.grooveforge?.reportLaunchSmokeNoteGridSnapshot?.({
-              step: recorder.steps.length,
-              snapshot: nextSnapshot
-            });
-            if (recorder.steps.length >= 6) {
-              document.removeEventListener('keydown', recorder.listener, true);
-            }
-          }, 0);
+          setTimeout(recorder.capture, 0);
         };
         window.__grooveforgeNoteGridKeyboardSmoke = recorder;
         document.addEventListener('keydown', recorder.listener, true);
@@ -3094,6 +3146,16 @@ async function collectLaunchSmokeNoteGridKeyboardEvidence(
       win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
       await new Promise((resolve) => setTimeout(resolve, 500));
     };
+    const captureCommandResult = async (expectedStep: number): Promise<void> => {
+      await win.webContents.executeJavaScript(`window.__grooveforgeNoteGridKeyboardSmoke?.capture?.()`);
+      const stepDeadline = Date.now() + 30000;
+      while (Date.now() < stepDeadline && !recordedSteps[expectedStep - 1]) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      if (!recordedSteps[expectedStep - 1]) {
+        throw new Error(`Native note-grid keyboard recorder did not capture command result step ${expectedStep}.`);
+      }
+    };
     const commandModifier: Electron.InputEvent["modifiers"] = process.platform === "darwin" ? ["meta"] : ["control"];
 
     onStep("sending native spatial navigation and activation keys");
@@ -3101,10 +3163,10 @@ async function collectLaunchSmokeNoteGridKeyboardEvidence(
     await sendKey("Down", 2);
     await sendKey("Enter", 3);
     await sendCommandKey("Z", commandModifier);
-    await sendKey("Escape", 4);
+    await captureCommandResult(4);
     await sendKey("Space", 5);
     await sendCommandKey("Z", commandModifier);
-    await sendKey("Escape", 6);
+    await captureCommandResult(6);
     onStep("collecting renderer snapshots");
     const recorderDeadline = Date.now() + 20000;
     while (Date.now() < recorderDeadline && recordedSteps.filter(Boolean).length < 6) {
@@ -3519,7 +3581,7 @@ async function collectLaunchSmokeModalFocusEvidence(
   );
   const dockSharedPlayReady = await runStep<boolean>(`
     document.querySelector('[data-testid="workspace-command-dock-play"]')?.textContent?.trim() === 'Stop' &&
-      document.querySelector('[data-testid="transport-play"]')?.textContent?.trim() === 'Stop'
+      document.querySelector('[data-testid="transport-play"] strong')?.textContent?.trim() === 'Stop'
   `);
   await sendClick("workspace-command-dock-play");
   await waitFor(
