@@ -278,6 +278,8 @@ export const minMixerPan = -100;
 export const maxMixerPan = 100;
 export const minMasterCeilingDb = -6;
 export const maxMasterCeilingDb = 0;
+export const minProjectMidiNote = 0;
+export const maxProjectMidiNote = 127;
 export const projectKeys = ["F minor", "F# minor", "A minor", "C minor", "D minor", "E minor", "G minor", "C major", "D dorian"] as const;
 export const maxProjectSnapshots = 6;
 export const maxProjectSnapshotNameLength = 32;
@@ -2851,24 +2853,47 @@ export function melodyPitchLanes(key: string): string[] {
 }
 
 export function noteToFrequency(note: string): number {
-  const match = /^([A-G])(#|b)?(-?\d+)$/.exec(note);
+  const midi = projectPitchMidiNumber(normalizeProjectPitch(note)) ?? 69;
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+export function projectPitchMidiNumber(value: unknown): number | null {
+  const midi = rawProjectPitchMidiNumber(value);
+  return midi !== null && Number.isFinite(midi) && midi >= minProjectMidiNote && midi <= maxProjectMidiNote
+    ? midi
+    : null;
+}
+
+export function normalizeProjectPitch(value: unknown): string {
+  if (typeof value !== "string") {
+    return "A4";
+  }
+  const midi = rawProjectPitchMidiNumber(value);
+  if (midi === null) {
+    return "A4";
+  }
+  if (Number.isFinite(midi) && midi >= minProjectMidiNote && midi <= maxProjectMidiNote) {
+    const match = /^([A-G])(#|b)?(-?\d+)$/.exec(value);
+    const [, letter = "A", accidental = "", octaveText = "4"] = match ?? [];
+    return `${letter}${accidental}${String(Number(octaveText))}`;
+  }
+  const boundedMidi = midi < minProjectMidiNote ? minProjectMidiNote : maxProjectMidiNote;
+  return `${sharpNotes[boundedMidi % 12]}${Math.floor(boundedMidi / 12) - 1}`;
+}
+
+function rawProjectPitchMidiNumber(value: unknown): number | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const match = /^([A-G])(#|b)?(-?\d+)$/.exec(value);
   if (!match) {
-    return 440;
+    return null;
   }
   const [, letter, accidental = "", octaveText] = match;
-  const semitones: Record<string, number> = {
-    C: 0,
-    D: 2,
-    E: 4,
-    F: 5,
-    G: 7,
-    A: 9,
-    B: 11
-  };
+  const semitones: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
   const octave = Number(octaveText);
   const accidentalOffset = accidental === "#" ? 1 : accidental === "b" ? -1 : 0;
-  const midi = (octave + 1) * 12 + semitones[letter] + accidentalOffset;
-  return 440 * Math.pow(2, (midi - 69) / 12);
+  return (octave + 1) * 12 + semitones[letter] + accidentalOffset;
 }
 
 export function chordPitches(chord: ChordEvent, octave = 3): string[] {
@@ -3020,6 +3045,7 @@ function normalizeDrumProbabilities(value: DrumProbabilities | undefined): DrumP
 function normalizeBassNotes(notes: BassNoteInput[]): BassNote[] {
   return notes.map((note) => ({
     ...note,
+    pitch: normalizeProjectPitch(note.pitch),
     velocity: normalizeNoteVelocity(note.velocity),
     probability: normalizeEventProbability(note.probability ?? 1)
   }));
@@ -3028,6 +3054,7 @@ function normalizeBassNotes(notes: BassNoteInput[]): BassNote[] {
 function normalizeMelodyNotes(notes: MelodyNoteInput[]): MelodyNote[] {
   return notes.map((note) => ({
     ...note,
+    pitch: normalizeProjectPitch(note.pitch),
     velocity: normalizeNoteVelocity(note.velocity, 0.64),
     probability: normalizeEventProbability(note.probability ?? 1)
   }));

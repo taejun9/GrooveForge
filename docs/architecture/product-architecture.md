@@ -58,7 +58,7 @@ The current MVP stack is:
 - Renderer/build: Vite, React, TypeScript.
 - UI rendering: DOM/CSS for the current workstation surface; Canvas/WebGL remains available for dense piano-roll work, while waveform views belong only to a later optional sampling phase.
 - Audio: Web Audio API for realtime loop playback and a local WAV renderer for the first export path.
-- Storage: bounded versioned JSON project files with domain-owned import/serialization normalization, plus IndexedDB/local file cache in later plans. Unknown wrapped versions fail closed rather than being resaved through an older schema.
+- Storage: bounded versioned JSON project files with domain-owned import/serialization normalization, including finite standard-MIDI pitch boundaries shared by project data, MIDI export, and audio conversion, plus IndexedDB/local file cache in later plans. Unknown wrapped versions fail closed rather than being resaved through an older schema.
 
 Electron is used for the first desktop MVP because it gets the existing web audio/UI direction into a runnable desktop app quickly. A later native/pro audio engine can still move to JUCE after the product loop is proven.
 
