@@ -1,4 +1,4 @@
-import { activeDeliveryTarget, arrangementTotalBars, projectFileName, serializeProjectFile } from "../domain/workstation";
+import { activeDeliveryTarget, arrangementTotalBars, projectFileName, projectFileStem, serializeProjectFile } from "../domain/workstation";
 import type { ProjectState } from "../domain/workstation";
 import { downloadBlob } from "../platform/downloads";
 import { createHandoffSheet, handoffSheetFileName } from "./handoff";
@@ -68,16 +68,12 @@ type BundleSourceEntry = {
 const encoder = new TextEncoder();
 const crcTable = createCrcTable();
 
-function projectSlug(project: ProjectState): string {
-  return project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "grooveforge-project";
-}
-
 export function deliveryBundleZipFileName(project: ProjectState): string {
-  return `${projectSlug(project)}-delivery-bundle.zip`;
+  return `${projectFileStem(project)}-delivery-bundle.zip`;
 }
 
 function deliveryBundleRoot(project: ProjectState): string {
-  return `${projectSlug(project)}-delivery-bundle`;
+  return `${projectFileStem(project)}-delivery-bundle`;
 }
 
 function bytesFromText(contents: string): Uint8Array {

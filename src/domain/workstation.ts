@@ -2580,9 +2580,44 @@ function cloneProjectCore(project: ProjectCoreState): ProjectCoreState {
   };
 }
 
+const maxProjectFileStemBytes = 120;
+const reservedWindowsFileStem = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+
+function utf8ByteLength(value: string): number {
+  let bytes = 0;
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    bytes += codePoint <= 0x7f ? 1 : codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4;
+  }
+  return bytes;
+}
+
+function truncateUtf8(value: string, maxBytes: number): string {
+  let result = "";
+  for (const character of value) {
+    if (utf8ByteLength(result + character) > maxBytes) {
+      break;
+    }
+    result += character;
+  }
+  return result;
+}
+
+export function projectFileStem(project: Pick<ProjectState, "title">): string {
+  const normalized = project.title
+    .normalize("NFKC")
+    .toLocaleLowerCase("und")
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+  const bounded = truncateUtf8(normalized, maxProjectFileStemBytes).replace(/-+$/g, "");
+  if (!/[\p{L}\p{N}]/u.test(bounded)) {
+    return "grooveforge-project";
+  }
+  return reservedWindowsFileStem.test(bounded) ? `grooveforge-${bounded}` : bounded;
+}
+
 export function projectFileName(project: ProjectState): string {
-  const slug = project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-  return `${slug || "grooveforge-project"}.grooveforge.json`;
+  return `${projectFileStem(project)}.grooveforge.json`;
 }
 
 export function serializeProjectFile(project: ProjectState): string {

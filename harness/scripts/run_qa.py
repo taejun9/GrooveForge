@@ -5657,7 +5657,12 @@ TEXT_EXPECTATIONS = {
     "harness/scripts/run_runtime_smoke.mjs": [
         "GrooveForge runtime smoke passed.",
         "../../src/audio/handoff.ts",
+        "../../src/audio/deliveryBundle.ts",
         "../../src/platform/downloads.ts",
+        "validateUnicodeFileIdentity",
+        "workstation.projectFileStem",
+        "Unicode file identity",
+        "distinct titles x",
         "workstation.beatBlueprints.map",
         "workstation.styleProfiles.map",
         "styleSmokeProject(profile)",
@@ -29063,6 +29068,7 @@ TEXT_EXPECTATIONS = {
         "createStereoPanner",
     ],
     "src/audio/render.ts": [
+        "projectFileStem",
         "patternForSlot",
         "arrangementBlock",
         "arrangementBarCount",
@@ -29128,6 +29134,7 @@ TEXT_EXPECTATIONS = {
         "import type { ArrangementBlock, ArrangementMuteTrack, ProjectState, SoundDesign, TrackType }",
     ],
     "src/audio/midi.ts": [
+        "projectFileStem",
         "createMidiFile",
         "exportMidi",
         "midiFileName",
@@ -29153,6 +29160,7 @@ TEXT_EXPECTATIONS = {
         "import type { ArrangementBlock, ArrangementMuteTrack, DrumLane, ProjectState }",
     ],
     "src/audio/deliveryBundle.ts": [
+        "projectFileStem",
         "DeliveryBundleManifest",
         "deliveryBundleZipFileName",
         "createDeliveryBundleZipBlob",
@@ -29183,6 +29191,15 @@ TEXT_EXPECTATIONS = {
     ],
     "src/domain/workstation.ts": [
         'export type TrackType = "drum_rack" | "bass_808" | "synth" | "chord" | "fx_return" | "master";',
+        "maxProjectFileStemBytes",
+        "reservedWindowsFileStem",
+        "truncateUtf8",
+        "projectFileStem",
+        '.normalize("NFKC")',
+        '.toLocaleLowerCase("und")',
+        "\\p{L}",
+        "\\p{M}",
+        "\\p{N}",
         "styleProfiles",
         '"k_hiphop_rnb"',
         '"afrobeats"',

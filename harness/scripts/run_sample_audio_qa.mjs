@@ -224,6 +224,35 @@ async function runStyleMatrixCase(profile) {
   };
 }
 
+async function runUnicodeFileIdentityCase({ id, title, expectedStem, styleId }) {
+  const profile = workstation.styleProfiles.find((candidate) => candidate.id === styleId);
+  check(Boolean(profile), `unicode-file-identity:${id}: style ${styleId} must exist`);
+  const project = { ...styleMatrixProject(profile ?? workstation.styleProfiles[0]), title };
+  const fileStem = workstation.projectFileStem(project);
+  const fileName = render.mixWavFileName(project);
+  const caseRoot = path.join(outputRoot, "unicode-file-identity", fileStem);
+  await mkdir(caseRoot, { recursive: true });
+  check(fileStem === expectedStem, `unicode-file-identity:${id}: expected file stem ${expectedStem}, got ${fileStem}`);
+  check(fileName === `${expectedStem}-demo.wav`, `unicode-file-identity:${id}: WAV filename must preserve the shared project stem`);
+  check(!/[\\/\u0000-\u001f\u007f]/u.test(fileName), `unicode-file-identity:${id}: WAV filename must not contain separators or control characters`);
+  const artifact = await renderArtifact({
+    blobFactory: () => render.createMixWavBlob(project),
+    analysis: render.analyzeExport(project),
+    fileName,
+    label: `unicode-file-identity:${id} full mix`,
+    caseRoot,
+    project,
+    requireTailContent: true
+  });
+  return {
+    id,
+    title,
+    fileStem,
+    project: { styleId: project.styleId, bpm: project.bpm, key: project.key, bars: workstation.arrangementTotalBars(project) },
+    artifact
+  };
+}
+
 function updateMixerChannel(project, trackId, update) {
   return {
     ...project,
@@ -359,10 +388,14 @@ function markdownReport(report) {
   const styleRows = report.styleMatrix.map((style) =>
     `| ${style.id} | ${style.name} | ${style.project.bpm} | \`${style.artifact.path}\` | ${style.artifact.decoded.musicalDurationSeconds.toFixed(2)} s | +${style.artifact.decoded.tailDurationSeconds.toFixed(2)} s | ${style.artifact.decoded.durationSeconds.toFixed(2)} s | ${style.artifact.decoded.peakDb.toFixed(2)} dB | ${style.artifact.decoded.rmsDb.toFixed(2)} dB | ${style.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${style.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${style.artifact.deterministic ? "yes" : "no"} |`
   );
+  const unicodeRows = report.unicodeFileIdentity.map((identity) =>
+    `| ${identity.title} | \`${identity.fileStem}\` | ${identity.project.styleId} | \`${identity.artifact.path}\` | ${identity.artifact.decoded.durationSeconds.toFixed(2)} s | ${identity.artifact.decoded.peakDb.toFixed(2)} dB | ${identity.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${identity.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${identity.artifact.deterministic ? "yes" : "no"} |`
+  );
   return `# GrooveForge Sample Audio QA\n\nStatus: **${report.status}**\n\n` +
     `Generated from built-in editable musical events only. No imported audio, private project data, network service, or external release claim is used.\n\n` +
     `| Case | Artifact | Local path | Musical | Tail | Delivered | Peak | RMS | Tail content | Zero end | Repeat render |\n|---|---|---|---:|---:|---:|---:|---:|---|---|---|\n${rows.join("\n")}\n\n` +
     `## All-style PCM Matrix\n\n| Style | Name | BPM | Local path | Musical | Tail | Delivered | Peak | RMS | Tail content | Zero end | Repeat render |\n|---|---|---:|---|---:|---:|---:|---:|---:|---|---|---|\n${styleRows.join("\n")}\n\n` +
+    `## Unicode File Identity\n\nDistinct Korean project titles keep distinct shared file stems and real decoded WAV output: **${report.unicodeFileIdentity.length}/2**.\n\n| Title | Shared stem | Style | Local WAV | Delivered | Peak | Tail content | Zero end | Repeat render |\n|---|---|---|---|---:|---:|---|---|---|\n${unicodeRows.join("\n")}\n\n` +
     `## Export Tail Safety\n\nExpected tail length and digital-zero ending: **${report.tailSafety.allArtifactsSafe ? "yes" : "no"}** (${report.tailSafety.zeroEndedCount}/${report.tailSafety.artifactCount} artifacts). Full mixes preserving post-boundary content: **${report.tailSafety.fullMixTailContentCount}/${report.tailSafety.fullMixCount}**.\n\n` +
     `## Render Isolation\n\nUnrelated edits isolated: **${report.renderIsolation.unrelatedEditsIsolated ? "yes" : "no"}** (${report.renderIsolation.unrelatedEditCount} cases). Target mixer sensitivity: **${report.renderIsolation.targetMixerSensitive ? "yes" : "no"}**. Noise-sound sensitivity: **${report.renderIsolation.noiseSoundSensitive ? "yes" : "no"}**. Drums solo equals Drums stem: **${report.renderIsolation.soloMatchesStem ? "yes" : "no"}**.\n\n` +
     `Checks: canonical stereo PCM WAV, 44.1kHz, 16-bit, complete frames, audible decoded PCM, musical-boundary tail preservation, terminal digital zero, analysis agreement, ceiling safety, no digital full-scale samples, unique stems, and byte-identical immediate rerender.\n`;
@@ -375,9 +408,16 @@ for (const smokeCase of buildCases()) cases.push(await runCase(smokeCase));
 const styleMatrix = [];
 for (const profile of workstation.styleProfiles) styleMatrix.push(await runStyleMatrixCase(profile));
 check(new Set(styleMatrix.map((style) => style.artifact.sha256)).size === styleMatrix.length, "style matrix full mixes must all contain distinct PCM");
+const unicodeFileIdentity = [];
+for (const identityCase of [
+  { id: "seoul-beat", title: "서울 비트", expectedStem: "서울-비트", styleId: "lofi" },
+  { id: "busan-beat", title: "부산 비트", expectedStem: "부산-비트", styleId: "k_hiphop_rnb" }
+]) unicodeFileIdentity.push(await runUnicodeFileIdentityCase(identityCase));
+check(new Set(unicodeFileIdentity.map((identity) => identity.fileStem)).size === unicodeFileIdentity.length, "unicode-file-identity: distinct Korean titles must retain distinct shared stems");
+check(new Set(unicodeFileIdentity.map((identity) => identity.artifact.path)).size === unicodeFileIdentity.length, "unicode-file-identity: distinct Korean titles must write distinct WAV paths");
 const renderIsolation = await validateRenderIsolation();
-const allArtifacts = [...cases.flatMap((smokeCase) => smokeCase.artifacts), ...styleMatrix.map((style) => style.artifact)];
-const fullMixArtifacts = [...cases.map((smokeCase) => smokeCase.artifacts[0]), ...styleMatrix.map((style) => style.artifact)];
+const allArtifacts = [...cases.flatMap((smokeCase) => smokeCase.artifacts), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact)];
+const fullMixArtifacts = [...cases.map((smokeCase) => smokeCase.artifacts[0]), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact)];
 const tailSafety = {
   artifactCount: allArtifacts.length,
   zeroEndedCount: allArtifacts.filter((artifact) => artifact.decoded.finalFramePeak === 0).length,
@@ -387,7 +427,7 @@ const tailSafety = {
 };
 
 const report = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   status: failures.length === 0 ? "passed" : "failed",
   app: { name: appName, version: packageJson.version, platformArch },
   boundaries: {
@@ -396,6 +436,7 @@ const report = {
   },
   cases,
   styleMatrix,
+  unicodeFileIdentity,
   tailSafety,
   renderIsolation,
   failures
@@ -411,7 +452,7 @@ if (failures.length > 0) {
 }
 
 console.log("GrooveForge sample audio QA passed.");
-console.log(`Audience cases: ${cases.length}; style matrix: ${styleMatrix.length}/${workstation.styleProfiles.length}; playable WAV files: ${cases.reduce((total, smokeCase) => total + smokeCase.artifacts.length, 0) + styleMatrix.length}`);
+console.log(`Audience cases: ${cases.length}; style matrix: ${styleMatrix.length}/${workstation.styleProfiles.length}; Unicode file identity: ${unicodeFileIdentity.length}/2; playable WAV files: ${allArtifacts.length}`);
 console.log(`Export tail safety: ${tailSafety.zeroEndedCount}/${tailSafety.artifactCount} artifacts end at digital zero; full-mix tail content ${tailSafety.fullMixTailContentCount}/${tailSafety.fullMixCount}`);
 console.log(`Render isolation: ${renderIsolation.unrelatedEditCount}/${renderIsolation.unrelatedEditCount} unrelated edits isolated; target mixer sensitive ${renderIsolation.targetMixerSensitive ? "yes" : "no"}; noise sound sensitive ${renderIsolation.noiseSoundSensitive ? "yes" : "no"}; solo/stem match ${renderIsolation.soloMatchesStem ? "yes" : "no"}`);
 for (const smokeCase of cases) {

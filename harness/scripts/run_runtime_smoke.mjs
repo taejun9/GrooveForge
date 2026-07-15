@@ -28,6 +28,7 @@ const workstation = await import("../../src/domain/workstation.ts");
 const render = await import("../../src/audio/render.ts");
 const midi = await import("../../src/audio/midi.ts");
 const handoff = await import("../../src/audio/handoff.ts");
+const deliveryBundle = await import("../../src/audio/deliveryBundle.ts");
 const downloads = await import("../../src/platform/downloads.ts");
 const coreTrackTypes = new Set(["drum_rack", "bass_808", "synth", "chord", "fx_return", "master"]);
 const smokeKey = "F minor";
@@ -93,10 +94,6 @@ function legacySinglePatternProjectFile() {
   };
 }
 
-function projectSlug(project) {
-  return project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "grooveforge";
-}
-
 function safeJsonParse(text, label) {
   try {
     return JSON.parse(text);
@@ -117,6 +114,47 @@ function stableJson(value) {
       .join(",")}}`;
   }
   return JSON.stringify(value);
+}
+
+function validateUnicodeFileIdentity() {
+  const identityCases = [
+    ["서울 비트", "서울-비트"],
+    ["부산 비트", "부산-비트"],
+    ["東京ビート", "東京ビート"],
+    ["🔥 새 비트", "새-비트"]
+  ].map(([title, expectedStem]) => {
+    const project = { ...workstation.starterProject, title };
+    const stem = workstation.projectFileStem(project);
+    const fileNames = [
+      workstation.projectFileName(project),
+      render.mixWavFileName(project),
+      ...render.stemWavFileNames(project),
+      midi.midiFileName(project),
+      handoff.handoffSheetFileName(project),
+      deliveryBundle.deliveryBundleZipFileName(project)
+    ];
+    check(stem === expectedStem, `unicode-file-identity:${title} should preserve the normalized title stem ${expectedStem}, got ${stem}`);
+    check(fileNames.every((fileName) => fileName.startsWith(`${stem}-`) || fileName.startsWith(`${stem}.`)), `unicode-file-identity:${title} deliverables should share one project file stem`);
+    check(fileNames.every((fileName) => !/[\\/\u0000-\u001f\u007f]/u.test(fileName)), `unicode-file-identity:${title} deliverables should not contain path separators or control characters`);
+    return { title, stem, fileNames };
+  });
+
+  check(new Set(identityCases.map((entry) => entry.stem)).size === identityCases.length, "unicode-file-identity: distinct non-English titles must keep distinct stems");
+  for (let fileIndex = 0; fileIndex < identityCases[0].fileNames.length; fileIndex += 1) {
+    check(new Set(identityCases.map((entry) => entry.fileNames[fileIndex])).size === identityCases.length, `unicode-file-identity: deliverable position ${fileIndex + 1} must not collide across distinct titles`);
+  }
+
+  const englishProject = { ...workstation.starterProject, title: "Midnight Drive" };
+  check(workstation.projectFileStem(englishProject) === "midnight-drive", "unicode-file-identity: English title output must remain unchanged");
+  check(render.mixWavFileName(englishProject) === "midnight-drive-demo.wav", "unicode-file-identity: English WAV output must remain unchanged");
+  check(workstation.projectFileStem({ title: "Cafe\u0301 De\u0301ja\u0300 Vu" }) === "café-déjà-vu", "unicode-file-identity: canonically equivalent accents must normalize consistently");
+  check(workstation.projectFileStem({ title: "CON" }) === "grooveforge-con", "unicode-file-identity: Windows reserved basenames must be prefixed");
+  check(workstation.projectFileStem({ title: "🔥 !!!" }) === "grooveforge-project", "unicode-file-identity: symbol-only titles must use the stable fallback");
+  const boundedStem = workstation.projectFileStem({ title: "서울야간비트".repeat(80) });
+  check(new TextEncoder().encode(boundedStem).byteLength <= 120, "unicode-file-identity: project file stem must stay within the UTF-8 byte bound");
+  check(!boundedStem.endsWith("-"), "unicode-file-identity: bounded project file stem must not end with a separator");
+
+  return { cases: identityCases.length, deliverablesPerCase: identityCases[0].fileNames.length, boundedBytes: new TextEncoder().encode(boundedStem).byteLength };
 }
 
 function projectEventCounts(project) {
@@ -238,7 +276,7 @@ function validateHandoffSheet(project, label, analysis, stemAnalyses) {
   }));
 
   check(sheetFileName.endsWith("-handoff.txt"), `${label} Handoff Sheet file name should end in -handoff.txt`);
-  check(sheetFileName.includes(projectSlug(project)), `${label} Handoff Sheet file name should use the project slug`);
+  check(sheetFileName.includes(workstation.projectFileStem(project)), `${label} Handoff Sheet file name should use the project file stem`);
   check(sheet.endsWith("\n"), `${label} Handoff Sheet should end with a newline`);
   check(sheet.length > 1000, `${label} Handoff Sheet should contain a full delivery summary`);
   check(!sheet.match(/undefined|NaN/), `${label} Handoff Sheet contains undefined or NaN text`);
@@ -495,7 +533,7 @@ async function validateProjectExportSmoke(smokeCase) {
 
   const mixFileName = render.mixWavFileName(project);
   check(mixFileName.endsWith(".wav"), `${label} full mix file name should end in .wav`);
-  check(mixFileName.includes(projectSlug(project)), `${label} full mix file name should use the project slug`);
+  check(mixFileName.includes(workstation.projectFileStem(project)), `${label} full mix file name should use the project file stem`);
   checkWavBytes(await blobBytes(render.createMixWavBlob(project)), `${label} full mix`);
 
   const stemAnalyses = render.analyzeStemExports(project);
@@ -583,6 +621,7 @@ for (const smokeCase of smokeCases) {
 }
 const downloadSmokeProject = workstation.parseProjectFile(workstation.serializeProjectFile(starterCase.project));
 const downloadSmokeSummary = validateDownloadPathSmoke(downloadSmokeProject);
+const unicodeFileIdentitySummary = validateUnicodeFileIdentity();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -601,6 +640,7 @@ console.log(`- Legacy migrations: ${legacyMigrationProject ? 1 : 0}/1 single-pat
 console.log(`- Project roundtrips: ${summaries.length}/${smokeCases.length} .grooveforge.json save/load checks before export`);
 console.log(`- Handoff sheets: ${summaries.length}/${smokeCases.length} text deliverables verified`);
 console.log(`- Download path: ${downloadSmokeSummary.clicked}/${downloadSmokeSummary.expected} mocked Blob URL downloads verified (${downloadSmokeSummary.fileNames.join(", ")})`);
+console.log(`- Unicode file identity: ${unicodeFileIdentitySummary.cases} distinct titles x ${unicodeFileIdentitySummary.deliverablesPerCase} deliverables, bounded stem ${unicodeFileIdentitySummary.boundedBytes}/120 UTF-8 bytes`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

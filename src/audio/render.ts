@@ -13,6 +13,7 @@ import {
   noteToFrequency,
   masterAutomationGainAtStep,
   patternForSlot,
+  projectFileStem,
   projectStepDurationSeconds,
   normalizeArrangementBars,
   sidechainGainForStep,
@@ -617,17 +618,13 @@ function encodeWav(buffer: AudioChannels): Blob {
   return new Blob([arrayBuffer], { type: "audio/wav" });
 }
 
-function projectSlug(project: ProjectState): string {
-  return project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "grooveforge";
-}
-
 export function mixWavFileName(project: ProjectState): string {
-  return `${projectSlug(project)}-demo.wav`;
+  return `${projectFileStem(project)}-demo.wav`;
 }
 
 export function stemWavFileNames(project: ProjectState): string[] {
-  const slug = projectSlug(project);
-  return stemTrackIds.map((track) => `${slug}-${track.replace("_", "-")}-stem.wav`);
+  const stem = projectFileStem(project);
+  return stemTrackIds.map((track) => `${stem}-${track.replace("_", "-")}-stem.wav`);
 }
 
 function downloadWavBlob(blob: Blob, fileName: string): void {
