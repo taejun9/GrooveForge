@@ -419,7 +419,9 @@ async function validateProjectExportSmoke(smokeCase) {
   } = smokeCase;
   const project = validateProjectFileRoundTrip(smokeCase.project, label);
   const bars = workstation.arrangementTotalBars(project);
-  const expectedDuration = bars * workstation.stepsPerBar * workstation.projectStepDurationSeconds(project);
+  const musicalDuration = bars * workstation.stepsPerBar * workstation.projectStepDurationSeconds(project);
+  const expectedTailDuration = render.exportTailDurationSeconds(project);
+  const expectedDuration = musicalDuration + expectedTailDuration;
 
   check(project.styleId === expectedStyleId, `${label} should use ${expectedStyleId}, got ${project.styleId}`);
   if (expectedTitle) {
@@ -486,7 +488,8 @@ async function validateProjectExportSmoke(smokeCase) {
   check(mixAnalysis.status !== "Silent", `${label} full mix analysis should not be silent`);
   check(mixAnalysis.channels === 2, `${label} full mix should be stereo, got ${mixAnalysis.channels} channels`);
   check(mixAnalysis.sampleRate === 44100, `${label} full mix sample rate should be 44100, got ${mixAnalysis.sampleRate}`);
-  check(Math.abs(mixAnalysis.durationSeconds - expectedDuration) < 0.05, `${label} full mix duration does not match the ${expectedBars}-bar arrangement`);
+  check(expectedTailDuration >= 0.75, `${label} full mix export tail is shorter than the safety floor`);
+  check(Math.abs(mixAnalysis.durationSeconds - expectedDuration) < 0.05, `${label} full mix duration does not match musical duration plus export tail`);
   check(Number.isFinite(mixAnalysis.peakDb), `${label} full mix peak should be finite`);
   check(Number.isFinite(mixAnalysis.rmsDb), `${label} full mix RMS should be finite`);
 
@@ -502,7 +505,7 @@ async function validateProjectExportSmoke(smokeCase) {
     const analysis = stemAnalyses[track];
     check(stemNames[index]?.endsWith("-stem.wav"), `${label} ${track} stem file name should end in -stem.wav`);
     check(analysis.status !== "Silent", `${label} ${track} stem analysis should not be silent`);
-    check(Math.abs(analysis.durationSeconds - expectedDuration) < 0.05, `${label} ${track} stem duration does not match the ${expectedBars}-bar arrangement`);
+    check(Math.abs(analysis.durationSeconds - expectedDuration) < 0.05, `${label} ${track} stem duration does not match musical duration plus export tail`);
     checkWavBytes(await blobBytes(render.createStemWavBlob(project, track)), `${label} ${track} stem`);
   }
 
