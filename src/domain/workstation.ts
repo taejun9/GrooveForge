@@ -297,6 +297,7 @@ const defaultRequiredMixerChannels: Record<RequiredMixerChannelId, MixerChannel>
 };
 export const projectKeys = ["F minor", "F# minor", "A minor", "C minor", "D minor", "E minor", "G minor", "C major", "D dorian"] as const;
 export const maxProjectSnapshots = 6;
+export const maxProjectSnapshotIdLength = 64;
 export const maxProjectSnapshotNameLength = 32;
 export const maxSessionBriefFieldLength = 64;
 export const maxSessionBriefNotesLength = 240;
@@ -2506,6 +2507,53 @@ export function normalizeProjectSnapshotName(name: string): string {
   return name.trim().replace(/\s+/g, " ").slice(0, maxProjectSnapshotNameLength);
 }
 
+const unsafeProjectSnapshotIdCharacters = /[^A-Za-z0-9_-]+/g;
+const safeProjectSnapshotId = /^[A-Za-z0-9_-]+$/;
+const defaultImportedSnapshotId = "snapshot-imported";
+
+export function normalizeProjectSnapshotId(value: unknown): string {
+  const source = typeof value === "string" ? value.normalize("NFKC").trim() : "";
+  const normalized = (safeProjectSnapshotId.test(source)
+    ? source
+    : source.replace(unsafeProjectSnapshotIdCharacters, "-").replace(/^[-_]+|[-_]+$/g, "")
+  ).slice(0, maxProjectSnapshotIdLength);
+  return normalized || defaultImportedSnapshotId;
+}
+
+function projectSnapshotIdWithSuffix(base: string, suffix: number): string {
+  const suffixText = `-${suffix}`;
+  const boundedBase = base.slice(0, Math.max(1, maxProjectSnapshotIdLength - suffixText.length));
+  return `${boundedBase || defaultImportedSnapshotId}${suffixText}`;
+}
+
+export function normalizeProjectSnapshotIdentities(snapshots: readonly ProjectSnapshot[]): ProjectSnapshot[] {
+  const safeAuthoredIds = new Set(
+    snapshots
+      .map((snapshot) => snapshot.id)
+      .filter((id) => id.length > 0 && id === normalizeProjectSnapshotId(id))
+  );
+  const usedIds = new Set<string>();
+  let changed = false;
+  const normalized = snapshots.map((snapshot) => {
+    const base = normalizeProjectSnapshotId(snapshot.id);
+    let id = base;
+    if (usedIds.has(id) || (snapshot.id !== base && safeAuthoredIds.has(id))) {
+      let suffix = 2;
+      do {
+        id = projectSnapshotIdWithSuffix(base, suffix);
+        suffix += 1;
+      } while (usedIds.has(id) || safeAuthoredIds.has(id));
+    }
+    usedIds.add(id);
+    if (id === snapshot.id) {
+      return snapshot;
+    }
+    changed = true;
+    return { ...snapshot, id };
+  });
+  return changed ? normalized : (snapshots as ProjectSnapshot[]);
+}
+
 export function createProjectSnapshot(project: ProjectState, createdAt = new Date().toISOString()): ProjectSnapshot {
   return {
     id: projectSnapshotId(project, createdAt),
@@ -2516,29 +2564,39 @@ export function createProjectSnapshot(project: ProjectState, createdAt = new Dat
 }
 
 export function saveProjectSnapshot(project: ProjectState, createdAt = new Date().toISOString()): ProjectState {
-  const snapshot = createProjectSnapshot(project, createdAt);
+  const normalizedSnapshots = normalizeProjectSnapshotIdentities(project.snapshots);
+  const normalizedProject = normalizedSnapshots === project.snapshots ? project : { ...project, snapshots: normalizedSnapshots };
+  const snapshot = createProjectSnapshot(normalizedProject, createdAt);
   return {
     ...project,
-    snapshots: [snapshot, ...cloneProjectSnapshots(project.snapshots)].slice(0, maxProjectSnapshots)
+    snapshots: [snapshot, ...cloneProjectSnapshots(normalizedSnapshots)].slice(0, maxProjectSnapshots)
   };
 }
 
 export function restoreProjectSnapshot(project: ProjectState, snapshotId: string): ProjectState {
-  const snapshot = project.snapshots.find((candidate) => candidate.id === snapshotId);
+  const snapshots = normalizeProjectSnapshotIdentities(project.snapshots);
+  const snapshot = snapshots.find((candidate) => candidate.id === snapshotId);
   if (!snapshot) {
-    return project;
+    return snapshots === project.snapshots ? project : { ...project, snapshots: cloneProjectSnapshots(snapshots) };
   }
   return {
     ...cloneProjectCore(snapshot.project),
-    snapshots: cloneProjectSnapshots(project.snapshots)
+    snapshots: cloneProjectSnapshots(snapshots)
   };
 }
 
 export function deleteProjectSnapshot(project: ProjectState, snapshotId: string): ProjectState {
-  const snapshots = project.snapshots.filter((snapshot) => snapshot.id !== snapshotId);
-  if (snapshots.length === project.snapshots.length) {
-    return project;
+  const normalizedSnapshots = normalizeProjectSnapshotIdentities(project.snapshots);
+  const snapshotIndex = normalizedSnapshots.findIndex((snapshot) => snapshot.id === snapshotId);
+  if (snapshotIndex < 0) {
+    return normalizedSnapshots === project.snapshots
+      ? project
+      : { ...project, snapshots: cloneProjectSnapshots(normalizedSnapshots) };
   }
+  const snapshots = [
+    ...normalizedSnapshots.slice(0, snapshotIndex),
+    ...normalizedSnapshots.slice(snapshotIndex + 1)
+  ];
   return {
     ...project,
     snapshots: cloneProjectSnapshots(snapshots)
@@ -2551,26 +2609,33 @@ export function renameProjectSnapshot(project: ProjectState, snapshotId: string,
     return project;
   }
 
-  let changed = false;
-  const snapshots = project.snapshots.map((snapshot) => {
+  const normalizedSnapshots = normalizeProjectSnapshotIdentities(project.snapshots);
+  const snapshotIndex = normalizedSnapshots.findIndex((snapshot) => snapshot.id === snapshotId);
+  if (snapshotIndex < 0) {
+    return normalizedSnapshots === project.snapshots
+      ? project
+      : { ...project, snapshots: cloneProjectSnapshots(normalizedSnapshots) };
+  }
+  let renamed = false;
+  const snapshots = normalizedSnapshots.map((snapshot, index) => {
     const clonedSnapshot = {
       ...snapshot,
       project: cloneProjectCore(snapshot.project)
     };
-    if (snapshot.id !== snapshotId) {
+    if (index !== snapshotIndex) {
       return clonedSnapshot;
     }
     if (snapshot.name === normalizedName) {
       return clonedSnapshot;
     }
-    changed = true;
+    renamed = true;
     return {
       ...clonedSnapshot,
       name: normalizedName
     };
   });
 
-  if (!changed) {
+  if (!renamed && normalizedSnapshots === project.snapshots) {
     return project;
   }
 
@@ -2587,7 +2652,7 @@ export function projectSnapshotSummary(snapshot: ProjectSnapshot): string {
 
 function projectSnapshotId(project: ProjectState, createdAt: string): string {
   const base = `snapshot-${createdAt.replace(/[^0-9]/g, "").slice(0, 17) || "local"}`;
-  const existingIds = new Set(project.snapshots.map((snapshot) => snapshot.id));
+  const existingIds = new Set(normalizeProjectSnapshotIdentities(project.snapshots).map((snapshot) => snapshot.id));
   let suffix = 1;
   while (existingIds.has(`${base}-${suffix}`)) {
     suffix += 1;
@@ -3369,16 +3434,16 @@ function normalizeBriefText(value: unknown, maxLength: number): string {
 }
 
 function normalizeProjectSnapshots(snapshots: ProjectSnapshotInput[] | undefined): ProjectSnapshot[] {
-  return (
+  const normalized =
     snapshots
       ?.slice(0, maxProjectSnapshots)
-      ?.map((snapshot, index) => ({
+      .map((snapshot, index) => ({
         id: snapshot.id,
         name: normalizeProjectSnapshotName(snapshot.name) || `Idea ${index + 1}`,
         createdAt: snapshot.createdAt,
         project: normalizeProjectCoreState(snapshot.project)
-      })) ?? []
-  );
+      })) ?? [];
+  return normalizeProjectSnapshotIdentities(normalized);
 }
 
 function normalizeProjectState(value: unknown): ProjectState | null {

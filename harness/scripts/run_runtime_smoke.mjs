@@ -650,6 +650,79 @@ async function validateMixerTopologySafety() {
   };
 }
 
+function validateSnapshotIdentitySafety() {
+  const { snapshots: _snapshots, ...snapshotCore } = structuredClone(workstation.starterProject);
+  const longId = "x".repeat(workstation.maxProjectSnapshotIdLength + 40);
+  const sourceIds = [
+    "duplicate-snapshot",
+    "duplicate-snapshot",
+    "../../duplicate snapshot",
+    "",
+    longId,
+    "snapshot-imported"
+  ];
+  const sourceBpms = [140, 90, 104, 112, 124, 132];
+  const sourceProject = {
+    ...structuredClone(workstation.starterProject),
+    title: "Recovered Snapshot Identity Safety Beat",
+    snapshots: sourceIds.map((id, index) => ({
+      id,
+      name: `Imported idea ${index + 1}`,
+      createdAt: `2026-07-16T0${index}:00:00.000Z`,
+      project: { ...structuredClone(snapshotCore), bpm: sourceBpms[index] }
+    }))
+  };
+  const wrapped = JSON.stringify({
+    app: "GrooveForge",
+    fileVersion: workstation.projectFileVersion,
+    savedAt: "2026-07-16T00:00:00.000Z",
+    project: sourceProject
+  });
+  const parsed = workstation.parseProjectFile(wrapped);
+  const bareParsed = workstation.parseProjectFile(JSON.stringify(sourceProject));
+  const serializedFile = safeJsonParse(workstation.serializeProjectFile(sourceProject), "snapshot-identity-safety");
+  const direct = workstation.normalizeProjectSnapshotIdentities(sourceProject.snapshots);
+  const ids = parsed.snapshots.map((snapshot) => snapshot.id);
+  const firstId = ids[0];
+  const secondId = ids[1];
+  const renamed = workstation.renameProjectSnapshot(parsed, firstId, "Renamed Once");
+  const deleted = workstation.deleteProjectSnapshot(parsed, firstId);
+  const directRenamed = workstation.renameProjectSnapshot(sourceProject, firstId, "Direct Rename Once");
+  const directDeleted = workstation.deleteProjectSnapshot(sourceProject, firstId);
+  const restoredBpms = [firstId, secondId].map((id) => workstation.restoreProjectSnapshot(parsed, id).bpm);
+  const saved = workstation.saveProjectSnapshot(sourceProject, "2026-07-16T07:00:00.000Z");
+  const safeEdgeSnapshot = { ...sourceProject.snapshots[0], id: "-safe_authored-" };
+
+  check(ids.length === workstation.maxProjectSnapshots, "snapshot-identity-safety: import should retain the finite snapshot capacity");
+  check(new Set(ids).size === ids.length, "snapshot-identity-safety: every imported snapshot id should be unique");
+  check(ids[0] === "duplicate-snapshot" && ids[1] === "duplicate-snapshot-2" && ids[2] === "duplicate-snapshot-3", "snapshot-identity-safety: duplicate and unsafe collisions should receive deterministic suffixes");
+  check(ids[3] === "snapshot-imported-2" && ids[5] === "snapshot-imported", "snapshot-identity-safety: repaired empty ids should not steal a later safe authored id");
+  check(ids[4] === "x".repeat(workstation.maxProjectSnapshotIdLength), "snapshot-identity-safety: overlong ids should clamp to the domain bound");
+  check(ids.every((id) => /^[A-Za-z0-9_-]+$/.test(id) && id.length <= workstation.maxProjectSnapshotIdLength), "snapshot-identity-safety: repaired ids should be selector-safe bounded tokens");
+  check(stableJson(bareParsed.snapshots.map(({ id }) => id)) === stableJson(ids), "snapshot-identity-safety: wrapped and bare repair should match");
+  check(stableJson(serializedFile?.project?.snapshots?.map(({ id }) => id)) === stableJson(ids), "snapshot-identity-safety: serialization should persist unique repaired ids");
+  check(stableJson(direct.map(({ id }) => id)) === stableJson(ids), "snapshot-identity-safety: direct identity normalization should match durable repair");
+  check(workstation.normalizeProjectSnapshotIdentities(parsed.snapshots) === parsed.snapshots, "snapshot-identity-safety: canonical identities should preserve collection identity");
+  check(workstation.normalizeProjectSnapshotIdentities([safeEdgeSnapshot])[0]?.id === "-safe_authored-", "snapshot-identity-safety: already-safe authored separator positions should remain unchanged");
+  check(renamed.snapshots[0]?.name === "Renamed Once" && renamed.snapshots[1]?.name === "Imported idea 2", "snapshot-identity-safety: rename should change exactly one formerly colliding snapshot");
+  check(deleted.snapshots.length === parsed.snapshots.length - 1 && deleted.snapshots.some(({ id }) => id === secondId), "snapshot-identity-safety: delete should remove exactly one formerly colliding snapshot");
+  check(directRenamed.snapshots.filter(({ name }) => name === "Direct Rename Once").length === 1, "snapshot-identity-safety: direct malformed-state rename should still change one snapshot only");
+  check(directDeleted.snapshots.length === sourceProject.snapshots.length - 1, "snapshot-identity-safety: direct malformed-state delete should still remove one snapshot only");
+  check(stableJson(restoredBpms) === stableJson([140, 90]), "snapshot-identity-safety: both formerly colliding snapshots should restore independently");
+  check(new Set(saved.snapshots.map(({ id }) => id)).size === saved.snapshots.length, "snapshot-identity-safety: saving into a malformed direct state should retain unique ids");
+  check(stableJson(sourceProject.snapshots.map(({ id }) => id)) === stableJson(sourceIds), "snapshot-identity-safety: repair and snapshot actions should not mutate caller ids");
+
+  return {
+    sourceIds: sourceIds.length,
+    repairedIds: ids.length,
+    uniqueIds: new Set(ids).size,
+    renamed: `${sourceProject.snapshots.filter(({ id }) => id === firstId).length}->1`,
+    deleted: `${parsed.snapshots.length}->${deleted.snapshots.length}`,
+    restoredBpms: restoredBpms.join("/"),
+    paths: 6
+  };
+}
+
 function projectEventCounts(project) {
   return workstation.patternSlots.map((slot) => {
     const pattern = project.patterns[slot];
@@ -1121,6 +1194,7 @@ const projectPitchSafetySummary = validateProjectPitchSafety();
 const timelineBoundarySafetySummary = validateTimelineBoundarySafety();
 const eventDensitySafetySummary = await validateEventDensitySafety();
 const mixerTopologySafetySummary = await validateMixerTopologySafety();
+const snapshotIdentitySafetySummary = validateSnapshotIdentitySafety();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -1146,6 +1220,7 @@ console.log(`- Project pitch safety: ${projectPitchSafetySummary.range} / ${proj
 console.log(`- Timeline boundary safety: ${timelineBoundarySafetySummary.sourceBars}->${timelineBoundarySafetySummary.repairedBars} bars / ${timelineBoundarySafetySummary.blocks} blocks / event lengths ${timelineBoundarySafetySummary.eventLengths} / normalized paths ${timelineBoundarySafetySummary.paths}/5 / MIDI ${timelineBoundarySafetySummary.midiBytes} bytes`);
 console.log(`- Event density safety: ${eventDensitySafetySummary.sourceEvents}->${eventDensitySafetySummary.repairedEvents} bass/melody/chord/automation / note capacity ${eventDensitySafetySummary.noteCapacity} / chord steps ${eventDensitySafetySummary.chordSteps} / normalized paths ${eventDensitySafetySummary.paths}/6 / MIDI ${eventDensitySafetySummary.midiBytes} bytes / WAV ${eventDensitySafetySummary.wavBytes} bytes`);
 console.log(`- Mixer topology safety: ${mixerTopologySafetySummary.sourceChannels}->${mixerTopologySafetySummary.repairedChannels} required channels / duplicates ${mixerTopologySafetySummary.duplicateChannels} / normalized paths ${mixerTopologySafetySummary.paths}/7 / ${mixerTopologySafetySummary.status} ${mixerTopologySafetySummary.peakDb.toFixed(2)} dB / WAV ${mixerTopologySafetySummary.wavBytes} bytes`);
+console.log(`- Snapshot identity safety: ${snapshotIdentitySafetySummary.sourceIds}->${snapshotIdentitySafetySummary.repairedIds} ids / unique ${snapshotIdentitySafetySummary.uniqueIds}/${snapshotIdentitySafetySummary.repairedIds} / rename ${snapshotIdentitySafetySummary.renamed} / delete ${snapshotIdentitySafetySummary.deleted} / restore ${snapshotIdentitySafetySummary.restoredBpms} BPM / normalized paths ${snapshotIdentitySafetySummary.paths}/6`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

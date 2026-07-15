@@ -45,6 +45,8 @@ Event-density coverage treats note, chord, and master-automation collection size
 
 Mixer-topology coverage treats required audio paths and mixer collection size as one domain-owned resource contract. Runtime smoke proves current wrapped, bare, legacy, snapshot, serialization, direct render, editor-audition source, and realtime source paths restore one Drums, 808/Bass, Synth, Chord, and Master channel, discard inert FX-return rows, keep the first authored required row per id, collapse 1,000 duplicate rows to the finite topology, preserve canonical array identity for realtime reuse, and leave caller data unchanged. Sample-audio QA renders and decodes `믹서-복구-비트-demo.wav`, compares direct parser-bypass PCM with imported-repair PCM, and raises the expected report to schema version 10 with 32 playable WAVs and 24 full mixes retaining tail content.
 
+Snapshot-identity coverage treats six local idea slots and their React/action keys as one domain-owned identity contract. Runtime smoke proves wrapped, bare, serialization, direct normalization, save, rename, restore, and delete paths convert duplicate, unsafe, empty, and overlong ids into unique selector-safe tokens of at most 64 characters; preserve later safe authored ids; retain canonical collection identity; leave caller data unchanged; rename exactly one former collision; delete one slot; and independently restore 140 BPM and 90 BPM project cores. Sample-audio QA renders and decodes `스냅샷-복구-빠른-비트-demo.wav` and `스냅샷-복구-느린-비트-demo.wav`, requires distinct PCM hashes, and raises the expected report to schema version 11 with 34 playable WAVs and 26 full mixes retaining tail content.
+
 ## Agent Readability
 
 Agents should be able to answer these questions from repo files alone:
