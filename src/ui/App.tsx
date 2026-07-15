@@ -6902,6 +6902,7 @@ export function App(): ReactElement {
       controllerRef.current?.stop();
       controllerRef.current = null;
       setPlaybackPosition(null);
+      setIsPlaying(false);
       return;
     }
 

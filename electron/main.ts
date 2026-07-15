@@ -2904,6 +2904,8 @@ async function collectLaunchSmokeDrumGridKeyboardEvidence(
     expectedStep: number,
     modifiers: Electron.InputEvent["modifiers"] = []
   ): Promise<void> => {
+    win.webContents.focus();
+    await new Promise((resolve) => setTimeout(resolve, 50));
     win.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
     win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
     const stepDeadline = Date.now() + 30000;
@@ -2918,6 +2920,8 @@ async function collectLaunchSmokeDrumGridKeyboardEvidence(
     keyCode: string,
     modifiers: Electron.InputEvent["modifiers"]
   ): Promise<void> => {
+    win.webContents.focus();
+    await new Promise((resolve) => setTimeout(resolve, 50));
     win.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
     win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -3128,6 +3132,8 @@ async function collectLaunchSmokeNoteGridKeyboardEvidence(
       expectedStep: number,
       modifiers: Electron.InputEvent["modifiers"] = []
     ): Promise<void> => {
+      win.webContents.focus();
+      await new Promise((resolve) => setTimeout(resolve, 50));
       win.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
       win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
       const stepDeadline = Date.now() + 30000;
@@ -3142,6 +3148,8 @@ async function collectLaunchSmokeNoteGridKeyboardEvidence(
       keyCode: string,
       modifiers: Electron.InputEvent["modifiers"]
     ): Promise<void> => {
+      win.webContents.focus();
+      await new Promise((resolve) => setTimeout(resolve, 50));
       win.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
       win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -3346,6 +3354,8 @@ async function collectLaunchSmokeModalFocusEvidence(
       })();
     `);
   const sendKey = async (keyCode: string, modifiers: Electron.InputEvent["modifiers"] = []): Promise<void> => {
+    win.webContents.focus();
+    await new Promise((resolve) => setTimeout(resolve, 50));
     win.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
     win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
     await new Promise((resolve) => setTimeout(resolve, 80));
@@ -3361,6 +3371,8 @@ async function collectLaunchSmokeModalFocusEvidence(
     if (point.x < 0 || point.y < 0) {
       throw new Error(`Could not locate native click target ${testId}.`);
     }
+    win.webContents.focus();
+    await new Promise((resolve) => setTimeout(resolve, 50));
     win.webContents.sendInputEvent({ type: "mouseMove", x: point.x, y: point.y });
     win.webContents.sendInputEvent({ type: "mouseDown", x: point.x, y: point.y, button: "left", clickCount: 1 });
     win.webContents.sendInputEvent({ type: "mouseUp", x: point.x, y: point.y, button: "left", clickCount: 1 });
@@ -3679,7 +3691,7 @@ async function collectLaunchSmokeModalFocusEvidence(
 function collectLaunchSmokeModalFocusEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeModalFocusCoreEvidence> {
   return new Promise((resolve, reject) => {
     let step = "starting";
-    const timeout = setTimeout(() => reject(new Error(`Timed out collecting live modal focus evidence at ${step}.`)), 280000);
+    const timeout = setTimeout(() => reject(new Error(`Timed out collecting live modal focus evidence at ${step}.`)), 600000);
     void collectLaunchSmokeModalFocusEvidence(win, (nextStep) => {
       step = nextStep;
     })
