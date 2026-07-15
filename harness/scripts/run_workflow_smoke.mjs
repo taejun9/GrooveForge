@@ -62,7 +62,8 @@ function validateWorkflowProject(workflow) {
   const counts = projectEventCounts(reopened);
   const patterns = usedPatterns(reopened);
   const bars = workstation.arrangementTotalBars(reopened);
-  const duration = bars * workstation.stepsPerBar * workstation.projectStepDurationSeconds(reopened);
+  const musicalDuration = bars * workstation.stepsPerBar * workstation.projectStepDurationSeconds(reopened);
+  const deliveredDuration = musicalDuration + render.exportTailDurationSeconds(reopened);
   const analysis = render.analyzeExport(reopened);
   const stemAnalyses = render.analyzeStemExports(reopened);
   const midiBytes = midi.createMidiFile(reopened);
@@ -92,11 +93,11 @@ function validateWorkflowProject(workflow) {
   check(analysis.status !== "Silent", `${label} full mix should not be silent`);
   check(analysis.sampleRate === 44100, `${label} full mix sample rate should be 44100`);
   check(analysis.channels === 2, `${label} full mix should be stereo`);
-  check(Math.abs(analysis.durationSeconds - duration) < 0.05, `${label} full mix duration should match arrangement`);
+  check(Math.abs(analysis.durationSeconds - deliveredDuration) < 0.05, `${label} full mix duration should match arrangement plus export tail`);
   for (const track of render.stemTrackIds) {
     const stem = stemAnalyses[track];
     check(stem.status !== "Silent", `${label} ${track} stem should not be silent`);
-    check(Math.abs(stem.durationSeconds - duration) < 0.05, `${label} ${track} stem duration should match arrangement`);
+    check(Math.abs(stem.durationSeconds - deliveredDuration) < 0.05, `${label} ${track} stem duration should match arrangement plus export tail`);
   }
 
   check(ascii(midiBytes, 0, 4) === "MThd", `${label} MIDI should include an MThd header`);

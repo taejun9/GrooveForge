@@ -938,8 +938,8 @@ MVP capabilities:
 - Reproducible export peak/RMS/dynamics/headroom meter with limiter activity status for the current arrangement.
 - Local project save/load as a `.grooveforge.json` file, with UI-local current-file identity and unsaved-edit status.
 - Local draft recovery as a session-loss safety net only, with a UI-local project safety readout; explicit project files remain the durable save/load workflow.
-- WAV export through deterministic offline rendering.
-- Stem export through deterministic offline rendering for isolated drum, 808, synth, and chord WAV files from the current arrangement.
+- WAV export through deterministic offline rendering with a tempo-aware bounded tail and terminal fade so final notes and built-in Space returns are not cut at the arrangement boundary.
+- Stem export through deterministic offline rendering for isolated drum, 808, synth, and chord WAV files from the current arrangement, using the same tail-safe render and terminal fade as the full mix.
 - MIDI export as a deterministic Standard MIDI File with drum, 808, synth, and chord tracks from the current arrangement.
 - Handoff Sheet export as a local plain text summary of title, BPM/key/style, Delivery Target, Session Brief, arrangement blocks, export meter, and stem meter data without media upload or compliance claims.
 

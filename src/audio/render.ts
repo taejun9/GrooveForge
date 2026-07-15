@@ -23,6 +23,9 @@ import { downloadBlob } from "../platform/downloads";
 const sampleRate = 44100;
 const channels = 2;
 const renderNoiseSeedSalt = 0x47524647;
+const minimumExportTailSeconds = 0.75;
+const exportTailSteps = 6;
+const terminalFadeSeconds = 0.08;
 export const stemTrackIds = ["drum_rack", "bass_808", "synth", "chord"] as const;
 export type StemTrackId = (typeof stemTrackIds)[number];
 export type ExportAnalysis = {
@@ -58,6 +61,11 @@ type RenderNoiseSeed = (start: number, duration: number, brightness: number) => 
 
 function stepDuration(project: ProjectState): number {
   return projectStepDurationSeconds(project);
+}
+
+export function exportTailDurationSeconds(project: ProjectState): number {
+  // Six tempo-scaled steps cover the longest current event overhang; the floor keeps fast projects safe for Space feedback.
+  return Math.max(minimumExportTailSeconds, stepDuration(project) * exportTailSteps);
 }
 
 function hasSolo(project: ProjectState): boolean {
@@ -355,10 +363,20 @@ function synthShape(sound: SoundDesign): ToneShape {
   return sound.synthBrightness > 0.46 ? "triangle" : "sine";
 }
 
+function terminalFadeGain(frame: number, frameCount: number): number {
+  const fadeFrames = Math.max(2, Math.floor(terminalFadeSeconds * sampleRate));
+  const fadeStart = Math.max(0, frameCount - fadeFrames);
+  if (frame < fadeStart) {
+    return 1;
+  }
+  return Math.max(0, Math.min(1, (frameCount - 1 - frame) / Math.max(1, frameCount - 1 - fadeStart)));
+}
+
 function renderProject(project: ProjectState, bars = arrangementBarCount(project), stemTarget?: StemTrackId): RenderedAudio {
   const step = stepDuration(project);
   const totalSteps = bars * 16;
-  const duration = totalSteps * step;
+  const musicalDuration = totalSteps * step;
+  const duration = musicalDuration + exportTailDurationSeconds(project);
   const frames = Math.ceil(duration * sampleRate);
   const buffer: AudioChannels = [new Float32Array(frames), new Float32Array(frames)];
   const sendBuffer: AudioChannels = [new Float32Array(frames), new Float32Array(frames)];
@@ -504,7 +522,11 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   for (let channel = 0; channel < channels; channel += 1) {
     for (let index = 0; index < buffer[channel].length; index += 1) {
       const absoluteStep = (index / sampleRate) / step;
-      const value = buffer[channel][index] * outputGain * masterAutomationGainAtStep(project, absoluteStep);
+      const value =
+        buffer[channel][index] *
+        outputGain *
+        masterAutomationGainAtStep(project, absoluteStep) *
+        terminalFadeGain(index, buffer[channel].length);
       if (Math.abs(value) > ceiling) {
         limitedSamples += 1;
       }

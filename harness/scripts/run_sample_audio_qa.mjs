@@ -41,7 +41,7 @@ async function blobToBuffer(blob) {
   return Buffer.from(await blob.arrayBuffer());
 }
 
-function parseCanonicalPcmWav(bytes, label) {
+function parseCanonicalPcmWav(bytes, label, musicalDurationSeconds) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const ascii = (start, length) => bytes.subarray(start, start + length).toString("ascii");
 
@@ -74,8 +74,12 @@ function parseCanonicalPcmWav(bytes, label) {
   let squareSum = 0;
   let nonZeroSamples = 0;
   let fullScaleSamples = 0;
+  let postBoundaryNonZeroSamples = 0;
+  let postBoundaryPeak = 0;
   const channelNonZeroSamples = Array.from({ length: channels }, () => 0);
   const sampleCount = Math.floor(dataSize / 2);
+  const frames = dataSize / blockAlign;
+  const musicalBoundaryFrame = Math.max(0, Math.min(frames, Math.round(musicalDurationSeconds * sampleRate)));
   for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += 1) {
     const raw = view.getInt16(44 + sampleIndex * 2, true);
     const normalized = raw < 0 ? raw / 32768 : raw / 32767;
@@ -86,11 +90,20 @@ function parseCanonicalPcmWav(bytes, label) {
       nonZeroSamples += 1;
       channelNonZeroSamples[sampleIndex % channels] += 1;
     }
+    if (Math.floor(sampleIndex / channels) >= musicalBoundaryFrame) {
+      if (raw !== 0) postBoundaryNonZeroSamples += 1;
+      postBoundaryPeak = Math.max(postBoundaryPeak, absolute);
+    }
     if (raw === -32768 || raw === 32767) fullScaleSamples += 1;
   }
 
-  const frames = dataSize / blockAlign;
   const rms = sampleCount > 0 ? Math.sqrt(squareSum / sampleCount) : 0;
+  let finalFramePeak = 0;
+  for (let channel = 0; channel < channels && frames > 0; channel += 1) {
+    const raw = view.getInt16(44 + ((frames - 1) * channels + channel) * 2, true);
+    const normalized = raw < 0 ? raw / 32768 : raw / 32767;
+    finalFramePeak = Math.max(finalFramePeak, Math.abs(normalized));
+  }
   return {
     audioFormat, channels, sampleRate, byteRate, blockAlign, bitsPerSample, dataSize, frames,
     durationSeconds: frames / sampleRate,
@@ -99,13 +112,19 @@ function parseCanonicalPcmWav(bytes, label) {
     nonZeroSamples,
     nonZeroPercent: sampleCount > 0 ? (nonZeroSamples / sampleCount) * 100 : 0,
     channelNonZeroSamples,
-    fullScaleSamples
+    fullScaleSamples,
+    musicalDurationSeconds,
+    tailDurationSeconds: frames / sampleRate - musicalDurationSeconds,
+    postBoundaryNonZeroSamples,
+    postBoundaryPeak,
+    finalFramePeak
   };
 }
 
-function validateDecodedAudio(decoded, analysis, label) {
+function validateDecodedAudio(decoded, analysis, expectedTailDurationSeconds, requireTailContent, label) {
   const durationTolerance = 1 / decoded.sampleRate + Number.EPSILON;
   check(Math.abs(decoded.durationSeconds - analysis.durationSeconds) <= durationTolerance, `${label}: decoded duration must match renderer analysis within one frame`);
+  check(Math.abs(decoded.tailDurationSeconds - expectedTailDurationSeconds) <= durationTolerance, `${label}: decoded WAV must preserve the expected export tail within one frame`);
   check(decoded.nonZeroSamples > 0, `${label}: decoded PCM must not be silent`);
   check(decoded.nonZeroPercent >= 0.01, `${label}: decoded PCM nonzero population is unexpectedly sparse`);
   check(decoded.channelNonZeroSamples.every((count) => count > 0), `${label}: both stereo channels must contain audio`);
@@ -115,22 +134,30 @@ function validateDecodedAudio(decoded, analysis, label) {
   check(Math.abs(decoded.rmsDb - analysis.rmsDb) <= 0.02, `${label}: decoded RMS disagrees with renderer analysis`);
   check(decoded.peakDb <= analysis.ceilingDb + 0.02, `${label}: decoded peak exceeds the configured ceiling`);
   check(decoded.fullScaleSamples === 0, `${label}: decoded PCM contains digital full-scale samples`);
+  check(decoded.finalFramePeak === 0, `${label}: terminal fade must end at digital zero`);
+  if (requireTailContent) {
+    check(decoded.postBoundaryNonZeroSamples > 0, `${label}: full mix must preserve audible event or Space-return content after the musical boundary`);
+  }
 }
 
-async function renderArtifact({ blobFactory, analysis, fileName, label, caseRoot }) {
+async function renderArtifact({ blobFactory, analysis, fileName, label, caseRoot, project, requireTailContent = false }) {
   const firstBytes = await blobToBuffer(blobFactory());
   const secondBytes = await blobToBuffer(blobFactory());
   const deterministic = firstBytes.equals(secondBytes);
   check(deterministic, `${label}: immediate rerender must be byte-identical`);
-  const decoded = parseCanonicalPcmWav(firstBytes, label);
-  validateDecodedAudio(decoded, analysis, label);
+  const musicalDurationSeconds = workstation.arrangementTotalBars(project) * 16 * workstation.projectStepDurationSeconds(project);
+  const expectedTailDurationSeconds = render.exportTailDurationSeconds(project);
+  const decoded = parseCanonicalPcmWav(firstBytes, label, musicalDurationSeconds);
+  validateDecodedAudio(decoded, analysis, expectedTailDurationSeconds, requireTailContent, label);
   const filePath = path.join(caseRoot, fileName);
   await writeFile(filePath, firstBytes);
   return {
     label, path: relative(filePath), bytes: firstBytes.byteLength, sha256: sha256(firstBytes), deterministic,
     decoded: {
       ...decoded,
-      durationSeconds: round(decoded.durationSeconds), peakDb: round(decoded.peakDb), rmsDb: round(decoded.rmsDb), nonZeroPercent: round(decoded.nonZeroPercent)
+      durationSeconds: round(decoded.durationSeconds), musicalDurationSeconds: round(decoded.musicalDurationSeconds),
+      tailDurationSeconds: round(decoded.tailDurationSeconds), peakDb: round(decoded.peakDb), rmsDb: round(decoded.rmsDb),
+      nonZeroPercent: round(decoded.nonZeroPercent), postBoundaryPeak: round(decoded.postBoundaryPeak), finalFramePeak: round(decoded.finalFramePeak)
     },
     rendererAnalysis: {
       ...analysis,
@@ -185,7 +212,9 @@ async function runStyleMatrixCase(profile) {
     analysis: render.analyzeExport(project),
     fileName: render.mixWavFileName(project),
     label: `style-matrix:${profile.id} full mix`,
-    caseRoot
+    caseRoot,
+    project,
+    requireTailContent: true
   });
   return {
     id: profile.id,
@@ -304,13 +333,13 @@ async function runCase(smokeCase) {
   const stemAnalyses = render.analyzeStemExports(project);
   const artifacts = [await renderArtifact({
     blobFactory: () => render.createMixWavBlob(project), analysis: mixAnalysis,
-    fileName: render.mixWavFileName(project), label: `${smokeCase.id} full mix`, caseRoot
+    fileName: render.mixWavFileName(project), label: `${smokeCase.id} full mix`, caseRoot, project, requireTailContent: true
   })];
   const stemFileNames = render.stemWavFileNames(project);
   for (const [index, track] of render.stemTrackIds.entries()) {
     artifacts.push(await renderArtifact({
       blobFactory: () => render.createStemWavBlob(project, track), analysis: stemAnalyses[track],
-      fileName: stemFileNames[index], label: `${smokeCase.id} ${track} stem`, caseRoot
+      fileName: stemFileNames[index], label: `${smokeCase.id} ${track} stem`, caseRoot, project
     }));
   }
 
@@ -325,17 +354,18 @@ async function runCase(smokeCase) {
 
 function markdownReport(report) {
   const rows = report.cases.flatMap((smokeCase) => smokeCase.artifacts.map((artifact) =>
-    `| ${smokeCase.id} | ${artifact.label} | \`${artifact.path}\` | ${artifact.decoded.durationSeconds.toFixed(2)} s | ${artifact.decoded.peakDb.toFixed(2)} dB | ${artifact.decoded.rmsDb.toFixed(2)} dB | ${artifact.decoded.nonZeroPercent.toFixed(2)}% | ${artifact.deterministic ? "yes" : "no"} |`
+    `| ${smokeCase.id} | ${artifact.label} | \`${artifact.path}\` | ${artifact.decoded.musicalDurationSeconds.toFixed(2)} s | +${artifact.decoded.tailDurationSeconds.toFixed(2)} s | ${artifact.decoded.durationSeconds.toFixed(2)} s | ${artifact.decoded.peakDb.toFixed(2)} dB | ${artifact.decoded.rmsDb.toFixed(2)} dB | ${artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${artifact.deterministic ? "yes" : "no"} |`
   ));
   const styleRows = report.styleMatrix.map((style) =>
-    `| ${style.id} | ${style.name} | ${style.project.bpm} | \`${style.artifact.path}\` | ${style.artifact.decoded.durationSeconds.toFixed(2)} s | ${style.artifact.decoded.peakDb.toFixed(2)} dB | ${style.artifact.decoded.rmsDb.toFixed(2)} dB | ${style.artifact.deterministic ? "yes" : "no"} |`
+    `| ${style.id} | ${style.name} | ${style.project.bpm} | \`${style.artifact.path}\` | ${style.artifact.decoded.musicalDurationSeconds.toFixed(2)} s | +${style.artifact.decoded.tailDurationSeconds.toFixed(2)} s | ${style.artifact.decoded.durationSeconds.toFixed(2)} s | ${style.artifact.decoded.peakDb.toFixed(2)} dB | ${style.artifact.decoded.rmsDb.toFixed(2)} dB | ${style.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${style.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${style.artifact.deterministic ? "yes" : "no"} |`
   );
   return `# GrooveForge Sample Audio QA\n\nStatus: **${report.status}**\n\n` +
     `Generated from built-in editable musical events only. No imported audio, private project data, network service, or external release claim is used.\n\n` +
-    `| Case | Artifact | Local path | Duration | Peak | RMS | Nonzero PCM | Repeat render |\n|---|---|---|---:|---:|---:|---:|---|\n${rows.join("\n")}\n\n` +
-    `## All-style PCM Matrix\n\n| Style | Name | BPM | Local path | Duration | Peak | RMS | Repeat render |\n|---|---|---:|---|---:|---:|---:|---|\n${styleRows.join("\n")}\n\n` +
+    `| Case | Artifact | Local path | Musical | Tail | Delivered | Peak | RMS | Tail content | Zero end | Repeat render |\n|---|---|---|---:|---:|---:|---:|---:|---|---|---|\n${rows.join("\n")}\n\n` +
+    `## All-style PCM Matrix\n\n| Style | Name | BPM | Local path | Musical | Tail | Delivered | Peak | RMS | Tail content | Zero end | Repeat render |\n|---|---|---:|---|---:|---:|---:|---:|---:|---|---|---|\n${styleRows.join("\n")}\n\n` +
+    `## Export Tail Safety\n\nExpected tail length and digital-zero ending: **${report.tailSafety.allArtifactsSafe ? "yes" : "no"}** (${report.tailSafety.zeroEndedCount}/${report.tailSafety.artifactCount} artifacts). Full mixes preserving post-boundary content: **${report.tailSafety.fullMixTailContentCount}/${report.tailSafety.fullMixCount}**.\n\n` +
     `## Render Isolation\n\nUnrelated edits isolated: **${report.renderIsolation.unrelatedEditsIsolated ? "yes" : "no"}** (${report.renderIsolation.unrelatedEditCount} cases). Target mixer sensitivity: **${report.renderIsolation.targetMixerSensitive ? "yes" : "no"}**. Noise-sound sensitivity: **${report.renderIsolation.noiseSoundSensitive ? "yes" : "no"}**. Drums solo equals Drums stem: **${report.renderIsolation.soloMatchesStem ? "yes" : "no"}**.\n\n` +
-    `Checks: canonical stereo PCM WAV, 44.1kHz, 16-bit, complete frames, audible decoded PCM, analysis agreement, ceiling safety, no digital full-scale samples, unique stems, and byte-identical immediate rerender.\n`;
+    `Checks: canonical stereo PCM WAV, 44.1kHz, 16-bit, complete frames, audible decoded PCM, musical-boundary tail preservation, terminal digital zero, analysis agreement, ceiling safety, no digital full-scale samples, unique stems, and byte-identical immediate rerender.\n`;
 }
 
 await rm(outputRoot, { recursive: true, force: true });
@@ -346,9 +376,18 @@ const styleMatrix = [];
 for (const profile of workstation.styleProfiles) styleMatrix.push(await runStyleMatrixCase(profile));
 check(new Set(styleMatrix.map((style) => style.artifact.sha256)).size === styleMatrix.length, "style matrix full mixes must all contain distinct PCM");
 const renderIsolation = await validateRenderIsolation();
+const allArtifacts = [...cases.flatMap((smokeCase) => smokeCase.artifacts), ...styleMatrix.map((style) => style.artifact)];
+const fullMixArtifacts = [...cases.map((smokeCase) => smokeCase.artifacts[0]), ...styleMatrix.map((style) => style.artifact)];
+const tailSafety = {
+  artifactCount: allArtifacts.length,
+  zeroEndedCount: allArtifacts.filter((artifact) => artifact.decoded.finalFramePeak === 0).length,
+  allArtifactsSafe: allArtifacts.every((artifact) => artifact.decoded.tailDurationSeconds > 0 && artifact.decoded.finalFramePeak === 0),
+  fullMixCount: fullMixArtifacts.length,
+  fullMixTailContentCount: fullMixArtifacts.filter((artifact) => artifact.decoded.postBoundaryNonZeroSamples > 0).length
+};
 
 const report = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   status: failures.length === 0 ? "passed" : "failed",
   app: { name: appName, version: packageJson.version, platformArch },
   boundaries: {
@@ -357,6 +396,7 @@ const report = {
   },
   cases,
   styleMatrix,
+  tailSafety,
   renderIsolation,
   failures
 };
@@ -372,6 +412,7 @@ if (failures.length > 0) {
 
 console.log("GrooveForge sample audio QA passed.");
 console.log(`Audience cases: ${cases.length}; style matrix: ${styleMatrix.length}/${workstation.styleProfiles.length}; playable WAV files: ${cases.reduce((total, smokeCase) => total + smokeCase.artifacts.length, 0) + styleMatrix.length}`);
+console.log(`Export tail safety: ${tailSafety.zeroEndedCount}/${tailSafety.artifactCount} artifacts end at digital zero; full-mix tail content ${tailSafety.fullMixTailContentCount}/${tailSafety.fullMixCount}`);
 console.log(`Render isolation: ${renderIsolation.unrelatedEditCount}/${renderIsolation.unrelatedEditCount} unrelated edits isolated; target mixer sensitive ${renderIsolation.targetMixerSensitive ? "yes" : "no"}; noise sound sensitive ${renderIsolation.noiseSoundSensitive ? "yes" : "no"}; solo/stem match ${renderIsolation.soloMatchesStem ? "yes" : "no"}`);
 for (const smokeCase of cases) {
   const mix = smokeCase.artifacts[0];
