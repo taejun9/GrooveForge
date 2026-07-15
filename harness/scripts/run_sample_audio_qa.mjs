@@ -358,6 +358,61 @@ async function runProjectImportSafetyCase() {
   };
 }
 
+async function runProjectPitchSafetyCase() {
+  const profile = workstation.styleProfiles.find((candidate) => candidate.id === "rnb") ?? workstation.styleProfiles[0];
+  const sourceProject = {
+    ...styleMatrixProject(profile),
+    title: "음정 복구 비트"
+  };
+  for (const pattern of Object.values(sourceProject.patterns)) {
+    if (pattern.bassNotes[0]) pattern.bassNotes[0].pitch = "C-999999";
+    if (pattern.melodyNotes[0]) pattern.melodyNotes[0].pitch = "C999999";
+  }
+  const importedProject = workstation.parseProjectFile(JSON.stringify({
+    app: "GrooveForge",
+    fileVersion: workstation.projectFileVersion,
+    savedAt: "2026-07-16T00:00:00.000Z",
+    project: sourceProject
+  }));
+  const fileStem = workstation.projectFileStem(importedProject);
+  const fileName = render.mixWavFileName(importedProject);
+  const caseRoot = path.join(outputRoot, "pitch-boundary-safety", fileStem);
+  await mkdir(caseRoot, { recursive: true });
+
+  check(importedProject.patterns.A.bassNotes[0]?.pitch === "C-1", "project-pitch-safety: imported low pitch must clamp to C-1 before rendering");
+  check(importedProject.patterns.A.melodyNotes[0]?.pitch === "G9", "project-pitch-safety: imported high pitch must clamp to G9 before rendering");
+  check(workstation.projectPitchMidiNumber(importedProject.patterns.A.bassNotes[0]?.pitch) === workstation.minProjectMidiNote, "project-pitch-safety: repaired bass pitch must be MIDI zero");
+  check(workstation.projectPitchMidiNumber(importedProject.patterns.A.melodyNotes[0]?.pitch) === workstation.maxProjectMidiNote, "project-pitch-safety: repaired melody pitch must be MIDI 127");
+  check(Number.isFinite(workstation.noteToFrequency("C-999999")), "project-pitch-safety: low bypass frequency must stay finite");
+  check(Number.isFinite(workstation.noteToFrequency("C999999")), "project-pitch-safety: high bypass frequency must stay finite");
+  check(sourceProject.patterns.A.bassNotes[0]?.pitch === "C-999999", "project-pitch-safety: import must not mutate source pitch data");
+  check(fileName === "음정-복구-비트-demo.wav", "project-pitch-safety: repaired project must preserve its Korean filename identity");
+
+  const analysis = render.analyzeExport(importedProject);
+  check(Number.isFinite(analysis.peakDb), "project-pitch-safety: renderer peak analysis must be finite");
+  check(Number.isFinite(analysis.rmsDb), "project-pitch-safety: renderer RMS analysis must be finite");
+  const artifact = await renderArtifact({
+    blobFactory: () => render.createMixWavBlob(importedProject),
+    analysis,
+    fileName,
+    label: "project-pitch-safety:repaired-pitch full mix",
+    caseRoot,
+    project: importedProject,
+    requireTailContent: true
+  });
+  return {
+    source: { lowPitch: sourceProject.patterns.A.bassNotes[0]?.pitch, highPitch: sourceProject.patterns.A.melodyNotes[0]?.pitch },
+    repaired: {
+      lowPitch: importedProject.patterns.A.bassNotes[0]?.pitch,
+      highPitch: importedProject.patterns.A.melodyNotes[0]?.pitch,
+      lowFrequencyHz: round(workstation.noteToFrequency("C-999999")),
+      highFrequencyHz: round(workstation.noteToFrequency("C999999"))
+    },
+    fileStem,
+    artifact
+  };
+}
+
 function updateMixerChannel(project, trackId, update) {
   return {
     ...project,
@@ -498,6 +553,7 @@ function markdownReport(report) {
   );
   const titleIntegrity = report.projectTitleIntegrity;
   const importSafety = report.projectImportSafety;
+  const pitchSafety = report.projectPitchSafety;
   return `# GrooveForge Sample Audio QA\n\nStatus: **${report.status}**\n\n` +
     `Generated from built-in editable musical events only. No imported audio, private project data, network service, or external release claim is used.\n\n` +
     `| Case | Artifact | Local path | Musical | Tail | Delivered | Peak | RMS | Tail content | Zero end | Repeat render |\n|---|---|---|---:|---:|---:|---:|---:|---|---|---|\n${rows.join("\n")}\n\n` +
@@ -505,6 +561,7 @@ function markdownReport(report) {
     `## Unicode File Identity\n\nDistinct Korean project titles keep distinct shared file stems and real decoded WAV output: **${report.unicodeFileIdentity.length}/2**.\n\n| Title | Shared stem | Style | Local WAV | Delivered | Peak | Tail content | Zero end | Repeat render |\n|---|---|---|---|---:|---:|---|---|---|\n${unicodeRows.join("\n")}\n\n` +
     `## Project Title Integrity\n\nMalformed imported metadata normalized to **${titleIntegrity.normalizedTitle}** with shared stem \`${titleIntegrity.fileStem}\` before rendering a real decoded WAV.\n\n| Local WAV | Delivered | Peak | Tail content | Zero end | Repeat render |\n|---|---:|---:|---|---|---|\n| \`${titleIntegrity.artifact.path}\` | ${titleIntegrity.artifact.decoded.durationSeconds.toFixed(2)} s | ${titleIntegrity.artifact.decoded.peakDb.toFixed(2)} dB | ${titleIntegrity.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${titleIntegrity.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${titleIntegrity.artifact.deterministic ? "yes" : "no"} |\n\n` +
     `## Project Import Safety\n\nOut-of-range imported timing and audio values repaired to **${importSafety.repaired.bpm} BPM / ${importSafety.repaired.key} / ${importSafety.repaired.masterCeilingDb} dB ceiling** before rendering a real decoded WAV.\n\n| Local WAV | Delivered | Peak | RMS | Tail content | Zero end | Repeat render |\n|---|---:|---:|---:|---|---|---|\n| \`${importSafety.artifact.path}\` | ${importSafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${importSafety.artifact.decoded.peakDb.toFixed(2)} dB | ${importSafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${importSafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${importSafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${importSafety.artifact.deterministic ? "yes" : "no"} |\n\n` +
+    `## Project Pitch Safety\n\nExtreme imported pitches repaired from **${pitchSafety.source.lowPitch}–${pitchSafety.source.highPitch}** to **${pitchSafety.repaired.lowPitch}–${pitchSafety.repaired.highPitch} (${pitchSafety.repaired.lowFrequencyHz.toFixed(2)}–${pitchSafety.repaired.highFrequencyHz.toFixed(2)} Hz)** before rendering a finite decoded WAV.\n\n| Local WAV | Delivered | Peak | RMS | Non-zero PCM | Tail content | Zero end | Repeat render |\n|---|---:|---:|---:|---:|---|---|---|\n| \`${pitchSafety.artifact.path}\` | ${pitchSafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${pitchSafety.artifact.decoded.peakDb.toFixed(2)} dB | ${pitchSafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${pitchSafety.artifact.decoded.nonZeroSamples} | ${pitchSafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${pitchSafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${pitchSafety.artifact.deterministic ? "yes" : "no"} |\n\n` +
     `## Export Tail Safety\n\nExpected tail length and digital-zero ending: **${report.tailSafety.allArtifactsSafe ? "yes" : "no"}** (${report.tailSafety.zeroEndedCount}/${report.tailSafety.artifactCount} artifacts). Full mixes preserving post-boundary content: **${report.tailSafety.fullMixTailContentCount}/${report.tailSafety.fullMixCount}**.\n\n` +
     `## Render Isolation\n\nUnrelated edits isolated: **${report.renderIsolation.unrelatedEditsIsolated ? "yes" : "no"}** (${report.renderIsolation.unrelatedEditCount} cases). Target mixer sensitivity: **${report.renderIsolation.targetMixerSensitive ? "yes" : "no"}**. Noise-sound sensitivity: **${report.renderIsolation.noiseSoundSensitive ? "yes" : "no"}**. Drums solo equals Drums stem: **${report.renderIsolation.soloMatchesStem ? "yes" : "no"}**.\n\n` +
     `Checks: canonical stereo PCM WAV, 44.1kHz, 16-bit, complete frames, audible decoded PCM, musical-boundary tail preservation, terminal digital zero, analysis agreement, ceiling safety, no digital full-scale samples, unique stems, and byte-identical immediate rerender.\n`;
@@ -526,9 +583,10 @@ check(new Set(unicodeFileIdentity.map((identity) => identity.fileStem)).size ===
 check(new Set(unicodeFileIdentity.map((identity) => identity.artifact.path)).size === unicodeFileIdentity.length, "unicode-file-identity: distinct Korean titles must write distinct WAV paths");
 const projectTitleIntegrity = await runProjectTitleIntegrityCase();
 const projectImportSafety = await runProjectImportSafetyCase();
+const projectPitchSafety = await runProjectPitchSafetyCase();
 const renderIsolation = await validateRenderIsolation();
-const allArtifacts = [...cases.flatMap((smokeCase) => smokeCase.artifacts), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact];
-const fullMixArtifacts = [...cases.map((smokeCase) => smokeCase.artifacts[0]), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact];
+const allArtifacts = [...cases.flatMap((smokeCase) => smokeCase.artifacts), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact];
+const fullMixArtifacts = [...cases.map((smokeCase) => smokeCase.artifacts[0]), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact];
 const tailSafety = {
   artifactCount: allArtifacts.length,
   zeroEndedCount: allArtifacts.filter((artifact) => artifact.decoded.finalFramePeak === 0).length,
@@ -538,7 +596,7 @@ const tailSafety = {
 };
 
 const report = {
-  schemaVersion: 6,
+  schemaVersion: 7,
   status: failures.length === 0 ? "passed" : "failed",
   app: { name: appName, version: packageJson.version, platformArch },
   boundaries: {
@@ -550,6 +608,7 @@ const report = {
   unicodeFileIdentity,
   projectTitleIntegrity,
   projectImportSafety,
+  projectPitchSafety,
   tailSafety,
   renderIsolation,
   failures
@@ -565,7 +624,7 @@ if (failures.length > 0) {
 }
 
 console.log("GrooveForge sample audio QA passed.");
-console.log(`Audience cases: ${cases.length}; style matrix: ${styleMatrix.length}/${workstation.styleProfiles.length}; Unicode file identity: ${unicodeFileIdentity.length}/2; title integrity: 1/1; import safety: 1/1; playable WAV files: ${allArtifacts.length}`);
+console.log(`Audience cases: ${cases.length}; style matrix: ${styleMatrix.length}/${workstation.styleProfiles.length}; Unicode file identity: ${unicodeFileIdentity.length}/2; title integrity: 1/1; import safety: 1/1; pitch safety: 1/1; playable WAV files: ${allArtifacts.length}`);
 console.log(`Export tail safety: ${tailSafety.zeroEndedCount}/${tailSafety.artifactCount} artifacts end at digital zero; full-mix tail content ${tailSafety.fullMixTailContentCount}/${tailSafety.fullMixCount}`);
 console.log(`Render isolation: ${renderIsolation.unrelatedEditCount}/${renderIsolation.unrelatedEditCount} unrelated edits isolated; target mixer sensitive ${renderIsolation.targetMixerSensitive ? "yes" : "no"}; noise sound sensitive ${renderIsolation.noiseSoundSensitive ? "yes" : "no"}; solo/stem match ${renderIsolation.soloMatchesStem ? "yes" : "no"}`);
 for (const smokeCase of cases) {

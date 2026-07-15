@@ -314,6 +314,80 @@ function validateProjectImportSafety() {
   };
 }
 
+function validateProjectPitchSafety() {
+  const sourceProject = structuredClone(workstation.starterProject);
+  sourceProject.title = "Recovered Pitch Safety Beat";
+  sourceProject.patterns.A.bassNotes[0].pitch = "C-999999";
+  sourceProject.patterns.A.melodyNotes[0].pitch = "C999999";
+  sourceProject.patterns.B.bassNotes[0].pitch = "Bb2";
+  sourceProject.patterns.B.melodyNotes[0].pitch = "F#4";
+  sourceProject.patterns.C.melodyNotes[0].pitch = `C${"0".repeat(4096)}4`;
+  const snapshot = workstation.createProjectSnapshot(workstation.starterProject, "2026-07-16T00:00:00.000Z");
+  snapshot.project.patterns.A.bassNotes[0].pitch = "D-999999";
+  snapshot.project.patterns.A.melodyNotes[0].pitch = "F#999999";
+  sourceProject.snapshots = [snapshot];
+
+  const wrapped = JSON.stringify({
+    app: "GrooveForge",
+    fileVersion: workstation.projectFileVersion,
+    savedAt: "2026-07-16T00:00:00.000Z",
+    project: sourceProject
+  });
+  const parsed = workstation.parseProjectFile(wrapped);
+  const bareParsed = workstation.parseProjectFile(JSON.stringify(sourceProject));
+  const serializedFile = safeJsonParse(workstation.serializeProjectFile(sourceProject), "project-pitch-safety");
+  const legacyFile = legacySinglePatternProjectFile();
+  legacyFile.project.bassNotes[0].pitch = "C-999999";
+  legacyFile.project.melodyNotes[0].pitch = "C999999";
+  const legacyParsed = workstation.parseProjectFile(JSON.stringify(legacyFile));
+  const repairedMidi = midi.createMidiFile(parsed);
+  const bypassMidi = midi.createMidiFile(sourceProject);
+
+  check(parsed.patterns.A.bassNotes[0]?.pitch === "C-1", "project-pitch-safety: imported pitch below MIDI zero should clamp to C-1");
+  check(parsed.patterns.A.melodyNotes[0]?.pitch === "G9", "project-pitch-safety: imported pitch above MIDI 127 should clamp to G9");
+  check(parsed.patterns.B.bassNotes[0]?.pitch === "Bb2", "project-pitch-safety: valid flat spelling should remain byte-identical");
+  check(parsed.patterns.B.melodyNotes[0]?.pitch === "F#4", "project-pitch-safety: valid sharp spelling should remain byte-identical");
+  check(parsed.patterns.C.melodyNotes[0]?.pitch === "C4", "project-pitch-safety: safe leading-zero octave text should canonicalize before reaching UI or disk");
+  check(parsed.snapshots[0]?.project.patterns.A.bassNotes[0]?.pitch === "C-1", "project-pitch-safety: snapshot low pitch should use the same boundary");
+  check(parsed.snapshots[0]?.project.patterns.A.melodyNotes[0]?.pitch === "G9", "project-pitch-safety: snapshot high pitch should use the same boundary");
+  check(legacyParsed.patterns.A.bassNotes[0]?.pitch === "C-1", "project-pitch-safety: legacy low pitch should use the same boundary");
+  check(legacyParsed.patterns.A.melodyNotes[0]?.pitch === "G9", "project-pitch-safety: legacy high pitch should use the same boundary");
+  check(stableJson(bareParsed) === stableJson(parsed), "project-pitch-safety: wrapped and bare pitch repair should match");
+  check(serializedFile?.project?.patterns?.A?.bassNotes?.[0]?.pitch === "C-1", "project-pitch-safety: serialization should repair low pitch before writing");
+  check(serializedFile?.project?.patterns?.A?.melodyNotes?.[0]?.pitch === "G9", "project-pitch-safety: serialization should repair high pitch before writing");
+  check(sourceProject.patterns.A.bassNotes[0].pitch === "C-999999", "project-pitch-safety: parsing and serialization should not mutate source pitch data");
+  check(workstation.projectPitchMidiNumber("C-1") === workstation.minProjectMidiNote, "project-pitch-safety: C-1 should map to MIDI zero");
+  check(workstation.projectPitchMidiNumber("G9") === workstation.maxProjectMidiNote, "project-pitch-safety: G9 should map to MIDI 127");
+  check(Number.isFinite(workstation.noteToFrequency("C-999999")), "project-pitch-safety: low bypass pitch frequency should stay finite");
+  check(Number.isFinite(workstation.noteToFrequency("C999999")), "project-pitch-safety: high bypass pitch frequency should stay finite");
+  check(workstation.noteToFrequency("malformed") === 440, "project-pitch-safety: malformed bypass pitch should use finite A4 fallback");
+  check(ascii(repairedMidi, 0, 4) === "MThd", "project-pitch-safety: repaired project should produce a Standard MIDI file");
+  check(ascii(bypassMidi, 0, 4) === "MThd", "project-pitch-safety: MIDI export should normalize extreme bypass pitches through the domain boundary");
+
+  const malformedProject = structuredClone(workstation.starterProject);
+  malformedProject.patterns.A.bassNotes[0].pitch = "not-a-note";
+  for (const [label, operation] of [
+    ["parse", () => workstation.parseProjectFile(JSON.stringify(malformedProject))],
+    ["serialize", () => workstation.serializeProjectFile(malformedProject)]
+  ]) {
+    try {
+      operation();
+      failures.push(`project-pitch-safety: malformed pitch ${label} should be rejected`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      check(message.includes("Invalid GrooveForge project"), `project-pitch-safety: malformed pitch ${label} should report an invalid project`);
+    }
+  }
+
+  return {
+    range: `${parsed.patterns.A.bassNotes[0]?.pitch}..${parsed.patterns.A.melodyNotes[0]?.pitch}`,
+    frequencies: `${workstation.noteToFrequency("C-999999").toFixed(2)}..${workstation.noteToFrequency("C999999").toFixed(2)}`,
+    paths: 5,
+    rejected: 2,
+    midiBytes: repairedMidi.byteLength
+  };
+}
+
 function projectEventCounts(project) {
   return workstation.patternSlots.map((slot) => {
     const pattern = project.patterns[slot];
@@ -781,6 +855,7 @@ const downloadSmokeSummary = validateDownloadPathSmoke(downloadSmokeProject);
 const unicodeFileIdentitySummary = validateUnicodeFileIdentity();
 const projectTitleIntegritySummary = validateProjectTitleIntegrity();
 const projectImportSafetySummary = validateProjectImportSafety();
+const projectPitchSafetySummary = validateProjectPitchSafety();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -802,6 +877,7 @@ console.log(`- Download path: ${downloadSmokeSummary.clicked}/${downloadSmokeSum
 console.log(`- Unicode file identity: ${unicodeFileIdentitySummary.cases} distinct titles x ${unicodeFileIdentitySummary.deliverablesPerCase} deliverables, bounded stem ${unicodeFileIdentitySummary.boundedBytes}/120 UTF-8 bytes`);
 console.log(`- Project title integrity: ${projectTitleIntegritySummary.normalizedTitle}, ${projectTitleIntegritySummary.fileStem}, ${projectTitleIntegritySummary.maxCodePoints} code-point bound`);
 console.log(`- Project import safety: ${projectImportSafetySummary.bpm} BPM / ${projectImportSafetySummary.key} / swing ${projectImportSafetySummary.swing} / ceiling ${projectImportSafetySummary.masterCeilingDb} dB / mixer ${projectImportSafetySummary.mixerRange} dB / rejected boundaries ${projectImportSafetySummary.rejected}/4`);
+console.log(`- Project pitch safety: ${projectPitchSafetySummary.range} / ${projectPitchSafetySummary.frequencies} Hz / normalized paths ${projectPitchSafetySummary.paths}/5 / malformed rejections ${projectPitchSafetySummary.rejected}/2 / MIDI ${projectPitchSafetySummary.midiBytes} bytes`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

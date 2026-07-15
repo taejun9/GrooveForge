@@ -10,8 +10,10 @@ import {
   hatRepeatCount,
   noteEventShouldPlay,
   normalizeArrangementBars,
+  normalizeProjectPitch,
   patternForSlot,
   projectFileStem,
+  projectPitchMidiNumber,
   projectStepDurationSeconds,
   stepsPerBar
 } from "../domain/workstation";
@@ -63,22 +65,7 @@ function trackMuted(block: ArrangementBlock | undefined, track: ArrangementMuteT
 }
 
 function noteNameToMidi(note: string): number | null {
-  const match = /^([A-G])(#|b)?(-?\d+)$/.exec(note);
-  if (!match) {
-    return null;
-  }
-  const [, letter, accidental = "", octaveText] = match;
-  const semitones: Record<string, number> = {
-    C: 0,
-    D: 2,
-    E: 4,
-    F: 5,
-    G: 7,
-    A: 9,
-    B: 11
-  };
-  const accidentalOffset = accidental === "#" ? 1 : accidental === "b" ? -1 : 0;
-  return (Number(octaveText) + 1) * 12 + semitones[letter] + accidentalOffset;
+  return projectPitchMidiNumber(normalizeProjectPitch(note));
 }
 
 function clampMidiNote(note: number): number {
