@@ -270,7 +270,7 @@ async function runProjectTitleIntegrityCase() {
   check(importedProject.title === expectedTitle, "project-title-integrity: malformed imported title must normalize before rendering");
   check(fileStem === "서울-야간-비트", "project-title-integrity: normalized imported title must own the shared filename stem");
   check(fileName === "서울-야간-비트-demo.wav", "project-title-integrity: real WAV must use the normalized Korean title filename");
-  check(!/[\/ -]/u.test(fileName), "project-title-integrity: WAV filename must not contain separators or control characters");
+  check(!/[\/\u0000-\u001f\u007f]/u.test(fileName), "project-title-integrity: WAV filename must not contain separators or control characters");
   const artifact = await renderArtifact({
     blobFactory: () => render.createMixWavBlob(importedProject),
     analysis: render.analyzeExport(importedProject),

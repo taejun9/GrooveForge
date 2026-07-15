@@ -29427,6 +29427,32 @@ def check_required_paths(errors: list[str]) -> None:
             errors.append(f"missing required path: {path}")
 
 
+def check_tracked_text_sources_are_binary_free(errors: list[str]) -> None:
+    text_extensions = {
+        ".css",
+        ".cts",
+        ".html",
+        ".js",
+        ".json",
+        ".md",
+        ".mjs",
+        ".plist",
+        ".py",
+        ".sh",
+        ".ts",
+        ".tsx",
+        ".yaml",
+        ".yml",
+    }
+    text_files = [ROOT / "README.md", ROOT / "AGENTS.md", ROOT / "package.json", ROOT / "package-lock.json"]
+    for source_root in (ROOT / "src", ROOT / "electron", ROOT / "harness", ROOT / "docs"):
+        text_files.extend(path for path in source_root.rglob("*") if path.is_file() and path.suffix in text_extensions)
+
+    for file_path in text_files:
+        if b"\x00" in file_path.read_bytes():
+            errors.append(f"tracked text source must not contain a literal NUL byte: {file_path.relative_to(ROOT)}")
+
+
 def check_root_markdown(errors: list[str]) -> None:
     allowed = {"README.md", "AGENTS.md"}
     found = {path.name for path in ROOT.glob("*.md")}
@@ -29655,6 +29681,7 @@ def check_first_read_framing(errors: list[str]) -> None:
 def run_checks(strict: bool = False) -> list[str]:
     errors: list[str] = []
     check_required_paths(errors)
+    check_tracked_text_sources_are_binary_free(errors)
     check_root_markdown(errors)
     check_forbidden_paths(errors)
     check_plan_names(errors)
