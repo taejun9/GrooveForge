@@ -294,6 +294,70 @@ async function runProjectTitleIntegrityCase() {
   };
 }
 
+async function runProjectImportSafetyCase() {
+  const profile = workstation.styleProfiles.find((candidate) => candidate.id === "lofi") ?? workstation.styleProfiles[0];
+  const sourceProject = {
+    ...styleMatrixProject(profile),
+    title: "복구된 프로젝트",
+    bpm: 400,
+    key: "Unsupported future key",
+    swing: -4,
+    masterCeilingDb: -900,
+    mixer: workstation.starterProject.mixer.map((channel, index) => ({
+      ...channel,
+      volumeDb: index === 0 ? 900 : index === 1 ? -900 : channel.id === "master" ? 900 : channel.volumeDb,
+      pan: index === 2 ? 900 : index === 3 ? -900 : channel.pan
+    }))
+  };
+  const importedProject = workstation.parseProjectFile(JSON.stringify({
+    app: "GrooveForge",
+    fileVersion: workstation.projectFileVersion,
+    savedAt: "2026-07-15T00:00:00.000Z",
+    project: sourceProject
+  }));
+  const fileStem = workstation.projectFileStem(importedProject);
+  const fileName = render.mixWavFileName(importedProject);
+  const caseRoot = path.join(outputRoot, "project-import-safety", fileStem);
+  await mkdir(caseRoot, { recursive: true });
+
+  check(importedProject.bpm === workstation.maxProjectBpm, "project-import-safety: imported BPM must clamp to 220 before rendering");
+  check(importedProject.key === "A minor", "project-import-safety: unsupported key must recover before rendering");
+  check(importedProject.swing === workstation.minProjectSwing, "project-import-safety: imported swing must clamp to zero before rendering");
+  check(importedProject.masterCeilingDb === workstation.minMasterCeilingDb, "project-import-safety: imported ceiling must clamp to -6 dB before rendering");
+  check(importedProject.mixer[0]?.volumeDb === workstation.maxMixerVolumeDb, "project-import-safety: imported hot channel must clamp before rendering");
+  check(importedProject.mixer[1]?.volumeDb === workstation.minMixerVolumeDb, "project-import-safety: imported low channel must clamp before rendering");
+  check(importedProject.mixer[2]?.pan === workstation.maxMixerPan, "project-import-safety: imported right pan must clamp before rendering");
+  check(importedProject.mixer[3]?.pan === workstation.minMixerPan, "project-import-safety: imported left pan must clamp before rendering");
+  check(workstation.projectStepDurationSeconds(importedProject) > 0, "project-import-safety: repaired project must have positive render timing");
+  check(fileName === "복구된-프로젝트-demo.wav", "project-import-safety: repaired project must preserve its Korean filename identity");
+
+  const artifact = await renderArtifact({
+    blobFactory: () => render.createMixWavBlob(importedProject),
+    analysis: render.analyzeExport(importedProject),
+    fileName,
+    label: "project-import-safety:repaired-import full mix",
+    caseRoot,
+    project: importedProject,
+    requireTailContent: true
+  });
+  return {
+    source: { bpm: sourceProject.bpm, key: sourceProject.key, swing: sourceProject.swing, masterCeilingDb: sourceProject.masterCeilingDb },
+    repaired: {
+      title: importedProject.title,
+      bpm: importedProject.bpm,
+      key: importedProject.key,
+      swing: importedProject.swing,
+      masterCeilingDb: importedProject.masterCeilingDb,
+      drumVolumeDb: importedProject.mixer[0]?.volumeDb,
+      bassVolumeDb: importedProject.mixer[1]?.volumeDb,
+      synthPan: importedProject.mixer[2]?.pan,
+      chordPan: importedProject.mixer[3]?.pan
+    },
+    fileStem,
+    artifact
+  };
+}
+
 function updateMixerChannel(project, trackId, update) {
   return {
     ...project,
@@ -433,12 +497,14 @@ function markdownReport(report) {
     `| ${identity.title} | \`${identity.fileStem}\` | ${identity.project.styleId} | \`${identity.artifact.path}\` | ${identity.artifact.decoded.durationSeconds.toFixed(2)} s | ${identity.artifact.decoded.peakDb.toFixed(2)} dB | ${identity.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${identity.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${identity.artifact.deterministic ? "yes" : "no"} |`
   );
   const titleIntegrity = report.projectTitleIntegrity;
+  const importSafety = report.projectImportSafety;
   return `# GrooveForge Sample Audio QA\n\nStatus: **${report.status}**\n\n` +
     `Generated from built-in editable musical events only. No imported audio, private project data, network service, or external release claim is used.\n\n` +
     `| Case | Artifact | Local path | Musical | Tail | Delivered | Peak | RMS | Tail content | Zero end | Repeat render |\n|---|---|---|---:|---:|---:|---:|---:|---|---|---|\n${rows.join("\n")}\n\n` +
     `## All-style PCM Matrix\n\n| Style | Name | BPM | Local path | Musical | Tail | Delivered | Peak | RMS | Tail content | Zero end | Repeat render |\n|---|---|---:|---|---:|---:|---:|---:|---:|---|---|---|\n${styleRows.join("\n")}\n\n` +
     `## Unicode File Identity\n\nDistinct Korean project titles keep distinct shared file stems and real decoded WAV output: **${report.unicodeFileIdentity.length}/2**.\n\n| Title | Shared stem | Style | Local WAV | Delivered | Peak | Tail content | Zero end | Repeat render |\n|---|---|---|---|---:|---:|---|---|---|\n${unicodeRows.join("\n")}\n\n` +
     `## Project Title Integrity\n\nMalformed imported metadata normalized to **${titleIntegrity.normalizedTitle}** with shared stem \`${titleIntegrity.fileStem}\` before rendering a real decoded WAV.\n\n| Local WAV | Delivered | Peak | Tail content | Zero end | Repeat render |\n|---|---:|---:|---|---|---|\n| \`${titleIntegrity.artifact.path}\` | ${titleIntegrity.artifact.decoded.durationSeconds.toFixed(2)} s | ${titleIntegrity.artifact.decoded.peakDb.toFixed(2)} dB | ${titleIntegrity.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${titleIntegrity.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${titleIntegrity.artifact.deterministic ? "yes" : "no"} |\n\n` +
+    `## Project Import Safety\n\nOut-of-range imported timing and audio values repaired to **${importSafety.repaired.bpm} BPM / ${importSafety.repaired.key} / ${importSafety.repaired.masterCeilingDb} dB ceiling** before rendering a real decoded WAV.\n\n| Local WAV | Delivered | Peak | RMS | Tail content | Zero end | Repeat render |\n|---|---:|---:|---:|---|---|---|\n| \`${importSafety.artifact.path}\` | ${importSafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${importSafety.artifact.decoded.peakDb.toFixed(2)} dB | ${importSafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${importSafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${importSafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${importSafety.artifact.deterministic ? "yes" : "no"} |\n\n` +
     `## Export Tail Safety\n\nExpected tail length and digital-zero ending: **${report.tailSafety.allArtifactsSafe ? "yes" : "no"}** (${report.tailSafety.zeroEndedCount}/${report.tailSafety.artifactCount} artifacts). Full mixes preserving post-boundary content: **${report.tailSafety.fullMixTailContentCount}/${report.tailSafety.fullMixCount}**.\n\n` +
     `## Render Isolation\n\nUnrelated edits isolated: **${report.renderIsolation.unrelatedEditsIsolated ? "yes" : "no"}** (${report.renderIsolation.unrelatedEditCount} cases). Target mixer sensitivity: **${report.renderIsolation.targetMixerSensitive ? "yes" : "no"}**. Noise-sound sensitivity: **${report.renderIsolation.noiseSoundSensitive ? "yes" : "no"}**. Drums solo equals Drums stem: **${report.renderIsolation.soloMatchesStem ? "yes" : "no"}**.\n\n` +
     `Checks: canonical stereo PCM WAV, 44.1kHz, 16-bit, complete frames, audible decoded PCM, musical-boundary tail preservation, terminal digital zero, analysis agreement, ceiling safety, no digital full-scale samples, unique stems, and byte-identical immediate rerender.\n`;
@@ -459,9 +525,10 @@ for (const identityCase of [
 check(new Set(unicodeFileIdentity.map((identity) => identity.fileStem)).size === unicodeFileIdentity.length, "unicode-file-identity: distinct Korean titles must retain distinct shared stems");
 check(new Set(unicodeFileIdentity.map((identity) => identity.artifact.path)).size === unicodeFileIdentity.length, "unicode-file-identity: distinct Korean titles must write distinct WAV paths");
 const projectTitleIntegrity = await runProjectTitleIntegrityCase();
+const projectImportSafety = await runProjectImportSafetyCase();
 const renderIsolation = await validateRenderIsolation();
-const allArtifacts = [...cases.flatMap((smokeCase) => smokeCase.artifacts), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact];
-const fullMixArtifacts = [...cases.map((smokeCase) => smokeCase.artifacts[0]), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact];
+const allArtifacts = [...cases.flatMap((smokeCase) => smokeCase.artifacts), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact];
+const fullMixArtifacts = [...cases.map((smokeCase) => smokeCase.artifacts[0]), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact];
 const tailSafety = {
   artifactCount: allArtifacts.length,
   zeroEndedCount: allArtifacts.filter((artifact) => artifact.decoded.finalFramePeak === 0).length,
@@ -471,7 +538,7 @@ const tailSafety = {
 };
 
 const report = {
-  schemaVersion: 5,
+  schemaVersion: 6,
   status: failures.length === 0 ? "passed" : "failed",
   app: { name: appName, version: packageJson.version, platformArch },
   boundaries: {
@@ -482,6 +549,7 @@ const report = {
   styleMatrix,
   unicodeFileIdentity,
   projectTitleIntegrity,
+  projectImportSafety,
   tailSafety,
   renderIsolation,
   failures
@@ -497,7 +565,7 @@ if (failures.length > 0) {
 }
 
 console.log("GrooveForge sample audio QA passed.");
-console.log(`Audience cases: ${cases.length}; style matrix: ${styleMatrix.length}/${workstation.styleProfiles.length}; Unicode file identity: ${unicodeFileIdentity.length}/2; title integrity: 1/1; playable WAV files: ${allArtifacts.length}`);
+console.log(`Audience cases: ${cases.length}; style matrix: ${styleMatrix.length}/${workstation.styleProfiles.length}; Unicode file identity: ${unicodeFileIdentity.length}/2; title integrity: 1/1; import safety: 1/1; playable WAV files: ${allArtifacts.length}`);
 console.log(`Export tail safety: ${tailSafety.zeroEndedCount}/${tailSafety.artifactCount} artifacts end at digital zero; full-mix tail content ${tailSafety.fullMixTailContentCount}/${tailSafety.fullMixCount}`);
 console.log(`Render isolation: ${renderIsolation.unrelatedEditCount}/${renderIsolation.unrelatedEditCount} unrelated edits isolated; target mixer sensitive ${renderIsolation.targetMixerSensitive ? "yes" : "no"}; noise sound sensitive ${renderIsolation.noiseSoundSensitive ? "yes" : "no"}; solo/stem match ${renderIsolation.soloMatchesStem ? "yes" : "no"}`);
 for (const smokeCase of cases) {

@@ -152,6 +152,7 @@ import {
   melodyPitchLanes,
   maxProjectSnapshotNameLength,
   maxProjectSnapshots,
+  maxProjectFileBytes,
   maxProjectTitleLength,
   minDeliveryTargetBars,
   minDeliveryTargetStemGoal,
@@ -701,7 +702,8 @@ import {
   drumAccentDefinitions,
   drumFoundationDefinitions,
   beatReadinessPriorityCheck,
-  layerStarterPriorityOption
+  layerStarterPriorityOption,
+  projectFileLoadErrorStatus
 } from "./workstationUiModel";
 import type { SnapshotCompareProjectProfile } from "./workstationSnapshotCompare";
 import {
@@ -6936,10 +6938,9 @@ export function App(): ReactElement {
   }
 
   async function handleSaveProject(): Promise<void> {
-    const contents = serializeProjectFile(project);
-    const defaultName = projectFileName(project);
-
     try {
+      const contents = serializeProjectFile(project);
+      const defaultName = projectFileName(project);
       const result = await window.grooveforge?.saveProject?.(contents, defaultName);
       if (result) {
         if (result.canceled) {
@@ -6995,7 +6996,7 @@ export function App(): ReactElement {
       console.error(error);
       setProjectFileResult(null);
       setLocalDraftRecoveryResult(null);
-      setProjectStatus("Open failed");
+      setProjectStatus(projectFileLoadErrorStatus(error, "Open failed"));
     }
   }
 
@@ -7007,6 +7008,12 @@ export function App(): ReactElement {
       setLocalDraftRecoveryResult(null);
       return;
     }
+    if (file.size > maxProjectFileBytes) {
+      setProjectFileResult(null);
+      setLocalDraftRecoveryResult(null);
+      setProjectStatus("Project file is too large to open safely");
+      return;
+    }
 
     void file
       .text()
@@ -7015,7 +7022,7 @@ export function App(): ReactElement {
         console.error(error);
         setProjectFileResult(null);
         setLocalDraftRecoveryResult(null);
-        setProjectStatus("Open failed");
+        setProjectStatus(projectFileLoadErrorStatus(error, "Open failed"));
       });
   }
 
@@ -7107,7 +7114,7 @@ export function App(): ReactElement {
       console.error(error);
       setProjectFileResult(null);
       setLocalDraftRecoveryResult(null);
-      setProjectStatus("Invalid project file");
+      setProjectStatus(projectFileLoadErrorStatus(error));
     }
   }
 

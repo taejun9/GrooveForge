@@ -33,7 +33,13 @@ import type {
   StyleId,
   StyleProfile
 } from "../domain/workstation";
-import { soundPresetIds } from "../domain/workstation";
+import {
+  maxProjectBpm,
+  maxProjectFileCharacters,
+  minProjectBpm,
+  projectKeys,
+  soundPresetIds
+} from "../domain/workstation";
 import type { ExportAnalysis, StemExportAnalyses, StemTrackId } from "../audio/render";
 import { stemTrackIds } from "../audio/render";
 
@@ -46,9 +52,8 @@ export const drumLabels: Record<DrumLane, string> = {
 
 export const localDraftStorageKey = "grooveforge.localDraft.v1";
 export const localDraftRecordVersion = 1;
-export const localDraftMaxCharacters = 1_500_000;
-export const minProjectBpm = 60;
-export const maxProjectBpm = 220;
+export const localDraftMaxCharacters = maxProjectFileCharacters;
+export { minProjectBpm, maxProjectBpm };
 export const tapTempoWindowMs = 2500;
 export const tapTempoMaxTaps = 6;
 export const tapTempoCommitDelayMs = 650;
@@ -58,6 +63,17 @@ export const tempoNudgePads: TempoNudgePadDefinition[] = [
   { id: "half", label: "1/2", title: "Set half-time BPM" },
   { id: "double", label: "x2", title: "Set double-time BPM" }
 ];
+
+export function projectFileLoadErrorStatus(error: unknown, fallback = "Invalid project file"): string {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  if (message.includes("Unsupported GrooveForge project file version")) {
+    return "Project version is unsupported; update GrooveForge or use the app version that saved it";
+  }
+  if (message.includes("character safety limit") || (message.includes("project file exceeds") && message.includes("safety limit"))) {
+    return "Project file is too large to open safely";
+  }
+  return fallback;
+}
 
 export const swingFeelPads: SwingFeelPadDefinition[] = [
   { id: "straight", label: "Straight", detail: "grid feel", value: 0 },
@@ -320,7 +336,7 @@ export const masterAutomationPadDefinitions: MasterAutomationPadDefinition[] = [
   }
 ];
 
-export const keys = ["F minor", "A minor", "C minor", "D minor", "E minor", "G minor", "C major", "D dorian"];
+export const keys = [...projectKeys];
 export const historyLimit = 50;
 export const keyboardCaptureKeys = ["a", "s", "d", "f", "g", "h", "j", "k"] as const;
 export type KeyboardCaptureKey = (typeof keyboardCaptureKeys)[number];

@@ -1,6 +1,6 @@
 import { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import type { MenuItemConstructorOptions, OpenDialogOptions, SaveDialogOptions } from "electron";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveUpdateFeedConfig } from "./updateFeedConfig.js";
@@ -16,6 +16,9 @@ const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
 const launchSmokeTimeoutMs = 1800000;
 const projectIoSmokeTimeoutMs = 640000;
+// Mirrors the renderer/domain 1,500,000-character contract at the native IPC boundary.
+const maxNativeProjectFileCharacters = 1_500_000;
+const maxNativeProjectFileBytes = maxNativeProjectFileCharacters * 4;
 
 type NativeMenuCommand =
   | "open-project"
@@ -605,6 +608,7 @@ function isSaveProjectPayload(value: unknown): value is SaveProjectPayload {
     "contents" in value &&
     "defaultName" in value &&
     typeof value.contents === "string" &&
+    value.contents.length <= maxNativeProjectFileCharacters &&
     typeof value.defaultName === "string"
   );
 }
@@ -871,6 +875,10 @@ function registerProjectFileHandlers(): void {
       return { canceled: true };
     }
 
+    const fileStats = await stat(filePath);
+    if (fileStats.size > maxNativeProjectFileBytes) {
+      throw new Error(`GrooveForge project file exceeds the ${maxNativeProjectFileBytes.toLocaleString("en-US")} byte native read safety limit.`);
+    }
     const contents = await readFile(filePath, "utf8");
     return { canceled: false, filePath, contents };
   });
