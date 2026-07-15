@@ -22,6 +22,7 @@ import { downloadBlob } from "../platform/downloads";
 
 const sampleRate = 44100;
 const channels = 2;
+const renderNoiseSeedSalt = 0x47524647;
 export const stemTrackIds = ["drum_rack", "bass_808", "synth", "chord"] as const;
 export type StemTrackId = (typeof stemTrackIds)[number];
 export type ExportAnalysis = {
@@ -302,23 +303,13 @@ function applySpaceReturn(buffer: AudioChannels, sendBuffer: AudioChannels): voi
   }
 }
 
-function createRenderNoiseSeed(project: ProjectState): RenderNoiseSeed {
-  const renderSeed = hashString(
-    stableStringify({
-      bpm: project.bpm,
-      selectedPattern: project.selectedPattern,
-      patterns: project.patterns,
-      sound: project.sound,
-      mixer: project.mixer,
-      arrangement: project.arrangement,
-      masterCeilingDb: project.masterCeilingDb
-    })
-  );
+function createRenderNoiseSeed(): RenderNoiseSeed {
+  // Event-local inputs keep an unchanged noise source stable across unrelated project and mixer edits.
   let eventIndex = 0;
 
   return (start: number, duration: number, brightness: number) => {
     const seed = hashNumbers(
-      renderSeed,
+      renderNoiseSeedSalt,
       eventIndex,
       Math.max(0, Math.floor(start * sampleRate)),
       Math.max(1, Math.floor(duration * sampleRate)),
@@ -329,30 +320,8 @@ function createRenderNoiseSeed(project: ProjectState): RenderNoiseSeed {
   };
 }
 
-function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
-  }
-  if (value && typeof value === "object") {
-    return `{${Object.entries(value)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value) ?? "undefined";
-}
-
 function seededNoiseSample(seed: number, index: number): number {
   return (hashNumbers(seed, index) / 0xffffffff) * 2 - 1;
-}
-
-function hashString(value: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
 }
 
 function hashNumbers(...values: number[]): number {
@@ -399,7 +368,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   const baseChordMix = channelMix(project, "chord", stemTarget);
   const sound = project.sound;
   const outputGain = masterOutputGain(project);
-  const nextNoiseSeed = createRenderNoiseSeed(project);
+  const nextNoiseSeed = createRenderNoiseSeed();
 
   for (let bar = 0; bar < bars; bar += 1) {
     const barOffset = bar * 16;
