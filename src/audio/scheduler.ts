@@ -2,6 +2,7 @@ import {
   dbToGain,
   arrangementEnergyGain,
   activePattern,
+  audibleMixerChannelIds,
   ArrangementMuteTrack,
   ArrangementSection,
   arrangementTotalBars,
@@ -15,6 +16,7 @@ import {
   masterAutomationGainForEvents,
   normalizeArrangementBars,
   normalizeArrangementPlaybackRange,
+  normalizeMixerChannelTopology,
   normalizePatternEventCollections,
   normalizePatternEventLength,
   normalizeProjectAutomationEvents,
@@ -98,7 +100,9 @@ function createAudioContext(): AudioContext {
 }
 
 function hasSolo(project: ProjectState): boolean {
-  return project.mixer.some((track) => track.id !== "master" && track.solo);
+  return project.mixer.some(
+    (track) => audibleMixerChannelIds.includes(track.id as (typeof audibleMixerChannelIds)[number]) && track.solo
+  );
 }
 
 function channelMix(project: ProjectState, id: string): TrackMix {
@@ -585,11 +589,13 @@ function scheduleStep(
 }
 
 export function playEditorAudition(project: ProjectState, target: EditorAuditionTarget): PlaybackController {
+  const normalizedMixer = normalizeMixerChannelTopology(project.mixer);
+  const mixerProject = normalizedMixer === project.mixer ? project : { ...project, mixer: normalizedMixer };
   const context = createAudioContext();
   void context.resume();
   const masterGain = context.createGain();
   const ceiling = dbToGain(project.masterCeilingDb);
-  masterGain.gain.setValueAtTime(masterOutputGain(project) * Math.min(1, ceiling), context.currentTime);
+  masterGain.gain.setValueAtTime(masterOutputGain(mixerProject) * Math.min(1, ceiling), context.currentTime);
   masterGain.connect(context.destination);
   const spaceInput = createSpaceBus(context, masterGain);
   const destination: PlaybackDestination = { dry: masterGain, send: spaceInput };
@@ -604,7 +610,7 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
   };
 
   if (target.kind === "drum") {
-    const drumMix = channelMix(project, "drum_rack");
+    const drumMix = channelMix(mixerProject, "drum_rack");
     const velocity = drumStepVelocity(pattern, target.lane, target.step);
     const drumTime = time + Math.max(0, drumStepTimingMs(pattern, target.lane, target.step) / 1000);
 
@@ -659,7 +665,7 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
     }
   } else if (target.kind === "note" && target.track === "bass") {
     const note = target.note as BassNote;
-    const bassMix = channelMix(project, "bass_808");
+    const bassMix = channelMix(mixerProject, "bass_808");
     const duration = normalizePatternEventLength(note.length, note.step) * stepDuration * (0.74 + sound.bassDecay * 0.52);
     scheduleTone(
       context,
@@ -682,7 +688,7 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
     extendStop(duration + sound.bassDecay * 0.16);
   } else if (target.kind === "note") {
     const note = target.note as MelodyNote;
-    const synthMix = channelMix(project, "synth");
+    const synthMix = channelMix(mixerProject, "synth");
     const duration = normalizePatternEventLength(note.length, note.step) * stepDuration * (0.8 + sound.synthRelease * 0.42);
     scheduleTone(
       context,
@@ -704,7 +710,7 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
     );
     extendStop(duration + sound.synthRelease * 0.16);
   } else {
-    const chordMix = channelMix(project, "chord");
+    const chordMix = channelMix(mixerProject, "chord");
     const pitches = chordPitches(target.chord);
     const duration =
       normalizePatternEventLength(target.chord.length, target.chord.step) *
@@ -771,6 +777,10 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
   let intervalId: number | undefined;
   const feedbackTimeouts = new Set<number>();
   const normalizedPatternCache = new WeakMap<PatternData, PatternData>();
+  let mixerSource: ProjectState["mixer"] | null = null;
+  let normalizedMixer = normalizeMixerChannelTopology([]);
+  let playbackProjectSource: ProjectState | null = null;
+  let normalizedPlaybackProject: ProjectState | null = null;
   let automationSource: ProjectState["automation"] | null = null;
   let automationEvents = normalizeProjectAutomationEvents([]);
 
@@ -782,6 +792,23 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
     const normalized = normalizePatternEventCollections(pattern);
     normalizedPatternCache.set(pattern, normalized);
     return normalized;
+  };
+
+  const normalizedProjectForPlayback = (currentProject: ProjectState): ProjectState => {
+    if (currentProject.mixer !== mixerSource) {
+      mixerSource = currentProject.mixer;
+      normalizedMixer = normalizeMixerChannelTopology(currentProject.mixer);
+      playbackProjectSource = null;
+      normalizedPlaybackProject = null;
+    }
+    if (normalizedMixer === currentProject.mixer) {
+      return currentProject;
+    }
+    if (currentProject !== playbackProjectSource) {
+      playbackProjectSource = currentProject;
+      normalizedPlaybackProject = { ...currentProject, mixer: normalizedMixer };
+    }
+    return normalizedPlaybackProject ?? currentProject;
   };
 
   const normalizedAutomationForPlayback = (events: ProjectState["automation"]): ProjectState["automation"] => {
@@ -810,7 +837,7 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
 
     const nowMs = performance.now();
     while (nextStepAtMs < nowMs + scheduleAheadMs) {
-      const currentProject = getProject();
+      const currentProject = normalizedProjectForPlayback(getProject());
       const requestedBars = options.bars ?? (mode === "arrangement" ? arrangementTotalBars(currentProject) : 2);
       const playbackRange = normalizeArrangementPlaybackRange(
         requestedBars,

@@ -72,6 +72,8 @@ Extension boundary: optional sampling attaches after this pipeline as an additio
 
 Composition-first invariant: GrooveForge must remain fully usable when audio import, sampler tracks, chop pads, and audio warping are absent. Core playback, arrangement, save/load, and export paths should depend on musical events, built-in instruments, mixer state, and master state before they depend on user audio assets.
 
+Mixer-topology invariant: current, bare, legacy, snapshot, and serialized projects normalize to one Drums, 808/Bass, Synth, Chord, and Master channel in canonical order. The domain preserves the first valid authored required row for each id, supplies defaults only for missing required paths, and discards inert FX-return rows until the product has an explicit return editor and matching audio path. Offline render, editor audition, and realtime scheduling defensively reuse the same topology boundary so a parser-bypass empty mixer cannot remove controls or turn an otherwise valid beat into silent output.
+
 Default project creation, first-run navigation, and MVP validation must instantiate editable musical events and built-in instruments first. They must not instantiate an audio asset graph, sample browser, chop grid, or sampler device as the required starting point for making a beat.
 
 First-run ownership state must describe the default event project as an editable 8-bar foundation rather than a demo. Before an explicit file save, the compact safety state remains warning-toned and must say the project is editable now, local only, and needs Save for a durable `.grooveforge.json` copy; the first mutation continues through the existing unsaved-change and renderer-local draft path.

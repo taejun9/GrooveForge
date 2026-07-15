@@ -284,6 +284,17 @@ export const maxProjectMidiNote = 127;
 export const maxPatternNoteEvents = stepsPerBar * 8;
 export const maxPatternChordEvents = stepsPerBar;
 export const maxProjectAutomationEvents = stepsPerBar;
+export const audibleMixerChannelIds = ["drum_rack", "bass_808", "synth", "chord"] as const;
+export const requiredMixerChannelIds = [...audibleMixerChannelIds, "master"] as const;
+export const maxProjectMixerChannels = requiredMixerChannelIds.length;
+type RequiredMixerChannelId = (typeof requiredMixerChannelIds)[number];
+const defaultRequiredMixerChannels: Record<RequiredMixerChannelId, MixerChannel> = {
+  drum_rack: { id: "drum_rack", name: "Drums", volumeDb: -4, pan: 0, lowCut: 0.08, air: 0.24, drive: 0.16, glue: 0.26, send: 0.14, muted: false, solo: false, accent: "#78f0c8" },
+  bass_808: { id: "bass_808", name: "808", volumeDb: -6, pan: 0, lowCut: 0, air: 0.1, drive: 0.22, glue: 0.18, send: 0.04, muted: false, solo: false, accent: "#ff7a4f" },
+  synth: { id: "synth", name: "Synth", volumeDb: -8, pan: -12, lowCut: 0.18, air: 0.36, drive: 0.08, glue: 0.12, send: 0.26, muted: false, solo: false, accent: "#8aa8ff" },
+  chord: { id: "chord", name: "Chord", volumeDb: -10, pan: 16, lowCut: 0.12, air: 0.28, drive: 0.06, glue: 0.18, send: 0.32, muted: false, solo: false, accent: "#d58cff" },
+  master: { id: "master", name: "Master", volumeDb: -1, pan: 0, lowCut: 0, air: 0, drive: 0, glue: 0, send: 0, muted: false, solo: false, accent: "#f0c36a" }
+};
 export const projectKeys = ["F minor", "F# minor", "A minor", "C minor", "D minor", "E minor", "G minor", "C major", "D dorian"] as const;
 export const maxProjectSnapshots = 6;
 export const maxProjectSnapshotNameLength = 32;
@@ -2221,13 +2232,7 @@ export const starterProject: ProjectState = {
   metronomeEnabled: false,
   sound: soundPresetDesign(styleSoundPreset(starterStyleId)),
   patterns: createStylePatternSet(starterStyleId, "A minor"),
-  mixer: [
-    { id: "drum_rack", name: "Drums", volumeDb: -4, pan: 0, lowCut: 0.08, air: 0.24, drive: 0.16, glue: 0.26, send: 0.14, muted: false, solo: false, accent: "#78f0c8" },
-    { id: "bass_808", name: "808", volumeDb: -6, pan: 0, lowCut: 0, air: 0.1, drive: 0.22, glue: 0.18, send: 0.04, muted: false, solo: false, accent: "#ff7a4f" },
-    { id: "synth", name: "Synth", volumeDb: -8, pan: -12, lowCut: 0.18, air: 0.36, drive: 0.08, glue: 0.12, send: 0.26, muted: false, solo: false, accent: "#8aa8ff" },
-    { id: "chord", name: "Chord", volumeDb: -10, pan: 16, lowCut: 0.12, air: 0.28, drive: 0.06, glue: 0.18, send: 0.32, muted: false, solo: false, accent: "#d58cff" },
-    { id: "master", name: "Master", volumeDb: -1, pan: 0, lowCut: 0, air: 0, drive: 0, glue: 0, send: 0, muted: false, solo: false, accent: "#f0c36a" }
-  ],
+  mixer: requiredMixerChannelIds.map((id) => ({ ...defaultRequiredMixerChannels[id] })),
   arrangement: createArrangementTemplate("loop"),
   automation: [],
   masterCeilingDb: masterPresetCeilingsDb["Clean Demo"],
@@ -3028,8 +3033,8 @@ function normalizePatternMap(patterns: Record<PatternSlot, PatternDataInput>): R
   };
 }
 
-function normalizeMixerChannels(channels: MixerChannelInput[]): MixerChannel[] {
-  return channels.map((channel) => ({
+function normalizeMixerChannel(channel: MixerChannelInput): MixerChannel {
+  const normalized: MixerChannel = {
     ...channel,
     volumeDb: normalizeMixerVolumeDb(channel.volumeDb),
     pan: normalizeMixerPan(channel.pan),
@@ -3038,7 +3043,45 @@ function normalizeMixerChannels(channels: MixerChannelInput[]): MixerChannel[] {
     drive: normalizeMixerEq(channel.drive ?? 0),
     glue: normalizeMixerEq(channel.glue ?? 0),
     send: normalizeMixerEq(channel.send ?? 0)
-  }));
+  };
+  return channel.volumeDb === normalized.volumeDb &&
+    channel.pan === normalized.pan &&
+    channel.lowCut === normalized.lowCut &&
+    channel.air === normalized.air &&
+    channel.drive === normalized.drive &&
+    channel.glue === normalized.glue &&
+    channel.send === normalized.send
+    ? (channel as MixerChannel)
+    : normalized;
+}
+
+function normalizeMixerChannels(channels: MixerChannelInput[]): MixerChannel[] {
+  const firstChannelById = new Map<TrackType, MixerChannel>();
+  for (const channel of channels) {
+    if (!requiredMixerChannelIds.includes(channel.id as RequiredMixerChannelId)) {
+      continue;
+    }
+    if (firstChannelById.has(channel.id)) {
+      continue;
+    }
+    firstChannelById.set(channel.id, normalizeMixerChannel(channel));
+    if (firstChannelById.size >= maxProjectMixerChannels) {
+      break;
+    }
+  }
+
+  const normalized = audibleMixerChannelIds.map(
+    (id) => firstChannelById.get(id) ?? { ...defaultRequiredMixerChannels[id] }
+  );
+  normalized.push(firstChannelById.get("master") ?? { ...defaultRequiredMixerChannels.master });
+
+  return normalized.length === channels.length && normalized.every((channel, index) => channel === channels[index])
+    ? (channels as MixerChannel[])
+    : normalized;
+}
+
+export function normalizeMixerChannelTopology(channels: MixerChannel[]): MixerChannel[] {
+  return normalizeMixerChannels(channels);
 }
 
 export function normalizeProjectArrangement(arrangement: ArrangementBlockInput[]): ArrangementBlock[] {

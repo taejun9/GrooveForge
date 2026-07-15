@@ -32,7 +32,7 @@ const deliveryBundle = await import("../../src/audio/deliveryBundle.ts");
 const downloads = await import("../../src/platform/downloads.ts");
 const coreTrackTypes = new Set(["drum_rack", "bass_808", "synth", "chord", "fx_return", "master"]);
 const smokeKey = "F minor";
-const smokeScope = "sample-free first-run starter project plus all-style 8-bar beats with local project-file roundtrips, Handoff Sheet checks, and mocked download-path checks without writing media artifacts";
+const smokeScope = "sample-free first-run starter project plus all-style 8-bar beats with local project-file roundtrips, bounded mixer-topology recovery, Handoff Sheet checks, and mocked download-path checks without writing media artifacts";
 
 function cloneMixerForSmoke() {
   return workstation.starterProject.mixer.map((channel) => ({
@@ -561,6 +561,95 @@ async function validateEventDensitySafety() {
   };
 }
 
+async function validateMixerTopologySafety() {
+  const requiredIds = [...workstation.requiredMixerChannelIds];
+  const sourceProject = structuredClone(workstation.starterProject);
+  sourceProject.title = "Recovered Mixer Topology Safety Beat";
+  sourceProject.mixer = [];
+  const snapshot = workstation.createProjectSnapshot(workstation.starterProject, "2026-07-16T00:00:00.000Z");
+  snapshot.project.mixer = [];
+  sourceProject.snapshots = [snapshot];
+
+  const wrapped = JSON.stringify({
+    app: "GrooveForge",
+    fileVersion: workstation.projectFileVersion,
+    savedAt: "2026-07-16T00:00:00.000Z",
+    project: sourceProject
+  });
+  const parsed = workstation.parseProjectFile(wrapped);
+  const bareParsed = workstation.parseProjectFile(JSON.stringify(sourceProject));
+  const serializedFile = safeJsonParse(workstation.serializeProjectFile(sourceProject), "mixer-topology-safety");
+  const legacyFile = legacySinglePatternProjectFile();
+  legacyFile.project.mixer = [];
+  const legacyParsed = workstation.parseProjectFile(JSON.stringify(legacyFile));
+
+  const fxReturn = {
+    ...workstation.starterProject.mixer.at(-1),
+    id: "fx_return",
+    name: "FX Return",
+    volumeDb: -6,
+    solo: true
+  };
+  const duplicateSeeds = [
+    ...workstation.starterProject.mixer.slice(0, -1),
+    fxReturn,
+    workstation.starterProject.mixer.at(-1)
+  ];
+  const duplicateCount = 1_000;
+  const duplicateSource = Array.from({ length: duplicateCount }, (_, index) => ({
+    ...duplicateSeeds[index % duplicateSeeds.length],
+    name: `Mixer channel ${index}`
+  }));
+  const duplicateProject = { ...structuredClone(workstation.starterProject), mixer: duplicateSource };
+  const duplicateParsed = workstation.parseProjectFile(JSON.stringify(duplicateProject));
+  const directEmpty = workstation.normalizeMixerChannelTopology([]);
+  const directDuplicate = workstation.normalizeMixerChannelTopology(duplicateSource);
+  const partialSource = [
+    { ...workstation.starterProject.mixer.find(({ id }) => id === "synth"), name: "Authored Synth", volumeDb: -12.3 },
+    { ...workstation.starterProject.mixer.find(({ id }) => id === "master"), name: "Authored Master", volumeDb: -2.4 }
+  ];
+  const directPartial = workstation.normalizeMixerChannelTopology(partialSource);
+  const canonicalMixer = workstation.starterProject.mixer;
+  const optionalFxProject = { ...structuredClone(workstation.starterProject), mixer: duplicateSeeds };
+  const optionalFxAnalysis = render.analyzeExport(optionalFxProject);
+  const directAnalysis = render.analyzeExport(sourceProject);
+  const directWav = await blobBytes(render.createMixWavBlob(sourceProject));
+
+  check(stableJson(parsed.mixer.map(({ id }) => id)) === stableJson(requiredIds), "mixer-topology-safety: empty imported mixer should restore every required channel in canonical order");
+  check(stableJson(bareParsed.mixer) === stableJson(parsed.mixer), "mixer-topology-safety: wrapped and bare empty-mixer repair should match");
+  check(stableJson(serializedFile?.project?.mixer?.map(({ id }) => id)) === stableJson(requiredIds), "mixer-topology-safety: serialization should persist the required mixer topology");
+  check(stableJson(parsed.snapshots[0]?.project.mixer.map(({ id }) => id)) === stableJson(requiredIds), "mixer-topology-safety: snapshot mixer should use the same required topology");
+  check(stableJson(legacyParsed.mixer.map(({ id }) => id)) === stableJson(requiredIds), "mixer-topology-safety: legacy mixer should use the same required topology");
+  check(stableJson(directEmpty.map(({ id }) => id)) === stableJson(requiredIds), "mixer-topology-safety: direct parser-bypass mixer should restore every required channel");
+  check(duplicateParsed.mixer.length === workstation.maxProjectMixerChannels, "mixer-topology-safety: imported duplicate and inert FX-return channels should stop at the required topology");
+  check(directDuplicate.length === workstation.maxProjectMixerChannels, "mixer-topology-safety: direct duplicate channels should stop at the finite topology capacity");
+  check(directDuplicate[0]?.name === "Mixer channel 0", "mixer-topology-safety: duplicate repair should preserve the first authored channel for an id");
+  check(!directDuplicate.some(({ id }) => id === "fx_return") && directDuplicate.at(-1)?.id === "master", "mixer-topology-safety: inert FX-return rows should not enter the current five-channel editor topology");
+  check(optionalFxAnalysis.status !== "Silent", "mixer-topology-safety: FX-return-only Solo should not mute every audible source channel");
+  check(stableJson(directPartial.map(({ id }) => id)) === stableJson(requiredIds), "mixer-topology-safety: partial mixer should restore only missing required channels in canonical order");
+  check(directPartial.find(({ id }) => id === "synth")?.name === "Authored Synth" && directPartial.find(({ id }) => id === "synth")?.volumeDb === -12.3, "mixer-topology-safety: partial repair should preserve authored Synth settings");
+  check(directPartial.find(({ id }) => id === "master")?.name === "Authored Master" && directPartial.find(({ id }) => id === "master")?.volumeDb === -2.4, "mixer-topology-safety: partial repair should preserve authored Master settings");
+  check(partialSource.length === 2, "mixer-topology-safety: partial repair should not mutate the caller collection");
+  check(workstation.normalizeMixerChannelTopology(canonicalMixer) === canonicalMixer, "mixer-topology-safety: canonical mixer normalization should preserve array identity for realtime reuse");
+  check(sourceProject.mixer.length === 0, "mixer-topology-safety: parse, serialization, and direct render should not mutate the caller mixer");
+  check(duplicateSource.length === duplicateCount, "mixer-topology-safety: duplicate repair should not mutate the caller mixer collection");
+  check(directAnalysis.status !== "Silent", "mixer-topology-safety: direct empty-mixer render should recover to playable output");
+  check(Number.isFinite(directAnalysis.peakDb) && Number.isFinite(directAnalysis.rmsDb), "mixer-topology-safety: repaired direct render should have finite peak and RMS");
+  checkWavBytes(directWav, "mixer-topology-safety:direct-render");
+  check(directWav.slice(44).some((byte) => byte !== 0), "mixer-topology-safety: repaired direct WAV should contain non-zero PCM bytes");
+
+  return {
+    sourceChannels: sourceProject.mixer.length,
+    repairedChannels: parsed.mixer.length,
+    duplicateChannels: `${duplicateCount}->${duplicateParsed.mixer.length}`,
+    optionalFxStatus: optionalFxAnalysis.status,
+    paths: 7,
+    status: directAnalysis.status,
+    peakDb: directAnalysis.peakDb,
+    wavBytes: directWav.byteLength
+  };
+}
+
 function projectEventCounts(project) {
   return workstation.patternSlots.map((slot) => {
     const pattern = project.patterns[slot];
@@ -1031,6 +1120,7 @@ const projectImportSafetySummary = validateProjectImportSafety();
 const projectPitchSafetySummary = validateProjectPitchSafety();
 const timelineBoundarySafetySummary = validateTimelineBoundarySafety();
 const eventDensitySafetySummary = await validateEventDensitySafety();
+const mixerTopologySafetySummary = await validateMixerTopologySafety();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -1055,6 +1145,7 @@ console.log(`- Project import safety: ${projectImportSafetySummary.bpm} BPM / ${
 console.log(`- Project pitch safety: ${projectPitchSafetySummary.range} / ${projectPitchSafetySummary.frequencies} Hz / normalized paths ${projectPitchSafetySummary.paths}/5 / malformed rejections ${projectPitchSafetySummary.rejected}/2 / MIDI ${projectPitchSafetySummary.midiBytes} bytes`);
 console.log(`- Timeline boundary safety: ${timelineBoundarySafetySummary.sourceBars}->${timelineBoundarySafetySummary.repairedBars} bars / ${timelineBoundarySafetySummary.blocks} blocks / event lengths ${timelineBoundarySafetySummary.eventLengths} / normalized paths ${timelineBoundarySafetySummary.paths}/5 / MIDI ${timelineBoundarySafetySummary.midiBytes} bytes`);
 console.log(`- Event density safety: ${eventDensitySafetySummary.sourceEvents}->${eventDensitySafetySummary.repairedEvents} bass/melody/chord/automation / note capacity ${eventDensitySafetySummary.noteCapacity} / chord steps ${eventDensitySafetySummary.chordSteps} / normalized paths ${eventDensitySafetySummary.paths}/6 / MIDI ${eventDensitySafetySummary.midiBytes} bytes / WAV ${eventDensitySafetySummary.wavBytes} bytes`);
+console.log(`- Mixer topology safety: ${mixerTopologySafetySummary.sourceChannels}->${mixerTopologySafetySummary.repairedChannels} required channels / duplicates ${mixerTopologySafetySummary.duplicateChannels} / normalized paths ${mixerTopologySafetySummary.paths}/7 / ${mixerTopologySafetySummary.status} ${mixerTopologySafetySummary.peakDb.toFixed(2)} dB / WAV ${mixerTopologySafetySummary.wavBytes} bytes`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

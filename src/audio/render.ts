@@ -2,6 +2,7 @@ import {
   arrangementBlockMutesTrack,
   arrangementEnergyGain,
   arrangementTotalBars,
+  audibleMixerChannelIds,
   chordEventShouldPlay,
   chordPitches,
   dbToGain,
@@ -15,6 +16,7 @@ import {
   projectFileStem,
   projectStepDurationSeconds,
   normalizeArrangementBars,
+  normalizeMixerChannelTopology,
   normalizePatternEventCollections,
   normalizePatternEventLength,
   normalizeProjectAutomationEvents,
@@ -72,7 +74,9 @@ export function exportTailDurationSeconds(project: ProjectState): number {
 }
 
 function hasSolo(project: ProjectState): boolean {
-  return project.mixer.some((track) => track.id !== "master" && track.solo);
+  return project.mixer.some(
+    (track) => audibleMixerChannelIds.includes(track.id as (typeof audibleMixerChannelIds)[number]) && track.solo
+  );
 }
 
 function channelMix(project: ProjectState, id: TrackType, stemTarget?: StemTrackId): ChannelMix {
@@ -376,6 +380,8 @@ function terminalFadeGain(frame: number, frameCount: number): number {
 }
 
 function renderProject(project: ProjectState, bars = arrangementBarCount(project), stemTarget?: StemTrackId): RenderedAudio {
+  const normalizedMixer = normalizeMixerChannelTopology(project.mixer);
+  const mixerProject = normalizedMixer === project.mixer ? project : { ...project, mixer: normalizedMixer };
   const step = stepDuration(project);
   const totalSteps = bars * 16;
   const musicalDuration = totalSteps * step;
@@ -383,12 +389,12 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   const frames = Math.ceil(duration * sampleRate);
   const buffer: AudioChannels = [new Float32Array(frames), new Float32Array(frames)];
   const sendBuffer: AudioChannels = [new Float32Array(frames), new Float32Array(frames)];
-  const baseDrumMix = channelMix(project, "drum_rack", stemTarget);
-  const baseBassMix = channelMix(project, "bass_808", stemTarget);
-  const baseSynthMix = channelMix(project, "synth", stemTarget);
-  const baseChordMix = channelMix(project, "chord", stemTarget);
+  const baseDrumMix = channelMix(mixerProject, "drum_rack", stemTarget);
+  const baseBassMix = channelMix(mixerProject, "bass_808", stemTarget);
+  const baseSynthMix = channelMix(mixerProject, "synth", stemTarget);
+  const baseChordMix = channelMix(mixerProject, "chord", stemTarget);
   const sound = project.sound;
-  const outputGain = masterOutputGain(project);
+  const outputGain = masterOutputGain(mixerProject);
   const automationEvents = normalizeProjectAutomationEvents(project.automation);
   const normalizedPatterns = {
     A: normalizePatternEventCollections(project.patterns.A),
