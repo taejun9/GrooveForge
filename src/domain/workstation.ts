@@ -281,6 +281,9 @@ export const minMasterCeilingDb = -6;
 export const maxMasterCeilingDb = 0;
 export const minProjectMidiNote = 0;
 export const maxProjectMidiNote = 127;
+export const maxPatternNoteEvents = stepsPerBar * 8;
+export const maxPatternChordEvents = stepsPerBar;
+export const maxProjectAutomationEvents = stepsPerBar;
 export const projectKeys = ["F minor", "F# minor", "A minor", "C minor", "D minor", "E minor", "G minor", "C major", "D dorian"] as const;
 export const maxProjectSnapshots = 6;
 export const maxProjectSnapshotNameLength = 32;
@@ -1541,9 +1544,17 @@ export function applyMasterAutomationPreset(project: ProjectState, preset: Maste
 }
 
 export function masterAutomationGainAtStep(project: Pick<ProjectCoreState, "automation">, absoluteStep: number): number {
-  return project.automation
-    .filter((event) => event.target === "master_volume")
-    .reduce((gain, event) => gain * automationEventValueAtStep(event, absoluteStep), 1);
+  return masterAutomationGainForEvents(normalizeProjectAutomationEvents(project.automation), absoluteStep);
+}
+
+export function masterAutomationGainForEvents(events: readonly AutomationEvent[], absoluteStep: number): number {
+  let gain = 1;
+  for (const event of events) {
+    if (event.target === "master_volume") {
+      gain *= automationEventValueAtStep(event, absoluteStep);
+    }
+  }
+  return gain;
 }
 
 export function masterAutomationPresetForProject(
@@ -2332,14 +2343,18 @@ export function createChordProgressionPreset(preset: ChordProgressionPreset, key
   return chordProgressionPresetBlueprints[preset].map((chord) => chordFromBlueprint(key, chord));
 }
 
-export function createNextChordEvent(key: string, chords: ChordEvent[]): ChordEvent {
+export function createNextChordEvent(key: string, chords: ChordEvent[]): ChordEvent | null {
   const sortedChords = [...chords].sort((first, second) => first.step - second.step);
   const lastChord = sortedChords[sortedChords.length - 1];
   const usedSteps = new Set(sortedChords.map((chord) => chord.step));
   const quarterStep = [0, 4, 8, 12].find((step) => !usedSteps.has(step));
+  const nextStep = lastChord ? Math.min(stepsPerBar - 1, lastChord.step + Math.max(1, lastChord.length)) : 0;
   const step =
     quarterStep ??
-    (lastChord ? Math.min(stepsPerBar - 1, lastChord.step + Math.max(1, lastChord.length)) : 0);
+    (!usedSteps.has(nextStep) ? nextStep : steps.find((candidate) => !usedSteps.has(candidate)));
+  if (step === undefined) {
+    return null;
+  }
   const degree = sortedChords.length % scalePitchNames(key).length;
   return chordFromBlueprint(key, { step, degree, length: Math.min(4, stepsPerBar - step), velocity: 0.5 });
 }
@@ -2996,6 +3011,15 @@ function normalizePatternData(pattern: PatternDataInput): PatternData {
   };
 }
 
+export function normalizePatternEventCollections(pattern: PatternData): PatternData {
+  return {
+    ...pattern,
+    bassNotes: normalizeBassNotes(pattern.bassNotes),
+    melodyNotes: normalizeMelodyNotes(pattern.melodyNotes),
+    chordEvents: normalizeChordEvents(pattern.chordEvents)
+  };
+}
+
 function normalizePatternMap(patterns: Record<PatternSlot, PatternDataInput>): Record<PatternSlot, PatternData> {
   return {
     A: normalizePatternData(patterns.A),
@@ -3074,34 +3098,72 @@ function normalizeDrumProbabilities(value: DrumProbabilities | undefined): DrumP
 }
 
 function normalizeBassNotes(notes: BassNoteInput[]): BassNote[] {
-  return notes.map((note) => ({
-    ...note,
-    pitch: normalizeProjectPitch(note.pitch),
-    length: normalizePatternEventLength(note.length, note.step),
-    velocity: normalizeNoteVelocity(note.velocity),
-    probability: normalizeEventProbability(note.probability ?? 1)
-  }));
+  const normalized: BassNote[] = [];
+  const acceptedLocations = new Set<string>();
+  for (const note of notes) {
+    const pitch = normalizeProjectPitch(note.pitch);
+    const location = `${note.step}:${pitch}`;
+    if (acceptedLocations.has(location)) {
+      continue;
+    }
+    normalized.push({
+      ...note,
+      pitch,
+      length: normalizePatternEventLength(note.length, note.step),
+      velocity: normalizeNoteVelocity(note.velocity),
+      probability: normalizeEventProbability(note.probability ?? 1)
+    });
+    acceptedLocations.add(location);
+    if (normalized.length >= maxPatternNoteEvents) {
+      break;
+    }
+  }
+  return normalized;
 }
 
 function normalizeMelodyNotes(notes: MelodyNoteInput[]): MelodyNote[] {
-  return notes.map((note) => ({
-    ...note,
-    pitch: normalizeProjectPitch(note.pitch),
-    length: normalizePatternEventLength(note.length, note.step),
-    velocity: normalizeNoteVelocity(note.velocity, 0.64),
-    probability: normalizeEventProbability(note.probability ?? 1)
-  }));
+  const normalized: MelodyNote[] = [];
+  const acceptedLocations = new Set<string>();
+  for (const note of notes) {
+    const pitch = normalizeProjectPitch(note.pitch);
+    const location = `${note.step}:${pitch}`;
+    if (acceptedLocations.has(location)) {
+      continue;
+    }
+    normalized.push({
+      ...note,
+      pitch,
+      length: normalizePatternEventLength(note.length, note.step),
+      velocity: normalizeNoteVelocity(note.velocity, 0.64),
+      probability: normalizeEventProbability(note.probability ?? 1)
+    });
+    acceptedLocations.add(location);
+    if (normalized.length >= maxPatternNoteEvents) {
+      break;
+    }
+  }
+  return normalized;
 }
 
 function normalizeChordEvents(events: ChordEventInput[] | undefined): ChordEvent[] {
-  return (
-    events?.map((event) => ({
+  const normalized: ChordEvent[] = [];
+  const acceptedSteps = new Set<number>();
+  for (const event of events ?? []) {
+    if (acceptedSteps.has(event.step)) {
+      continue;
+    }
+    normalized.push({
       ...event,
       inversion: normalizeChordInversion(event.inversion),
       length: normalizePatternEventLength(event.length, event.step),
       probability: normalizeEventProbability(event.probability ?? 1)
-    })) ?? []
-  );
+    });
+    acceptedSteps.add(event.step);
+    if (normalized.length >= maxPatternChordEvents) {
+      break;
+    }
+  }
+  return normalized;
 }
 
 function normalizeHatRepeats(value: number[] | undefined, hatSteps: boolean[]): number[] {
@@ -3130,8 +3192,25 @@ function normalizeSoundDesign(sound: SoundDesignInput | undefined): SoundDesign 
   };
 }
 
-function normalizeAutomationEvents(events: AutomationEventInput[] | undefined): AutomationEvent[] {
-  return events?.map(normalizeAutomationEvent).filter((event): event is AutomationEvent => event !== null) ?? [];
+export function normalizeProjectAutomationEvents(events: readonly AutomationEventInput[] | undefined): AutomationEvent[] {
+  const normalized: AutomationEvent[] = [];
+  const acceptedEvents = new Set<string>();
+  for (const source of events ?? []) {
+    const event = normalizeAutomationEvent(source);
+    if (!event) {
+      continue;
+    }
+    const identity = `${event.target}:${event.startStep}:${event.endStep}:${event.startValue}:${event.endValue}:${event.curve}`;
+    if (acceptedEvents.has(identity)) {
+      continue;
+    }
+    normalized.push(event);
+    acceptedEvents.add(identity);
+    if (normalized.length >= maxProjectAutomationEvents) {
+      break;
+    }
+  }
+  return normalized;
 }
 
 function normalizeAutomationEvent(event: AutomationEventInput): AutomationEvent | null {
@@ -3181,7 +3260,7 @@ function normalizeProjectCoreState(value: ProjectCoreStateInput): ProjectCoreSta
     patterns: normalizePatternMap(value.patterns),
     mixer: normalizeMixerChannels(value.mixer),
     arrangement: normalizeProjectArrangement(value.arrangement),
-    automation: normalizeAutomationEvents(value.automation),
+    automation: normalizeProjectAutomationEvents(value.automation),
     masterCeilingDb: normalizeMasterCeilingDb(value.masterCeilingDb)
   };
 }
@@ -3249,13 +3328,13 @@ function normalizeBriefText(value: unknown, maxLength: number): string {
 function normalizeProjectSnapshots(snapshots: ProjectSnapshotInput[] | undefined): ProjectSnapshot[] {
   return (
     snapshots
+      ?.slice(0, maxProjectSnapshots)
       ?.map((snapshot, index) => ({
         id: snapshot.id,
         name: normalizeProjectSnapshotName(snapshot.name) || `Idea ${index + 1}`,
         createdAt: snapshot.createdAt,
         project: normalizeProjectCoreState(snapshot.project)
-      }))
-      .slice(0, maxProjectSnapshots) ?? []
+      })) ?? []
   );
 }
 
@@ -3291,7 +3370,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
       },
       mixer: normalizeMixerChannels(value.mixer),
       arrangement: normalizeProjectArrangement(value.arrangement),
-      automation: normalizeAutomationEvents(value.automation),
+      automation: normalizeProjectAutomationEvents(value.automation),
       masterCeilingDb: normalizeMasterCeilingDb(value.masterCeilingDb),
       masterPreset: value.masterPreset,
       deliveryTarget: normalizeDeliveryTargetId(value.deliveryTarget),

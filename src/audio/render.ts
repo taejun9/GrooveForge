@@ -11,12 +11,13 @@ import {
   hatRepeatCount,
   noteEventShouldPlay,
   noteToFrequency,
-  masterAutomationGainAtStep,
-  patternForSlot,
+  masterAutomationGainForEvents,
   projectFileStem,
   projectStepDurationSeconds,
   normalizeArrangementBars,
+  normalizePatternEventCollections,
   normalizePatternEventLength,
+  normalizeProjectAutomationEvents,
   sidechainGainForStep,
 } from "../domain/workstation";
 import type { ArrangementBlock, ArrangementMuteTrack, ProjectState, SoundDesign, TrackType } from "../domain/workstation";
@@ -388,12 +389,18 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   const baseChordMix = channelMix(project, "chord", stemTarget);
   const sound = project.sound;
   const outputGain = masterOutputGain(project);
+  const automationEvents = normalizeProjectAutomationEvents(project.automation);
+  const normalizedPatterns = {
+    A: normalizePatternEventCollections(project.patterns.A),
+    B: normalizePatternEventCollections(project.patterns.B),
+    C: normalizePatternEventCollections(project.patterns.C)
+  };
   const nextNoiseSeed = createRenderNoiseSeed();
 
   for (let bar = 0; bar < bars; bar += 1) {
     const barOffset = bar * 16;
     const arrangementBlock = arrangementBlockForBar(project, bar);
-    const pattern = arrangementBlock ? patternForSlot(project, arrangementBlock.pattern) : patternForSlot(project, project.selectedPattern);
+    const pattern = normalizedPatterns[arrangementBlock?.pattern ?? project.selectedPattern];
     const energyGain = arrangementBlock ? arrangementEnergyGain(arrangementBlock.energy) : 1;
     const drumMix = arrangementChannelMix(baseDrumMix, arrangementBlock, "drum_rack");
     const bassMix = arrangementChannelMix(baseBassMix, arrangementBlock, "bass_808");
@@ -521,14 +528,16 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   let squareSum = 0;
   let limitedSamples = 0;
   const totalSamples = buffer[0].length * channels;
-  for (let channel = 0; channel < channels; channel += 1) {
-    for (let index = 0; index < buffer[channel].length; index += 1) {
-      const absoluteStep = (index / sampleRate) / step;
+  for (let index = 0; index < buffer[0].length; index += 1) {
+    const absoluteStep = (index / sampleRate) / step;
+    const finalGain =
+      outputGain *
+      masterAutomationGainForEvents(automationEvents, absoluteStep) *
+      terminalFadeGain(index, buffer[0].length);
+    for (let channel = 0; channel < channels; channel += 1) {
       const value =
         buffer[channel][index] *
-        outputGain *
-        masterAutomationGainAtStep(project, absoluteStep) *
-        terminalFadeGain(index, buffer[channel].length);
+        finalGain;
       if (Math.abs(value) > ceiling) {
         limitedSamples += 1;
       }

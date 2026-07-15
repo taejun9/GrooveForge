@@ -12,10 +12,12 @@ import {
   drumStepVelocity,
   drumStepShouldPlay,
   hatRepeatCount,
-  masterAutomationGainAtStep,
+  masterAutomationGainForEvents,
   normalizeArrangementBars,
   normalizeArrangementPlaybackRange,
+  normalizePatternEventCollections,
   normalizePatternEventLength,
+  normalizeProjectAutomationEvents,
   noteEventShouldPlay,
   noteToFrequency,
   BassNote,
@@ -768,6 +770,27 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
   let stopped = false;
   let intervalId: number | undefined;
   const feedbackTimeouts = new Set<number>();
+  const normalizedPatternCache = new WeakMap<PatternData, PatternData>();
+  let automationSource: ProjectState["automation"] | null = null;
+  let automationEvents = normalizeProjectAutomationEvents([]);
+
+  const normalizedPatternForPlayback = (pattern: PatternData): PatternData => {
+    const cached = normalizedPatternCache.get(pattern);
+    if (cached) {
+      return cached;
+    }
+    const normalized = normalizePatternEventCollections(pattern);
+    normalizedPatternCache.set(pattern, normalized);
+    return normalized;
+  };
+
+  const normalizedAutomationForPlayback = (events: ProjectState["automation"]): ProjectState["automation"] => {
+    if (events !== automationSource) {
+      automationSource = events;
+      automationEvents = normalizeProjectAutomationEvents(events);
+    }
+    return automationEvents;
+  };
 
   const queueStepFeedback = (snapshot: PlaybackSnapshot, stepAtMs: number): void => {
     const delayMs = Math.max(0, stepAtMs - performance.now());
@@ -801,13 +824,16 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
       const ceiling = dbToGain(currentProject.masterCeilingDb);
       const snapshot = snapshotForStep(currentProject, nextStep, loopSteps, totalBars, mode, startBar);
       const automationStep = mode === "arrangement" ? startBar * 16 + snapshot.loopStep : snapshot.loopStep;
-      const automationGain = masterAutomationGainAtStep(currentProject, automationStep);
+      const automationGain = masterAutomationGainForEvents(
+        normalizedAutomationForPlayback(currentProject.automation),
+        automationStep
+      );
       masterGain.gain.setTargetAtTime(masterOutputGain(currentProject) * Math.min(1, ceiling) * automationGain, context.currentTime, 0.01);
       const playbackContext = playbackContextForStep(currentProject, mode, snapshot.loopStep, startBar);
       const scheduleDelaySeconds = Math.max(0.015, (nextStepAtMs - nowMs) / 1000);
       scheduleStep(
         currentProject,
-        playbackContext.pattern,
+        normalizedPatternForPlayback(playbackContext.pattern),
         context,
         destinations,
         snapshot.loopStep,

@@ -10,9 +10,9 @@ import {
   hatRepeatCount,
   noteEventShouldPlay,
   normalizeArrangementBars,
+  normalizePatternEventCollections,
   normalizePatternEventLength,
   normalizeProjectPitch,
-  patternForSlot,
   projectFileStem,
   projectPitchMidiNumber,
   projectStepDurationSeconds,
@@ -166,10 +166,15 @@ export function createMidiFile(project: ProjectState): Uint8Array {
   const bars = arrangementBarCount(project);
   const totalTicks = bars * stepsPerBar * ticksPerStep;
   const tracks = createTracks();
+  const normalizedPatterns = {
+    A: normalizePatternEventCollections(project.patterns.A),
+    B: normalizePatternEventCollections(project.patterns.B),
+    C: normalizePatternEventCollections(project.patterns.C)
+  };
 
   for (let bar = 0; bar < bars; bar += 1) {
     const block = arrangementBlockForBar(project, bar);
-    const pattern = block ? patternForSlot(project, block.pattern) : patternForSlot(project, project.selectedPattern);
+    const pattern = normalizedPatterns[block?.pattern ?? project.selectedPattern];
     const energy = block ? arrangementEnergyGain(block.energy) : 1;
     const barTick = bar * stepsPerBar * ticksPerStep;
     const barStepOffset = bar * stepsPerBar;

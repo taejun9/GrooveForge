@@ -467,6 +467,100 @@ function validateTimelineBoundarySafety() {
   };
 }
 
+async function validateEventDensitySafety() {
+  const sourceProject = structuredClone(workstation.starterProject);
+  sourceProject.title = "Recovered Event Density Safety Beat";
+  const bassSeed = sourceProject.patterns.A.bassNotes[0];
+  const melodySeed = sourceProject.patterns.A.melodyNotes[0];
+  const chordSeed = sourceProject.patterns.A.chordEvents[0];
+  const duplicateCount = 512;
+  sourceProject.patterns.A.bassNotes = Array.from({ length: duplicateCount }, () => ({ ...bassSeed }));
+  sourceProject.patterns.A.melodyNotes = Array.from({ length: duplicateCount }, () => ({ ...melodySeed }));
+  sourceProject.patterns.A.chordEvents = Array.from({ length: duplicateCount }, () => ({ ...chordSeed }));
+  sourceProject.automation = Array.from({ length: 64 }, (_, index) => ({
+    target: "master_volume",
+    startStep: index * 2,
+    endStep: index * 2 + 1,
+    startValue: index / 64,
+    endValue: 1,
+    curve: "linear"
+  }));
+  const snapshot = workstation.createProjectSnapshot(structuredClone(sourceProject), "2026-07-16T00:00:00.000Z");
+  sourceProject.snapshots = [snapshot];
+
+  const wrapped = JSON.stringify({
+    app: "GrooveForge",
+    fileVersion: workstation.projectFileVersion,
+    savedAt: "2026-07-16T00:00:00.000Z",
+    project: sourceProject
+  });
+  check(wrapped.length < workstation.maxProjectFileCharacters, "event-density-safety: dense fixture should stay below the project-file ceiling");
+  const parsed = workstation.parseProjectFile(wrapped);
+  const bareParsed = workstation.parseProjectFile(JSON.stringify(sourceProject));
+  const serializedFile = safeJsonParse(workstation.serializeProjectFile(sourceProject), "event-density-safety");
+  const legacyFile = legacySinglePatternProjectFile();
+  legacyFile.project.bassNotes = Array.from({ length: duplicateCount }, () => ({ ...bassSeed }));
+  legacyFile.project.melodyNotes = Array.from({ length: duplicateCount }, () => ({ ...melodySeed }));
+  legacyFile.project.chordEvents = Array.from({ length: duplicateCount }, () => ({ ...chordSeed }));
+  legacyFile.project.automation = structuredClone(sourceProject.automation);
+  const legacyParsed = workstation.parseProjectFile(JSON.stringify(legacyFile));
+
+  const pitchNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const pitchForMidi = (midiNote) => `${pitchNames[midiNote % 12]}${Math.floor(midiNote / 12) - 1}`;
+  const capacityProject = structuredClone(workstation.starterProject);
+  capacityProject.patterns.C.bassNotes = Array.from({ length: workstation.maxPatternNoteEvents + 32 }, (_, index) => ({
+    ...bassSeed,
+    step: Math.floor(index / 128),
+    pitch: pitchForMidi(index % 128)
+  }));
+  const capacityParsed = workstation.parseProjectFile(JSON.stringify(capacityProject));
+
+  check(parsed.patterns.A.bassNotes.length === 1, "event-density-safety: duplicate bass locations should keep the first event only");
+  check(parsed.patterns.A.melodyNotes.length === 1, "event-density-safety: duplicate melody locations should keep the first event only");
+  check(parsed.patterns.A.chordEvents.length === 1, "event-density-safety: duplicate chord steps should keep the first event only");
+  check(parsed.automation.length === workstation.maxProjectAutomationEvents, "event-density-safety: imported automation should stop at the project event limit");
+  check(parsed.snapshots[0]?.project.patterns.A.bassNotes.length === 1, "event-density-safety: snapshot notes should use the same duplicate repair");
+  check(parsed.snapshots[0]?.project.automation.length === workstation.maxProjectAutomationEvents, "event-density-safety: snapshot automation should use the same event limit");
+  check(legacyParsed.patterns.A.bassNotes.length === 1, "event-density-safety: legacy notes should use the same duplicate repair");
+  check(legacyParsed.patterns.A.chordEvents.length === 1, "event-density-safety: legacy chords should use the same step repair");
+  check(legacyParsed.automation.length === workstation.maxProjectAutomationEvents, "event-density-safety: legacy automation should use the same event limit");
+  check(capacityParsed.patterns.C.bassNotes.length === workstation.maxPatternNoteEvents, "event-density-safety: distinct imported notes should stop at the note-track capacity");
+  check(stableJson(bareParsed) === stableJson(parsed), "event-density-safety: wrapped and bare repair should match");
+  check(serializedFile?.project?.patterns?.A?.bassNotes?.length === 1, "event-density-safety: serialization should persist deduplicated notes");
+  check(serializedFile?.project?.automation?.length === workstation.maxProjectAutomationEvents, "event-density-safety: serialization should persist bounded automation");
+  check(sourceProject.patterns.A.bassNotes.length === duplicateCount, "event-density-safety: parse and serialization should not mutate caller notes");
+  check(sourceProject.automation.length === 64, "event-density-safety: parse and serialization should not mutate caller automation");
+
+  const directPattern = workstation.normalizePatternEventCollections(sourceProject.patterns.A);
+  const directAutomation = workstation.normalizeProjectAutomationEvents(sourceProject.automation);
+  check(directPattern.bassNotes.length === 1 && directPattern.melodyNotes.length === 1 && directPattern.chordEvents.length === 1, "event-density-safety: direct runtime pattern normalization should deduplicate every pitched collection");
+  check(directAutomation.length === workstation.maxProjectAutomationEvents, "event-density-safety: direct automation normalization should enforce the same limit");
+  const directMidi = midi.createMidiFile(sourceProject);
+  check(ascii(directMidi, 0, 4) === "MThd", "event-density-safety: direct MIDI should survive parser-bypass event density");
+  check(directMidi.byteLength < 100_000, "event-density-safety: direct MIDI should not expand duplicate pattern events without bound");
+  const directWav = await blobBytes(render.createMixWavBlob(sourceProject));
+  checkWavBytes(directWav, "event-density-safety:direct-render");
+
+  const chords = [];
+  for (let index = 0; index < workstation.stepsPerBar + 8; index += 1) {
+    const chord = workstation.createNextChordEvent(sourceProject.key, chords);
+    if (chord) chords.push(chord);
+  }
+  check(chords.length === workstation.maxPatternChordEvents, "event-density-safety: chord creation should stop after all 16 steps are occupied");
+  check(new Set(chords.map((chord) => chord.step)).size === workstation.maxPatternChordEvents, "event-density-safety: chord creation should use each pattern step at most once");
+  check(workstation.createNextChordEvent(sourceProject.key, chords) === null, "event-density-safety: a full chord grid should return no new event");
+
+  return {
+    sourceEvents: `${duplicateCount}/${duplicateCount}/${duplicateCount}/${sourceProject.automation.length}`,
+    repairedEvents: `${parsed.patterns.A.bassNotes.length}/${parsed.patterns.A.melodyNotes.length}/${parsed.patterns.A.chordEvents.length}/${parsed.automation.length}`,
+    noteCapacity: capacityParsed.patterns.C.bassNotes.length,
+    chordSteps: chords.length,
+    paths: 6,
+    midiBytes: directMidi.byteLength,
+    wavBytes: directWav.byteLength
+  };
+}
+
 function projectEventCounts(project) {
   return workstation.patternSlots.map((slot) => {
     const pattern = project.patterns[slot];
@@ -936,6 +1030,7 @@ const projectTitleIntegritySummary = validateProjectTitleIntegrity();
 const projectImportSafetySummary = validateProjectImportSafety();
 const projectPitchSafetySummary = validateProjectPitchSafety();
 const timelineBoundarySafetySummary = validateTimelineBoundarySafety();
+const eventDensitySafetySummary = await validateEventDensitySafety();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -959,6 +1054,7 @@ console.log(`- Project title integrity: ${projectTitleIntegritySummary.normalize
 console.log(`- Project import safety: ${projectImportSafetySummary.bpm} BPM / ${projectImportSafetySummary.key} / swing ${projectImportSafetySummary.swing} / ceiling ${projectImportSafetySummary.masterCeilingDb} dB / mixer ${projectImportSafetySummary.mixerRange} dB / rejected boundaries ${projectImportSafetySummary.rejected}/4`);
 console.log(`- Project pitch safety: ${projectPitchSafetySummary.range} / ${projectPitchSafetySummary.frequencies} Hz / normalized paths ${projectPitchSafetySummary.paths}/5 / malformed rejections ${projectPitchSafetySummary.rejected}/2 / MIDI ${projectPitchSafetySummary.midiBytes} bytes`);
 console.log(`- Timeline boundary safety: ${timelineBoundarySafetySummary.sourceBars}->${timelineBoundarySafetySummary.repairedBars} bars / ${timelineBoundarySafetySummary.blocks} blocks / event lengths ${timelineBoundarySafetySummary.eventLengths} / normalized paths ${timelineBoundarySafetySummary.paths}/5 / MIDI ${timelineBoundarySafetySummary.midiBytes} bytes`);
+console.log(`- Event density safety: ${eventDensitySafetySummary.sourceEvents}->${eventDensitySafetySummary.repairedEvents} bass/melody/chord/automation / note capacity ${eventDensitySafetySummary.noteCapacity} / chord steps ${eventDensitySafetySummary.chordSteps} / normalized paths ${eventDensitySafetySummary.paths}/6 / MIDI ${eventDensitySafetySummary.midiBytes} bytes / WAV ${eventDensitySafetySummary.wavBytes} bytes`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

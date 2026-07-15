@@ -6644,9 +6644,14 @@ export function App(): ReactElement {
 
   function addChordEvent(): void {
     let nextSelectedIndex: number | null = null;
+    let patternFull = false;
     const changed = updateCurrentPattern(
       (pattern) => {
         const chord = createNextChordEvent(projectRef.current.key, pattern.chordEvents);
+        if (!chord) {
+          patternFull = true;
+          return pattern;
+        }
         const chordEvents = sortChordEvents([...pattern.chordEvents, chord]);
         nextSelectedIndex = findChordEventIndex(chordEvents, chord);
         return {
@@ -6660,6 +6665,8 @@ export function App(): ReactElement {
       setSelectedChordIndex(nextSelectedIndex);
       setSelectedNote(null);
       setSelectedDrumStep(null);
+    } else if (patternFull) {
+      setProjectStatus("Chord grid is full: one chord per step");
     }
   }
 

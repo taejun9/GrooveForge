@@ -462,6 +462,73 @@ async function runTimelineBoundarySafetyCase() {
   };
 }
 
+async function runEventDensitySafetyCase() {
+  const profile = workstation.styleProfiles.find((candidate) => candidate.id === "k_hiphop_rnb") ?? workstation.styleProfiles[0];
+  const sourceProject = {
+    ...styleMatrixProject(profile),
+    title: "이벤트 밀도 복구 비트"
+  };
+  const duplicateCount = 256;
+  for (const pattern of Object.values(sourceProject.patterns)) {
+    const bassSeed = pattern.bassNotes[0];
+    const melodySeed = pattern.melodyNotes[0];
+    const chordSeed = pattern.chordEvents[0];
+    pattern.bassNotes = Array.from({ length: duplicateCount }, () => ({ ...bassSeed }));
+    pattern.melodyNotes = Array.from({ length: duplicateCount }, () => ({ ...melodySeed }));
+    pattern.chordEvents = Array.from({ length: duplicateCount }, () => ({ ...chordSeed }));
+  }
+  sourceProject.automation = Array.from({ length: 64 }, (_, index) => ({
+    target: "master_volume",
+    startStep: index * 2,
+    endStep: index * 2 + 1,
+    startValue: index / 64,
+    endValue: 1,
+    curve: "linear"
+  }));
+  const importedProject = workstation.parseProjectFile(JSON.stringify({
+    app: "GrooveForge",
+    fileVersion: workstation.projectFileVersion,
+    savedAt: "2026-07-16T00:00:00.000Z",
+    project: sourceProject
+  }));
+  const fileStem = workstation.projectFileStem(importedProject);
+  const fileName = render.mixWavFileName(importedProject);
+  const caseRoot = path.join(outputRoot, "event-density-safety", fileStem);
+  await mkdir(caseRoot, { recursive: true });
+
+  check(Object.values(importedProject.patterns).every((pattern) => pattern.bassNotes.length === 1), "event-density-safety: imported duplicate bass locations must keep one event per Pattern");
+  check(Object.values(importedProject.patterns).every((pattern) => pattern.melodyNotes.length === 1), "event-density-safety: imported duplicate melody locations must keep one event per Pattern");
+  check(Object.values(importedProject.patterns).every((pattern) => pattern.chordEvents.length === 1), "event-density-safety: imported duplicate chord steps must keep one event per Pattern");
+  check(importedProject.automation.length === workstation.maxProjectAutomationEvents, "event-density-safety: imported automation must stop at the project event limit");
+  check(sourceProject.patterns.A.bassNotes.length === duplicateCount, "event-density-safety: import must not mutate source note collections");
+  check(sourceProject.automation.length === 64, "event-density-safety: import must not mutate source automation");
+  check(fileName === "이벤트-밀도-복구-비트-demo.wav", "event-density-safety: repaired project must preserve its Korean filename identity");
+
+  const analysis = render.analyzeExport(importedProject);
+  check(Number.isFinite(analysis.peakDb), "event-density-safety: renderer peak analysis must be finite");
+  check(Number.isFinite(analysis.rmsDb), "event-density-safety: renderer RMS analysis must be finite");
+  const artifact = await renderArtifact({
+    blobFactory: () => render.createMixWavBlob(importedProject),
+    analysis,
+    fileName,
+    label: "event-density-safety:repaired-event-collections full mix",
+    caseRoot,
+    project: importedProject,
+    requireTailContent: true
+  });
+  return {
+    source: { bassNotes: duplicateCount, melodyNotes: duplicateCount, chordEvents: duplicateCount, automation: 64 },
+    repaired: {
+      bassNotes: importedProject.patterns.A.bassNotes.length,
+      melodyNotes: importedProject.patterns.A.melodyNotes.length,
+      chordEvents: importedProject.patterns.A.chordEvents.length,
+      automation: importedProject.automation.length
+    },
+    fileStem,
+    artifact
+  };
+}
+
 function updateMixerChannel(project, trackId, update) {
   return {
     ...project,
@@ -604,6 +671,7 @@ function markdownReport(report) {
   const importSafety = report.projectImportSafety;
   const pitchSafety = report.projectPitchSafety;
   const timelineSafety = report.timelineBoundarySafety;
+  const eventDensitySafety = report.eventDensitySafety;
   return `# GrooveForge Sample Audio QA\n\nStatus: **${report.status}**\n\n` +
     `Generated from built-in editable musical events only. No imported audio, private project data, network service, or external release claim is used.\n\n` +
     `| Case | Artifact | Local path | Musical | Tail | Delivered | Peak | RMS | Tail content | Zero end | Repeat render |\n|---|---|---|---:|---:|---:|---:|---:|---|---|---|\n${rows.join("\n")}\n\n` +
@@ -613,6 +681,7 @@ function markdownReport(report) {
     `## Project Import Safety\n\nOut-of-range imported timing and audio values repaired to **${importSafety.repaired.bpm} BPM / ${importSafety.repaired.key} / ${importSafety.repaired.masterCeilingDb} dB ceiling** before rendering a real decoded WAV.\n\n| Local WAV | Delivered | Peak | RMS | Tail content | Zero end | Repeat render |\n|---|---:|---:|---:|---|---|---|\n| \`${importSafety.artifact.path}\` | ${importSafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${importSafety.artifact.decoded.peakDb.toFixed(2)} dB | ${importSafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${importSafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${importSafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${importSafety.artifact.deterministic ? "yes" : "no"} |\n\n` +
     `## Project Pitch Safety\n\nExtreme imported pitches repaired from **${pitchSafety.source.lowPitch}–${pitchSafety.source.highPitch}** to **${pitchSafety.repaired.lowPitch}–${pitchSafety.repaired.highPitch} (${pitchSafety.repaired.lowFrequencyHz.toFixed(2)}–${pitchSafety.repaired.highFrequencyHz.toFixed(2)} Hz)** before rendering a finite decoded WAV.\n\n| Local WAV | Delivered | Peak | RMS | Non-zero PCM | Tail content | Zero end | Repeat render |\n|---|---:|---:|---:|---:|---|---|---|\n| \`${pitchSafety.artifact.path}\` | ${pitchSafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${pitchSafety.artifact.decoded.peakDb.toFixed(2)} dB | ${pitchSafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${pitchSafety.artifact.decoded.nonZeroSamples} | ${pitchSafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${pitchSafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${pitchSafety.artifact.deterministic ? "yes" : "no"} |\n\n` +
     `## Timeline Boundary Safety\n\nPattern-crossing imported bass/melody/chord lengths repaired from **${timelineSafety.source.bassLength}/${timelineSafety.source.melodyLength}/${timelineSafety.source.chordLength}** to **${timelineSafety.repaired.bassLength}/${timelineSafety.repaired.melodyLength}/${timelineSafety.repaired.chordLength} steps** before rendering a finite decoded WAV.\n\n| Local WAV | Delivered | Peak | RMS | Non-zero PCM | Tail content | Zero end | Repeat render |\n|---|---:|---:|---:|---:|---|---|---|\n| \`${timelineSafety.artifact.path}\` | ${timelineSafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${timelineSafety.artifact.decoded.peakDb.toFixed(2)} dB | ${timelineSafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${timelineSafety.artifact.decoded.nonZeroSamples} | ${timelineSafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${timelineSafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${timelineSafety.artifact.deterministic ? "yes" : "no"} |\n\n` +
+    `## Event Density Safety\n\nDuplicate imported bass/melody/chord collections and oversized automation repaired from **${eventDensitySafety.source.bassNotes}/${eventDensitySafety.source.melodyNotes}/${eventDensitySafety.source.chordEvents}/${eventDensitySafety.source.automation}** to **${eventDensitySafety.repaired.bassNotes}/${eventDensitySafety.repaired.melodyNotes}/${eventDensitySafety.repaired.chordEvents}/${eventDensitySafety.repaired.automation} events** before rendering a finite decoded WAV.\n\n| Local WAV | Delivered | Peak | RMS | Non-zero PCM | Tail content | Zero end | Repeat render |\n|---|---:|---:|---:|---:|---|---|---|\n| \`${eventDensitySafety.artifact.path}\` | ${eventDensitySafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${eventDensitySafety.artifact.decoded.peakDb.toFixed(2)} dB | ${eventDensitySafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${eventDensitySafety.artifact.decoded.nonZeroSamples} | ${eventDensitySafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${eventDensitySafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${eventDensitySafety.artifact.deterministic ? "yes" : "no"} |\n\n` +
     `## Export Tail Safety\n\nExpected tail length and digital-zero ending: **${report.tailSafety.allArtifactsSafe ? "yes" : "no"}** (${report.tailSafety.zeroEndedCount}/${report.tailSafety.artifactCount} artifacts). Full mixes preserving post-boundary content: **${report.tailSafety.fullMixTailContentCount}/${report.tailSafety.fullMixCount}**.\n\n` +
     `## Render Isolation\n\nUnrelated edits isolated: **${report.renderIsolation.unrelatedEditsIsolated ? "yes" : "no"}** (${report.renderIsolation.unrelatedEditCount} cases). Target mixer sensitivity: **${report.renderIsolation.targetMixerSensitive ? "yes" : "no"}**. Noise-sound sensitivity: **${report.renderIsolation.noiseSoundSensitive ? "yes" : "no"}**. Drums solo equals Drums stem: **${report.renderIsolation.soloMatchesStem ? "yes" : "no"}**.\n\n` +
     `Checks: canonical stereo PCM WAV, 44.1kHz, 16-bit, complete frames, audible decoded PCM, musical-boundary tail preservation, terminal digital zero, analysis agreement, ceiling safety, no digital full-scale samples, unique stems, and byte-identical immediate rerender.\n`;
@@ -636,9 +705,10 @@ const projectTitleIntegrity = await runProjectTitleIntegrityCase();
 const projectImportSafety = await runProjectImportSafetyCase();
 const projectPitchSafety = await runProjectPitchSafetyCase();
 const timelineBoundarySafety = await runTimelineBoundarySafetyCase();
+const eventDensitySafety = await runEventDensitySafetyCase();
 const renderIsolation = await validateRenderIsolation();
-const allArtifacts = [...cases.flatMap((smokeCase) => smokeCase.artifacts), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact];
-const fullMixArtifacts = [...cases.map((smokeCase) => smokeCase.artifacts[0]), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact];
+const allArtifacts = [...cases.flatMap((smokeCase) => smokeCase.artifacts), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact, eventDensitySafety.artifact];
+const fullMixArtifacts = [...cases.map((smokeCase) => smokeCase.artifacts[0]), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact, eventDensitySafety.artifact];
 const tailSafety = {
   artifactCount: allArtifacts.length,
   zeroEndedCount: allArtifacts.filter((artifact) => artifact.decoded.finalFramePeak === 0).length,
@@ -648,7 +718,7 @@ const tailSafety = {
 };
 
 const report = {
-  schemaVersion: 8,
+  schemaVersion: 9,
   status: failures.length === 0 ? "passed" : "failed",
   app: { name: appName, version: packageJson.version, platformArch },
   boundaries: {
@@ -662,6 +732,7 @@ const report = {
   projectImportSafety,
   projectPitchSafety,
   timelineBoundarySafety,
+  eventDensitySafety,
   tailSafety,
   renderIsolation,
   failures
@@ -677,7 +748,7 @@ if (failures.length > 0) {
 }
 
 console.log("GrooveForge sample audio QA passed.");
-console.log(`Audience cases: ${cases.length}; style matrix: ${styleMatrix.length}/${workstation.styleProfiles.length}; Unicode file identity: ${unicodeFileIdentity.length}/2; title integrity: 1/1; import safety: 1/1; pitch safety: 1/1; timeline safety: 1/1; playable WAV files: ${allArtifacts.length}`);
+console.log(`Audience cases: ${cases.length}; style matrix: ${styleMatrix.length}/${workstation.styleProfiles.length}; Unicode file identity: ${unicodeFileIdentity.length}/2; title integrity: 1/1; import safety: 1/1; pitch safety: 1/1; timeline safety: 1/1; event density safety: 1/1; playable WAV files: ${allArtifacts.length}`);
 console.log(`Export tail safety: ${tailSafety.zeroEndedCount}/${tailSafety.artifactCount} artifacts end at digital zero; full-mix tail content ${tailSafety.fullMixTailContentCount}/${tailSafety.fullMixCount}`);
 console.log(`Render isolation: ${renderIsolation.unrelatedEditCount}/${renderIsolation.unrelatedEditCount} unrelated edits isolated; target mixer sensitive ${renderIsolation.targetMixerSensitive ? "yes" : "no"}; noise sound sensitive ${renderIsolation.noiseSoundSensitive ? "yes" : "no"}; solo/stem match ${renderIsolation.soloMatchesStem ? "yes" : "no"}`);
 for (const smokeCase of cases) {
