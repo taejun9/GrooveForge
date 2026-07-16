@@ -1033,6 +1033,73 @@ async function runHandoffRuntimeSafetyCase() {
   };
 }
 
+async function runSnapshotRuntimeSafetyCase() {
+  const sourceProject = {
+    ...structuredClone(workstation.starterProject),
+    title: "스냅샷 복구 비트",
+    bpm: 0,
+    key: "H major",
+    swing: 99,
+    masterCeilingDb: 999,
+    arrangement: [{ section: "Hook", pattern: "A", energy: 99, bars: 0, mutedTracks: [] }],
+    sessionBrief: {
+      artist: "Artist\nExport Meter",
+      vibe: "  night\t drive  ",
+      reference: "Ref\nStatus: Ready",
+      notes: "x".repeat(600)
+    },
+    snapshots: []
+  };
+  const savedProject = workstation.saveProjectSnapshot(sourceProject, "2026-07-16T00:00:00.000Z");
+  const snapshot = savedProject.snapshots[0];
+  const restoredProject = workstation.restoreProjectSnapshot({ ...savedProject, bpm: 124, key: "C minor" }, snapshot.id);
+  const importedProject = workstation.parseProjectFile(workstation.serializeProjectFile(restoredProject));
+  const caseRoot = path.join(outputRoot, "snapshot-runtime-safety", workstation.projectFileStem(restoredProject));
+  await mkdir(caseRoot, { recursive: true });
+  const analysis = render.analyzeExport(restoredProject);
+  const artifact = await renderArtifact({
+    blobFactory: () => render.createMixWavBlob(restoredProject),
+    analysis,
+    fileName: render.mixWavFileName(restoredProject),
+    label: "snapshot-runtime-safety:repaired restored full mix",
+    caseRoot,
+    project: restoredProject,
+    requireTailContent: true
+  });
+  const importedWavBytes = await blobToBuffer(render.createMixWavBlob(importedProject));
+  const directMidiBytes = Buffer.from(midi.createMidiFile(restoredProject));
+  const importedMidiBytes = Buffer.from(midi.createMidiFile(importedProject));
+  const midiPath = path.join(caseRoot, midi.midiFileName(restoredProject));
+  await writeFile(midiPath, directMidiBytes);
+  const stemAnalyses = { drum_rack: analysis, bass_808: analysis, synth: analysis, chord: analysis };
+  const directSheet = handoff.createHandoffSheet(restoredProject, analysis, stemAnalyses);
+  const importedSheet = handoff.createHandoffSheet(importedProject, analysis, stemAnalyses);
+  const handoffPath = path.join(caseRoot, handoff.handoffSheetFileName(restoredProject));
+  await writeFile(handoffPath, directSheet);
+
+  check(snapshot.project.bpm === workstation.minProjectBpm && snapshot.project.key === "A minor", "snapshot-runtime-safety: saved snapshot must repair BPM/key identity");
+  check(snapshot.project.swing === workstation.maxProjectSwing && snapshot.project.masterCeilingDb === workstation.maxMasterCeilingDb, "snapshot-runtime-safety: saved snapshot must repair swing/ceiling");
+  check(snapshot.project.arrangement[0].bars === 1 && snapshot.project.arrangement[0].energy === 1, "snapshot-runtime-safety: saved snapshot must repair arrangement");
+  check(snapshot.project.sessionBrief.artist === "Artist Export Meter" && snapshot.project.sessionBrief.notes.length === 240, "snapshot-runtime-safety: saved snapshot must repair Session Brief");
+  check(workstation.projectSnapshotSummary(snapshot) === "A minor / 60 BPM / 1 bars", "snapshot-runtime-safety: snapshot summary must use repaired identity");
+  check(restoredProject.bpm === snapshot.project.bpm && restoredProject.key === snapshot.project.key, "snapshot-runtime-safety: restore must use repaired snapshot core");
+  check(sha256(importedWavBytes) === artifact.sha256, "snapshot-runtime-safety: restored WAV must match durable repair");
+  check(directMidiBytes.equals(importedMidiBytes), "snapshot-runtime-safety: restored MIDI must match durable repair");
+  check(directSheet === importedSheet && !directSheet.includes("BPM: 0") && !directSheet.includes("Artist: Artist\nExport Meter"), "snapshot-runtime-safety: restored Handoff must match durable repair without injection");
+  check(render.mixWavFileName(restoredProject) === "스냅샷-복구-비트-demo.wav", "snapshot-runtime-safety: sample must preserve its Korean filename identity");
+  check(sourceProject.bpm === 0 && sourceProject.key === "H major" && sourceProject.arrangement[0].bars === 0 && sourceProject.sessionBrief.notes.length === 600, "snapshot-runtime-safety: snapshot operations must not mutate the source");
+
+  return {
+    source: { bpm: 0, key: "H major", bars: 0, energy: 99, notesLength: 600 },
+    repaired: { bpm: snapshot.project.bpm, key: snapshot.project.key, bars: snapshot.project.arrangement[0].bars, energy: snapshot.project.arrangement[0].energy, notesLength: snapshot.project.sessionBrief.notes.length },
+    summary: workstation.projectSnapshotSummary(snapshot),
+    midi: { path: relative(midiPath), bytes: directMidiBytes.byteLength, sha256: sha256(directMidiBytes), importedSha256: sha256(importedMidiBytes) },
+    handoff: { path: relative(handoffPath), bytes: Buffer.byteLength(directSheet), sha256: sha256(Buffer.from(directSheet)) },
+    importedWavSha256: sha256(importedWavBytes),
+    artifact
+  };
+}
+
 function updateMixerChannel(project, trackId, update) {
   return {
     ...project,
@@ -1204,6 +1271,7 @@ function markdownReport(report) {
     `## Master Ceiling Runtime Safety\n\nA direct parser-bypass Ceiling of **${masterCeilingRuntimeSafety.source.low} dB** repaired to **${masterCeilingRuntimeSafety.repaired.low} dB** at render, analysis, realtime/audition, and Handoff boundaries instead of silencing the mix. Direct and imported repair produced the same PCM hash; the decoded sample stayed audible, respected the repaired ceiling, retained tail content, and ended at digital zero. A direct **+${masterCeilingRuntimeSafety.source.high} dB** value likewise matched imported **${masterCeilingRuntimeSafety.repaired.high} dB** repair.\n\n| Local WAV | Delivered | Peak | RMS | Ceiling | Non-zero PCM | Tail content | Zero end | Repeat render |\n|---|---:|---:|---:|---:|---:|---|---|---|\n| \`${masterCeilingRuntimeSafety.artifact.path}\` | ${masterCeilingRuntimeSafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${masterCeilingRuntimeSafety.artifact.decoded.peakDb.toFixed(2)} dB | ${masterCeilingRuntimeSafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${masterCeilingRuntimeSafety.artifact.rendererAnalysis.ceilingDb.toFixed(1)} dB | ${masterCeilingRuntimeSafety.artifact.decoded.nonZeroSamples} | ${masterCeilingRuntimeSafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${masterCeilingRuntimeSafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${masterCeilingRuntimeSafety.artifact.deterministic ? "yes" : "no"} |\n\n` +
     `## Delivery Metadata Runtime Safety\n\nA direct parser-bypass identity of **${deliveryMetadataRuntimeSafety.source.bpm} BPM / ${deliveryMetadataRuntimeSafety.source.key}** repaired to **${deliveryMetadataRuntimeSafety.repaired.bpm} BPM / ${deliveryMetadataRuntimeSafety.repaired.key}** across WAV timing, MIDI metadata, Handoff Sheet, delivery manifest, and durable project JSON. Direct and imported WAV/MIDI bytes match without mutating the source object.\n\n| Local WAV | Local MIDI | Delivered | Peak | RMS | MIDI bytes | WAV parity | MIDI parity | Tail content | Zero end |\n|---|---|---:|---:|---:|---:|---|---|---|---|\n| \`${deliveryMetadataRuntimeSafety.artifact.path}\` | \`${deliveryMetadataRuntimeSafety.midi.path}\` | ${deliveryMetadataRuntimeSafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${deliveryMetadataRuntimeSafety.artifact.decoded.peakDb.toFixed(2)} dB | ${deliveryMetadataRuntimeSafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${deliveryMetadataRuntimeSafety.midi.bytes} | ${deliveryMetadataRuntimeSafety.artifact.sha256 === deliveryMetadataRuntimeSafety.importedWavSha256 ? "yes" : "no"} | ${deliveryMetadataRuntimeSafety.midi.sha256 === deliveryMetadataRuntimeSafety.midi.importedSha256 ? "yes" : "no"} | ${deliveryMetadataRuntimeSafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${deliveryMetadataRuntimeSafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} |\n\n` +
     `## Handoff Runtime Safety\n\nA direct parser-bypass arrangement and Session Brief repaired from **${handoffRuntimeSafety.source.bars} bars / ${handoffRuntimeSafety.source.energy * 100}% / ${handoffRuntimeSafety.source.notesLength} note characters** to **${handoffRuntimeSafety.repaired.bars} bar / ${handoffRuntimeSafety.repaired.energy * 100}% / ${handoffRuntimeSafety.repaired.notesLength} characters**. Multiline brief text collapses to safe single-line fields, and direct/imported WAV, MIDI, and Handoff output match without source mutation.\n\n| Local WAV | Local MIDI | Local Handoff | Delivered | Peak | RMS | Handoff bytes | Tail content | Zero end |\n|---|---|---|---:|---:|---:|---:|---|---|\n| \`${handoffRuntimeSafety.artifact.path}\` | \`${handoffRuntimeSafety.midi.path}\` | \`${handoffRuntimeSafety.handoff.path}\` | ${handoffRuntimeSafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${handoffRuntimeSafety.artifact.decoded.peakDb.toFixed(2)} dB | ${handoffRuntimeSafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${handoffRuntimeSafety.handoff.bytes} | ${handoffRuntimeSafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${handoffRuntimeSafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} |\n\n` +
+    `## Snapshot Runtime Safety\n\nA direct snapshot source of **${snapshotRuntimeSafety.source.bpm} BPM / ${snapshotRuntimeSafety.source.key} / ${snapshotRuntimeSafety.source.bars} bars / ${snapshotRuntimeSafety.source.energy * 100}% / ${snapshotRuntimeSafety.source.notesLength} note characters** is stored and restored as **${snapshotRuntimeSafety.repaired.bpm} BPM / ${snapshotRuntimeSafety.repaired.key} / ${snapshotRuntimeSafety.repaired.bars} bar / ${snapshotRuntimeSafety.repaired.energy * 100}% / ${snapshotRuntimeSafety.repaired.notesLength} characters**. The producer-facing summary is **${snapshotRuntimeSafety.summary}**, and restored/direct versus imported WAV, MIDI, and Handoff output match without source mutation.\n\n| Local WAV | Local MIDI | Local Handoff | Delivered | Peak | RMS | Handoff bytes | Tail content | Zero end |\n|---|---|---|---:|---:|---:|---:|---|---|\n| \`${snapshotRuntimeSafety.artifact.path}\` | \`${snapshotRuntimeSafety.midi.path}\` | \`${snapshotRuntimeSafety.handoff.path}\` | ${snapshotRuntimeSafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${snapshotRuntimeSafety.artifact.decoded.peakDb.toFixed(2)} dB | ${snapshotRuntimeSafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${snapshotRuntimeSafety.handoff.bytes} | ${snapshotRuntimeSafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${snapshotRuntimeSafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} |\n\n` +
     `## Export Tail Safety\n\nExpected tail length and digital-zero ending: **${report.tailSafety.allArtifactsSafe ? "yes" : "no"}** (${report.tailSafety.zeroEndedCount}/${report.tailSafety.artifactCount} artifacts). Full mixes preserving post-boundary content: **${report.tailSafety.fullMixTailContentCount}/${report.tailSafety.fullMixCount}**.\n\n` +
     `## Render Isolation\n\nUnrelated edits isolated: **${report.renderIsolation.unrelatedEditsIsolated ? "yes" : "no"}** (${report.renderIsolation.unrelatedEditCount} cases). Target mixer sensitivity: **${report.renderIsolation.targetMixerSensitive ? "yes" : "no"}**. Noise-sound sensitivity: **${report.renderIsolation.noiseSoundSensitive ? "yes" : "no"}**. Drums solo equals Drums stem: **${report.renderIsolation.soloMatchesStem ? "yes" : "no"}**.\n\n` +
     `Checks: canonical stereo PCM WAV, 44.1kHz, 16-bit, complete frames, audible decoded PCM, musical-boundary tail preservation, terminal digital zero, analysis agreement, ceiling safety, no digital full-scale samples, unique stems, and byte-identical immediate rerender.\n`;
@@ -1235,9 +1303,10 @@ const swingPlaybackTiming = await runSwingPlaybackTimingCase();
 const masterCeilingRuntimeSafety = await runMasterCeilingRuntimeSafetyCase();
 const deliveryMetadataRuntimeSafety = await runDeliveryMetadataRuntimeSafetyCase();
 const handoffRuntimeSafety = await runHandoffRuntimeSafetyCase();
+const snapshotRuntimeSafety = await runSnapshotRuntimeSafetyCase();
 const renderIsolation = await validateRenderIsolation();
-const allArtifacts = [...cases.flatMap((smokeCase) => smokeCase.artifacts), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact, eventDensitySafety.artifact, mixerTopologySafety.artifact, ...snapshotIdentitySafety.artifacts, musicalControlRangeSafety.artifact, ...swingPlaybackTiming.artifacts, masterCeilingRuntimeSafety.artifact, deliveryMetadataRuntimeSafety.artifact, handoffRuntimeSafety.artifact];
-const fullMixArtifacts = [...cases.map((smokeCase) => smokeCase.artifacts[0]), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact, eventDensitySafety.artifact, mixerTopologySafety.artifact, ...snapshotIdentitySafety.artifacts, musicalControlRangeSafety.artifact, ...swingPlaybackTiming.artifacts, masterCeilingRuntimeSafety.artifact, deliveryMetadataRuntimeSafety.artifact, handoffRuntimeSafety.artifact];
+const allArtifacts = [...cases.flatMap((smokeCase) => smokeCase.artifacts), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact, eventDensitySafety.artifact, mixerTopologySafety.artifact, ...snapshotIdentitySafety.artifacts, musicalControlRangeSafety.artifact, ...swingPlaybackTiming.artifacts, masterCeilingRuntimeSafety.artifact, deliveryMetadataRuntimeSafety.artifact, handoffRuntimeSafety.artifact, snapshotRuntimeSafety.artifact];
+const fullMixArtifacts = [...cases.map((smokeCase) => smokeCase.artifacts[0]), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact, eventDensitySafety.artifact, mixerTopologySafety.artifact, ...snapshotIdentitySafety.artifacts, musicalControlRangeSafety.artifact, ...swingPlaybackTiming.artifacts, masterCeilingRuntimeSafety.artifact, deliveryMetadataRuntimeSafety.artifact, handoffRuntimeSafety.artifact, snapshotRuntimeSafety.artifact];
 const tailSafety = {
   artifactCount: allArtifacts.length,
   zeroEndedCount: allArtifacts.filter((artifact) => artifact.decoded.finalFramePeak === 0).length,
@@ -1247,7 +1316,7 @@ const tailSafety = {
 };
 
 const report = {
-  schemaVersion: 16,
+  schemaVersion: 17,
   status: failures.length === 0 ? "passed" : "failed",
   app: { name: appName, version: packageJson.version, platformArch },
   boundaries: {
@@ -1269,6 +1338,7 @@ const report = {
   masterCeilingRuntimeSafety,
   deliveryMetadataRuntimeSafety,
   handoffRuntimeSafety,
+  snapshotRuntimeSafety,
   tailSafety,
   renderIsolation,
   failures
@@ -1284,7 +1354,7 @@ if (failures.length > 0) {
 }
 
 console.log("GrooveForge sample audio QA passed.");
-console.log(`Audience cases: ${cases.length}; style matrix: ${styleMatrix.length}/${workstation.styleProfiles.length}; Unicode file identity: ${unicodeFileIdentity.length}/2; title integrity: 1/1; import safety: 1/1; pitch safety: 1/1; timeline safety: 1/1; event density safety: 1/1; mixer topology safety: 1/1; snapshot identity safety: 2/2; musical control range safety: 1/1; swing playback timing: 2/2; master ceiling runtime safety: 1/1; delivery metadata runtime safety: 1/1; Handoff runtime safety: 1/1; playable WAV files: ${allArtifacts.length}`);
+console.log(`Audience cases: ${cases.length}; style matrix: ${styleMatrix.length}/${workstation.styleProfiles.length}; Unicode file identity: ${unicodeFileIdentity.length}/2; title integrity: 1/1; import safety: 1/1; pitch safety: 1/1; timeline safety: 1/1; event density safety: 1/1; mixer topology safety: 1/1; snapshot identity safety: 2/2; musical control range safety: 1/1; swing playback timing: 2/2; master ceiling runtime safety: 1/1; delivery metadata runtime safety: 1/1; Handoff runtime safety: 1/1; snapshot runtime safety: 1/1; playable WAV files: ${allArtifacts.length}`);
 console.log(`Export tail safety: ${tailSafety.zeroEndedCount}/${tailSafety.artifactCount} artifacts end at digital zero; full-mix tail content ${tailSafety.fullMixTailContentCount}/${tailSafety.fullMixCount}`);
 console.log(`Render isolation: ${renderIsolation.unrelatedEditCount}/${renderIsolation.unrelatedEditCount} unrelated edits isolated; target mixer sensitive ${renderIsolation.targetMixerSensitive ? "yes" : "no"}; noise sound sensitive ${renderIsolation.noiseSoundSensitive ? "yes" : "no"}; solo/stem match ${renderIsolation.soloMatchesStem ? "yes" : "no"}`);
 for (const smokeCase of cases) {

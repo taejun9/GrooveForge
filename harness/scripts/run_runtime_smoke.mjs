@@ -1090,6 +1090,61 @@ async function validateHandoffRuntimeSafety() {
   };
 }
 
+async function validateSnapshotRuntimeSafety() {
+  const sourceProject = {
+    ...structuredClone(workstation.starterProject),
+    title: "Snapshot Runtime Safety Beat",
+    bpm: 0,
+    key: "H major",
+    swing: 99,
+    masterCeilingDb: 999,
+    arrangement: [{ section: "Hook", pattern: "A", energy: 99, bars: 0, mutedTracks: [] }],
+    sessionBrief: {
+      artist: "Artist\nExport Meter",
+      vibe: "  night\t drive  ",
+      reference: "Ref\nStatus: Ready",
+      notes: "x".repeat(600)
+    },
+    snapshots: []
+  };
+  const savedProject = workstation.saveProjectSnapshot(sourceProject, "2026-07-16T00:00:00.000Z");
+  const snapshot = savedProject.snapshots[0];
+  const restoredProject = workstation.restoreProjectSnapshot({ ...savedProject, bpm: 124, key: "C minor" }, snapshot.id);
+  const importedProject = workstation.parseProjectFile(workstation.serializeProjectFile(restoredProject));
+  const directWav = await blobBytes(render.createMixWavBlob(restoredProject));
+  const importedWav = await blobBytes(render.createMixWavBlob(importedProject));
+  const directMidi = midi.createMidiFile(restoredProject);
+  const importedMidi = midi.createMidiFile(importedProject);
+  const analysis = render.analyzeExport(restoredProject);
+  const stemAnalyses = { drum_rack: analysis, bass_808: analysis, synth: analysis, chord: analysis };
+  const directSheet = handoff.createHandoffSheet(restoredProject, analysis, stemAnalyses);
+  const importedSheet = handoff.createHandoffSheet(importedProject, analysis, stemAnalyses);
+  const canonicalProject = { ...structuredClone(workstation.starterProject), arrangement: [{ section: "Hook", pattern: "A", energy: 0.8, bars: 1, mutedTracks: [] }], snapshots: [] };
+  const canonicalSnapshot = workstation.createProjectSnapshot(canonicalProject, "2026-07-16T00:00:01.000Z");
+  const { snapshots: canonicalSnapshots, ...canonicalImportedCore } = workstation.parseProjectFile(workstation.serializeProjectFile(canonicalProject));
+
+  check(snapshot.project.bpm === workstation.minProjectBpm && snapshot.project.key === "A minor", "snapshot-runtime-safety: saved snapshot must repair direct BPM/key identity");
+  check(snapshot.project.swing === workstation.maxProjectSwing && snapshot.project.masterCeilingDb === workstation.maxMasterCeilingDb, "snapshot-runtime-safety: saved snapshot must repair swing and master ceiling");
+  check(snapshot.project.arrangement[0].bars === 1 && snapshot.project.arrangement[0].energy === 1, "snapshot-runtime-safety: saved snapshot must repair arrangement bars and energy");
+  check(snapshot.project.sessionBrief.artist === "Artist Export Meter" && snapshot.project.sessionBrief.notes.length === 240, "snapshot-runtime-safety: saved snapshot must repair Session Brief text");
+  check(workstation.projectSnapshotSummary(snapshot) === "A minor / 60 BPM / 1 bars", "snapshot-runtime-safety: summary must report repaired project identity");
+  check(restoredProject.bpm === snapshot.project.bpm && restoredProject.key === snapshot.project.key && restoredProject.arrangement[0].bars === snapshot.project.arrangement[0].bars, "snapshot-runtime-safety: restore must preserve repaired snapshot project core");
+  check(directWav.byteLength === importedWav.byteLength && directWav.every((byte, index) => byte === importedWav[index]), "snapshot-runtime-safety: restored WAV must match durable repair");
+  check(directMidi.byteLength === importedMidi.byteLength && directMidi.every((byte, index) => byte === importedMidi[index]), "snapshot-runtime-safety: restored MIDI must match durable repair");
+  check(directSheet === importedSheet && !directSheet.includes("BPM: 0") && !directSheet.includes("Artist: Artist\nExport Meter"), "snapshot-runtime-safety: restored Handoff must match durable repair without injected lines");
+  check(canonicalSnapshots.length === 0 && JSON.stringify(canonicalSnapshot.project) === JSON.stringify(canonicalImportedCore), "snapshot-runtime-safety: canonical snapshot project core must remain stable");
+  check(sourceProject.bpm === 0 && sourceProject.key === "H major" && sourceProject.arrangement[0].bars === 0 && sourceProject.sessionBrief.notes.length === 600, "snapshot-runtime-safety: snapshot operations must not mutate caller-owned project state");
+
+  return {
+    source: "0 BPM / H major / 0 bars / 600 chars",
+    repaired: `${snapshot.project.bpm} BPM / ${snapshot.project.key} / ${snapshot.project.arrangement[0].bars} bar / ${snapshot.project.sessionBrief.notes.length} chars`,
+    normalizedPaths: 11,
+    handoffBytes: new TextEncoder().encode(directSheet).byteLength,
+    midiBytes: directMidi.byteLength,
+    wavBytes: directWav.byteLength
+  };
+}
+
 function projectEventCounts(project) {
   return workstation.patternSlots.map((slot) => {
     const pattern = project.patterns[slot];
@@ -1567,6 +1622,7 @@ const swingPlaybackTimingSummary = await validateSwingPlaybackTiming();
 const masterCeilingRuntimeSafetySummary = await validateMasterCeilingRuntimeSafety();
 const deliveryMetadataRuntimeSafetySummary = await validateDeliveryMetadataRuntimeSafety();
 const handoffRuntimeSafetySummary = await validateHandoffRuntimeSafety();
+const snapshotRuntimeSafetySummary = await validateSnapshotRuntimeSafety();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -1598,6 +1654,7 @@ console.log(`- Swing playback timing: ${swingPlaybackTimingSummary.swingRange} /
 console.log(`- Master ceiling runtime safety: ${masterCeilingRuntimeSafetySummary.ceilingRange} dB / normalized paths ${masterCeilingRuntimeSafetySummary.normalizedPaths}/8 / low peak ${masterCeilingRuntimeSafetySummary.lowPeakDb.toFixed(2)} dB / high headroom ${masterCeilingRuntimeSafetySummary.highHeadroomDb.toFixed(2)} dB / WAV ${masterCeilingRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Delivery metadata runtime safety: ${deliveryMetadataRuntimeSafetySummary.source} -> ${deliveryMetadataRuntimeSafetySummary.repaired} / normalized paths ${deliveryMetadataRuntimeSafetySummary.normalizedPaths}/9 / MIDI ${deliveryMetadataRuntimeSafetySummary.midiBytes} bytes / WAV ${deliveryMetadataRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Handoff runtime safety: ${handoffRuntimeSafetySummary.source} -> ${handoffRuntimeSafetySummary.repaired} / normalized paths ${handoffRuntimeSafetySummary.normalizedPaths}/8 / Handoff ${handoffRuntimeSafetySummary.handoffBytes} bytes / MIDI ${handoffRuntimeSafetySummary.midiBytes} bytes / WAV ${handoffRuntimeSafetySummary.wavBytes} bytes`);
+console.log(`- Snapshot runtime safety: ${snapshotRuntimeSafetySummary.source} -> ${snapshotRuntimeSafetySummary.repaired} / normalized paths ${snapshotRuntimeSafetySummary.normalizedPaths}/11 / Handoff ${snapshotRuntimeSafetySummary.handoffBytes} bytes / MIDI ${snapshotRuntimeSafetySummary.midiBytes} bytes / WAV ${snapshotRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

@@ -57,6 +57,8 @@ Delivery-metadata runtime coverage applies the same domain-owned BPM/key repair 
 
 Handoff runtime coverage applies durable arrangement and Session Brief normalization before producer-facing text generation. Runtime smoke proves direct `0 bars / 9900%` rows and multiline or oversized brief fields become the same `1 bar / 100%`, single-line, bounded Handoff as durable repair without source mutation. Sample-audio QA writes `핸드오프-복구-비트-demo.wav`, its arrangement MIDI, and Handoff text, requires direct/imported parity across all three, and raises the current report to schema version 16 with 40 playable WAVs and 32 full mixes retaining tail content.
 
+Snapshot runtime coverage applies durable project-core normalization when a local idea is captured and again when it is restored, while producer-facing summaries read the same repaired identity. Runtime smoke proves a direct `0 BPM / H major / 0 bars / 600 characters` source is stored and restored as `60 BPM / A minor / 1 bar / 240 characters`, preserves canonical snapshot cores, matches durable WAV/MIDI/Handoff output, and leaves the source untouched. Sample-audio QA writes `스냅샷-복구-비트-demo.wav`, its arrangement MIDI, and Handoff text, requires restored/imported parity across all three, and raises the current report to schema version 17 with 41 playable WAVs and 33 full mixes retaining tail content.
+
 ## Agent Readability
 
 Agents should be able to answer these questions from repo files alone:

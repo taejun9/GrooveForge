@@ -2555,11 +2555,12 @@ export function normalizeProjectSnapshotIdentities(snapshots: readonly ProjectSn
 }
 
 export function createProjectSnapshot(project: ProjectState, createdAt = new Date().toISOString()): ProjectSnapshot {
+  const normalizedProject = normalizeProjectCoreState(project);
   return {
     id: projectSnapshotId(project, createdAt),
     name: nextProjectSnapshotName(project),
     createdAt,
-    project: cloneProjectCore(project)
+    project: cloneProjectCore(normalizedProject)
   };
 }
 
@@ -2580,7 +2581,7 @@ export function restoreProjectSnapshot(project: ProjectState, snapshotId: string
     return snapshots === project.snapshots ? project : { ...project, snapshots: cloneProjectSnapshots(snapshots) };
   }
   return {
-    ...cloneProjectCore(snapshot.project),
+    ...cloneProjectCore(normalizeProjectCoreState(snapshot.project)),
     snapshots: cloneProjectSnapshots(snapshots)
   };
 }
@@ -2646,8 +2647,9 @@ export function renameProjectSnapshot(project: ProjectState, snapshotId: string,
 }
 
 export function projectSnapshotSummary(snapshot: ProjectSnapshot): string {
-  const bars = snapshot.project.arrangement.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
-  return `${snapshot.project.key} / ${snapshot.project.bpm} BPM / ${bars} bars`;
+  const project = normalizeProjectCoreState(snapshot.project);
+  const bars = boundedArrangementTotalBars(project.arrangement);
+  return `${project.key} / ${project.bpm} BPM / ${bars} bars`;
 }
 
 function projectSnapshotId(project: ProjectState, createdAt: string): string {
