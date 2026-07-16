@@ -33,6 +33,7 @@ import {
   PatternSlot,
   patternForSlot,
   projectStepDurationSeconds,
+  projectSwingOffsetSeconds,
   ProjectState,
   sidechainGainForStep,
   SoundDesign
@@ -871,7 +872,8 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
       );
       masterGain.gain.setTargetAtTime(masterOutputGain(currentProject) * Math.min(1, ceiling) * automationGain, context.currentTime, 0.01);
       const playbackContext = playbackContextForStep(currentProject, mode, snapshot.loopStep, startBar);
-      const scheduleDelaySeconds = Math.max(0.015, (nextStepAtMs - nowMs) / 1000);
+      const audibleStepAtMs = nextStepAtMs + projectSwingOffsetSeconds(currentProject, nextStep) * 1000;
+      const scheduleDelaySeconds = Math.max(0.015, (audibleStepAtMs - nowMs) / 1000);
       scheduleStep(
         currentProject,
         normalizedPatternForPlayback(playbackContext.pattern),
@@ -883,7 +885,7 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
         playbackContext.energyGain,
         playbackContext.mutedTracks
       );
-      queueStepFeedback(snapshot, nextStepAtMs);
+      queueStepFeedback(snapshot, audibleStepAtMs);
       nextStep += 1;
       nextStepAtMs += stepDuration * 1000;
     }

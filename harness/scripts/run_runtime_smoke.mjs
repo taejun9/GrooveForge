@@ -888,6 +888,76 @@ async function validateMusicalControlRangeSafety() {
   };
 }
 
+function sparseSwingTimingProject(swing = 0) {
+  const pattern = structuredClone(workstation.starterProject.patterns.A);
+  pattern.drumPattern = {
+    kick: workstation.steps.map((step) => step === 1 || step === 15),
+    clap: workstation.steps.map(() => false),
+    hat: workstation.steps.map(() => false),
+    perc: workstation.steps.map(() => false)
+  };
+  pattern.bassNotes = [];
+  pattern.melodyNotes = [];
+  pattern.chordEvents = [];
+  const clonePattern = () => structuredClone(pattern);
+  return {
+    ...structuredClone(workstation.starterProject),
+    title: swing > 0 ? "Swing Timing Smoke Beat" : "Straight Timing Smoke Beat",
+    bpm: 120,
+    swing,
+    patterns: { A: clonePattern(), B: clonePattern(), C: clonePattern() },
+    arrangement: [{ section: "Intro", pattern: "A", energy: 0.8, bars: 1, mutedTracks: [] }],
+    mixer: workstation.starterProject.mixer.map((channel) => ({ ...channel, send: 0, muted: false, solo: false })),
+    snapshots: []
+  };
+}
+
+async function validateSwingPlaybackTiming() {
+  const straightProject = sparseSwingTimingProject(0);
+  const swungProject = sparseSwingTimingProject(workstation.maxProjectSwing);
+  const straightWav = await blobBytes(render.createMixWavBlob(straightProject));
+  const swungWav = await blobBytes(render.createMixWavBlob(swungProject));
+  const straightMidi = midi.createMidiFile(straightProject);
+  const swungMidi = midi.createMidiFile(swungProject);
+  const wavEqual = straightWav.byteLength === swungWav.byteLength && straightWav.every((byte, index) => byte === swungWav[index]);
+  const midiEqual = straightMidi.byteLength === swungMidi.byteLength && straightMidi.every((byte, index) => byte === swungMidi[index]);
+  const expectedOffsetSteps = workstation.maxProjectSwing;
+  const expectedOffsetSeconds = workstation.projectStepDurationSeconds(swungProject) * expectedOffsetSteps;
+
+  check(workstation.projectSwingOffsetSteps(swungProject, 0) === 0, "swing-playback-timing: even sixteenth must stay on the straight grid");
+  check(workstation.projectSwingOffsetSteps(swungProject, 1) === expectedOffsetSteps, "swing-playback-timing: odd sixteenth must use the bounded project swing offset");
+  check(workstation.projectSwingOffsetSteps({ swing: 99 }, 1) === workstation.maxProjectSwing, "swing-playback-timing: direct excessive swing must clamp at the runtime boundary");
+  check(Math.abs(workstation.projectSwingOffsetSeconds(swungProject, 1) - expectedOffsetSeconds) < 1e-12, "swing-playback-timing: seconds offset must derive from the shared step duration");
+  check(workstation.projectStepDurationSeconds({ ...straightProject, bpm: 0 }) === workstation.stepDurationSeconds(workstation.minProjectBpm), "swing-playback-timing: direct zero BPM must use the safe domain minimum");
+  check(straightWav.byteLength === swungWav.byteLength, "swing-playback-timing: swing must preserve WAV duration and frame count");
+  check(!wavEqual, "swing-playback-timing: 0% and 24% swing WAV output must differ");
+  check(!midiEqual, "swing-playback-timing: 0% and 24% swing MIDI output must differ");
+
+  const excessiveSwingProject = { ...structuredClone(swungProject), swing: 99 };
+  const repairedSwingProject = workstation.parseProjectFile(JSON.stringify(excessiveSwingProject));
+  const bypassWav = await blobBytes(render.createMixWavBlob(excessiveSwingProject));
+  const repairedWav = await blobBytes(render.createMixWavBlob(repairedSwingProject));
+  const bypassMidi = midi.createMidiFile(excessiveSwingProject);
+  const repairedMidi = midi.createMidiFile(repairedSwingProject);
+  check(repairedSwingProject.swing === workstation.maxProjectSwing, "swing-playback-timing: imported excessive swing must clamp to 24%");
+  check(bypassWav.byteLength === repairedWav.byteLength && bypassWav.every((byte, index) => byte === repairedWav[index]), "swing-playback-timing: parser-bypass WAV must match imported swing repair");
+  check(bypassMidi.byteLength === repairedMidi.byteLength && bypassMidi.every((byte, index) => byte === repairedMidi[index]), "swing-playback-timing: parser-bypass MIDI must match imported swing repair");
+
+  const zeroBpmProject = { ...structuredClone(straightProject), bpm: 0 };
+  const repairedBpmProject = workstation.parseProjectFile(JSON.stringify(zeroBpmProject));
+  const bypassBpmMidi = midi.createMidiFile(zeroBpmProject);
+  const repairedBpmMidi = midi.createMidiFile(repairedBpmProject);
+  check(bypassBpmMidi.byteLength === repairedBpmMidi.byteLength && bypassBpmMidi.every((byte, index) => byte === repairedBpmMidi[index]), "swing-playback-timing: direct zero-BPM MIDI must match imported BPM repair");
+
+  return {
+    swingRange: `0..${workstation.maxProjectSwing}`,
+    oddOffsetMs: Math.round(expectedOffsetSeconds * 1000),
+    wavBytes: straightWav.byteLength,
+    midiBytes: straightMidi.byteLength,
+    normalizedPaths: 4
+  };
+}
+
 function projectEventCounts(project) {
   return workstation.patternSlots.map((slot) => {
     const pattern = project.patterns[slot];
@@ -1361,6 +1431,7 @@ const eventDensitySafetySummary = await validateEventDensitySafety();
 const mixerTopologySafetySummary = await validateMixerTopologySafety();
 const snapshotIdentitySafetySummary = validateSnapshotIdentitySafety();
 const musicalControlRangeSafetySummary = await validateMusicalControlRangeSafety();
+const swingPlaybackTimingSummary = await validateSwingPlaybackTiming();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -1388,6 +1459,7 @@ console.log(`- Event density safety: ${eventDensitySafetySummary.sourceEvents}->
 console.log(`- Mixer topology safety: ${mixerTopologySafetySummary.sourceChannels}->${mixerTopologySafetySummary.repairedChannels} required channels / duplicates ${mixerTopologySafetySummary.duplicateChannels} / normalized paths ${mixerTopologySafetySummary.paths}/7 / ${mixerTopologySafetySummary.status} ${mixerTopologySafetySummary.peakDb.toFixed(2)} dB / WAV ${mixerTopologySafetySummary.wavBytes} bytes`);
 console.log(`- Snapshot identity safety: ${snapshotIdentitySafetySummary.sourceIds}->${snapshotIdentitySafetySummary.repairedIds} ids / unique ${snapshotIdentitySafetySummary.uniqueIds}/${snapshotIdentitySafetySummary.repairedIds} / rename ${snapshotIdentitySafetySummary.renamed} / delete ${snapshotIdentitySafetySummary.deleted} / restore ${snapshotIdentitySafetySummary.restoredBpms} BPM / normalized paths ${snapshotIdentitySafetySummary.paths}/6`);
 console.log(`- Musical control range safety: sound ${musicalControlRangeSafetySummary.soundRange} / drum velocity ${musicalControlRangeSafetySummary.drumVelocityRange} / mixer ${musicalControlRangeSafetySummary.mixerRange} dB / normalized paths ${musicalControlRangeSafetySummary.paths}/8 / structural rejections ${musicalControlRangeSafetySummary.rejected}/3 / MIDI ${musicalControlRangeSafetySummary.midiBytes} bytes / WAV ${musicalControlRangeSafetySummary.wavBytes} bytes`);
+console.log(`- Swing playback timing: ${swingPlaybackTimingSummary.swingRange} / odd-step delay ${swingPlaybackTimingSummary.oddOffsetMs} ms / distinct WAV and MIDI yes / normalized paths ${swingPlaybackTimingSummary.normalizedPaths}/4 / MIDI ${swingPlaybackTimingSummary.midiBytes} bytes / WAV ${swingPlaybackTimingSummary.wavBytes} bytes`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

@@ -14,6 +14,7 @@ import {
   noteToFrequency,
   masterAutomationGainForEvents,
   projectFileStem,
+  projectStepStartSeconds,
   projectStepDurationSeconds,
   normalizeArrangementBars,
   normalizeMixerChannelTopology,
@@ -415,7 +416,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
     const chordMix = arrangementChannelMix(baseChordMix, arrangementBlock, "chord");
     for (let patternStep = 0; patternStep < 16; patternStep += 1) {
       const absoluteStep = barOffset + patternStep;
-      const time = (barOffset + patternStep) * step;
+      const time = projectStepStartSeconds(project, absoluteStep);
       if (drumStepShouldPlay(pattern, "kick", patternStep, absoluteStep)) {
         const velocity = drumStepVelocity(pattern, "kick", patternStep);
         const drumTime = time + drumStepTimingMs(pattern, "kick", patternStep) / 1000;
@@ -467,32 +468,34 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
       }
     }
     for (const note of pattern.bassNotes) {
-      if (!noteEventShouldPlay("bass", note, barOffset + note.step)) {
+      const absoluteStep = barOffset + note.step;
+      if (!noteEventShouldPlay("bass", note, absoluteStep)) {
         continue;
       }
       addToneWithSend(
         buffer,
         sendBuffer,
-        (barOffset + note.step) * step,
+        projectStepStartSeconds(project, absoluteStep),
         normalizePatternEventLength(note.length, note.step) * step * (0.74 + sound.bassDecay * 0.52),
         noteToFrequency(note.pitch),
         bassMix,
         energyGain *
           note.velocity *
           (0.52 + sound.bassDrive * 0.24) *
-          sidechainGainForStep(pattern, note.step, sound.sidechainDuck, barOffset + note.step),
+          sidechainGainForStep(pattern, note.step, sound.sidechainDuck, absoluteStep),
         bassShape(sound),
         { drive: sound.bassDrive, filter: 0.72 + sound.bassDrive * 0.28, decay: 3.8 - sound.bassDecay * 1.4 }
       );
     }
     for (const note of pattern.melodyNotes) {
-      if (!noteEventShouldPlay("melody", note, barOffset + note.step)) {
+      const absoluteStep = barOffset + note.step;
+      if (!noteEventShouldPlay("melody", note, absoluteStep)) {
         continue;
       }
       addToneWithSend(
         buffer,
         sendBuffer,
-        (barOffset + note.step) * step,
+        projectStepStartSeconds(project, absoluteStep),
         normalizePatternEventLength(note.length, note.step) * step * (0.8 + sound.synthRelease * 0.42),
         noteToFrequency(note.pitch),
         synthMix,
@@ -502,7 +505,8 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
       );
     }
     for (const chord of pattern.chordEvents) {
-      if (!chordEventShouldPlay(chord, barOffset + chord.step)) {
+      const absoluteStep = barOffset + chord.step;
+      if (!chordEventShouldPlay(chord, absoluteStep)) {
         continue;
       }
       const pitches = chordPitches(chord);
@@ -516,7 +520,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
         addToneWithSend(
           buffer,
           sendBuffer,
-          (barOffset + chord.step) * step,
+          projectStepStartSeconds(project, absoluteStep),
           normalizePatternEventLength(chord.length, chord.step) * step * (0.9 + sound.synthRelease * 0.24),
           noteToFrequency(pitch),
           voiceMix,

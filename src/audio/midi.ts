@@ -12,10 +12,12 @@ import {
   normalizeArrangementBars,
   normalizePatternEventCollections,
   normalizePatternEventLength,
+  normalizeProjectBpm,
   normalizeProjectPitch,
   projectFileStem,
   projectPitchMidiNumber,
   projectStepDurationSeconds,
+  projectSwingOffsetSteps,
   stepsPerBar
 } from "../domain/workstation";
 import type { ArrangementBlock, ArrangementMuteTrack, DrumLane, ProjectState } from "../domain/workstation";
@@ -144,7 +146,7 @@ function encodeTrack(name: string, events: MidiTrackEvent[], endTick: number, pr
 }
 
 function encodeTempoTrack(project: ProjectState, endTick: number): number[] {
-  const tempo = Math.round(60_000_000 / project.bpm);
+  const tempo = Math.round(60_000_000 / normalizeProjectBpm(project.bpm));
   const events: MidiTrackEvent[] = [
     { tick: 0, order: -1, bytes: [0xff, 0x51, 0x03, ...numberToBytes(tempo, 3)] },
     { tick: 0, order: 0, bytes: [0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08] },
@@ -187,7 +189,11 @@ export function createMidiFile(project: ProjectState): Uint8Array {
             continue;
           }
           const repeatCount = lane === "hat" ? hatRepeatCount(pattern, step) : 1;
-          const baseTick = barTick + step * ticksPerStep + timingMsToTicks(project, drumStepTimingMs(pattern, lane, step));
+          const baseTick =
+            barTick +
+            step * ticksPerStep +
+            projectSwingOffsetSteps(project, absoluteStep) * ticksPerStep +
+            timingMsToTicks(project, drumStepTimingMs(pattern, lane, step));
           const velocity = drumStepVelocity(pattern, lane, step) * energy;
           for (let repeat = 0; repeat < repeatCount; repeat += 1) {
             addNote(
@@ -211,7 +217,7 @@ export function createMidiFile(project: ProjectState): Uint8Array {
         }
         addNote(
           tracks.bass,
-          barTick + note.step * ticksPerStep,
+          barTick + note.step * ticksPerStep + projectSwingOffsetSteps(project, absoluteStep) * ticksPerStep,
           normalizePatternEventLength(note.length, note.step) * ticksPerStep,
           midiNote,
           note.velocity * energy
@@ -228,7 +234,7 @@ export function createMidiFile(project: ProjectState): Uint8Array {
         }
         addNote(
           tracks.synth,
-          barTick + note.step * ticksPerStep,
+          barTick + note.step * ticksPerStep + projectSwingOffsetSteps(project, absoluteStep) * ticksPerStep,
           normalizePatternEventLength(note.length, note.step) * ticksPerStep,
           midiNote,
           note.velocity * energy
@@ -247,7 +253,7 @@ export function createMidiFile(project: ProjectState): Uint8Array {
           if (midiNote !== null) {
             addNote(
               tracks.chords,
-              barTick + chord.step * ticksPerStep,
+              barTick + chord.step * ticksPerStep + projectSwingOffsetSteps(project, absoluteStep) * ticksPerStep,
               normalizePatternEventLength(chord.length, chord.step) * ticksPerStep,
               midiNote,
               chord.velocity * energy

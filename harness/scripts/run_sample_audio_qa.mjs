@@ -76,6 +76,7 @@ function parseCanonicalPcmWav(bytes, label, musicalDurationSeconds) {
   let fullScaleSamples = 0;
   let postBoundaryNonZeroSamples = 0;
   let postBoundaryPeak = 0;
+  let firstNonZeroFrame = null;
   const channelNonZeroSamples = Array.from({ length: channels }, () => 0);
   const sampleCount = Math.floor(dataSize / 2);
   const frames = dataSize / blockAlign;
@@ -89,6 +90,7 @@ function parseCanonicalPcmWav(bytes, label, musicalDurationSeconds) {
     if (raw !== 0) {
       nonZeroSamples += 1;
       channelNonZeroSamples[sampleIndex % channels] += 1;
+      if (firstNonZeroFrame === null) firstNonZeroFrame = Math.floor(sampleIndex / channels);
     }
     if (Math.floor(sampleIndex / channels) >= musicalBoundaryFrame) {
       if (raw !== 0) postBoundaryNonZeroSamples += 1;
@@ -117,6 +119,7 @@ function parseCanonicalPcmWav(bytes, label, musicalDurationSeconds) {
     tailDurationSeconds: frames / sampleRate - musicalDurationSeconds,
     postBoundaryNonZeroSamples,
     postBoundaryPeak,
+    firstNonZeroFrame,
     finalFramePeak
   };
 }
@@ -771,6 +774,89 @@ async function runMusicalControlRangeSafetyCase() {
   };
 }
 
+function sparseSwingTimingSampleProject(swing, title) {
+  const pattern = structuredClone(workstation.starterProject.patterns.A);
+  pattern.drumPattern = {
+    kick: workstation.steps.map((step) => step === 1 || step === 15),
+    clap: workstation.steps.map(() => false),
+    hat: workstation.steps.map(() => false),
+    perc: workstation.steps.map(() => false)
+  };
+  pattern.bassNotes = [];
+  pattern.melodyNotes = [];
+  pattern.chordEvents = [];
+  const clonePattern = () => structuredClone(pattern);
+  return {
+    ...structuredClone(workstation.starterProject),
+    title,
+    bpm: 120,
+    swing,
+    patterns: { A: clonePattern(), B: clonePattern(), C: clonePattern() },
+    arrangement: [{ section: "Intro", pattern: "A", energy: 0.8, bars: 1, mutedTracks: [] }],
+    mixer: workstation.starterProject.mixer.map((channel) => ({ ...channel, send: 0, muted: false, solo: false })),
+    snapshots: []
+  };
+}
+
+async function runSwingPlaybackTimingCase() {
+  const straightProject = sparseSwingTimingSampleProject(0, "스트레이트 타이밍 비트");
+  const swungProject = sparseSwingTimingSampleProject(workstation.maxProjectSwing, "스윙 타이밍 비트");
+  const caseRoot = path.join(outputRoot, "swing-playback-timing");
+  const straightRoot = path.join(caseRoot, "straight");
+  const swungRoot = path.join(caseRoot, "swung");
+  await mkdir(straightRoot, { recursive: true });
+  await mkdir(swungRoot, { recursive: true });
+
+  const straightArtifact = await renderArtifact({
+    blobFactory: () => render.createMixWavBlob(straightProject),
+    analysis: render.analyzeExport(straightProject),
+    fileName: render.mixWavFileName(straightProject),
+    label: "swing-playback-timing:straight full mix",
+    caseRoot: straightRoot,
+    project: straightProject,
+    requireTailContent: true
+  });
+  const swungArtifact = await renderArtifact({
+    blobFactory: () => render.createMixWavBlob(swungProject),
+    analysis: render.analyzeExport(swungProject),
+    fileName: render.mixWavFileName(swungProject),
+    label: "swing-playback-timing:swung full mix",
+    caseRoot: swungRoot,
+    project: swungProject,
+    requireTailContent: true
+  });
+  const expectedDelayFrames =
+    Math.floor(workstation.projectStepStartSeconds(swungProject, 1) * 44100) -
+    Math.floor(workstation.projectStepStartSeconds(straightProject, 1) * 44100);
+  const measuredDelayFrames = swungArtifact.decoded.firstNonZeroFrame - straightArtifact.decoded.firstNonZeroFrame;
+
+  check(straightArtifact.sha256 !== swungArtifact.sha256, "swing-playback-timing: straight and swung PCM hashes must differ");
+  check(straightArtifact.bytes === swungArtifact.bytes, "swing-playback-timing: swing must preserve WAV byte length and total frames");
+  check(straightArtifact.decoded.durationSeconds === swungArtifact.decoded.durationSeconds, "swing-playback-timing: swing must preserve delivered duration");
+  check(straightArtifact.decoded.firstNonZeroFrame !== null && swungArtifact.decoded.firstNonZeroFrame !== null, "swing-playback-timing: both timing samples must expose a decoded onset");
+  check(Math.abs(measuredDelayFrames - expectedDelayFrames) <= 1, "swing-playback-timing: decoded odd-step onset must move by the domain swing offset within one frame");
+  check(render.mixWavFileName(straightProject) === "스트레이트-타이밍-비트-demo.wav", "swing-playback-timing: straight sample must preserve its Korean filename identity");
+  check(render.mixWavFileName(swungProject) === "스윙-타이밍-비트-demo.wav", "swing-playback-timing: swung sample must preserve its Korean filename identity");
+
+  const excessiveSwingProject = { ...structuredClone(swungProject), swing: 99 };
+  const importedProject = workstation.parseProjectFile(JSON.stringify(excessiveSwingProject));
+  const directBytes = await blobToBuffer(render.createMixWavBlob(excessiveSwingProject));
+  check(importedProject.swing === workstation.maxProjectSwing, "swing-playback-timing: imported excessive swing must clamp to 24%");
+  check(sha256(directBytes) === swungArtifact.sha256, "swing-playback-timing: parser-bypass excessive swing must match the 24% repaired sample");
+  check(excessiveSwingProject.swing === 99, "swing-playback-timing: render and import must not mutate the direct source swing");
+
+  return {
+    bpm: straightProject.bpm,
+    straightSwing: straightProject.swing,
+    swungSwing: swungProject.swing,
+    expectedDelayFrames,
+    measuredDelayFrames,
+    measuredDelayMs: round((measuredDelayFrames / 44100) * 1000),
+    directBypassSha256: sha256(directBytes),
+    artifacts: [straightArtifact, swungArtifact]
+  };
+}
+
 function updateMixerChannel(project, trackId, update) {
   return {
     ...project,
@@ -917,8 +1003,12 @@ function markdownReport(report) {
   const mixerTopologySafety = report.mixerTopologySafety;
   const snapshotIdentitySafety = report.snapshotIdentitySafety;
   const musicalControlRangeSafety = report.musicalControlRangeSafety;
+  const swingPlaybackTiming = report.swingPlaybackTiming;
   const snapshotRows = snapshotIdentitySafety.artifacts.map((artifact, index) =>
     `| ${snapshotIdentitySafety.repaired.ids[index]} | ${snapshotIdentitySafety.repaired.bpms[index]} | \`${artifact.path}\` | ${artifact.decoded.durationSeconds.toFixed(2)} s | ${artifact.decoded.peakDb.toFixed(2)} dB | ${artifact.decoded.rmsDb.toFixed(2)} dB | ${artifact.decoded.nonZeroSamples} | ${artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${artifact.deterministic ? "yes" : "no"} |`
+  );
+  const swingRows = swingPlaybackTiming.artifacts.map((artifact, index) =>
+    `| ${index === 0 ? "Straight" : "Swung"} | ${index === 0 ? swingPlaybackTiming.straightSwing : swingPlaybackTiming.swungSwing} | \`${artifact.path}\` | ${artifact.decoded.firstNonZeroFrame} | ${artifact.decoded.durationSeconds.toFixed(2)} s | ${artifact.decoded.peakDb.toFixed(2)} dB | ${artifact.decoded.rmsDb.toFixed(2)} dB | ${artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${artifact.deterministic ? "yes" : "no"} |`
   );
   return `# GrooveForge Sample Audio QA\n\nStatus: **${report.status}**\n\n` +
     `Generated from built-in editable musical events only. No imported audio, private project data, network service, or external release claim is used.\n\n` +
@@ -933,6 +1023,7 @@ function markdownReport(report) {
     `## Mixer Topology Safety\n\nAn imported **${mixerTopologySafety.source.channels}-channel** mixer was repaired to **${mixerTopologySafety.repaired.channels} required channels (${mixerTopologySafety.repaired.ids.join(", ")})** before rendering a finite decoded WAV. Direct parser-bypass rendering produced the same PCM hash.\n\n| Local WAV | Delivered | Peak | RMS | Non-zero PCM | Tail content | Zero end | Repeat render |\n|---|---:|---:|---:|---:|---|---|---|\n| \`${mixerTopologySafety.artifact.path}\` | ${mixerTopologySafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${mixerTopologySafety.artifact.decoded.peakDb.toFixed(2)} dB | ${mixerTopologySafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${mixerTopologySafety.artifact.decoded.nonZeroSamples} | ${mixerTopologySafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${mixerTopologySafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${mixerTopologySafety.artifact.deterministic ? "yes" : "no"} |\n\n` +
     `## Snapshot Identity Safety\n\nTwo imported snapshots sharing the unsafe id **${snapshotIdentitySafety.source.ids[0]}** were repaired to **${snapshotIdentitySafety.repaired.ids.join(" / ")}**, restored independently at **${snapshotIdentitySafety.repaired.bpms.join(" / ")} BPM**, and rendered as distinct decoded WAVs. Rename affected ${snapshotIdentitySafety.renameCount}/2 snapshots and delete changed ${snapshotIdentitySafety.deleteCount}.\n\n| Repaired id | BPM | Local WAV | Delivered | Peak | RMS | Non-zero PCM | Tail content | Zero end | Repeat render |\n|---|---:|---|---:|---:|---:|---:|---|---|---|\n${snapshotRows.join("\n")}\n\n` +
     `## Musical Control Range Safety\n\nFinite out-of-range sound, drum, note/chord, mixer-processing, and arrangement controls were repaired from **sound ${musicalControlRangeSafety.source.sound.join("..")} / drum velocity ${musicalControlRangeSafety.source.drumVelocity.join("..")}** to **sound ${musicalControlRangeSafety.repaired.sound.join("..")} / drum velocity ${musicalControlRangeSafety.repaired.drumVelocity.join("..")}** before rendering. Direct parser-bypass PCM matched the imported repair.\n\n| Local WAV | Delivered | Peak | RMS | Non-zero PCM | Tail content | Zero end | Repeat render |\n|---|---:|---:|---:|---:|---|---|---|\n| \`${musicalControlRangeSafety.artifact.path}\` | ${musicalControlRangeSafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${musicalControlRangeSafety.artifact.decoded.peakDb.toFixed(2)} dB | ${musicalControlRangeSafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${musicalControlRangeSafety.artifact.decoded.nonZeroSamples} | ${musicalControlRangeSafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${musicalControlRangeSafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${musicalControlRangeSafety.artifact.deterministic ? "yes" : "no"} |\n\n` +
+    `## Swing Playback Timing\n\nAt **${swingPlaybackTiming.bpm} BPM**, the same sparse beat rendered at **${swingPlaybackTiming.straightSwing * 100}%** and **${swingPlaybackTiming.swungSwing * 100}%** Swing with equal duration but distinct PCM. The decoded first odd-step onset moved **${swingPlaybackTiming.measuredDelayFrames} frames / ${swingPlaybackTiming.measuredDelayMs.toFixed(2)} ms** (expected ${swingPlaybackTiming.expectedDelayFrames} frames), and direct excessive Swing matched imported 24% repair.\n\n| Feel | Swing | Local WAV | First onset frame | Delivered | Peak | RMS | Tail content | Zero end | Repeat render |\n|---|---:|---|---:|---:|---:|---:|---|---|---|\n${swingRows.join("\n")}\n\n` +
     `## Export Tail Safety\n\nExpected tail length and digital-zero ending: **${report.tailSafety.allArtifactsSafe ? "yes" : "no"}** (${report.tailSafety.zeroEndedCount}/${report.tailSafety.artifactCount} artifacts). Full mixes preserving post-boundary content: **${report.tailSafety.fullMixTailContentCount}/${report.tailSafety.fullMixCount}**.\n\n` +
     `## Render Isolation\n\nUnrelated edits isolated: **${report.renderIsolation.unrelatedEditsIsolated ? "yes" : "no"}** (${report.renderIsolation.unrelatedEditCount} cases). Target mixer sensitivity: **${report.renderIsolation.targetMixerSensitive ? "yes" : "no"}**. Noise-sound sensitivity: **${report.renderIsolation.noiseSoundSensitive ? "yes" : "no"}**. Drums solo equals Drums stem: **${report.renderIsolation.soloMatchesStem ? "yes" : "no"}**.\n\n` +
     `Checks: canonical stereo PCM WAV, 44.1kHz, 16-bit, complete frames, audible decoded PCM, musical-boundary tail preservation, terminal digital zero, analysis agreement, ceiling safety, no digital full-scale samples, unique stems, and byte-identical immediate rerender.\n`;
@@ -960,9 +1051,10 @@ const eventDensitySafety = await runEventDensitySafetyCase();
 const mixerTopologySafety = await runMixerTopologySafetyCase();
 const snapshotIdentitySafety = await runSnapshotIdentitySafetyCase();
 const musicalControlRangeSafety = await runMusicalControlRangeSafetyCase();
+const swingPlaybackTiming = await runSwingPlaybackTimingCase();
 const renderIsolation = await validateRenderIsolation();
-const allArtifacts = [...cases.flatMap((smokeCase) => smokeCase.artifacts), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact, eventDensitySafety.artifact, mixerTopologySafety.artifact, ...snapshotIdentitySafety.artifacts, musicalControlRangeSafety.artifact];
-const fullMixArtifacts = [...cases.map((smokeCase) => smokeCase.artifacts[0]), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact, eventDensitySafety.artifact, mixerTopologySafety.artifact, ...snapshotIdentitySafety.artifacts, musicalControlRangeSafety.artifact];
+const allArtifacts = [...cases.flatMap((smokeCase) => smokeCase.artifacts), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact, eventDensitySafety.artifact, mixerTopologySafety.artifact, ...snapshotIdentitySafety.artifacts, musicalControlRangeSafety.artifact, ...swingPlaybackTiming.artifacts];
+const fullMixArtifacts = [...cases.map((smokeCase) => smokeCase.artifacts[0]), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact, eventDensitySafety.artifact, mixerTopologySafety.artifact, ...snapshotIdentitySafety.artifacts, musicalControlRangeSafety.artifact, ...swingPlaybackTiming.artifacts];
 const tailSafety = {
   artifactCount: allArtifacts.length,
   zeroEndedCount: allArtifacts.filter((artifact) => artifact.decoded.finalFramePeak === 0).length,
@@ -972,7 +1064,7 @@ const tailSafety = {
 };
 
 const report = {
-  schemaVersion: 12,
+  schemaVersion: 13,
   status: failures.length === 0 ? "passed" : "failed",
   app: { name: appName, version: packageJson.version, platformArch },
   boundaries: {
@@ -990,6 +1082,7 @@ const report = {
   mixerTopologySafety,
   snapshotIdentitySafety,
   musicalControlRangeSafety,
+  swingPlaybackTiming,
   tailSafety,
   renderIsolation,
   failures
@@ -1005,7 +1098,7 @@ if (failures.length > 0) {
 }
 
 console.log("GrooveForge sample audio QA passed.");
-console.log(`Audience cases: ${cases.length}; style matrix: ${styleMatrix.length}/${workstation.styleProfiles.length}; Unicode file identity: ${unicodeFileIdentity.length}/2; title integrity: 1/1; import safety: 1/1; pitch safety: 1/1; timeline safety: 1/1; event density safety: 1/1; mixer topology safety: 1/1; snapshot identity safety: 2/2; musical control range safety: 1/1; playable WAV files: ${allArtifacts.length}`);
+console.log(`Audience cases: ${cases.length}; style matrix: ${styleMatrix.length}/${workstation.styleProfiles.length}; Unicode file identity: ${unicodeFileIdentity.length}/2; title integrity: 1/1; import safety: 1/1; pitch safety: 1/1; timeline safety: 1/1; event density safety: 1/1; mixer topology safety: 1/1; snapshot identity safety: 2/2; musical control range safety: 1/1; swing playback timing: 2/2; playable WAV files: ${allArtifacts.length}`);
 console.log(`Export tail safety: ${tailSafety.zeroEndedCount}/${tailSafety.artifactCount} artifacts end at digital zero; full-mix tail content ${tailSafety.fullMixTailContentCount}/${tailSafety.fullMixCount}`);
 console.log(`Render isolation: ${renderIsolation.unrelatedEditCount}/${renderIsolation.unrelatedEditCount} unrelated edits isolated; target mixer sensitive ${renderIsolation.targetMixerSensitive ? "yes" : "no"}; noise sound sensitive ${renderIsolation.noiseSoundSensitive ? "yes" : "no"}; solo/stem match ${renderIsolation.soloMatchesStem ? "yes" : "no"}`);
 for (const smokeCase of cases) {

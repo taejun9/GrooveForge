@@ -2833,11 +2833,26 @@ export function dbToGain(db: number): number {
 }
 
 export function stepDurationSeconds(bpm: number): number {
-  return 60 / bpm / 4;
+  return 60 / normalizeProjectBpm(bpm) / 4;
 }
 
 export function projectStepDurationSeconds(project: ProjectState): number {
   return stepDurationSeconds(project.bpm);
+}
+
+export function projectSwingOffsetSteps(project: Pick<ProjectState, "swing">, absoluteStep: number): number {
+  if (!Number.isFinite(absoluteStep) || Math.abs(Math.trunc(absoluteStep)) % 2 === 0) {
+    return 0;
+  }
+  return normalizeProjectSwing(project.swing);
+}
+
+export function projectSwingOffsetSeconds(project: ProjectState, absoluteStep: number): number {
+  return projectSwingOffsetSteps(project, absoluteStep) * projectStepDurationSeconds(project);
+}
+
+export function projectStepStartSeconds(project: ProjectState, absoluteStep: number): number {
+  return absoluteStep * projectStepDurationSeconds(project) + projectSwingOffsetSeconds(project, absoluteStep);
 }
 
 export function loopStepCount(bars: number): number {

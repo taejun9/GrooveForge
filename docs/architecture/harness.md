@@ -49,6 +49,8 @@ Snapshot-identity coverage treats six local idea slots and their React/action ke
 
 Musical-control range coverage separates recoverable finite excursions from malformed structure. Runtime smoke proves current wrapped, bare, legacy, snapshot, serialization, direct domain, direct render, and direct MIDI paths clamp sound design to 0–1, drum velocity to 0.15–1, drum timing to -35–35 ms, chance to 0–1, hat repeats to 1–4, note/chord velocity and duration, mixer processing, arrangement bars/energy, and automation without mutating caller data; it also keeps wrong types, wrong array lengths, and invalid chord enums rejected. Canonical sound objects retain identity for realtime reuse. Sample-audio QA renders and decodes `컨트롤-복구-비트-demo.wav`, requires direct parser-bypass PCM to match imported repair, and raises the expected report to schema version 12 with 35 playable WAVs and 27 full mixes retaining tail content.
 
+Swing-playback coverage treats the saved Swing field as an audible timing contract rather than display-only metadata. One domain helper bounds BPM and Swing, leaves even sixteenth anchors on the straight grid, and delays odd sixteenth onsets by the Swing fraction of one step. Runtime smoke proves 0% and 24% produce distinct WAV and MIDI bytes, direct excessive Swing and zero BPM match imported repair, and realtime feedback uses the same heard timestamp as scheduling. Sample-audio QA renders paired `스트레이트-타이밍-비트-demo.wav` and `스윙-타이밍-비트-demo.wav` files at 120 BPM, requires equal duration and a decoded 1,323-frame/30 ms odd-step delay, and raises the expected report to schema version 13 with 37 playable WAVs and 29 full mixes retaining tail content.
+
 ## Agent Readability
 
 Agents should be able to answer these questions from repo files alone:
