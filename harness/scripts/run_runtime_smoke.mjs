@@ -31,6 +31,7 @@ const handoff = await import("../../src/audio/handoff.ts");
 const deliveryBundle = await import("../../src/audio/deliveryBundle.ts");
 const downloads = await import("../../src/platform/downloads.ts");
 const localDraftLifecycle = await import("../../src/ui/localDraftLifecycle.ts");
+const projectReplacementGuard = await import("../../src/ui/projectReplacementGuard.ts");
 const coreTrackTypes = new Set(["drum_rack", "bass_808", "synth", "chord", "fx_return", "master"]);
 const smokeKey = "F minor";
 const smokeScope = "sample-free first-run starter project plus all-style 8-bar beats with local project-file roundtrips, bounded mixer-topology recovery, Handoff Sheet checks, and mocked download-path checks without writing media artifacts";
@@ -141,6 +142,25 @@ function validateLocalDraftWriteGate() {
   );
 
   return { paths: cases.length, firstEditWriteEligible: firstEdit.shouldWrite };
+}
+
+function validateProjectReplacementGuard() {
+  const cases = [
+    { dirty: false, recovery: false, confirm: false, warning: null },
+    { dirty: true, recovery: false, confirm: true, warning: "unsaved changes" },
+    { dirty: false, recovery: true, confirm: true, warning: "local recovery draft" },
+    { dirty: true, recovery: true, confirm: true, warning: "unsaved changes and the current local recovery draft" }
+  ];
+  for (const entry of cases) {
+    const decision = projectReplacementGuard.resolveProjectReplacementGuard(entry.dirty, entry.recovery);
+    check(
+      decision.requiresConfirmation === entry.confirm &&
+        (entry.warning === null ? decision.warning === null : decision.warning?.includes(entry.warning) === true),
+      `project-replacement-guard:${entry.dirty}/${entry.recovery} should resolve confirmation ${entry.confirm}`
+    );
+  }
+
+  return { paths: cases.length, protectedPaths: cases.filter((entry) => entry.confirm).length };
 }
 
 function validateUnicodeFileIdentity() {
@@ -1664,6 +1684,7 @@ const deliveryMetadataRuntimeSafetySummary = await validateDeliveryMetadataRunti
 const handoffRuntimeSafetySummary = await validateHandoffRuntimeSafety();
 const snapshotRuntimeSafetySummary = await validateSnapshotRuntimeSafety();
 const localDraftWriteGateSummary = validateLocalDraftWriteGate();
+const projectReplacementGuardSummary = validateProjectReplacementGuard();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -1697,6 +1718,7 @@ console.log(`- Delivery metadata runtime safety: ${deliveryMetadataRuntimeSafety
 console.log(`- Handoff runtime safety: ${handoffRuntimeSafetySummary.source} -> ${handoffRuntimeSafetySummary.repaired} / normalized paths ${handoffRuntimeSafetySummary.normalizedPaths}/8 / Handoff ${handoffRuntimeSafetySummary.handoffBytes} bytes / MIDI ${handoffRuntimeSafetySummary.midiBytes} bytes / WAV ${handoffRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Snapshot runtime safety: ${snapshotRuntimeSafetySummary.source} -> ${snapshotRuntimeSafetySummary.repaired} / normalized paths ${snapshotRuntimeSafetySummary.normalizedPaths}/11 / Handoff ${snapshotRuntimeSafetySummary.handoffBytes} bytes / MIDI ${snapshotRuntimeSafetySummary.midiBytes} bytes / WAV ${snapshotRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Local draft write gate: ${localDraftWriteGateSummary.paths}/4 boolean paths / first edit write eligible ${localDraftWriteGateSummary.firstEditWriteEligible ? "yes" : "no"}`);
+console.log(`- Project replacement guard: ${projectReplacementGuardSummary.paths}/4 dirty/recovery paths / protected loss paths ${projectReplacementGuardSummary.protectedPaths}/3`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

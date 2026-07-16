@@ -63,6 +63,8 @@ Snapshot runtime coverage applies durable project-core normalization when a loca
 
 Master-ceiling draft lifecycle coverage extends the existing runtime and `마스터-천장-복구-비트-demo.wav` evidence without increasing artifact count. Runtime smoke checks domain draft resolution, invalid/empty preservation, durable Save parity, stale-audio distinction, and source immutability across 13 ceiling paths. Renderer smoke inspects native menu routing and verifies Save reads the current project reference while project/history/local-draft/snapshot replacement rebases the editor. Sample QA proves a focused `-6.0 dB` draft matches durable and repaired WAV bytes and differs from stale `-1.0 dB` audio while retaining schema 17, 41 playable WAVs, and 33 full mixes with tail content.
 
+Project-replacement guard coverage adds no media artifact. Runtime smoke exhausts all four dirty/recovery combinations and verifies that the three protected-loss states identify only the data that exists. Renderer smoke loads the pure guard through Vite SSR and inspects the shared App load path to prove candidate parsing precedes the guard, the latest dirty ref plus current recovery object and focused ceiling draft feed the decision, cancellation returns before playback stop/replacement, and confirmed replacement continues through the existing bounded parser and replacement lifecycle. Sample QA remains schema 17 with 41 playable WAVs, 33 full mixes with tail content, and unchanged audience sample hashes.
+
 ## Agent Readability
 
 Agents should be able to answer these questions from repo files alone:

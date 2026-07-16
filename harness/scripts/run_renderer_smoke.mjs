@@ -114,6 +114,46 @@ function validateMasterCeilingDraftLifecycle(workstation) {
   );
 }
 
+function validateProjectReplacementGuard(replacementGuard) {
+  const clean = replacementGuard.resolveProjectReplacementGuard(false, false);
+  const dirty = replacementGuard.resolveProjectReplacementGuard(true, false);
+  const recoveryOnly = replacementGuard.resolveProjectReplacementGuard(false, true);
+  const dirtyRecovery = replacementGuard.resolveProjectReplacementGuard(true, true);
+  check(
+    clean.requiresConfirmation === false &&
+      dirty.requiresConfirmation === true &&
+      recoveryOnly.requiresConfirmation === true &&
+      dirtyRecovery.requiresConfirmation === true,
+    "project replacement guard should protect all dirty and recovery-draft loss states"
+  );
+
+  const loadSource = printNamedFunction(appSource, "App.tsx", "loadProjectText");
+  const dirtySetterSource = printNamedFunction(appSource, "App.tsx", "setProjectHasUnsavedChanges");
+  const parseIndex = loadSource.indexOf("const nextProject = parseProjectFile(contents);");
+  const guardIndex = loadSource.indexOf("resolveProjectReplacementGuard(");
+  const stopIndex = loadSource.indexOf("controllerRef.current?.stop();");
+  const replaceIndex = loadSource.indexOf("replaceProject(nextProject");
+  check(
+    parseIndex >= 0 && guardIndex > parseIndex && stopIndex > guardIndex && replaceIndex > stopIndex,
+    "project replacement should parse before confirmation and confirm before stopping playback or replacing content"
+  );
+  check(
+    loadSource.includes("commitMasterCeilingDraft();") &&
+      loadSource.includes("!window.confirm(replacementGuard.warning)") &&
+      loadSource.includes('setProjectStatus("Open canceled; current project kept")') &&
+      /!window\.confirm\(replacementGuard\.warning\)\) \{[\s\S]*?return;/u.test(loadSource),
+    "dirty Open cancellation should keep the current project after resolving any focused ceiling draft"
+  );
+  check(
+    appSource.includes("const projectHasUnsavedChangesRef = useRef(false);") &&
+      dirtySetterSource.includes("projectHasUnsavedChangesRef.current = value;") &&
+      dirtySetterSource.includes("setProjectHasUnsavedChangesState(value);") &&
+      loadSource.includes("projectHasUnsavedChangesRef.current,") &&
+      loadSource.includes("localDraftRecovery !== null"),
+    "project replacement confirmation should read current dirty and recovery-draft state"
+  );
+}
+
 function validateDemandMaterialization(palette) {
   let factoryCalls = 0;
   const factory = () => {
@@ -3227,6 +3267,7 @@ try {
   const { App } = await server.ssrLoadModule("/src/ui/App.tsx");
   validateProjectFileLoadErrorStatus(await server.ssrLoadModule("/src/ui/workstationUiModel.ts"));
   validateMasterCeilingDraftLifecycle(await server.ssrLoadModule("/src/domain/workstation.ts"));
+  validateProjectReplacementGuard(await server.ssrLoadModule("/src/ui/projectReplacementGuard.ts"));
   const html = renderToStaticMarkup(React.createElement(App));
   validateFirstRunRenderer(html);
   validateWorkspaceCommandDockSource(html);

@@ -1046,6 +1046,7 @@ import {
   fileDisplayName
 } from "./workstationPatternTools";
 import { resolveLocalDraftWriteGate } from "./localDraftLifecycle";
+import { resolveProjectReplacementGuard } from "./projectReplacementGuard";
 import {
   activeReferenceAlignmentQuickActionCard,
   activeSessionBriefCompassQuickActionCard,
@@ -1320,7 +1321,7 @@ export function App(): ReactElement {
   const [handoffExportReceipt, setHandoffExportReceipt] = useState<HandoffExportReceipt | null>(null);
   const [projectStatus, setProjectStatus] = useState("Editable 8-bar foundation");
   const [projectFileLabel, setProjectFileLabel] = useState<string | null>(null);
-  const [projectHasUnsavedChanges, setProjectHasUnsavedChanges] = useState(false);
+  const [projectHasUnsavedChanges, setProjectHasUnsavedChangesState] = useState(false);
   const [projectFileResult, setProjectFileResult] = useState<ProjectFileResult | null>(null);
   const [localDraftRecoveryResult, setLocalDraftRecoveryResult] = useState<LocalDraftRecoveryResult | null>(null);
   const [tapTempo, setTapTempo] = useState<TapTempoState>({ taps: 0, bpm: null, applied: true });
@@ -1329,6 +1330,7 @@ export function App(): ReactElement {
   const [localDraftSavedAt, setLocalDraftSavedAt] = useState<string | null>(localDraftRecovery?.savedAt ?? null);
   const [localDraftWriteArmed, setLocalDraftWriteArmed] = useState(false);
   const projectRef = useRef<ProjectState>(starterProject);
+  const projectHasUnsavedChangesRef = useRef(false);
   const handoffExportReceiptRef = useRef<HandoffExportReceipt | null>(null);
   const tapTempoTimesRef = useRef<number[]>([]);
   const tapTempoCommitTimerRef = useRef<number | null>(null);
@@ -2645,6 +2647,11 @@ export function App(): ReactElement {
     setSectionCueResult(null);
     setProjectStatus(status);
     return true;
+  }
+
+  function setProjectHasUnsavedChanges(value: boolean): void {
+    projectHasUnsavedChangesRef.current = value;
+    setProjectHasUnsavedChangesState(value);
   }
 
   function updateProjectView(update: (current: ProjectState) => ProjectState, status: string): void {
@@ -7179,6 +7186,17 @@ export function App(): ReactElement {
   function loadProjectText(contents: string, sourceName: string, action: "open" | "import"): void {
     try {
       const nextProject = parseProjectFile(contents);
+      commitMasterCeilingDraft();
+      const replacementGuard = resolveProjectReplacementGuard(
+        projectHasUnsavedChangesRef.current,
+        localDraftRecovery !== null
+      );
+      if (replacementGuard.requiresConfirmation && replacementGuard.warning && !window.confirm(replacementGuard.warning)) {
+        setProjectFileResult(null);
+        setLocalDraftRecoveryResult(null);
+        setProjectStatus("Open canceled; current project kept");
+        return;
+      }
       controllerRef.current?.stop();
       controllerRef.current = null;
       replaceProject(nextProject, `Loaded ${sourceName}`, sourceName);
