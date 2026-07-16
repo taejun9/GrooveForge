@@ -59,6 +59,8 @@ Handoff runtime coverage applies durable arrangement and Session Brief normaliza
 
 Snapshot runtime coverage applies durable project-core normalization when a local idea is captured and again when it is restored, while producer-facing summaries read the same repaired identity. Runtime smoke proves a direct `0 BPM / H major / 0 bars / 600 characters` source is stored and restored as `60 BPM / A minor / 1 bar / 240 characters`, preserves canonical snapshot cores, matches durable WAV/MIDI/Handoff output, and leaves the source untouched. Sample-audio QA writes `스냅샷-복구-비트-demo.wav`, its arrangement MIDI, and Handoff text, requires restored/imported parity across all three, and raises the current report to schema version 17 with 41 playable WAVs and 33 full mixes retaining tail content.
 
+Master-ceiling draft lifecycle coverage extends the existing runtime and `마스터-천장-복구-비트-demo.wav` evidence without increasing artifact count. Runtime smoke checks domain draft resolution, invalid/empty preservation, durable Save parity, stale-audio distinction, and source immutability across 13 ceiling paths. Renderer smoke inspects native menu routing and verifies Save reads the current project reference while project/history/local-draft/snapshot replacement rebases the editor. Sample QA proves a focused `-6.0 dB` draft matches durable and repaired WAV bytes and differs from stale `-1.0 dB` audio while retaining schema 17, 41 playable WAVs, and 33 full mixes with tail content.
+
 ## Agent Readability
 
 Agents should be able to answer these questions from repo files alone:

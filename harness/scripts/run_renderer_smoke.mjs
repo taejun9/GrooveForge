@@ -63,12 +63,54 @@ function validateProjectFileLoadErrorStatus(uiModel) {
     "project loading should route parser failures through the actionable status helper"
   );
   check(
-    /async function handleSaveProject\(\): Promise<void> \{\s*try \{\s*const contents = serializeProjectFile\(project\);/u.test(appSource),
-    "project serialization should stay inside the Save failure boundary"
+    /async function handleSaveProject\(\): Promise<void> \{\s*try \{\s*const projectToSave = projectRef\.current;\s*const contents = serializeProjectFile\(projectToSave\);/u.test(appSource),
+    "project serialization should stay inside the Save failure boundary and use the current project reference"
   );
   check(
     appSource.includes("file.size > maxProjectFileBytes"),
     "browser project import should reject oversized bytes before File.text()"
+  );
+}
+
+function validateMasterCeilingDraftLifecycle(workstation) {
+  const sourceProject = { ...workstation.starterProject, masterCeilingDb: -1 };
+  check(
+    workstation.resolveMasterCeilingDraft(sourceProject, " -6.0 ") === workstation.minMasterCeilingDb,
+    "focused master ceiling draft should resolve through the domain bound before Save"
+  );
+  check(
+    workstation.resolveMasterCeilingDraft(sourceProject, "") === -1 &&
+      workstation.resolveMasterCeilingDraft(sourceProject, "invalid") === -1,
+    "empty or invalid master ceiling draft should preserve the current project value"
+  );
+
+  const menuSource = printNamedFunction(appSource, "App.tsx", "handleNativeMenuCommand");
+  const saveSource = printNamedFunction(appSource, "App.tsx", "handleSaveProject");
+  const replaceSource = printNamedFunction(appSource, "App.tsx", "replaceProject");
+  const historySource = printNamedFunction(appSource, "App.tsx", "restoreProjectFromHistory");
+  const snapshotSource = printNamedFunction(appSource, "App.tsx", "restoreSavedSnapshot");
+  check(
+    /case "save-project":\s*commitMasterCeilingDraft\(\);/u.test(menuSource) &&
+      /case "open-project":\s*commitMasterCeilingDraft\(\);/u.test(menuSource) &&
+      /case "toggle-playback":\s*commitMasterCeilingDraft\(\);/u.test(menuSource),
+    "native Save, Open, and playback commands should commit a focused ceiling draft before consuming project state"
+  );
+  check(
+    /case "undo":\s*resetMasterCeilingEditor\(projectRef\.current\);/u.test(menuSource) &&
+      /case "redo":\s*resetMasterCeilingEditor\(projectRef\.current\);/u.test(menuSource),
+    "native Undo and Redo should cancel stale ceiling draft state before history restoration"
+  );
+  check(
+    saveSource.includes("const projectToSave = projectRef.current;") &&
+      saveSource.includes("serializeProjectFile(projectToSave)") &&
+      !saveSource.includes("serializeProjectFile(project)"),
+    "native Save should serialize current project state after draft resolution"
+  );
+  check(
+    replaceSource.includes("resetMasterCeilingEditor(nextProject);") &&
+      historySource.includes("resetMasterCeilingEditor(nextProject);") &&
+      snapshotSource.includes("resetMasterCeilingEditor(projectRef.current);"),
+    "project replacement, history restore, and snapshot restore should rebase the ceiling editor"
   );
 }
 
@@ -3158,6 +3200,7 @@ const server = await createServer({
 try {
   const { App } = await server.ssrLoadModule("/src/ui/App.tsx");
   validateProjectFileLoadErrorStatus(await server.ssrLoadModule("/src/ui/workstationUiModel.ts"));
+  validateMasterCeilingDraftLifecycle(await server.ssrLoadModule("/src/domain/workstation.ts"));
   const html = renderToStaticMarkup(React.createElement(App));
   validateFirstRunRenderer(html);
   validateWorkspaceCommandDockSource(html);

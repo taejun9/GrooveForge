@@ -2842,6 +2842,18 @@ export function projectMasterCeilingDb(project: Pick<ProjectState, "masterCeilin
   return normalizeMasterCeilingDb(project.masterCeilingDb);
 }
 
+export function resolveMasterCeilingDraft(
+  project: Pick<ProjectState, "masterCeilingDb">,
+  draft: string
+): number {
+  const trimmed = draft.trim();
+  if (trimmed === "") {
+    return projectMasterCeilingDb(project);
+  }
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? normalizeMasterCeilingDb(parsed) : projectMasterCeilingDb(project);
+}
+
 export function dbToGain(db: number): number {
   return Math.pow(10, db / 20);
 }

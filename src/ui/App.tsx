@@ -185,8 +185,10 @@ import {
   patternVariationPresetLabel,
   nextProjectSnapshotName,
   projectFileName,
+  projectMasterCeilingDb,
   projectSnapshotSummary,
   renameProjectSnapshot,
+  resolveMasterCeilingDraft,
   retargetProjectKey,
   restoreProjectSnapshot,
   scalePitches,
@@ -2401,7 +2403,9 @@ export function App(): ReactElement {
     keyboardCaptureEnabled,
     keyboardCaptureTarget,
     keyboardCaptureDefaults,
-    keyboardCaptureStepMode
+    keyboardCaptureStepMode,
+    masterCeilingDraft,
+    masterCeilingEditing
   ]);
 
   function handleDesktopShortcut(event: KeyboardEvent): void {
@@ -2522,15 +2526,19 @@ export function App(): ReactElement {
   function handleNativeMenuCommand(command: NativeMenuCommand): void {
     switch (command) {
       case "open-project":
+        commitMasterCeilingDraft();
         void handleOpenProject();
         return;
       case "save-project":
+        commitMasterCeilingDraft();
         void handleSaveProject();
         return;
       case "undo":
+        resetMasterCeilingEditor(projectRef.current);
         undoProject();
         return;
       case "redo":
+        resetMasterCeilingEditor(projectRef.current);
         redoProject();
         return;
       case "quick-actions":
@@ -2540,6 +2548,7 @@ export function App(): ReactElement {
         openCommandReference();
         return;
       case "toggle-playback":
+        commitMasterCeilingDraft();
         togglePlayback();
         return;
       case "delete-selected-event":
@@ -2804,6 +2813,7 @@ export function App(): ReactElement {
 
   function replaceProject(nextProject: ProjectState, status: string, fileLabel: string | null = null): void {
     projectRef.current = nextProject;
+    resetMasterCeilingEditor(nextProject);
     localDraftSkipNextWriteRef.current = true;
     resetTapTempo();
     setProjectFileLabel(fileLabel);
@@ -2893,6 +2903,7 @@ export function App(): ReactElement {
 
   function restoreProjectFromHistory(nextProject: ProjectState, status: string): void {
     projectRef.current = nextProject;
+    resetMasterCeilingEditor(nextProject);
     resetTapTempo();
     setProject(nextProject);
     setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, nextProject.arrangement.length - 1)));
@@ -3071,6 +3082,7 @@ export function App(): ReactElement {
     setLaunchpadOpen(false);
 
     if (changed) {
+      resetMasterCeilingEditor(projectRef.current);
       setSelectedArrangementIndex(0);
       setSelectedNote(null);
       setSelectedDrumStep(null);
@@ -3104,6 +3116,7 @@ export function App(): ReactElement {
     }
     const changed = updateProject((current) => restoreProjectSnapshot(current, snapshotId), `Restored snapshot ${snapshot.name}`);
     if (changed) {
+      resetMasterCeilingEditor(projectRef.current);
       setSelectedArrangementIndex(0);
       setSelectedNote(null);
       setSelectedDrumStep(null);
@@ -4352,20 +4365,28 @@ export function App(): ReactElement {
     }));
   }
 
-  function normalizeMasterCeilingDb(value: number): number {
-    return Number.isFinite(value) ? Math.min(0, Math.max(-6, Math.round(value * 10) / 10)) : projectRef.current.masterCeilingDb;
+  function normalizeMasterCeilingInput(value: number): number {
+    return Number.isFinite(value) ? projectMasterCeilingDb({ masterCeilingDb: value }) : projectMasterCeilingDb(projectRef.current);
   }
 
   function updateMasterCeilingDb(value: number): void {
-    const normalized = normalizeMasterCeilingDb(value);
-    updateProject((current) => ({ ...current, masterCeilingDb: normalized }));
+    const normalized = normalizeMasterCeilingInput(value);
+    updateProject((current) =>
+      current.masterCeilingDb === normalized ? current : { ...current, masterCeilingDb: normalized }
+    );
+  }
+
+  function resetMasterCeilingEditor(nextProject: Pick<ProjectState, "masterCeilingDb">): void {
+    setMasterCeilingEditing(false);
+    setMasterCeilingDraft(projectMasterCeilingDb(nextProject).toFixed(1));
   }
 
   function commitMasterCeilingDraft(): void {
-    const trimmed = masterCeilingDraft.trim();
-    const normalized = normalizeMasterCeilingDb(trimmed === "" ? projectRef.current.masterCeilingDb : Number(trimmed));
-    setMasterCeilingEditing(false);
-    setMasterCeilingDraft(normalized.toFixed(1));
+    if (!masterCeilingEditing) {
+      return;
+    }
+    const normalized = resolveMasterCeilingDraft(projectRef.current, masterCeilingDraft);
+    resetMasterCeilingEditor({ masterCeilingDb: normalized });
     updateMasterCeilingDb(normalized);
   }
 
@@ -6972,7 +6993,7 @@ export function App(): ReactElement {
 
     try {
       setIsPlaying(true);
-      controllerRef.current = startRealtimePlayback(project, {
+      controllerRef.current = startRealtimePlayback(projectRef.current, {
         mode: transportLoopMode,
         bars: transportLoopBars,
         startBar: transportLoopStartBar,
@@ -6993,8 +7014,9 @@ export function App(): ReactElement {
 
   async function handleSaveProject(): Promise<void> {
     try {
-      const contents = serializeProjectFile(project);
-      const defaultName = projectFileName(project);
+      const projectToSave = projectRef.current;
+      const contents = serializeProjectFile(projectToSave);
+      const defaultName = projectFileName(projectToSave);
       const result = await window.grooveforge?.saveProject?.(contents, defaultName);
       if (result) {
         if (result.canceled) {
@@ -7009,7 +7031,7 @@ export function App(): ReactElement {
         setProjectFileLabel(fileLabel);
         setProjectHasUnsavedChanges(false);
         setLocalDraftRecoveryResult(null);
-        setProjectFileResult(createProjectFileResult("save", fileLabel, project));
+        setProjectFileResult(createProjectFileResult("save", fileLabel, projectToSave));
         setProjectStatus(`Saved ${fileLabel}`);
         return;
       }
@@ -7019,7 +7041,7 @@ export function App(): ReactElement {
       setProjectFileLabel(defaultName);
       setProjectHasUnsavedChanges(false);
       setLocalDraftRecoveryResult(null);
-      setProjectFileResult(createProjectFileResult("download", defaultName, project));
+      setProjectFileResult(createProjectFileResult("download", defaultName, projectToSave));
       setProjectStatus(`Downloaded ${defaultName}`);
     } catch (error) {
       console.error(error);

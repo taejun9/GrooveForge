@@ -976,6 +976,13 @@ async function validateMasterCeilingRuntimeSafety() {
   const highAnalysis = render.analyzeExport(highProject);
   const lowStemAnalyses = render.analyzeStemExports(lowProject);
   const lowHandoff = handoff.createHandoffSheet(lowProject, lowAnalysis, lowStemAnalyses);
+  const draftSourceProject = { ...structuredClone(baseProject), masterCeilingDb: -1 };
+  const resolvedDraftCeiling = workstation.resolveMasterCeilingDraft(draftSourceProject, " -6.0 ");
+  const committedDraftProject = { ...draftSourceProject, masterCeilingDb: resolvedDraftCeiling };
+  const importedDraftProject = workstation.parseProjectFile(workstation.serializeProjectFile(committedDraftProject));
+  const committedDraftWav = await blobBytes(render.createMixWavBlob(committedDraftProject));
+  const importedDraftWav = await blobBytes(render.createMixWavBlob(importedDraftProject));
+  const staleDraftWav = await blobBytes(render.createMixWavBlob(draftSourceProject));
 
   check(workstation.projectMasterCeilingDb(lowProject) === workstation.minMasterCeilingDb, "master-ceiling-runtime-safety: direct low ceiling must clamp to -6 dB");
   check(workstation.projectMasterCeilingDb(highProject) === workstation.maxMasterCeilingDb, "master-ceiling-runtime-safety: direct high ceiling must clamp to 0 dB");
@@ -987,11 +994,17 @@ async function validateMasterCeilingRuntimeSafety() {
   check(lowAnalysis.ceilingDb === workstation.minMasterCeilingDb && highAnalysis.ceilingDb === workstation.maxMasterCeilingDb, "master-ceiling-runtime-safety: export analysis must report the bounded ceiling");
   check(lowAnalysis.peakDb <= lowAnalysis.ceilingDb + 1e-9 && highAnalysis.peakDb <= highAnalysis.ceilingDb + 1e-9, "master-ceiling-runtime-safety: analyzed peaks must respect the bounded ceiling");
   check(lowHandoff.includes("Master Ceiling: -6.0 dB"), "master-ceiling-runtime-safety: direct Handoff Sheet must report the bounded ceiling");
+  check(resolvedDraftCeiling === workstation.minMasterCeilingDb, "master-ceiling-draft-lifecycle: focused -6.0 dB draft must resolve before native Save");
+  check(workstation.resolveMasterCeilingDraft(draftSourceProject, "") === -1 && workstation.resolveMasterCeilingDraft(draftSourceProject, "not-a-number") === -1, "master-ceiling-draft-lifecycle: empty or invalid draft must preserve the current ceiling");
+  check(committedDraftWav.byteLength === importedDraftWav.byteLength && committedDraftWav.every((byte, index) => byte === importedDraftWav[index]), "master-ceiling-draft-lifecycle: committed draft WAV must match durable Save repair");
+  check(committedDraftWav.some((byte, index) => byte !== staleDraftWav[index]), "master-ceiling-draft-lifecycle: committed -6.0 dB WAV must differ from stale -1.0 dB project audio");
+  check(draftSourceProject.masterCeilingDb === -1, "master-ceiling-draft-lifecycle: draft resolution must not mutate caller-owned project state");
   check(lowProject.masterCeilingDb === -900 && highProject.masterCeilingDb === 18, "master-ceiling-runtime-safety: runtime consumers must not mutate caller-owned ceiling values");
 
   return {
     ceilingRange: `${workstation.minMasterCeilingDb}..${workstation.maxMasterCeilingDb}`,
-    normalizedPaths: 8,
+    normalizedPaths: 13,
+    draftLifecycle: `${draftSourceProject.masterCeilingDb} -> ${resolvedDraftCeiling} dB`,
     lowPeakDb: lowAnalysis.peakDb,
     highHeadroomDb: highAnalysis.headroomDb,
     wavBytes: directLowWav.byteLength
@@ -1651,7 +1664,7 @@ console.log(`- Mixer topology safety: ${mixerTopologySafetySummary.sourceChannel
 console.log(`- Snapshot identity safety: ${snapshotIdentitySafetySummary.sourceIds}->${snapshotIdentitySafetySummary.repairedIds} ids / unique ${snapshotIdentitySafetySummary.uniqueIds}/${snapshotIdentitySafetySummary.repairedIds} / rename ${snapshotIdentitySafetySummary.renamed} / delete ${snapshotIdentitySafetySummary.deleted} / restore ${snapshotIdentitySafetySummary.restoredBpms} BPM / normalized paths ${snapshotIdentitySafetySummary.paths}/6`);
 console.log(`- Musical control range safety: sound ${musicalControlRangeSafetySummary.soundRange} / drum velocity ${musicalControlRangeSafetySummary.drumVelocityRange} / mixer ${musicalControlRangeSafetySummary.mixerRange} dB / normalized paths ${musicalControlRangeSafetySummary.paths}/8 / structural rejections ${musicalControlRangeSafetySummary.rejected}/3 / MIDI ${musicalControlRangeSafetySummary.midiBytes} bytes / WAV ${musicalControlRangeSafetySummary.wavBytes} bytes`);
 console.log(`- Swing playback timing: ${swingPlaybackTimingSummary.swingRange} / odd-step delay ${swingPlaybackTimingSummary.oddOffsetMs} ms / distinct WAV and MIDI yes / normalized paths ${swingPlaybackTimingSummary.normalizedPaths}/4 / MIDI ${swingPlaybackTimingSummary.midiBytes} bytes / WAV ${swingPlaybackTimingSummary.wavBytes} bytes`);
-console.log(`- Master ceiling runtime safety: ${masterCeilingRuntimeSafetySummary.ceilingRange} dB / normalized paths ${masterCeilingRuntimeSafetySummary.normalizedPaths}/8 / low peak ${masterCeilingRuntimeSafetySummary.lowPeakDb.toFixed(2)} dB / high headroom ${masterCeilingRuntimeSafetySummary.highHeadroomDb.toFixed(2)} dB / WAV ${masterCeilingRuntimeSafetySummary.wavBytes} bytes`);
+console.log(`- Master ceiling runtime safety: ${masterCeilingRuntimeSafetySummary.ceilingRange} dB / draft ${masterCeilingRuntimeSafetySummary.draftLifecycle} / normalized paths ${masterCeilingRuntimeSafetySummary.normalizedPaths}/13 / low peak ${masterCeilingRuntimeSafetySummary.lowPeakDb.toFixed(2)} dB / high headroom ${masterCeilingRuntimeSafetySummary.highHeadroomDb.toFixed(2)} dB / WAV ${masterCeilingRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Delivery metadata runtime safety: ${deliveryMetadataRuntimeSafetySummary.source} -> ${deliveryMetadataRuntimeSafetySummary.repaired} / normalized paths ${deliveryMetadataRuntimeSafetySummary.normalizedPaths}/9 / MIDI ${deliveryMetadataRuntimeSafetySummary.midiBytes} bytes / WAV ${deliveryMetadataRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Handoff runtime safety: ${handoffRuntimeSafetySummary.source} -> ${handoffRuntimeSafetySummary.repaired} / normalized paths ${handoffRuntimeSafetySummary.normalizedPaths}/8 / Handoff ${handoffRuntimeSafetySummary.handoffBytes} bytes / MIDI ${handoffRuntimeSafetySummary.midiBytes} bytes / WAV ${handoffRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Snapshot runtime safety: ${snapshotRuntimeSafetySummary.source} -> ${snapshotRuntimeSafetySummary.repaired} / normalized paths ${snapshotRuntimeSafetySummary.normalizedPaths}/11 / Handoff ${snapshotRuntimeSafetySummary.handoffBytes} bytes / MIDI ${snapshotRuntimeSafetySummary.midiBytes} bytes / WAV ${snapshotRuntimeSafetySummary.wavBytes} bytes`);
