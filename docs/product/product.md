@@ -942,6 +942,7 @@ MVP capabilities:
 - Stem export through deterministic offline rendering for isolated drum, 808, synth, and chord WAV files from the current arrangement, using the same tail-safe render and terminal fade as the full mix.
 - MIDI export as a deterministic Standard MIDI File with drum, 808, synth, and chord tracks from the current arrangement.
 - Handoff Sheet export as a local plain text summary of title, BPM/key/style, Delivery Target, Session Brief, arrangement blocks, export meter, and stem meter data without media upload or compliance claims.
+- Project open/save recovers recognized finite sound-design, drum-dynamic, note/chord-dynamic, mixer-processing, arrangement, and automation controls that exceed editor ranges instead of rejecting the entire beat; malformed structures, non-finite values, invalid enums, and invalid musical identities still fail closed. Repaired state must drive the same realtime, MIDI, and deterministic WAV behavior, including a decoded `컨트롤-복구-비트-demo.wav` whose direct parser-bypass PCM matches imported repair.
 
 ## Roadmap
 

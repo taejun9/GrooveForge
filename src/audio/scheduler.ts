@@ -17,9 +17,11 @@ import {
   normalizeArrangementBars,
   normalizeArrangementPlaybackRange,
   normalizeMixerChannelTopology,
+  normalizeNoteVelocity,
   normalizePatternEventCollections,
   normalizePatternEventLength,
   normalizeProjectAutomationEvents,
+  normalizeSoundDesignControls,
   noteEventShouldPlay,
   noteToFrequency,
   BassNote,
@@ -453,7 +455,7 @@ function scheduleStep(
   const bassMix = arrangementTrackMix(project, "bass_808", mutedTracks);
   const synthMix = arrangementTrackMix(project, "synth", mutedTracks);
   const chordMix = arrangementTrackMix(project, "chord", mutedTracks);
-  const sound = project.sound;
+  const sound = normalizeSoundDesignControls(project.sound);
   const stepDuration = projectStepDurationSeconds(project);
   if (project.metronomeEnabled && patternStep % 4 === 0) {
     scheduleMetronomeClick(context, destination, time, patternStep);
@@ -600,7 +602,7 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
   const spaceInput = createSpaceBus(context, masterGain);
   const destination: PlaybackDestination = { dry: masterGain, send: spaceInput };
   const pattern = activePattern(project);
-  const sound = project.sound;
+  const sound = normalizeSoundDesignControls(project.sound);
   const stepDuration = projectStepDurationSeconds(project);
   const time = context.currentTime + 0.025;
   let stopAt = time + 0.42;
@@ -673,7 +675,7 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
       time,
       duration,
       noteToFrequency(note.pitch),
-      note.velocity * (0.42 + sound.bassDrive * 0.22) * bassMix.gain,
+      normalizeNoteVelocity(note.velocity) * (0.42 + sound.bassDrive * 0.22) * bassMix.gain,
       bassOscillator(sound),
       bassMix,
       bassMix.pan,
@@ -696,7 +698,7 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
       time,
       duration,
       noteToFrequency(note.pitch),
-      note.velocity * 0.12 * synthMix.gain,
+      normalizeNoteVelocity(note.velocity, 0.64) * 0.12 * synthMix.gain,
       synthOscillator(sound),
       synthMix,
       synthMix.pan,
@@ -724,7 +726,7 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
         time,
         duration,
         noteToFrequency(pitch),
-        target.chord.velocity * 0.08 * chordMix.gain,
+        normalizeNoteVelocity(target.chord.velocity, 0.5) * 0.08 * chordMix.gain,
         "triangle",
         chordMix,
         Math.max(-1, Math.min(1, chordMix.pan + spread * sound.chordWidth * 0.34)),
@@ -779,6 +781,8 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
   const normalizedPatternCache = new WeakMap<PatternData, PatternData>();
   let mixerSource: ProjectState["mixer"] | null = null;
   let normalizedMixer = normalizeMixerChannelTopology([]);
+  let soundSource: ProjectState["sound"] | null = null;
+  let normalizedSound: ProjectState["sound"] | null = null;
   let playbackProjectSource: ProjectState | null = null;
   let normalizedPlaybackProject: ProjectState | null = null;
   let automationSource: ProjectState["automation"] | null = null;
@@ -801,12 +805,22 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
       playbackProjectSource = null;
       normalizedPlaybackProject = null;
     }
-    if (normalizedMixer === currentProject.mixer) {
+    if (currentProject.sound !== soundSource) {
+      soundSource = currentProject.sound;
+      normalizedSound = normalizeSoundDesignControls(currentProject.sound);
+      playbackProjectSource = null;
+      normalizedPlaybackProject = null;
+    }
+    if (normalizedMixer === currentProject.mixer && normalizedSound === currentProject.sound) {
       return currentProject;
     }
     if (currentProject !== playbackProjectSource) {
       playbackProjectSource = currentProject;
-      normalizedPlaybackProject = { ...currentProject, mixer: normalizedMixer };
+      normalizedPlaybackProject = {
+        ...currentProject,
+        mixer: normalizedMixer,
+        sound: normalizedSound ?? currentProject.sound
+      };
     }
     return normalizedPlaybackProject ?? currentProject;
   };

@@ -3264,6 +3264,7 @@ function normalizeChordEvents(events: ChordEventInput[] | undefined): ChordEvent
       ...event,
       inversion: normalizeChordInversion(event.inversion),
       length: normalizePatternEventLength(event.length, event.step),
+      velocity: normalizeChordVelocity(event.velocity),
       probability: normalizeEventProbability(event.probability ?? 1)
     });
     acceptedSteps.add(event.step);
@@ -3285,7 +3286,7 @@ function normalizeSoundDesign(sound: SoundDesignInput | undefined): SoundDesign 
   if (!sound) {
     return { ...soundPresetDefaults.clean_knock };
   }
-  return {
+  const normalized: SoundDesign = {
     preset: sound.preset ?? "custom",
     kickPunch: clampUnit(sound.kickPunch),
     snareSnap: clampUnit(sound.snareSnap),
@@ -3298,6 +3299,23 @@ function normalizeSoundDesign(sound: SoundDesignInput | undefined): SoundDesign 
     chordWarmth: clampUnit(sound.chordWarmth),
     chordWidth: clampUnit(sound.chordWidth)
   };
+  return sound.preset === normalized.preset &&
+    sound.kickPunch === normalized.kickPunch &&
+    sound.snareSnap === normalized.snareSnap &&
+    sound.hatBrightness === normalized.hatBrightness &&
+    sound.bassDrive === normalized.bassDrive &&
+    sound.bassDecay === normalized.bassDecay &&
+    sound.sidechainDuck === normalized.sidechainDuck &&
+    sound.synthBrightness === normalized.synthBrightness &&
+    sound.synthRelease === normalized.synthRelease &&
+    sound.chordWarmth === normalized.chordWarmth &&
+    sound.chordWidth === normalized.chordWidth
+    ? (sound as SoundDesign)
+    : normalized;
+}
+
+export function normalizeSoundDesignControls(sound: SoundDesign): SoundDesign {
+  return normalizeSoundDesign(sound);
 }
 
 export function normalizeProjectAutomationEvents(events: readonly AutomationEventInput[] | undefined): AutomationEvent[] {
@@ -3635,16 +3653,16 @@ function isSoundDesignInput(value: unknown): value is SoundDesignInput {
   return (
     isRecord(value) &&
     (value.preset === undefined || isOneOf(value.preset, [...soundPresetIds, "custom"])) &&
-    isOptionalUnit(value.kickPunch) &&
-    isOptionalUnit(value.snareSnap) &&
-    isOptionalUnit(value.hatBrightness) &&
-    isOptionalUnit(value.bassDrive) &&
-    isOptionalUnit(value.bassDecay) &&
-    isOptionalUnit(value.sidechainDuck) &&
-    isOptionalUnit(value.synthBrightness) &&
-    isOptionalUnit(value.synthRelease) &&
-    isOptionalUnit(value.chordWarmth) &&
-    isOptionalUnit(value.chordWidth)
+    isOptionalFiniteNumber(value.kickPunch) &&
+    isOptionalFiniteNumber(value.snareSnap) &&
+    isOptionalFiniteNumber(value.hatBrightness) &&
+    isOptionalFiniteNumber(value.bassDrive) &&
+    isOptionalFiniteNumber(value.bassDecay) &&
+    isOptionalFiniteNumber(value.sidechainDuck) &&
+    isOptionalFiniteNumber(value.synthBrightness) &&
+    isOptionalFiniteNumber(value.synthRelease) &&
+    isOptionalFiniteNumber(value.chordWarmth) &&
+    isOptionalFiniteNumber(value.chordWidth)
   );
 }
 
@@ -3727,7 +3745,7 @@ function isDrumVelocities(value: unknown): value is DrumVelocities {
     (lane) =>
       Array.isArray(value[lane]) &&
       value[lane].length === stepsPerBar &&
-      value[lane].every((velocity) => isFiniteNumber(velocity) && velocity >= 0 && velocity <= 1)
+      value[lane].every(isFiniteNumber)
   );
 }
 
@@ -3739,7 +3757,7 @@ function isDrumTimings(value: unknown): value is DrumTimings {
     (lane) =>
       Array.isArray(value[lane]) &&
       value[lane].length === stepsPerBar &&
-      value[lane].every((timing) => isFiniteNumber(timing) && timing >= minDrumTimingMs && timing <= maxDrumTimingMs)
+      value[lane].every(isFiniteNumber)
   );
 }
 
@@ -3751,12 +3769,12 @@ function isDrumProbabilities(value: unknown): value is DrumProbabilities {
     (lane) =>
       Array.isArray(value[lane]) &&
       value[lane].length === stepsPerBar &&
-      value[lane].every((probability) => isFiniteNumber(probability) && probability >= 0 && probability <= 1)
+      value[lane].every(isFiniteNumber)
   );
 }
 
 function isHatRepeats(value: unknown): value is number[] {
-  return Array.isArray(value) && value.length === stepsPerBar && value.every((repeat) => Number.isInteger(repeat) && repeat >= 1 && repeat <= 4);
+  return Array.isArray(value) && value.length === stepsPerBar && value.every(isFiniteNumber);
 }
 
 function isBassNote(value: unknown): value is BassNoteInput {
@@ -3765,11 +3783,9 @@ function isBassNote(value: unknown): value is BassNoteInput {
     isStep(value.step) &&
     isPitch(value.pitch) &&
     isFiniteNumber(value.length) &&
-    value.length >= 1 &&
-    value.length <= stepsPerBar &&
-    isOptionalUnit(value.velocity) &&
+    isOptionalFiniteNumber(value.velocity) &&
     typeof value.glide === "boolean" &&
-    isOptionalUnit(value.probability)
+    isOptionalFiniteNumber(value.probability)
   );
 }
 
@@ -3779,12 +3795,8 @@ function isMelodyNote(value: unknown): value is MelodyNoteInput {
     isStep(value.step) &&
     isPitch(value.pitch) &&
     isFiniteNumber(value.length) &&
-    value.length >= 1 &&
-    value.length <= stepsPerBar &&
     isFiniteNumber(value.velocity) &&
-    value.velocity >= 0 &&
-    value.velocity <= 1 &&
-    isOptionalUnit(value.probability)
+    isOptionalFiniteNumber(value.probability)
   );
 }
 
@@ -3796,13 +3808,9 @@ function isChordEvent(value: unknown): value is ChordEventInput {
     (value.root in tonicIndex) &&
     isOneOf(value.quality, chordQualities) &&
     isFiniteNumber(value.length) &&
-    value.length >= 1 &&
-    value.length <= stepsPerBar &&
     isFiniteNumber(value.velocity) &&
-    value.velocity >= 0 &&
-    value.velocity <= 1 &&
     (value.inversion === undefined || isChordInversion(value.inversion)) &&
-    isOptionalUnit(value.probability)
+    isOptionalFiniteNumber(value.probability)
   );
 }
 
@@ -3813,11 +3821,11 @@ function isMixerChannelInput(value: unknown): value is MixerChannelInput {
     typeof value.name === "string" &&
     isFiniteNumber(value.volumeDb) &&
     isFiniteNumber(value.pan) &&
-    isOptionalUnit(value.lowCut) &&
-    isOptionalUnit(value.air) &&
-    isOptionalUnit(value.drive) &&
-    isOptionalUnit(value.glue) &&
-    isOptionalUnit(value.send) &&
+    isOptionalFiniteNumber(value.lowCut) &&
+    isOptionalFiniteNumber(value.air) &&
+    isOptionalFiniteNumber(value.drive) &&
+    isOptionalFiniteNumber(value.glue) &&
+    isOptionalFiniteNumber(value.send) &&
     typeof value.muted === "boolean" &&
     typeof value.solo === "boolean" &&
     typeof value.accent === "string"
@@ -3834,10 +3842,7 @@ function isArrangementBlock(value: unknown): value is ArrangementBlockInput {
     isOneOf(value.section, arrangementSections) &&
     isOneOf(value.pattern, patternSlots) &&
     isFiniteNumber(value.energy) &&
-    value.energy >= 0 &&
-    value.energy <= 1 &&
-    (value.bars === undefined ||
-      (isFiniteNumber(value.bars) && value.bars >= minArrangementBars && value.bars <= maxArrangementBars)) &&
+    isOptionalFiniteNumber(value.bars) &&
     (value.mutedTracks === undefined ||
       (Array.isArray(value.mutedTracks) && value.mutedTracks.every((track) => isOneOf(track, arrangementMuteTrackIds))))
   );
@@ -3855,8 +3860,8 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function isOptionalUnit(value: unknown): boolean {
-  return value === undefined || (isFiniteNumber(value) && value >= 0 && value <= 1);
+function isOptionalFiniteNumber(value: unknown): boolean {
+  return value === undefined || isFiniteNumber(value);
 }
 
 function isChordInversion(value: unknown): value is ChordInversion {

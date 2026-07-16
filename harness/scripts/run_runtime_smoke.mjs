@@ -723,6 +723,171 @@ function validateSnapshotIdentitySafety() {
   };
 }
 
+async function validateMusicalControlRangeSafety() {
+  const sourceProject = structuredClone(workstation.starterProject);
+  sourceProject.title = "Recovered Musical Control Safety Beat";
+  sourceProject.sound = {
+    preset: "custom",
+    kickPunch: 4,
+    snareSnap: -4,
+    hatBrightness: 3,
+    bassDrive: -3,
+    bassDecay: 2,
+    sidechainDuck: -2,
+    synthBrightness: 8,
+    synthRelease: -8,
+    chordWarmth: 6,
+    chordWidth: -6
+  };
+  for (const lane of workstation.drumLanes) {
+    sourceProject.patterns.A.drumVelocities[lane] = workstation.steps.map((step) => (step % 2 === 0 ? 4 : -4));
+    sourceProject.patterns.A.drumTimings[lane] = workstation.steps.map((step) => (step % 2 === 0 ? 999 : -999));
+    sourceProject.patterns.A.drumProbabilities[lane] = workstation.steps.map((step) => (step % 2 === 0 ? 3 : -3));
+  }
+  sourceProject.patterns.A.drumPattern.hat = workstation.steps.map(() => true);
+  sourceProject.patterns.A.hatRepeats = workstation.steps.map((step) => (step % 3 === 0 ? 9 : step % 3 === 1 ? -4 : 2.6));
+  sourceProject.patterns.A.bassNotes[0] = {
+    ...sourceProject.patterns.A.bassNotes[0],
+    length: 999,
+    velocity: 4,
+    probability: -4
+  };
+  sourceProject.patterns.A.melodyNotes[0] = {
+    ...sourceProject.patterns.A.melodyNotes[0],
+    length: -999,
+    velocity: -4,
+    probability: 4
+  };
+  sourceProject.patterns.A.chordEvents[0] = {
+    ...sourceProject.patterns.A.chordEvents[0],
+    length: 999,
+    velocity: 4,
+    probability: 4
+  };
+  sourceProject.patterns.B.chordEvents[0] = {
+    ...sourceProject.patterns.B.chordEvents[0],
+    velocity: -4
+  };
+  sourceProject.mixer = sourceProject.mixer.map((channel, index) => ({
+    ...channel,
+    volumeDb: index % 2 === 0 ? 999 : -999,
+    pan: index % 2 === 0 ? 999 : -999,
+    lowCut: index % 2 === 0 ? 4 : -4,
+    air: index % 2 === 0 ? -3 : 3,
+    drive: index % 2 === 0 ? 2 : -2,
+    glue: index % 2 === 0 ? -5 : 5,
+    send: index % 2 === 0 ? 7 : -7
+  }));
+  sourceProject.arrangement[0] = { ...sourceProject.arrangement[0], bars: 999, energy: 4 };
+  sourceProject.arrangement[1] = { ...sourceProject.arrangement[1], bars: -999, energy: -4 };
+  sourceProject.automation = [
+    {
+      target: "master_volume",
+      startStep: -999,
+      endStep: 9999,
+      startValue: -4,
+      endValue: 4,
+      curve: "linear"
+    }
+  ];
+  const { snapshots: _snapshots, ...snapshotCore } = structuredClone(sourceProject);
+  sourceProject.snapshots = [
+    {
+      id: "musical-control-range-safety",
+      name: "Out-of-range controls",
+      createdAt: "2026-07-16T08:00:00.000Z",
+      project: snapshotCore
+    }
+  ];
+
+  const wrapped = JSON.stringify({
+    app: "GrooveForge",
+    fileVersion: workstation.projectFileVersion,
+    savedAt: "2026-07-16T08:00:00.000Z",
+    project: sourceProject
+  });
+  const parsed = workstation.parseProjectFile(wrapped);
+  const bareParsed = workstation.parseProjectFile(JSON.stringify(sourceProject));
+  const serializedFile = safeJsonParse(workstation.serializeProjectFile(sourceProject), "musical-control-range-safety");
+  const serializedParsed = workstation.parseProjectFile(JSON.stringify(serializedFile));
+  const legacyFile = legacySinglePatternProjectFile();
+  legacyFile.project.sound = structuredClone(sourceProject.sound);
+  legacyFile.project.drumVelocities = structuredClone(sourceProject.patterns.A.drumVelocities);
+  legacyFile.project.drumTimings = structuredClone(sourceProject.patterns.A.drumTimings);
+  legacyFile.project.drumProbabilities = structuredClone(sourceProject.patterns.A.drumProbabilities);
+  legacyFile.project.hatRepeats = structuredClone(sourceProject.patterns.A.hatRepeats);
+  legacyFile.project.bassNotes[0] = structuredClone(sourceProject.patterns.A.bassNotes[0]);
+  legacyFile.project.melodyNotes[0] = structuredClone(sourceProject.patterns.A.melodyNotes[0]);
+  legacyFile.project.chordEvents[0] = structuredClone(sourceProject.patterns.A.chordEvents[0]);
+  legacyFile.project.mixer = structuredClone(sourceProject.mixer);
+  legacyFile.project.arrangement[0] = { ...legacyFile.project.arrangement[0], bars: 999, energy: 4 };
+  const legacyParsed = workstation.parseProjectFile(JSON.stringify(legacyFile));
+  const directSound = workstation.normalizeSoundDesignControls(sourceProject.sound);
+  const directPattern = workstation.normalizePatternEventCollections(sourceProject.patterns.A);
+  const directMixer = workstation.normalizeMixerChannelTopology(sourceProject.mixer);
+  const directArrangement = workstation.normalizeProjectArrangement(sourceProject.arrangement);
+  const directAutomation = workstation.normalizeProjectAutomationEvents(sourceProject.automation);
+  const importedWav = await blobBytes(render.createMixWavBlob(parsed));
+  const bypassWav = await blobBytes(render.createMixWavBlob(sourceProject));
+  const importedMidi = midi.createMidiFile(parsed);
+  const bypassMidi = midi.createMidiFile(sourceProject);
+  const { snapshots: _parsedSnapshots, ...parsedCore } = parsed;
+
+  check(parsed.sound.kickPunch === 1 && parsed.sound.snareSnap === 0 && parsed.sound.chordWidth === 0, "musical-control-range-safety: sound controls should clamp to unit bounds");
+  check(workstation.normalizeSoundDesignControls(parsed.sound) === parsed.sound, "musical-control-range-safety: canonical sound controls should preserve object identity");
+  check(directSound.kickPunch === 1 && directSound.snareSnap === 0 && directSound.chordWidth === 0, "musical-control-range-safety: direct sound normalization should use the import bounds");
+  check(parsed.patterns.A.drumVelocities.kick[0] === 1 && parsed.patterns.A.drumVelocities.kick[1] === 0.15, "musical-control-range-safety: drum velocities should clamp to playable bounds");
+  check(parsed.patterns.A.drumTimings.kick[0] === workstation.maxDrumTimingMs && parsed.patterns.A.drumTimings.kick[1] === workstation.minDrumTimingMs, "musical-control-range-safety: drum timing should clamp to pocket bounds");
+  check(parsed.patterns.A.drumProbabilities.kick[0] === 1 && parsed.patterns.A.drumProbabilities.kick[1] === 0, "musical-control-range-safety: drum chance should clamp to unit bounds");
+  check(parsed.patterns.A.hatRepeats[0] === 4 && parsed.patterns.A.hatRepeats[1] === 1 && parsed.patterns.A.hatRepeats[2] === 3, "musical-control-range-safety: hat repeats should clamp and round to 1..4");
+  check(parsed.patterns.A.bassNotes[0]?.length === workstation.stepsPerBar - parsed.patterns.A.bassNotes[0].step && parsed.patterns.A.bassNotes[0]?.velocity === 1 && parsed.patterns.A.bassNotes[0]?.probability === 0, "musical-control-range-safety: bass duration, velocity, and chance should normalize together");
+  check(parsed.patterns.A.melodyNotes[0]?.length === 1 && parsed.patterns.A.melodyNotes[0]?.velocity === 0 && parsed.patterns.A.melodyNotes[0]?.probability === 1, "musical-control-range-safety: melody duration, velocity, and chance should normalize together");
+  check(parsed.patterns.A.chordEvents[0]?.velocity === 1 && parsed.patterns.B.chordEvents[0]?.velocity === 0, "musical-control-range-safety: chord velocity should clamp on both bounds");
+  check(directPattern.chordEvents[0]?.velocity === 1, "musical-control-range-safety: parser-bypass chord velocity should use the same bound");
+  check(parsed.mixer[0]?.volumeDb === workstation.maxMixerVolumeDb && parsed.mixer[1]?.volumeDb === workstation.minMixerVolumeDb, "musical-control-range-safety: mixer volume should clamp on both bounds");
+  check(parsed.mixer[0]?.pan === workstation.maxMixerPan && parsed.mixer[1]?.pan === workstation.minMixerPan, "musical-control-range-safety: mixer pan should clamp on both bounds");
+  check(parsed.mixer[0]?.lowCut === 1 && parsed.mixer[0]?.air === 0 && parsed.mixer[0]?.drive === 1 && parsed.mixer[0]?.glue === 0 && parsed.mixer[0]?.send === 1, "musical-control-range-safety: mixer processing controls should clamp to unit bounds");
+  check(parsed.arrangement[0]?.bars === workstation.maxArrangementBars && parsed.arrangement[0]?.energy === 1 && parsed.arrangement[1]?.bars === workstation.minArrangementBars && parsed.arrangement[1]?.energy === 0, "musical-control-range-safety: arrangement bars and energy should normalize without dropping blocks");
+  check(parsed.automation[0]?.startStep === 0 && parsed.automation[0]?.endStep === workstation.maxDeliveryTargetBars * workstation.stepsPerBar && parsed.automation[0]?.startValue === 0 && parsed.automation[0]?.endValue === 1, "musical-control-range-safety: automation range should remain bounded");
+  check(stableJson(bareParsed) === stableJson(parsed), "musical-control-range-safety: wrapped and bare repair should match");
+  check(stableJson(serializedParsed) === stableJson(parsed), "musical-control-range-safety: durable serialization should persist the same repair");
+  check(stableJson(parsed.snapshots[0]?.project) === stableJson(parsedCore), "musical-control-range-safety: snapshot core should use the same repair");
+  check(legacyParsed.sound.kickPunch === 1 && legacyParsed.patterns.A.chordEvents[0]?.velocity === 1 && legacyParsed.mixer[0]?.drive === 1 && legacyParsed.arrangement[0]?.bars === workstation.maxArrangementBars, "musical-control-range-safety: legacy input should use the same control bounds");
+  check(directMixer[0]?.drive === 1 && directArrangement[0]?.energy === 1 && directAutomation[0]?.endValue === 1, "musical-control-range-safety: direct domain normalization should match imported repair");
+  check(stableJson(sourceProject.sound) !== stableJson(parsed.sound) && sourceProject.sound.kickPunch === 4, "musical-control-range-safety: normalization should not mutate caller sound controls");
+  check(sourceProject.patterns.A.chordEvents[0]?.velocity === 4 && sourceProject.mixer[0]?.drive === 2 && sourceProject.arrangement[0]?.energy === 4, "musical-control-range-safety: normalization should not mutate caller musical collections");
+  check(bypassWav.byteLength === importedWav.byteLength && bypassWav.every((byte, index) => byte === importedWav[index]), "musical-control-range-safety: parser-bypass render PCM should match imported repair");
+  check(bypassMidi.byteLength === importedMidi.byteLength && bypassMidi.every((byte, index) => byte === importedMidi[index]), "musical-control-range-safety: parser-bypass MIDI should match imported repair");
+  checkWavBytes(importedWav, "musical-control-range-safety:imported-render");
+  check(importedWav.slice(44).some((byte) => byte !== 0), "musical-control-range-safety: repaired WAV should contain non-zero PCM bytes");
+
+  const rejected = [];
+  for (const [label, mutate] of [
+    ["string-sound-control", (project) => { project.sound.kickPunch = "4"; }],
+    ["wrong-drum-array-length", (project) => { project.patterns.A.drumVelocities.kick = [1, 2]; }],
+    ["invalid-chord-quality", (project) => { project.patterns.A.chordEvents[0].quality = "unknown"; }]
+  ]) {
+    const invalid = structuredClone(workstation.starterProject);
+    mutate(invalid);
+    try {
+      workstation.parseProjectFile(JSON.stringify(invalid));
+      failures.push(`musical-control-range-safety:${label} should remain structurally rejected`);
+    } catch {
+      rejected.push(label);
+    }
+  }
+
+  return {
+    paths: 8,
+    soundRange: `${parsed.sound.snareSnap}..${parsed.sound.kickPunch}`,
+    drumVelocityRange: `${parsed.patterns.A.drumVelocities.kick[1]}..${parsed.patterns.A.drumVelocities.kick[0]}`,
+    mixerRange: `${parsed.mixer[1]?.volumeDb}..${parsed.mixer[0]?.volumeDb}`,
+    rejected: rejected.length,
+    midiBytes: importedMidi.byteLength,
+    wavBytes: importedWav.byteLength
+  };
+}
+
 function projectEventCounts(project) {
   return workstation.patternSlots.map((slot) => {
     const pattern = project.patterns[slot];
@@ -1195,6 +1360,7 @@ const timelineBoundarySafetySummary = validateTimelineBoundarySafety();
 const eventDensitySafetySummary = await validateEventDensitySafety();
 const mixerTopologySafetySummary = await validateMixerTopologySafety();
 const snapshotIdentitySafetySummary = validateSnapshotIdentitySafety();
+const musicalControlRangeSafetySummary = await validateMusicalControlRangeSafety();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -1221,6 +1387,7 @@ console.log(`- Timeline boundary safety: ${timelineBoundarySafetySummary.sourceB
 console.log(`- Event density safety: ${eventDensitySafetySummary.sourceEvents}->${eventDensitySafetySummary.repairedEvents} bass/melody/chord/automation / note capacity ${eventDensitySafetySummary.noteCapacity} / chord steps ${eventDensitySafetySummary.chordSteps} / normalized paths ${eventDensitySafetySummary.paths}/6 / MIDI ${eventDensitySafetySummary.midiBytes} bytes / WAV ${eventDensitySafetySummary.wavBytes} bytes`);
 console.log(`- Mixer topology safety: ${mixerTopologySafetySummary.sourceChannels}->${mixerTopologySafetySummary.repairedChannels} required channels / duplicates ${mixerTopologySafetySummary.duplicateChannels} / normalized paths ${mixerTopologySafetySummary.paths}/7 / ${mixerTopologySafetySummary.status} ${mixerTopologySafetySummary.peakDb.toFixed(2)} dB / WAV ${mixerTopologySafetySummary.wavBytes} bytes`);
 console.log(`- Snapshot identity safety: ${snapshotIdentitySafetySummary.sourceIds}->${snapshotIdentitySafetySummary.repairedIds} ids / unique ${snapshotIdentitySafetySummary.uniqueIds}/${snapshotIdentitySafetySummary.repairedIds} / rename ${snapshotIdentitySafetySummary.renamed} / delete ${snapshotIdentitySafetySummary.deleted} / restore ${snapshotIdentitySafetySummary.restoredBpms} BPM / normalized paths ${snapshotIdentitySafetySummary.paths}/6`);
+console.log(`- Musical control range safety: sound ${musicalControlRangeSafetySummary.soundRange} / drum velocity ${musicalControlRangeSafetySummary.drumVelocityRange} / mixer ${musicalControlRangeSafetySummary.mixerRange} dB / normalized paths ${musicalControlRangeSafetySummary.paths}/8 / structural rejections ${musicalControlRangeSafetySummary.rejected}/3 / MIDI ${musicalControlRangeSafetySummary.midiBytes} bytes / WAV ${musicalControlRangeSafetySummary.wavBytes} bytes`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

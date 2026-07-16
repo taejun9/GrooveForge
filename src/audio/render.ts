@@ -20,6 +20,7 @@ import {
   normalizePatternEventCollections,
   normalizePatternEventLength,
   normalizeProjectAutomationEvents,
+  normalizeSoundDesignControls,
   sidechainGainForStep,
 } from "../domain/workstation";
 import type { ArrangementBlock, ArrangementMuteTrack, ProjectState, SoundDesign, TrackType } from "../domain/workstation";
@@ -393,7 +394,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   const baseBassMix = channelMix(mixerProject, "bass_808", stemTarget);
   const baseSynthMix = channelMix(mixerProject, "synth", stemTarget);
   const baseChordMix = channelMix(mixerProject, "chord", stemTarget);
-  const sound = project.sound;
+  const sound = normalizeSoundDesignControls(project.sound);
   const outputGain = masterOutputGain(mixerProject);
   const automationEvents = normalizeProjectAutomationEvents(project.automation);
   const normalizedPatterns = {
