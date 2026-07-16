@@ -1045,6 +1045,51 @@ async function validateDeliveryMetadataRuntimeSafety() {
   };
 }
 
+async function validateHandoffRuntimeSafety() {
+  const directProject = {
+    ...structuredClone(workstation.starterProject),
+    title: "Handoff Runtime Safety Beat",
+    arrangement: [{ section: "Intro", pattern: "A", energy: 99, bars: 0, mutedTracks: [] }],
+    sessionBrief: {
+      artist: "Artist\nExport Meter",
+      vibe: "  night\t drive  ",
+      reference: "Ref\nStatus: Ready",
+      notes: "x".repeat(600)
+    },
+    snapshots: []
+  };
+  const repairedProject = workstation.parseProjectFile(workstation.serializeProjectFile(directProject));
+  const directWav = await blobBytes(render.createMixWavBlob(directProject));
+  const repairedWav = await blobBytes(render.createMixWavBlob(repairedProject));
+  const directMidi = midi.createMidiFile(directProject);
+  const repairedMidi = midi.createMidiFile(repairedProject);
+  const analysis = render.analyzeExport(directProject);
+  const stemAnalyses = { drum_rack: analysis, bass_808: analysis, synth: analysis, chord: analysis };
+  const directSheet = handoff.createHandoffSheet(directProject, analysis, stemAnalyses);
+  const repairedSheet = handoff.createHandoffSheet(repairedProject, analysis, stemAnalyses);
+  const normalizedArrangement = workstation.projectArrangement(directProject);
+  const normalizedBrief = workstation.projectSessionBrief(directProject);
+
+  check(normalizedArrangement.length === 1 && normalizedArrangement[0].bars === 1 && normalizedArrangement[0].energy === 1, "handoff-runtime-safety: direct arrangement must use durable bar/energy repair");
+  check(normalizedBrief.artist === "Artist Export Meter" && normalizedBrief.vibe === "night drive" && normalizedBrief.reference === "Ref Status: Ready", "handoff-runtime-safety: Session Brief whitespace must collapse to single-line values");
+  check(normalizedBrief.notes.length === 240, "handoff-runtime-safety: Session Brief notes must use the durable length bound");
+  check(directWav.byteLength === repairedWav.byteLength && directWav.every((byte, index) => byte === repairedWav[index]), "handoff-runtime-safety: direct WAV must match durable arrangement/brief repair");
+  check(directMidi.byteLength === repairedMidi.byteLength && directMidi.every((byte, index) => byte === repairedMidi[index]), "handoff-runtime-safety: direct MIDI must match durable arrangement/brief repair");
+  check(directSheet === repairedSheet, "handoff-runtime-safety: direct Handoff must match durable arrangement/brief repair");
+  check(directSheet.includes("1. Intro / Pattern A / 1 bar / Energy 100% / Muted None"), "handoff-runtime-safety: Handoff arrangement row must report repaired bars and energy");
+  check(directSheet.includes("Artist: Artist Export Meter") && !directSheet.includes("Artist: Artist\nExport Meter"), "handoff-runtime-safety: Handoff Session Brief must reject multiline section injection");
+  check(directProject.arrangement[0].bars === 0 && directProject.arrangement[0].energy === 99 && directProject.sessionBrief.notes.length === 600, "handoff-runtime-safety: runtime consumers must not mutate caller-owned arrangement or brief values");
+
+  return {
+    source: "0 bars / 9900% / 600 chars",
+    repaired: `${normalizedArrangement[0].bars} bar / ${Math.round(normalizedArrangement[0].energy * 100)}% / ${normalizedBrief.notes.length} chars`,
+    normalizedPaths: 8,
+    handoffBytes: new TextEncoder().encode(directSheet).byteLength,
+    midiBytes: directMidi.byteLength,
+    wavBytes: directWav.byteLength
+  };
+}
+
 function projectEventCounts(project) {
   return workstation.patternSlots.map((slot) => {
     const pattern = project.patterns[slot];
@@ -1521,6 +1566,7 @@ const musicalControlRangeSafetySummary = await validateMusicalControlRangeSafety
 const swingPlaybackTimingSummary = await validateSwingPlaybackTiming();
 const masterCeilingRuntimeSafetySummary = await validateMasterCeilingRuntimeSafety();
 const deliveryMetadataRuntimeSafetySummary = await validateDeliveryMetadataRuntimeSafety();
+const handoffRuntimeSafetySummary = await validateHandoffRuntimeSafety();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -1551,6 +1597,7 @@ console.log(`- Musical control range safety: sound ${musicalControlRangeSafetySu
 console.log(`- Swing playback timing: ${swingPlaybackTimingSummary.swingRange} / odd-step delay ${swingPlaybackTimingSummary.oddOffsetMs} ms / distinct WAV and MIDI yes / normalized paths ${swingPlaybackTimingSummary.normalizedPaths}/4 / MIDI ${swingPlaybackTimingSummary.midiBytes} bytes / WAV ${swingPlaybackTimingSummary.wavBytes} bytes`);
 console.log(`- Master ceiling runtime safety: ${masterCeilingRuntimeSafetySummary.ceilingRange} dB / normalized paths ${masterCeilingRuntimeSafetySummary.normalizedPaths}/8 / low peak ${masterCeilingRuntimeSafetySummary.lowPeakDb.toFixed(2)} dB / high headroom ${masterCeilingRuntimeSafetySummary.highHeadroomDb.toFixed(2)} dB / WAV ${masterCeilingRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Delivery metadata runtime safety: ${deliveryMetadataRuntimeSafetySummary.source} -> ${deliveryMetadataRuntimeSafetySummary.repaired} / normalized paths ${deliveryMetadataRuntimeSafetySummary.normalizedPaths}/9 / MIDI ${deliveryMetadataRuntimeSafetySummary.midiBytes} bytes / WAV ${deliveryMetadataRuntimeSafetySummary.wavBytes} bytes`);
+console.log(`- Handoff runtime safety: ${handoffRuntimeSafetySummary.source} -> ${handoffRuntimeSafetySummary.repaired} / normalized paths ${handoffRuntimeSafetySummary.normalizedPaths}/8 / Handoff ${handoffRuntimeSafetySummary.handoffBytes} bytes / MIDI ${handoffRuntimeSafetySummary.midiBytes} bytes / WAV ${handoffRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

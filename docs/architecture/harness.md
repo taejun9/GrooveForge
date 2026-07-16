@@ -55,6 +55,8 @@ Master-Ceiling runtime coverage applies the domain-owned -6–0 dB contract afte
 
 Delivery-metadata runtime coverage applies the same domain-owned BPM/key repair used by durable project serialization to MIDI tempo/key metadata, Handoff Sheet identity, delivery manifests, and audio timing. Runtime smoke proves a direct `0 BPM / H major` bypass becomes `60 BPM / A minor` everywhere without source mutation and produces byte-identical direct/imported WAV and MIDI output. Sample-audio QA writes `전달-메타데이터-복구-비트-demo.wav` plus its arrangement MIDI, verifies producer-facing metadata and durable JSON agree, and raises the current report to schema version 15 with 39 playable WAVs and 31 full mixes retaining tail content.
 
+Handoff runtime coverage applies durable arrangement and Session Brief normalization before producer-facing text generation. Runtime smoke proves direct `0 bars / 9900%` rows and multiline or oversized brief fields become the same `1 bar / 100%`, single-line, bounded Handoff as durable repair without source mutation. Sample-audio QA writes `핸드오프-복구-비트-demo.wav`, its arrangement MIDI, and Handoff text, requires direct/imported parity across all three, and raises the current report to schema version 16 with 40 playable WAVs and 32 full mixes retaining tail content.
+
 ## Agent Readability
 
 Agents should be able to answer these questions from repo files alone:

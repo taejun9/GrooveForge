@@ -4,10 +4,12 @@ import {
   arrangementTotalBars,
   normalizeProjectTitle,
   patternSlots,
+  projectArrangement,
   projectBpm,
   projectKey,
   projectMasterCeilingDb,
   projectFileName,
+  projectSessionBrief,
   styleProfiles
 } from "../domain/workstation";
 import type { PatternSlot, ProjectState } from "../domain/workstation";
@@ -53,12 +55,14 @@ export function createHandoffSheet(
   analysis: ExportAnalysis,
   stemAnalyses: StemExportAnalyses
 ): string {
+  const arrangement = projectArrangement(project);
+  const handoffProject = { ...project, arrangement };
   const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
   const target = activeDeliveryTarget(project);
-  const bars = arrangementTotalBars(project);
-  const patternUsage = usedPatternSlots(project).join("/") || project.selectedPattern;
-  const brief = project.sessionBrief;
-  const arrangementLines = project.arrangement.map(
+  const bars = arrangementTotalBars(handoffProject);
+  const patternUsage = usedPatternSlots(handoffProject).join("/") || project.selectedPattern;
+  const brief = projectSessionBrief(project);
+  const arrangementLines = arrangement.map(
     (block, index) =>
       `${index + 1}. ${block.section} / Pattern ${block.pattern} / ${barCountLabel(block.bars)} / Energy ${percentLabel(block.energy)} / Muted ${block.mutedTracks.length === 0 ? "None" : block.mutedTracks.map(arrangementMuteTrackLabel).join(", ")}`
   );

@@ -3196,6 +3196,10 @@ export function normalizeProjectArrangement(arrangement: ArrangementBlockInput[]
   return normalized;
 }
 
+export function projectArrangement(project: Pick<ProjectCoreState, "arrangement">): ArrangementBlock[] {
+  return normalizeProjectArrangement(project.arrangement);
+}
+
 function normalizeDrumVelocities(value: DrumVelocities | undefined, drumPattern: DrumPattern): DrumVelocities {
   if (!value) {
     return defaultDrumVelocities(drumPattern);
@@ -3472,6 +3476,10 @@ function normalizeSessionBrief(brief: SessionBriefInput | undefined): SessionBri
     reference: normalizeBriefText(brief?.reference, maxSessionBriefFieldLength),
     notes: normalizeBriefText(brief?.notes, maxSessionBriefNotesLength)
   };
+}
+
+export function projectSessionBrief(project: Pick<ProjectCoreState, "sessionBrief">): SessionBrief {
+  return normalizeSessionBrief(project.sessionBrief);
 }
 
 function normalizeBriefText(value: unknown, maxLength: number): string {
