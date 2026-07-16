@@ -63,7 +63,7 @@ function validateProjectFileLoadErrorStatus(uiModel) {
     "project loading should route parser failures through the actionable status helper"
   );
   check(
-    /async function handleSaveProject\(\): Promise<void> \{\s*try \{\s*const projectToSave = projectRef\.current;\s*const contents = serializeProjectFile\(projectToSave\);/u.test(appSource),
+    /async function handleSaveProject\(\): Promise<void> \{\s*const requestId = \+\+projectSaveRequestIdRef\.current;\s*try \{\s*commitMasterCeilingDraft\(\);\s*const projectToSave = projectRef\.current;\s*const contents = serializeProjectFile\(projectToSave\);/u.test(appSource),
     "project serialization should stay inside the Save failure boundary and use the current project reference"
   );
   check(
@@ -151,6 +151,57 @@ function validateProjectReplacementGuard(replacementGuard) {
       loadSource.includes("projectHasUnsavedChangesRef.current,") &&
       loadSource.includes("localDraftRecovery !== null"),
     "project replacement confirmation should read current dirty and recovery-draft state"
+  );
+}
+
+function validateProjectSaveCompletion(saveCompletion) {
+  check(
+    saveCompletion.resolveProjectSaveCompletion(1, 1, true) === "saved-current" &&
+      saveCompletion.resolveProjectSaveCompletion(1, 1, false) === "saved-snapshot" &&
+      saveCompletion.resolveProjectSaveCompletion(1, 2, true) === "stale" &&
+      saveCompletion.resolveProjectSaveCompletion(1, 2, false) === "stale",
+    "project Save completion should distinguish current, changed, and stale async results"
+  );
+
+  const saveSource = printNamedFunction(appSource, "App.tsx", "handleSaveProject");
+  const resultSource = printNamedFunction(appSource, "App.tsx", "createProjectFileResult");
+  const replaceSource = printNamedFunction(appSource, "App.tsx", "replaceProject");
+  const commitIndex = saveSource.indexOf("commitMasterCeilingDraft();");
+  const snapshotIndex = saveSource.indexOf("const projectToSave = projectRef.current;");
+  const awaitIndex = saveSource.indexOf("await window.grooveforge?.saveProject?.");
+  check(
+    saveSource.includes("const requestId = ++projectSaveRequestIdRef.current;") &&
+      commitIndex >= 0 &&
+      snapshotIndex > commitIndex &&
+      awaitIndex > snapshotIndex,
+    "Save should sequence the request and resolve focused project state before capturing the durable snapshot"
+  );
+  check(
+    saveSource.includes("projectRef.current === projectToSave") &&
+      saveSource.includes('if (completion === "stale")') &&
+      saveSource.includes("if (requestId !== projectSaveRequestIdRef.current)") &&
+      saveSource.includes('if (completion === "saved-current")'),
+    "Save should ignore older completions and only treat the exact captured snapshot as current"
+  );
+  check(
+    replaceSource.indexOf("projectSaveRequestIdRef.current += 1;") >= 0 &&
+      replaceSource.indexOf("projectSaveRequestIdRef.current += 1;") < replaceSource.indexOf("projectRef.current = nextProject;"),
+    "full project replacement should invalidate pending Save completions before changing file identity"
+  );
+  check(
+    saveSource.split('if (completion === "saved-current")').length - 1 === 2 &&
+      saveSource.split("clearLocalDraftState();").length - 1 === 2 &&
+      saveSource.split("setProjectHasUnsavedChanges(false);").length - 1 === 2 &&
+      saveSource.split("setProjectHasUnsavedChanges(true);").length - 1 === 2 &&
+      saveSource.includes("newer changes remain unsaved"),
+    "Save should clear recovery only for the saved current snapshot and retain dirty state for newer edits"
+  );
+  check(
+    resultSource.includes("newerChangesRemain = false") &&
+      resultSource.includes("newer local edits and recovery remain unsaved") &&
+      resultSource.includes("Save again to include the newer edits") &&
+      resultSource.includes('tone: newerChangesRemain ? "warn" : "good"'),
+    "Save result feedback should explain changed-snapshot safety and the required follow-up"
   );
 }
 
@@ -3268,6 +3319,7 @@ try {
   validateProjectFileLoadErrorStatus(await server.ssrLoadModule("/src/ui/workstationUiModel.ts"));
   validateMasterCeilingDraftLifecycle(await server.ssrLoadModule("/src/domain/workstation.ts"));
   validateProjectReplacementGuard(await server.ssrLoadModule("/src/ui/projectReplacementGuard.ts"));
+  validateProjectSaveCompletion(await server.ssrLoadModule("/src/ui/projectSaveCompletion.ts"));
   const html = renderToStaticMarkup(React.createElement(App));
   validateFirstRunRenderer(html);
   validateWorkspaceCommandDockSource(html);

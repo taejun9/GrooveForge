@@ -1047,6 +1047,7 @@ import {
 } from "./workstationPatternTools";
 import { resolveLocalDraftWriteGate } from "./localDraftLifecycle";
 import { resolveProjectReplacementGuard } from "./projectReplacementGuard";
+import { resolveProjectSaveCompletion } from "./projectSaveCompletion";
 import {
   activeReferenceAlignmentQuickActionCard,
   activeSessionBriefCompassQuickActionCard,
@@ -1331,6 +1332,7 @@ export function App(): ReactElement {
   const [localDraftWriteArmed, setLocalDraftWriteArmed] = useState(false);
   const projectRef = useRef<ProjectState>(starterProject);
   const projectHasUnsavedChangesRef = useRef(false);
+  const projectSaveRequestIdRef = useRef(0);
   const handoffExportReceiptRef = useRef<HandoffExportReceipt | null>(null);
   const tapTempoTimesRef = useRef<number[]>([]);
   const tapTempoCommitTimerRef = useRef<number | null>(null);
@@ -2818,6 +2820,7 @@ export function App(): ReactElement {
   }
 
   function replaceProject(nextProject: ProjectState, status: string, fileLabel: string | null = null): void {
+    projectSaveRequestIdRef.current += 1;
     projectRef.current = nextProject;
     resetMasterCeilingEditor(nextProject);
     localDraftSkipNextWriteRef.current = true;
@@ -7021,38 +7024,80 @@ export function App(): ReactElement {
   }
 
   async function handleSaveProject(): Promise<void> {
+    const requestId = ++projectSaveRequestIdRef.current;
     try {
+      commitMasterCeilingDraft();
       const projectToSave = projectRef.current;
       const contents = serializeProjectFile(projectToSave);
       const defaultName = projectFileName(projectToSave);
       const result = await window.grooveforge?.saveProject?.(contents, defaultName);
       if (result) {
         if (result.canceled) {
+          if (requestId !== projectSaveRequestIdRef.current) {
+            return;
+          }
           setProjectFileResult(null);
           setLocalDraftRecoveryResult(null);
           setProjectStatus("Save canceled");
           return;
         }
 
+        const completion = resolveProjectSaveCompletion(
+          requestId,
+          projectSaveRequestIdRef.current,
+          projectRef.current === projectToSave
+        );
+        if (completion === "stale") {
+          return;
+        }
         const fileLabel = fileDisplayName(result.filePath);
-        clearLocalDraftState();
         setProjectFileLabel(fileLabel);
-        setProjectHasUnsavedChanges(false);
+        if (completion === "saved-current") {
+          clearLocalDraftState();
+          setProjectHasUnsavedChanges(false);
+        } else {
+          setProjectHasUnsavedChanges(true);
+        }
         setLocalDraftRecoveryResult(null);
-        setProjectFileResult(createProjectFileResult("save", fileLabel, projectToSave));
-        setProjectStatus(`Saved ${fileLabel}`);
+        setProjectFileResult(
+          createProjectFileResult("save", fileLabel, projectToSave, completion === "saved-snapshot")
+        );
+        setProjectStatus(
+          completion === "saved-current" ? `Saved ${fileLabel}` : `Saved ${fileLabel}; newer changes remain unsaved`
+        );
         return;
       }
 
       downloadProjectFile(contents, defaultName);
-      clearLocalDraftState();
+      const completion = resolveProjectSaveCompletion(
+        requestId,
+        projectSaveRequestIdRef.current,
+        projectRef.current === projectToSave
+      );
+      if (completion === "stale") {
+        return;
+      }
       setProjectFileLabel(defaultName);
-      setProjectHasUnsavedChanges(false);
+      if (completion === "saved-current") {
+        clearLocalDraftState();
+        setProjectHasUnsavedChanges(false);
+      } else {
+        setProjectHasUnsavedChanges(true);
+      }
       setLocalDraftRecoveryResult(null);
-      setProjectFileResult(createProjectFileResult("download", defaultName, projectToSave));
-      setProjectStatus(`Downloaded ${defaultName}`);
+      setProjectFileResult(
+        createProjectFileResult("download", defaultName, projectToSave, completion === "saved-snapshot")
+      );
+      setProjectStatus(
+        completion === "saved-current"
+          ? `Downloaded ${defaultName}`
+          : `Downloaded ${defaultName}; newer changes remain unsaved`
+      );
     } catch (error) {
       console.error(error);
+      if (requestId !== projectSaveRequestIdRef.current) {
+        return;
+      }
       setProjectFileResult(null);
       setLocalDraftRecoveryResult(null);
       setProjectStatus("Save failed");
@@ -7145,7 +7190,8 @@ export function App(): ReactElement {
   function createProjectFileResult(
     action: ProjectFileResult["action"],
     fileLabel: string,
-    resultProject: ProjectState
+    resultProject: ProjectState,
+    newerChangesRemain = false
   ): ProjectFileResult {
     const statusByAction: Record<ProjectFileResult["action"], ProjectFileResult["status"]> = {
       save: "Saved",
@@ -7159,12 +7205,15 @@ export function App(): ReactElement {
       open: "Opened project",
       import: "Imported project"
     };
-    const safetyCue =
-      action === "save" || action === "download"
+    const savedAction = action === "save" || action === "download";
+    const safetyCue = newerChangesRemain
+      ? "This durable copy contains the project from when Save started; newer local edits and recovery remain unsaved."
+      : savedAction
         ? "Local draft recovery was cleared after this durable project copy."
         : "Loaded file is now current; undo and redo history were reset for this project.";
-    const nextCheck =
-      action === "save" || action === "download"
+    const nextCheck = newerChangesRemain
+      ? "Save again to include the newer edits in a durable project copy."
+      : savedAction
         ? "Keep composing; save again after the next meaningful edit."
         : `Play Pattern ${resultProject.selectedPattern}; confirm the loaded beat before editing.`;
 
@@ -7179,7 +7228,7 @@ export function App(): ReactElement {
       metricValue: `${projectEventTotal(resultProject)} events / Pattern ${resultProject.selectedPattern}`,
       safetyCue,
       nextCheck,
-      tone: "good"
+      tone: newerChangesRemain ? "warn" : "good"
     };
   }
 

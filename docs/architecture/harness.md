@@ -65,6 +65,8 @@ Master-ceiling draft lifecycle coverage extends the existing runtime and `마스
 
 Project-replacement guard coverage adds no media artifact. Runtime smoke exhausts all four dirty/recovery combinations and verifies that the three protected-loss states identify only the data that exists. Renderer smoke loads the pure guard through Vite SSR and inspects the shared App load path to prove candidate parsing precedes the guard, the latest dirty ref plus current recovery object and focused ceiling draft feed the decision, cancellation returns before playback stop/replacement, and confirmed replacement continues through the existing bounded parser and replacement lifecycle. Sample QA remains schema 17 with 41 playable WAVs, 33 full mixes with tail content, and unchanged audience sample hashes.
 
+Project Save completion coverage also adds no media artifact. Runtime smoke exhausts current-snapshot, changed-snapshot, and both stale-request identity paths through the dependency-free completion resolver. Renderer smoke verifies request sequencing occurs before the native await, focused ceiling resolution precedes snapshot capture, full-project replacement invalidates pending completion before establishing its own identity, stale cancel/failure/success results return without overwriting newer feedback, exact saved snapshots alone clear recovery and dirty state, and changed snapshots retain both with an explicit save-again warning. Browser download fallback uses the same decision contract. Sample QA therefore retains schema 17, 41 playable WAVs, 33 full mixes with tail content, and the established audience hashes.
+
 ## Agent Readability
 
 Agents should be able to answer these questions from repo files alone:

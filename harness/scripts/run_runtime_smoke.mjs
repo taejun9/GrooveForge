@@ -32,6 +32,7 @@ const deliveryBundle = await import("../../src/audio/deliveryBundle.ts");
 const downloads = await import("../../src/platform/downloads.ts");
 const localDraftLifecycle = await import("../../src/ui/localDraftLifecycle.ts");
 const projectReplacementGuard = await import("../../src/ui/projectReplacementGuard.ts");
+const projectSaveCompletion = await import("../../src/ui/projectSaveCompletion.ts");
 const coreTrackTypes = new Set(["drum_rack", "bass_808", "synth", "chord", "fx_return", "master"]);
 const smokeKey = "F minor";
 const smokeScope = "sample-free first-run starter project plus all-style 8-bar beats with local project-file roundtrips, bounded mixer-topology recovery, Handoff Sheet checks, and mocked download-path checks without writing media artifacts";
@@ -161,6 +162,32 @@ function validateProjectReplacementGuard() {
   }
 
   return { paths: cases.length, protectedPaths: cases.filter((entry) => entry.confirm).length };
+}
+
+function validateProjectSaveCompletion() {
+  const cases = [
+    { requestId: 1, latestRequestId: 1, current: true, expected: "saved-current" },
+    { requestId: 2, latestRequestId: 2, current: false, expected: "saved-snapshot" },
+    { requestId: 1, latestRequestId: 2, current: true, expected: "stale" },
+    { requestId: 1, latestRequestId: 2, current: false, expected: "stale" }
+  ];
+  for (const entry of cases) {
+    const completion = projectSaveCompletion.resolveProjectSaveCompletion(
+      entry.requestId,
+      entry.latestRequestId,
+      entry.current
+    );
+    check(
+      completion === entry.expected,
+      `project-save-completion:${entry.requestId}/${entry.latestRequestId}/${entry.current} should resolve ${entry.expected}`
+    );
+  }
+
+  return {
+    paths: cases.length,
+    stalePaths: cases.filter((entry) => entry.expected === "stale").length,
+    changedPaths: cases.filter((entry) => entry.expected === "saved-snapshot").length
+  };
 }
 
 function validateUnicodeFileIdentity() {
@@ -1685,6 +1712,7 @@ const handoffRuntimeSafetySummary = await validateHandoffRuntimeSafety();
 const snapshotRuntimeSafetySummary = await validateSnapshotRuntimeSafety();
 const localDraftWriteGateSummary = validateLocalDraftWriteGate();
 const projectReplacementGuardSummary = validateProjectReplacementGuard();
+const projectSaveCompletionSummary = validateProjectSaveCompletion();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -1719,6 +1747,7 @@ console.log(`- Handoff runtime safety: ${handoffRuntimeSafetySummary.source} -> 
 console.log(`- Snapshot runtime safety: ${snapshotRuntimeSafetySummary.source} -> ${snapshotRuntimeSafetySummary.repaired} / normalized paths ${snapshotRuntimeSafetySummary.normalizedPaths}/11 / Handoff ${snapshotRuntimeSafetySummary.handoffBytes} bytes / MIDI ${snapshotRuntimeSafetySummary.midiBytes} bytes / WAV ${snapshotRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Local draft write gate: ${localDraftWriteGateSummary.paths}/4 boolean paths / first edit write eligible ${localDraftWriteGateSummary.firstEditWriteEligible ? "yes" : "no"}`);
 console.log(`- Project replacement guard: ${projectReplacementGuardSummary.paths}/4 dirty/recovery paths / protected loss paths ${projectReplacementGuardSummary.protectedPaths}/3`);
+console.log(`- Project Save completion: ${projectSaveCompletionSummary.paths}/4 async paths / stale completions ${projectSaveCompletionSummary.stalePaths}/2 / changed snapshot ${projectSaveCompletionSummary.changedPaths}/1`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);
