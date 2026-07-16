@@ -2828,6 +2828,10 @@ export function normalizeMasterCeilingDb(value: unknown): number {
   return Math.min(maxMasterCeilingDb, Math.max(minMasterCeilingDb, Math.round(value * 10) / 10));
 }
 
+export function projectMasterCeilingDb(project: Pick<ProjectState, "masterCeilingDb">): number {
+  return normalizeMasterCeilingDb(project.masterCeilingDb);
+}
+
 export function dbToGain(db: number): number {
   return Math.pow(10, db / 20);
 }

@@ -16,6 +16,7 @@ const failures = [];
 
 const workstation = await import("../../src/domain/workstation.ts");
 const render = await import("../../src/audio/render.ts");
+const handoff = await import("../../src/audio/handoff.ts");
 
 function check(condition, message) {
   if (!condition) failures.push(message);
@@ -857,6 +858,64 @@ async function runSwingPlaybackTimingCase() {
   };
 }
 
+function masterCeilingRuntimeSampleProject(masterCeilingDb, title) {
+  return {
+    ...structuredClone(workstation.starterProject),
+    title,
+    masterCeilingDb,
+    arrangement: [{ section: "Intro", pattern: "A", energy: 0.8, bars: 1, mutedTracks: [] }],
+    snapshots: []
+  };
+}
+
+async function runMasterCeilingRuntimeSafetyCase() {
+  const directLowProject = masterCeilingRuntimeSampleProject(-900, "마스터 천장 복구 비트");
+  const importedLowProject = workstation.parseProjectFile(JSON.stringify(directLowProject));
+  const caseRoot = path.join(outputRoot, "master-ceiling-runtime-safety", workstation.projectFileStem(directLowProject));
+  await mkdir(caseRoot, { recursive: true });
+  const directLowAnalysis = render.analyzeExport(directLowProject);
+  const artifact = await renderArtifact({
+    blobFactory: () => render.createMixWavBlob(directLowProject),
+    analysis: directLowAnalysis,
+    fileName: render.mixWavFileName(directLowProject),
+    label: "master-ceiling-runtime-safety:repaired direct full mix",
+    caseRoot,
+    project: directLowProject,
+    requireTailContent: true
+  });
+  const importedLowBytes = await blobToBuffer(render.createMixWavBlob(importedLowProject));
+  const directHighProject = masterCeilingRuntimeSampleProject(18, "Master Ceiling High Repair Beat");
+  const importedHighProject = workstation.parseProjectFile(JSON.stringify(directHighProject));
+  const directHighBytes = await blobToBuffer(render.createMixWavBlob(directHighProject));
+  const importedHighBytes = await blobToBuffer(render.createMixWavBlob(importedHighProject));
+  const directHighAnalysis = render.analyzeExport(directHighProject);
+  const handoffSheet = handoff.createHandoffSheet(
+    directLowProject,
+    directLowAnalysis,
+    render.analyzeStemExports(directLowProject)
+  );
+
+  check(importedLowProject.masterCeilingDb === workstation.minMasterCeilingDb, "master-ceiling-runtime-safety: imported low ceiling must clamp to -6 dB");
+  check(importedHighProject.masterCeilingDb === workstation.maxMasterCeilingDb, "master-ceiling-runtime-safety: imported high ceiling must clamp to 0 dB");
+  check(sha256(importedLowBytes) === artifact.sha256, "master-ceiling-runtime-safety: direct low WAV must match imported repair");
+  check(directHighBytes.equals(importedHighBytes), "master-ceiling-runtime-safety: direct high WAV must match imported repair");
+  check(directLowAnalysis.ceilingDb === workstation.minMasterCeilingDb && directHighAnalysis.ceilingDb === workstation.maxMasterCeilingDb, "master-ceiling-runtime-safety: direct analysis must report bounded ceilings");
+  check(directLowAnalysis.peakDb <= directLowAnalysis.ceilingDb + 1e-9 && directHighAnalysis.peakDb <= directHighAnalysis.ceilingDb + 1e-9, "master-ceiling-runtime-safety: repaired PCM analysis must respect the bounded ceiling");
+  check(handoffSheet.includes("Master Ceiling: -6.0 dB") && !handoffSheet.includes("-900.0 dB"), "master-ceiling-runtime-safety: direct Handoff Sheet must report the repaired ceiling");
+  check(render.mixWavFileName(directLowProject) === "마스터-천장-복구-비트-demo.wav", "master-ceiling-runtime-safety: repaired sample must preserve its Korean filename identity");
+  check(directLowProject.masterCeilingDb === -900 && directHighProject.masterCeilingDb === 18, "master-ceiling-runtime-safety: render and Handoff must not mutate direct source ceilings");
+
+  return {
+    source: { low: directLowProject.masterCeilingDb, high: directHighProject.masterCeilingDb },
+    repaired: { low: importedLowProject.masterCeilingDb, high: importedHighProject.masterCeilingDb },
+    directLowAnalysis,
+    directHighAnalysis,
+    importedLowSha256: sha256(importedLowBytes),
+    importedHighSha256: sha256(importedHighBytes),
+    artifact
+  };
+}
+
 function updateMixerChannel(project, trackId, update) {
   return {
     ...project,
@@ -1004,6 +1063,7 @@ function markdownReport(report) {
   const snapshotIdentitySafety = report.snapshotIdentitySafety;
   const musicalControlRangeSafety = report.musicalControlRangeSafety;
   const swingPlaybackTiming = report.swingPlaybackTiming;
+  const masterCeilingRuntimeSafety = report.masterCeilingRuntimeSafety;
   const snapshotRows = snapshotIdentitySafety.artifacts.map((artifact, index) =>
     `| ${snapshotIdentitySafety.repaired.ids[index]} | ${snapshotIdentitySafety.repaired.bpms[index]} | \`${artifact.path}\` | ${artifact.decoded.durationSeconds.toFixed(2)} s | ${artifact.decoded.peakDb.toFixed(2)} dB | ${artifact.decoded.rmsDb.toFixed(2)} dB | ${artifact.decoded.nonZeroSamples} | ${artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${artifact.deterministic ? "yes" : "no"} |`
   );
@@ -1024,6 +1084,7 @@ function markdownReport(report) {
     `## Snapshot Identity Safety\n\nTwo imported snapshots sharing the unsafe id **${snapshotIdentitySafety.source.ids[0]}** were repaired to **${snapshotIdentitySafety.repaired.ids.join(" / ")}**, restored independently at **${snapshotIdentitySafety.repaired.bpms.join(" / ")} BPM**, and rendered as distinct decoded WAVs. Rename affected ${snapshotIdentitySafety.renameCount}/2 snapshots and delete changed ${snapshotIdentitySafety.deleteCount}.\n\n| Repaired id | BPM | Local WAV | Delivered | Peak | RMS | Non-zero PCM | Tail content | Zero end | Repeat render |\n|---|---:|---|---:|---:|---:|---:|---|---|---|\n${snapshotRows.join("\n")}\n\n` +
     `## Musical Control Range Safety\n\nFinite out-of-range sound, drum, note/chord, mixer-processing, and arrangement controls were repaired from **sound ${musicalControlRangeSafety.source.sound.join("..")} / drum velocity ${musicalControlRangeSafety.source.drumVelocity.join("..")}** to **sound ${musicalControlRangeSafety.repaired.sound.join("..")} / drum velocity ${musicalControlRangeSafety.repaired.drumVelocity.join("..")}** before rendering. Direct parser-bypass PCM matched the imported repair.\n\n| Local WAV | Delivered | Peak | RMS | Non-zero PCM | Tail content | Zero end | Repeat render |\n|---|---:|---:|---:|---:|---|---|---|\n| \`${musicalControlRangeSafety.artifact.path}\` | ${musicalControlRangeSafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${musicalControlRangeSafety.artifact.decoded.peakDb.toFixed(2)} dB | ${musicalControlRangeSafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${musicalControlRangeSafety.artifact.decoded.nonZeroSamples} | ${musicalControlRangeSafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${musicalControlRangeSafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${musicalControlRangeSafety.artifact.deterministic ? "yes" : "no"} |\n\n` +
     `## Swing Playback Timing\n\nAt **${swingPlaybackTiming.bpm} BPM**, the same sparse beat rendered at **${swingPlaybackTiming.straightSwing * 100}%** and **${swingPlaybackTiming.swungSwing * 100}%** Swing with equal duration but distinct PCM. The decoded first odd-step onset moved **${swingPlaybackTiming.measuredDelayFrames} frames / ${swingPlaybackTiming.measuredDelayMs.toFixed(2)} ms** (expected ${swingPlaybackTiming.expectedDelayFrames} frames), and direct excessive Swing matched imported 24% repair.\n\n| Feel | Swing | Local WAV | First onset frame | Delivered | Peak | RMS | Tail content | Zero end | Repeat render |\n|---|---:|---|---:|---:|---:|---:|---|---|---|\n${swingRows.join("\n")}\n\n` +
+    `## Master Ceiling Runtime Safety\n\nA direct parser-bypass Ceiling of **${masterCeilingRuntimeSafety.source.low} dB** repaired to **${masterCeilingRuntimeSafety.repaired.low} dB** at render, analysis, realtime/audition, and Handoff boundaries instead of silencing the mix. Direct and imported repair produced the same PCM hash; the decoded sample stayed audible, respected the repaired ceiling, retained tail content, and ended at digital zero. A direct **+${masterCeilingRuntimeSafety.source.high} dB** value likewise matched imported **${masterCeilingRuntimeSafety.repaired.high} dB** repair.\n\n| Local WAV | Delivered | Peak | RMS | Ceiling | Non-zero PCM | Tail content | Zero end | Repeat render |\n|---|---:|---:|---:|---:|---:|---|---|---|\n| \`${masterCeilingRuntimeSafety.artifact.path}\` | ${masterCeilingRuntimeSafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${masterCeilingRuntimeSafety.artifact.decoded.peakDb.toFixed(2)} dB | ${masterCeilingRuntimeSafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${masterCeilingRuntimeSafety.artifact.rendererAnalysis.ceilingDb.toFixed(1)} dB | ${masterCeilingRuntimeSafety.artifact.decoded.nonZeroSamples} | ${masterCeilingRuntimeSafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${masterCeilingRuntimeSafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} | ${masterCeilingRuntimeSafety.artifact.deterministic ? "yes" : "no"} |\n\n` +
     `## Export Tail Safety\n\nExpected tail length and digital-zero ending: **${report.tailSafety.allArtifactsSafe ? "yes" : "no"}** (${report.tailSafety.zeroEndedCount}/${report.tailSafety.artifactCount} artifacts). Full mixes preserving post-boundary content: **${report.tailSafety.fullMixTailContentCount}/${report.tailSafety.fullMixCount}**.\n\n` +
     `## Render Isolation\n\nUnrelated edits isolated: **${report.renderIsolation.unrelatedEditsIsolated ? "yes" : "no"}** (${report.renderIsolation.unrelatedEditCount} cases). Target mixer sensitivity: **${report.renderIsolation.targetMixerSensitive ? "yes" : "no"}**. Noise-sound sensitivity: **${report.renderIsolation.noiseSoundSensitive ? "yes" : "no"}**. Drums solo equals Drums stem: **${report.renderIsolation.soloMatchesStem ? "yes" : "no"}**.\n\n` +
     `Checks: canonical stereo PCM WAV, 44.1kHz, 16-bit, complete frames, audible decoded PCM, musical-boundary tail preservation, terminal digital zero, analysis agreement, ceiling safety, no digital full-scale samples, unique stems, and byte-identical immediate rerender.\n`;
@@ -1052,9 +1113,10 @@ const mixerTopologySafety = await runMixerTopologySafetyCase();
 const snapshotIdentitySafety = await runSnapshotIdentitySafetyCase();
 const musicalControlRangeSafety = await runMusicalControlRangeSafetyCase();
 const swingPlaybackTiming = await runSwingPlaybackTimingCase();
+const masterCeilingRuntimeSafety = await runMasterCeilingRuntimeSafetyCase();
 const renderIsolation = await validateRenderIsolation();
-const allArtifacts = [...cases.flatMap((smokeCase) => smokeCase.artifacts), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact, eventDensitySafety.artifact, mixerTopologySafety.artifact, ...snapshotIdentitySafety.artifacts, musicalControlRangeSafety.artifact, ...swingPlaybackTiming.artifacts];
-const fullMixArtifacts = [...cases.map((smokeCase) => smokeCase.artifacts[0]), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact, eventDensitySafety.artifact, mixerTopologySafety.artifact, ...snapshotIdentitySafety.artifacts, musicalControlRangeSafety.artifact, ...swingPlaybackTiming.artifacts];
+const allArtifacts = [...cases.flatMap((smokeCase) => smokeCase.artifacts), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact, eventDensitySafety.artifact, mixerTopologySafety.artifact, ...snapshotIdentitySafety.artifacts, musicalControlRangeSafety.artifact, ...swingPlaybackTiming.artifacts, masterCeilingRuntimeSafety.artifact];
+const fullMixArtifacts = [...cases.map((smokeCase) => smokeCase.artifacts[0]), ...styleMatrix.map((style) => style.artifact), ...unicodeFileIdentity.map((identity) => identity.artifact), projectTitleIntegrity.artifact, projectImportSafety.artifact, projectPitchSafety.artifact, timelineBoundarySafety.artifact, eventDensitySafety.artifact, mixerTopologySafety.artifact, ...snapshotIdentitySafety.artifacts, musicalControlRangeSafety.artifact, ...swingPlaybackTiming.artifacts, masterCeilingRuntimeSafety.artifact];
 const tailSafety = {
   artifactCount: allArtifacts.length,
   zeroEndedCount: allArtifacts.filter((artifact) => artifact.decoded.finalFramePeak === 0).length,
@@ -1064,7 +1126,7 @@ const tailSafety = {
 };
 
 const report = {
-  schemaVersion: 13,
+  schemaVersion: 14,
   status: failures.length === 0 ? "passed" : "failed",
   app: { name: appName, version: packageJson.version, platformArch },
   boundaries: {
@@ -1083,6 +1145,7 @@ const report = {
   snapshotIdentitySafety,
   musicalControlRangeSafety,
   swingPlaybackTiming,
+  masterCeilingRuntimeSafety,
   tailSafety,
   renderIsolation,
   failures
@@ -1098,7 +1161,7 @@ if (failures.length > 0) {
 }
 
 console.log("GrooveForge sample audio QA passed.");
-console.log(`Audience cases: ${cases.length}; style matrix: ${styleMatrix.length}/${workstation.styleProfiles.length}; Unicode file identity: ${unicodeFileIdentity.length}/2; title integrity: 1/1; import safety: 1/1; pitch safety: 1/1; timeline safety: 1/1; event density safety: 1/1; mixer topology safety: 1/1; snapshot identity safety: 2/2; musical control range safety: 1/1; swing playback timing: 2/2; playable WAV files: ${allArtifacts.length}`);
+console.log(`Audience cases: ${cases.length}; style matrix: ${styleMatrix.length}/${workstation.styleProfiles.length}; Unicode file identity: ${unicodeFileIdentity.length}/2; title integrity: 1/1; import safety: 1/1; pitch safety: 1/1; timeline safety: 1/1; event density safety: 1/1; mixer topology safety: 1/1; snapshot identity safety: 2/2; musical control range safety: 1/1; swing playback timing: 2/2; master ceiling runtime safety: 1/1; playable WAV files: ${allArtifacts.length}`);
 console.log(`Export tail safety: ${tailSafety.zeroEndedCount}/${tailSafety.artifactCount} artifacts end at digital zero; full-mix tail content ${tailSafety.fullMixTailContentCount}/${tailSafety.fullMixCount}`);
 console.log(`Render isolation: ${renderIsolation.unrelatedEditCount}/${renderIsolation.unrelatedEditCount} unrelated edits isolated; target mixer sensitive ${renderIsolation.targetMixerSensitive ? "yes" : "no"}; noise sound sensitive ${renderIsolation.noiseSoundSensitive ? "yes" : "no"}; solo/stem match ${renderIsolation.soloMatchesStem ? "yes" : "no"}`);
 for (const smokeCase of cases) {

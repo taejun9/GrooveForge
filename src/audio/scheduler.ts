@@ -34,6 +34,7 @@ import {
   patternForSlot,
   projectStepDurationSeconds,
   projectSwingOffsetSeconds,
+  projectMasterCeilingDb,
   ProjectState,
   sidechainGainForStep,
   SoundDesign
@@ -597,7 +598,7 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
   const context = createAudioContext();
   void context.resume();
   const masterGain = context.createGain();
-  const ceiling = dbToGain(project.masterCeilingDb);
+  const ceiling = dbToGain(projectMasterCeilingDb(project));
   masterGain.gain.setValueAtTime(masterOutputGain(mixerProject) * Math.min(1, ceiling), context.currentTime);
   masterGain.connect(context.destination);
   const spaceInput = createSpaceBus(context, masterGain);
@@ -863,7 +864,7 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
       const totalBars = Math.max(1, bars);
       const startBar = playbackRange.startBar;
       const stepDuration = projectStepDurationSeconds(currentProject);
-      const ceiling = dbToGain(currentProject.masterCeilingDb);
+      const ceiling = dbToGain(projectMasterCeilingDb(currentProject));
       const snapshot = snapshotForStep(currentProject, nextStep, loopSteps, totalBars, mode, startBar);
       const automationStep = mode === "arrangement" ? startBar * 16 + snapshot.loopStep : snapshot.loopStep;
       const automationGain = masterAutomationGainForEvents(

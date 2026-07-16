@@ -958,6 +958,46 @@ async function validateSwingPlaybackTiming() {
   };
 }
 
+async function validateMasterCeilingRuntimeSafety() {
+  const baseProject = {
+    ...structuredClone(workstation.starterProject),
+    title: "Master Ceiling Runtime Safety Beat",
+    arrangement: [{ section: "Intro", pattern: "A", energy: 0.8, bars: 1, mutedTracks: [] }]
+  };
+  const lowProject = { ...structuredClone(baseProject), masterCeilingDb: -900 };
+  const highProject = { ...structuredClone(baseProject), masterCeilingDb: 18 };
+  const repairedLow = workstation.parseProjectFile(JSON.stringify(lowProject));
+  const repairedHigh = workstation.parseProjectFile(JSON.stringify(highProject));
+  const directLowWav = await blobBytes(render.createMixWavBlob(lowProject));
+  const repairedLowWav = await blobBytes(render.createMixWavBlob(repairedLow));
+  const directHighWav = await blobBytes(render.createMixWavBlob(highProject));
+  const repairedHighWav = await blobBytes(render.createMixWavBlob(repairedHigh));
+  const lowAnalysis = render.analyzeExport(lowProject);
+  const highAnalysis = render.analyzeExport(highProject);
+  const lowStemAnalyses = render.analyzeStemExports(lowProject);
+  const lowHandoff = handoff.createHandoffSheet(lowProject, lowAnalysis, lowStemAnalyses);
+
+  check(workstation.projectMasterCeilingDb(lowProject) === workstation.minMasterCeilingDb, "master-ceiling-runtime-safety: direct low ceiling must clamp to -6 dB");
+  check(workstation.projectMasterCeilingDb(highProject) === workstation.maxMasterCeilingDb, "master-ceiling-runtime-safety: direct high ceiling must clamp to 0 dB");
+  check(workstation.projectMasterCeilingDb({ masterCeilingDb: Number.NaN }) === -1, "master-ceiling-runtime-safety: direct non-finite ceiling must use the safe default");
+  check(repairedLow.masterCeilingDb === workstation.minMasterCeilingDb && repairedHigh.masterCeilingDb === workstation.maxMasterCeilingDb, "master-ceiling-runtime-safety: import must use the same bounded ceiling contract");
+  check(directLowWav.byteLength === repairedLowWav.byteLength && directLowWav.every((byte, index) => byte === repairedLowWav[index]), "master-ceiling-runtime-safety: direct low WAV must match imported repair");
+  check(directHighWav.byteLength === repairedHighWav.byteLength && directHighWav.every((byte, index) => byte === repairedHighWav[index]), "master-ceiling-runtime-safety: direct high WAV must match imported repair");
+  check(directLowWav.slice(44).some((byte) => byte !== 0), "master-ceiling-runtime-safety: repaired direct low WAV must remain audible");
+  check(lowAnalysis.ceilingDb === workstation.minMasterCeilingDb && highAnalysis.ceilingDb === workstation.maxMasterCeilingDb, "master-ceiling-runtime-safety: export analysis must report the bounded ceiling");
+  check(lowAnalysis.peakDb <= lowAnalysis.ceilingDb + 1e-9 && highAnalysis.peakDb <= highAnalysis.ceilingDb + 1e-9, "master-ceiling-runtime-safety: analyzed peaks must respect the bounded ceiling");
+  check(lowHandoff.includes("Master Ceiling: -6.0 dB"), "master-ceiling-runtime-safety: direct Handoff Sheet must report the bounded ceiling");
+  check(lowProject.masterCeilingDb === -900 && highProject.masterCeilingDb === 18, "master-ceiling-runtime-safety: runtime consumers must not mutate caller-owned ceiling values");
+
+  return {
+    ceilingRange: `${workstation.minMasterCeilingDb}..${workstation.maxMasterCeilingDb}`,
+    normalizedPaths: 8,
+    lowPeakDb: lowAnalysis.peakDb,
+    highHeadroomDb: highAnalysis.headroomDb,
+    wavBytes: directLowWav.byteLength
+  };
+}
+
 function projectEventCounts(project) {
   return workstation.patternSlots.map((slot) => {
     const pattern = project.patterns[slot];
@@ -1432,6 +1472,7 @@ const mixerTopologySafetySummary = await validateMixerTopologySafety();
 const snapshotIdentitySafetySummary = validateSnapshotIdentitySafety();
 const musicalControlRangeSafetySummary = await validateMusicalControlRangeSafety();
 const swingPlaybackTimingSummary = await validateSwingPlaybackTiming();
+const masterCeilingRuntimeSafetySummary = await validateMasterCeilingRuntimeSafety();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -1460,6 +1501,7 @@ console.log(`- Mixer topology safety: ${mixerTopologySafetySummary.sourceChannel
 console.log(`- Snapshot identity safety: ${snapshotIdentitySafetySummary.sourceIds}->${snapshotIdentitySafetySummary.repairedIds} ids / unique ${snapshotIdentitySafetySummary.uniqueIds}/${snapshotIdentitySafetySummary.repairedIds} / rename ${snapshotIdentitySafetySummary.renamed} / delete ${snapshotIdentitySafetySummary.deleted} / restore ${snapshotIdentitySafetySummary.restoredBpms} BPM / normalized paths ${snapshotIdentitySafetySummary.paths}/6`);
 console.log(`- Musical control range safety: sound ${musicalControlRangeSafetySummary.soundRange} / drum velocity ${musicalControlRangeSafetySummary.drumVelocityRange} / mixer ${musicalControlRangeSafetySummary.mixerRange} dB / normalized paths ${musicalControlRangeSafetySummary.paths}/8 / structural rejections ${musicalControlRangeSafetySummary.rejected}/3 / MIDI ${musicalControlRangeSafetySummary.midiBytes} bytes / WAV ${musicalControlRangeSafetySummary.wavBytes} bytes`);
 console.log(`- Swing playback timing: ${swingPlaybackTimingSummary.swingRange} / odd-step delay ${swingPlaybackTimingSummary.oddOffsetMs} ms / distinct WAV and MIDI yes / normalized paths ${swingPlaybackTimingSummary.normalizedPaths}/4 / MIDI ${swingPlaybackTimingSummary.midiBytes} bytes / WAV ${swingPlaybackTimingSummary.wavBytes} bytes`);
+console.log(`- Master ceiling runtime safety: ${masterCeilingRuntimeSafetySummary.ceilingRange} dB / normalized paths ${masterCeilingRuntimeSafetySummary.normalizedPaths}/8 / low peak ${masterCeilingRuntimeSafetySummary.lowPeakDb.toFixed(2)} dB / high headroom ${masterCeilingRuntimeSafetySummary.highHeadroomDb.toFixed(2)} dB / WAV ${masterCeilingRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

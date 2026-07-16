@@ -51,6 +51,8 @@ Musical-control range coverage separates recoverable finite excursions from malf
 
 Swing-playback coverage treats the saved Swing field as an audible timing contract rather than display-only metadata. One domain helper bounds BPM and Swing, leaves even sixteenth anchors on the straight grid, and delays odd sixteenth onsets by the Swing fraction of one step. Runtime smoke proves 0% and 24% produce distinct WAV and MIDI bytes, direct excessive Swing and zero BPM match imported repair, and realtime feedback uses the same heard timestamp as scheduling. Sample-audio QA renders paired `스트레이트-타이밍-비트-demo.wav` and `스윙-타이밍-비트-demo.wav` files at 120 BPM, requires equal duration and a decoded 1,323-frame/30 ms odd-step delay, and raises the expected report to schema version 13 with 37 playable WAVs and 29 full mixes retaining tail content.
 
+Master-Ceiling runtime coverage applies the domain-owned -6–0 dB contract after project parsing as well as at direct offline render/analysis, realtime playback, editor audition, and Handoff boundaries. Runtime smoke proves low/high/non-finite direct values recover without source mutation and direct/imported WAV bytes agree. Sample-audio QA renders `마스터-천장-복구-비트-demo.wav` from a direct -900 dB bypass project, requires audible decoded PCM at the repaired -6 dB ceiling, imported hash parity, tail content, deterministic rerender, and digital-zero ending, and raises the current report to schema version 14 with 38 playable WAVs and 30 full mixes retaining tail content.
+
 ## Agent Readability
 
 Agents should be able to answer these questions from repo files alone:

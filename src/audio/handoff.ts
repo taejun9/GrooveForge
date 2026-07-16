@@ -4,6 +4,7 @@ import {
   arrangementTotalBars,
   normalizeProjectTitle,
   patternSlots,
+  projectMasterCeilingDb,
   projectFileName,
   styleProfiles
 } from "../domain/workstation";
@@ -81,7 +82,7 @@ export function createHandoffSheet(
     `Target Length: ${barCountLabel(target.targetBars)}`,
     `Target Stems: ${target.stemGoal}`,
     `Master Preset: ${project.masterPreset}`,
-    `Master Ceiling: ${formatDb(project.masterCeilingDb)}`,
+    `Master Ceiling: ${formatDb(projectMasterCeilingDb(project))}`,
     "",
     "Session Brief",
     `Artist: ${handoffValue(brief.artist)}`,

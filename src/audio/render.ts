@@ -22,6 +22,7 @@ import {
   normalizePatternEventLength,
   normalizeProjectAutomationEvents,
   normalizeSoundDesignControls,
+  projectMasterCeilingDb,
   sidechainGainForStep,
 } from "../domain/workstation";
 import type { ArrangementBlock, ArrangementMuteTrack, ProjectState, SoundDesign, TrackType } from "../domain/workstation";
@@ -534,7 +535,8 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
 
   applySpaceReturn(buffer, sendBuffer);
 
-  const ceiling = dbToGain(project.masterCeilingDb);
+  const ceilingDb = projectMasterCeilingDb(project);
+  const ceiling = dbToGain(ceilingDb);
   let peak = 0;
   let squareSum = 0;
   let limitedSamples = 0;
@@ -562,7 +564,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
 
   const peakDb = amplitudeToDb(peak);
   const rmsDb = amplitudeToDb(Math.sqrt(squareSum / Math.max(1, totalSamples)));
-  const headroomDb = Number.isFinite(peakDb) ? project.masterCeilingDb - peakDb : 99;
+  const headroomDb = Number.isFinite(peakDb) ? ceilingDb - peakDb : 99;
   const limitedPercent = (limitedSamples / Math.max(1, totalSamples)) * 100;
   const status =
     peak === 0 ? "Silent" : limitedSamples > 0 ? "Limiter active" : headroomDb < 1 ? "Hot" : "Ready";
@@ -576,7 +578,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
       peakDb,
       rmsDb,
       headroomDb,
-      ceilingDb: project.masterCeilingDb,
+      ceilingDb,
       limitedSamples,
       limitedPercent,
       status
