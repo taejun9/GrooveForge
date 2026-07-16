@@ -998,6 +998,53 @@ async function validateMasterCeilingRuntimeSafety() {
   };
 }
 
+async function validateDeliveryMetadataRuntimeSafety() {
+  const directProject = {
+    ...structuredClone(workstation.starterProject),
+    title: "Delivery Metadata Runtime Safety Beat",
+    bpm: 0,
+    key: "H major",
+    arrangement: [{ section: "Intro", pattern: "A", energy: 0.8, bars: 1, mutedTracks: [] }],
+    snapshots: []
+  };
+  const repairedProject = workstation.parseProjectFile(workstation.serializeProjectFile(directProject));
+  const directWav = await blobBytes(render.createMixWavBlob(directProject));
+  const repairedWav = await blobBytes(render.createMixWavBlob(repairedProject));
+  const directMidi = midi.createMidiFile(directProject);
+  const repairedMidi = midi.createMidiFile(repairedProject);
+  const midiText = new TextDecoder().decode(directMidi);
+  const analysis = render.analyzeExport(directProject);
+  const stemAnalyses = {
+    drum_rack: analysis,
+    bass_808: analysis,
+    synth: analysis,
+    chord: analysis
+  };
+  const sheet = handoff.createHandoffSheet(directProject, analysis, stemAnalyses);
+  const manifest = deliveryBundle.createDeliveryBundleManifest(directProject, "runtime-safety.zip", []);
+  const directWavMatches = directWav.byteLength === repairedWav.byteLength && directWav.every((byte, index) => byte === repairedWav[index]);
+  const directMidiMatches = directMidi.byteLength === repairedMidi.byteLength && directMidi.every((byte, index) => byte === repairedMidi[index]);
+
+  check(workstation.projectBpm(directProject) === workstation.minProjectBpm, "delivery-metadata-runtime-safety: direct zero BPM must clamp to the project minimum");
+  check(workstation.projectBpm({ bpm: Number.NaN }) === 82, "delivery-metadata-runtime-safety: direct non-finite BPM must use the safe default");
+  check(workstation.projectKey(directProject) === "A minor", "delivery-metadata-runtime-safety: direct unsupported key must use the safe project key");
+  check(repairedProject.bpm === workstation.minProjectBpm && repairedProject.key === "A minor", "delivery-metadata-runtime-safety: durable repair must use the same BPM/key contract");
+  check(directWavMatches, "delivery-metadata-runtime-safety: direct WAV must match durable BPM/key repair");
+  check(directMidiMatches, "delivery-metadata-runtime-safety: direct MIDI must match durable BPM/key repair");
+  check(midiText.includes("Key: A minor") && !midiText.includes("Key: H major"), "delivery-metadata-runtime-safety: MIDI key metadata must use the repaired key");
+  check(sheet.includes("BPM: 60") && sheet.includes("Key: A minor") && !sheet.includes("BPM: 0") && !sheet.includes("Key: H major"), "delivery-metadata-runtime-safety: Handoff Sheet must use repaired BPM/key metadata");
+  check(manifest.bpm === workstation.minProjectBpm && manifest.key === "A minor", "delivery-metadata-runtime-safety: delivery manifest must use repaired BPM/key metadata");
+  check(directProject.bpm === 0 && directProject.key === "H major", "delivery-metadata-runtime-safety: runtime consumers must not mutate caller-owned BPM/key values");
+
+  return {
+    source: `${directProject.bpm} BPM / ${directProject.key}`,
+    repaired: `${repairedProject.bpm} BPM / ${repairedProject.key}`,
+    normalizedPaths: 9,
+    midiBytes: directMidi.byteLength,
+    wavBytes: directWav.byteLength
+  };
+}
+
 function projectEventCounts(project) {
   return workstation.patternSlots.map((slot) => {
     const pattern = project.patterns[slot];
@@ -1473,6 +1520,7 @@ const snapshotIdentitySafetySummary = validateSnapshotIdentitySafety();
 const musicalControlRangeSafetySummary = await validateMusicalControlRangeSafety();
 const swingPlaybackTimingSummary = await validateSwingPlaybackTiming();
 const masterCeilingRuntimeSafetySummary = await validateMasterCeilingRuntimeSafety();
+const deliveryMetadataRuntimeSafetySummary = await validateDeliveryMetadataRuntimeSafety();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -1502,6 +1550,7 @@ console.log(`- Snapshot identity safety: ${snapshotIdentitySafetySummary.sourceI
 console.log(`- Musical control range safety: sound ${musicalControlRangeSafetySummary.soundRange} / drum velocity ${musicalControlRangeSafetySummary.drumVelocityRange} / mixer ${musicalControlRangeSafetySummary.mixerRange} dB / normalized paths ${musicalControlRangeSafetySummary.paths}/8 / structural rejections ${musicalControlRangeSafetySummary.rejected}/3 / MIDI ${musicalControlRangeSafetySummary.midiBytes} bytes / WAV ${musicalControlRangeSafetySummary.wavBytes} bytes`);
 console.log(`- Swing playback timing: ${swingPlaybackTimingSummary.swingRange} / odd-step delay ${swingPlaybackTimingSummary.oddOffsetMs} ms / distinct WAV and MIDI yes / normalized paths ${swingPlaybackTimingSummary.normalizedPaths}/4 / MIDI ${swingPlaybackTimingSummary.midiBytes} bytes / WAV ${swingPlaybackTimingSummary.wavBytes} bytes`);
 console.log(`- Master ceiling runtime safety: ${masterCeilingRuntimeSafetySummary.ceilingRange} dB / normalized paths ${masterCeilingRuntimeSafetySummary.normalizedPaths}/8 / low peak ${masterCeilingRuntimeSafetySummary.lowPeakDb.toFixed(2)} dB / high headroom ${masterCeilingRuntimeSafetySummary.highHeadroomDb.toFixed(2)} dB / WAV ${masterCeilingRuntimeSafetySummary.wavBytes} bytes`);
+console.log(`- Delivery metadata runtime safety: ${deliveryMetadataRuntimeSafetySummary.source} -> ${deliveryMetadataRuntimeSafetySummary.repaired} / normalized paths ${deliveryMetadataRuntimeSafetySummary.normalizedPaths}/9 / MIDI ${deliveryMetadataRuntimeSafetySummary.midiBytes} bytes / WAV ${deliveryMetadataRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

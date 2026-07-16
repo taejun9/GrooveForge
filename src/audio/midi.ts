@@ -12,9 +12,10 @@ import {
   normalizeArrangementBars,
   normalizePatternEventCollections,
   normalizePatternEventLength,
-  normalizeProjectBpm,
   normalizeProjectPitch,
+  projectBpm,
   projectFileStem,
+  projectKey,
   projectPitchMidiNumber,
   projectStepDurationSeconds,
   projectSwingOffsetSteps,
@@ -146,11 +147,11 @@ function encodeTrack(name: string, events: MidiTrackEvent[], endTick: number, pr
 }
 
 function encodeTempoTrack(project: ProjectState, endTick: number): number[] {
-  const tempo = Math.round(60_000_000 / normalizeProjectBpm(project.bpm));
+  const tempo = Math.round(60_000_000 / projectBpm(project));
   const events: MidiTrackEvent[] = [
     { tick: 0, order: -1, bytes: [0xff, 0x51, 0x03, ...numberToBytes(tempo, 3)] },
     { tick: 0, order: 0, bytes: [0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08] },
-    { tick: 0, order: 1, bytes: metaTextEvent(`Key: ${project.key}`) }
+    { tick: 0, order: 1, bytes: metaTextEvent(`Key: ${projectKey(project)}`) }
   ];
   return encodeTrack("GrooveForge Tempo", events, endTick);
 }

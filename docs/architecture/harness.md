@@ -53,6 +53,8 @@ Swing-playback coverage treats the saved Swing field as an audible timing contra
 
 Master-Ceiling runtime coverage applies the domain-owned -6–0 dB contract after project parsing as well as at direct offline render/analysis, realtime playback, editor audition, and Handoff boundaries. Runtime smoke proves low/high/non-finite direct values recover without source mutation and direct/imported WAV bytes agree. Sample-audio QA renders `마스터-천장-복구-비트-demo.wav` from a direct -900 dB bypass project, requires audible decoded PCM at the repaired -6 dB ceiling, imported hash parity, tail content, deterministic rerender, and digital-zero ending, and raises the current report to schema version 14 with 38 playable WAVs and 30 full mixes retaining tail content.
 
+Delivery-metadata runtime coverage applies the same domain-owned BPM/key repair used by durable project serialization to MIDI tempo/key metadata, Handoff Sheet identity, delivery manifests, and audio timing. Runtime smoke proves a direct `0 BPM / H major` bypass becomes `60 BPM / A minor` everywhere without source mutation and produces byte-identical direct/imported WAV and MIDI output. Sample-audio QA writes `전달-메타데이터-복구-비트-demo.wav` plus its arrangement MIDI, verifies producer-facing metadata and durable JSON agree, and raises the current report to schema version 15 with 39 playable WAVs and 31 full mixes retaining tail content.
+
 ## Agent Readability
 
 Agents should be able to answer these questions from repo files alone:

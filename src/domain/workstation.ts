@@ -2807,6 +2807,14 @@ export function normalizeProjectKey(value: unknown): string {
   return isOneOf(value, projectKeys) ? value : "A minor";
 }
 
+export function projectBpm(project: Pick<ProjectState, "bpm">): number {
+  return normalizeProjectBpm(project.bpm);
+}
+
+export function projectKey(project: Pick<ProjectState, "key">): string {
+  return normalizeProjectKey(project.key);
+}
+
 export function normalizeMixerVolumeDb(value: unknown): number {
   if (!isFiniteNumber(value)) {
     return -6;
@@ -2841,7 +2849,7 @@ export function stepDurationSeconds(bpm: number): number {
 }
 
 export function projectStepDurationSeconds(project: ProjectState): number {
-  return stepDurationSeconds(project.bpm);
+  return stepDurationSeconds(projectBpm(project));
 }
 
 export function projectSwingOffsetSteps(project: Pick<ProjectState, "swing">, absoluteStep: number): number {

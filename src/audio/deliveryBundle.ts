@@ -2,8 +2,10 @@ import {
   activeDeliveryTarget,
   arrangementTotalBars,
   normalizeProjectTitle,
+  projectBpm,
   projectFileName,
   projectFileStem,
+  projectKey,
   serializeProjectFile
 } from "../domain/workstation";
 import type { ProjectState } from "../domain/workstation";
@@ -301,8 +303,8 @@ export function createDeliveryBundleManifest(
     bundleFileName,
     deliveryTarget: activeDeliveryTarget(project).name,
     bars: arrangementTotalBars(project),
-    bpm: project.bpm,
-    key: project.key,
+    bpm: projectBpm(project),
+    key: projectKey(project),
     styleId: project.styleId,
     artifactCount: manifestEntries.length + 2,
     artifactBytes: manifestEntries.reduce((sum, entry) => sum + entry.bytes, 0),
