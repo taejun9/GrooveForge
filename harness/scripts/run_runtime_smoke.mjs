@@ -30,6 +30,7 @@ const midi = await import("../../src/audio/midi.ts");
 const handoff = await import("../../src/audio/handoff.ts");
 const deliveryBundle = await import("../../src/audio/deliveryBundle.ts");
 const downloads = await import("../../src/platform/downloads.ts");
+const localDraftLifecycle = await import("../../src/ui/localDraftLifecycle.ts");
 const coreTrackTypes = new Set(["drum_rack", "bass_808", "synth", "chord", "fx_return", "master"]);
 const smokeKey = "F minor";
 const smokeScope = "sample-free first-run starter project plus all-style 8-bar beats with local project-file roundtrips, bounded mixer-topology recovery, Handoff Sheet checks, and mocked download-path checks without writing media artifacts";
@@ -114,6 +115,32 @@ function stableJson(value) {
       .join(",")}}`;
   }
   return JSON.stringify(value);
+}
+
+function validateLocalDraftWriteGate() {
+  const cases = [
+    { armed: false, skip: false, shouldWrite: false },
+    { armed: true, skip: false, shouldWrite: true },
+    { armed: false, skip: true, shouldWrite: false },
+    { armed: true, skip: true, shouldWrite: false }
+  ];
+
+  for (const entry of cases) {
+    const decision = localDraftLifecycle.resolveLocalDraftWriteGate(entry.armed, entry.skip);
+    check(
+      decision.shouldWrite === entry.shouldWrite && decision.skipNextWrite === false,
+      `local-draft-write-gate:${entry.armed}/${entry.skip} should resolve to write ${entry.shouldWrite} with a consumed skip`
+    );
+  }
+
+  const replacement = localDraftLifecycle.resolveLocalDraftWriteGate(false, true);
+  const firstEdit = localDraftLifecycle.resolveLocalDraftWriteGate(true, replacement.skipNextWrite);
+  check(
+    replacement.shouldWrite === false && firstEdit.shouldWrite === true,
+    "local-draft-write-gate: replacement should not write while the first later edit remains write eligible"
+  );
+
+  return { paths: cases.length, firstEditWriteEligible: firstEdit.shouldWrite };
 }
 
 function validateUnicodeFileIdentity() {
@@ -1636,6 +1663,7 @@ const masterCeilingRuntimeSafetySummary = await validateMasterCeilingRuntimeSafe
 const deliveryMetadataRuntimeSafetySummary = await validateDeliveryMetadataRuntimeSafety();
 const handoffRuntimeSafetySummary = await validateHandoffRuntimeSafety();
 const snapshotRuntimeSafetySummary = await validateSnapshotRuntimeSafety();
+const localDraftWriteGateSummary = validateLocalDraftWriteGate();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -1668,6 +1696,7 @@ console.log(`- Master ceiling runtime safety: ${masterCeilingRuntimeSafetySummar
 console.log(`- Delivery metadata runtime safety: ${deliveryMetadataRuntimeSafetySummary.source} -> ${deliveryMetadataRuntimeSafetySummary.repaired} / normalized paths ${deliveryMetadataRuntimeSafetySummary.normalizedPaths}/9 / MIDI ${deliveryMetadataRuntimeSafetySummary.midiBytes} bytes / WAV ${deliveryMetadataRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Handoff runtime safety: ${handoffRuntimeSafetySummary.source} -> ${handoffRuntimeSafetySummary.repaired} / normalized paths ${handoffRuntimeSafetySummary.normalizedPaths}/8 / Handoff ${handoffRuntimeSafetySummary.handoffBytes} bytes / MIDI ${handoffRuntimeSafetySummary.midiBytes} bytes / WAV ${handoffRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Snapshot runtime safety: ${snapshotRuntimeSafetySummary.source} -> ${snapshotRuntimeSafetySummary.repaired} / normalized paths ${snapshotRuntimeSafetySummary.normalizedPaths}/11 / Handoff ${snapshotRuntimeSafetySummary.handoffBytes} bytes / MIDI ${snapshotRuntimeSafetySummary.midiBytes} bytes / WAV ${snapshotRuntimeSafetySummary.wavBytes} bytes`);
+console.log(`- Local draft write gate: ${localDraftWriteGateSummary.paths}/4 boolean paths / first edit write eligible ${localDraftWriteGateSummary.firstEditWriteEligible ? "yes" : "no"}`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

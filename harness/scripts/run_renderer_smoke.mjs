@@ -186,7 +186,7 @@ function printNamedFunction(source, fileName, functionName) {
     : "";
 }
 
-function validateLocalDraftRecoveryDeferral(shell, helpers, workstation) {
+function validateLocalDraftRecoveryDeferral(shell, helpers, draftLifecycle, workstation) {
   const recovery = {
     savedAt: "2026-07-13T00:00:00.000Z",
     project: workstation.starterProject,
@@ -220,6 +220,9 @@ function validateLocalDraftRecoveryDeferral(shell, helpers, workstation) {
     false
   );
   const deferHandlerSource = printNamedFunction(appSource, "App.tsx", "deferLocalDraftRecovery");
+  const restoreHistorySource = printNamedFunction(appSource, "App.tsx", "restoreProjectFromHistory");
+  const replacementGate = draftLifecycle.resolveLocalDraftWriteGate(false, true);
+  const firstEditGate = draftLifecycle.resolveLocalDraftWriteGate(true, replacementGate.skipNextWrite);
 
   check(
     bannerHtml.includes('data-testid="defer-local-draft"') &&
@@ -255,6 +258,29 @@ function validateLocalDraftRecoveryDeferral(shell, helpers, workstation) {
       appSource
     ),
     "a successful current-project draft write should drop the replaced stale recovery target"
+  );
+  check(
+    replacementGate.shouldWrite === false &&
+      replacementGate.skipNextWrite === false &&
+      firstEditGate.shouldWrite === true &&
+      firstEditGate.skipNextWrite === false &&
+      draftLifecycle.resolveLocalDraftWriteGate(false, false).shouldWrite === false &&
+      draftLifecycle.resolveLocalDraftWriteGate(true, false).shouldWrite === true,
+    "project replacement should consume its own draft skip while the first later edit remains write eligible"
+  );
+  check(
+    appSource.includes(
+      "const writeGate = resolveLocalDraftWriteGate(localDraftWriteArmed, localDraftSkipNextWriteRef.current);"
+    ) &&
+      appSource.includes("localDraftSkipNextWriteRef.current = writeGate.skipNextWrite;") &&
+      appSource.includes("if (!writeGate.shouldWrite)"),
+    "the local-draft effect should apply the explicit write gate before attempting storage"
+  );
+  check(
+    restoreHistorySource.includes("setLocalDraftWriteArmed(true)") &&
+      restoreHistorySource.includes("setProjectHasUnsavedChanges(true)") &&
+      restoreHistorySource.includes("setProject(nextProject)"),
+    "Undo and Redo restoration should conservatively mark changed project content unsaved and recovery-write eligible"
   );
   check(
     appSource.includes("    localDraftRecovery,") &&
@@ -3225,6 +3251,7 @@ try {
   validateLocalDraftRecoveryDeferral(
     await server.ssrLoadModule("/src/ui/workstationShellPanels.tsx"),
     await server.ssrLoadModule("/src/ui/workstationAppHelpers.tsx"),
+    await server.ssrLoadModule("/src/ui/localDraftLifecycle.ts"),
     await server.ssrLoadModule("/src/domain/workstation.ts")
   );
   validateFirstRunProjectOwnership(

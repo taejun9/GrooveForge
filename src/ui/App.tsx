@@ -1045,6 +1045,7 @@ import {
   downloadTextFile,
   fileDisplayName
 } from "./workstationPatternTools";
+import { resolveLocalDraftWriteGate } from "./localDraftLifecycle";
 import {
   activeReferenceAlignmentQuickActionCard,
   activeSessionBriefCompassQuickActionCard,
@@ -2205,11 +2206,9 @@ export function App(): ReactElement {
       localDraftReadyRef.current = true;
       return;
     }
-    if (!localDraftWriteArmed) {
-      return;
-    }
-    if (localDraftSkipNextWriteRef.current) {
-      localDraftSkipNextWriteRef.current = false;
+    const writeGate = resolveLocalDraftWriteGate(localDraftWriteArmed, localDraftSkipNextWriteRef.current);
+    localDraftSkipNextWriteRef.current = writeGate.skipNextWrite;
+    if (!writeGate.shouldWrite) {
       return;
     }
 
@@ -2905,6 +2904,8 @@ export function App(): ReactElement {
     projectRef.current = nextProject;
     resetMasterCeilingEditor(nextProject);
     resetTapTempo();
+    setLocalDraftWriteArmed(true);
+    setProjectHasUnsavedChanges(true);
     setProject(nextProject);
     setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, nextProject.arrangement.length - 1)));
     setSelectedNote(null);
