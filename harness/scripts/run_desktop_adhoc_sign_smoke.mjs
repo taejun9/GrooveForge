@@ -23,7 +23,7 @@ const requiredEntitlements = [
   "com.apple.security.cs.disable-library-validation"
 ];
 // Keep the parent harness alive beyond the app's 640-second launch-smoke timeout.
-const timeoutMs = 660000;
+const timeoutMs = 1820000;
 const failures = [];
 
 function check(condition, message) {

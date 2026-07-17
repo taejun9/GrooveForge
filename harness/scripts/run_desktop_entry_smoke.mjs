@@ -131,6 +131,11 @@ function checkPackageScripts() {
     "package.json desktop:project-io-smoke script"
   );
   checkIncludes(
+    packageJson.scripts?.["desktop:close-flow-smoke"] ?? "",
+    "run_desktop_close_flow_smoke.mjs",
+    "package.json desktop:close-flow-smoke script"
+  );
+  checkIncludes(
     packageJson.scripts?.["desktop:packaged-project-io-smoke"] ?? "",
     "run_desktop_packaged_project_io_smoke.mjs",
     "package.json desktop:packaged-project-io-smoke script"
@@ -154,6 +159,7 @@ function checkPackageScripts() {
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:smoke", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:crash-report-regression-smoke", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:project-io-smoke", "package.json verify script");
+  checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:close-flow-smoke", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:packaged-project-io-smoke", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:pkg-payload-smoke", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:pkg-payload-project-io-smoke", "package.json verify script");
@@ -173,8 +179,10 @@ function checkPackageScripts() {
     (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:launch-smoke") <
       (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:project-io-smoke") &&
       (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:project-io-smoke") <
+        (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:close-flow-smoke") &&
+      (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:close-flow-smoke") <
         (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:package-smoke"),
-    "package.json verify should run desktop:project-io-smoke after launch smoke and before package smoke"
+    "package.json verify should run desktop:project-io-smoke and desktop:close-flow-smoke after launch smoke and before package smoke"
   );
   check(
     (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:package-smoke") <
@@ -207,6 +215,7 @@ function checkDesktopGuiLaunchGuardContract() {
   const desktopAppSource = readText("harness/scripts/run_desktop_app.mjs");
   const launchSmokeSource = readText("harness/scripts/run_desktop_launch_smoke.mjs");
   const projectIoSmokeSource = readText("harness/scripts/run_desktop_project_io_smoke.mjs");
+  const closeFlowSmokeSource = readText("harness/scripts/run_desktop_close_flow_smoke.mjs");
   const packageSmokeSource = readText("harness/scripts/run_desktop_package_smoke.mjs");
   const packagedProjectIoSmokeSource = readText("harness/scripts/run_desktop_packaged_project_io_smoke.mjs");
   const adhocSignSmokeSource = readText("harness/scripts/run_desktop_adhoc_sign_smoke.mjs");
@@ -238,6 +247,10 @@ function checkDesktopGuiLaunchGuardContract() {
   checkIncludes(launchSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:launch-smoke\"", "harness/scripts/run_desktop_launch_smoke.mjs");
   checkIncludes(projectIoSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:project-io-smoke\")", "harness/scripts/run_desktop_project_io_smoke.mjs");
   checkIncludes(projectIoSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:project-io-smoke\"", "harness/scripts/run_desktop_project_io_smoke.mjs");
+  checkIncludes(closeFlowSmokeSource, "macGuiLaunchBlockDetails(command)", "harness/scripts/run_desktop_close_flow_smoke.mjs");
+  checkIncludes(closeFlowSmokeSource, "macGuiLaunchAbortDetails(command", "harness/scripts/run_desktop_close_flow_smoke.mjs");
+  checkIncludes(closeFlowSmokeSource, "GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE", "harness/scripts/run_desktop_close_flow_smoke.mjs");
+  checkIncludes(closeFlowSmokeSource, "secondGuardedCloseCompleted", "harness/scripts/run_desktop_close_flow_smoke.mjs");
   checkIncludes(packageSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:package-smoke\")", "harness/scripts/run_desktop_package_smoke.mjs");
   checkIncludes(packageSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:package-smoke\"", "harness/scripts/run_desktop_package_smoke.mjs");
   checkIncludes(packageSmokeSource, "allRequiredDependenciesSignatureCompatible", "harness/scripts/run_desktop_package_smoke.mjs");
@@ -400,7 +413,7 @@ function checkElectronMainContract() {
   checkIncludes(source, "nodeIntegration: false", label);
   checkIncludes(source, "contextIsolation: true", label);
   checkIncludes(source, "sandbox: true", label);
-  checkIncludes(source, "backgroundThrottling: !(isLaunchSmoke || isProjectIoSmoke)", label);
+  checkIncludes(source, "backgroundThrottling: !(isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke)", label);
   checkIncludes(source, "paintWhenInitiallyHidden: true", label);
   checkIncludes(source, 'void win.loadFile(path.join(__dirname, "../dist/index.html"))', label);
   checkIncludes(source, "win.webContents.setWindowOpenHandler", label);
@@ -408,6 +421,14 @@ function checkElectronMainContract() {
   checkIncludes(source, "registerProjectFileHandlers();", label);
   checkIncludes(source, "ipcMain.on(closeWindowChannel", label);
   checkIncludes(source, "BrowserWindow.fromWebContents(event.sender)?.close();", label);
+  checkIncludes(source, 'const isCloseFlowSmoke = process.env.GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE === "1"', label);
+  checkIncludes(source, "installCloseFlowSmoke(win);", label);
+  checkIncludes(source, 'closeFlowSmokeState.events.push("first-close-prevented")', label);
+  checkIncludes(source, 'closeFlowSmokeState.events.push("renderer-close-request")', label);
+  checkIncludes(source, "const smokeFilePath = projectIoSmokePath() ?? closeFlowSmokePath();", label);
+  checkIncludes(source, "secondGuardedCloseCompleted: true", label);
+  checkIncludes(source, '!isCloseFlowSmoke && BrowserWindow.getAllWindows().length === 0', label);
+  checkIncludes(source, 'process.platform !== "darwin" && !isCloseFlowSmoke', label);
   checkIncludes(source, "Menu.setApplicationMenu(createNativeCommandMenu())", label);
   checkIncludes(source, "createWindow();", label);
   checkIncludes(source, "autoUpdater", label);

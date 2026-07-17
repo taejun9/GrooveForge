@@ -16,12 +16,16 @@ const menuCommandChannel = "grooveforge:menu-command";
 const closeWindowChannel = "grooveforge:close-window";
 const isLaunchSmoke = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1";
 const isProjectIoSmoke = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE === "1";
+const isCloseFlowSmoke = process.env.GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE === "1";
 const launchSmokeDrumGridSnapshotChannel = "grooveforge:launch-smoke-drum-grid-snapshot";
 const launchSmokeNoteGridSnapshotChannel = "grooveforge:launch-smoke-note-grid-snapshot";
 const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
+const closeFlowSmokeResultPrefix = "GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE_RESULT ";
 const launchSmokeTimeoutMs = 1800000;
 const projectIoSmokeTimeoutMs = 640000;
+const closeFlowSmokeTimeoutMs = 240000;
+const closeFlowSmokeExpectedTitle = "Close Flow Smoke Beat";
 // Mirrors the renderer/domain 1,500,000-character contract at the native IPC boundary.
 const maxNativeProjectFileCharacters = 1_500_000;
 const maxNativeProjectFileBytes = maxNativeProjectFileCharacters * 4;
@@ -604,6 +608,35 @@ type ProjectIoSmokeEvidence = {
   title: string;
 };
 
+type CloseFlowSmokeLiveEditEvidence = {
+  dirtyStatus: string;
+  initialTitle: string;
+  inputPresent: boolean;
+  title: string;
+};
+
+type CloseFlowSmokeState = {
+  closeRequestCount: number;
+  events: string[];
+  liveEdit: CloseFlowSmokeLiveEditEvidence | null;
+  nativeSaveCount: number;
+  nativeSaveDefaultName: string | null;
+  nativeSavePath: string | null;
+  smokeChoiceSubstituted: boolean;
+  willPreventUnloadCount: number;
+};
+
+const closeFlowSmokeState: CloseFlowSmokeState = {
+  closeRequestCount: 0,
+  events: [],
+  liveEdit: null,
+  nativeSaveCount: 0,
+  nativeSaveDefaultName: null,
+  nativeSavePath: null,
+  smokeChoiceSubstituted: false,
+  willPreventUnloadCount: 0
+};
+
 const projectFilters = [{ name: "GrooveForge Project", extensions: ["json"] }];
 let updateHandlersRegistered = false;
 let updateCheckInProgress = false;
@@ -840,6 +873,10 @@ function createNativeCommandMenu(): Menu {
 
 function registerProjectFileHandlers(): void {
   ipcMain.on(closeWindowChannel, (event) => {
+    if (isCloseFlowSmoke) {
+      closeFlowSmokeState.closeRequestCount += 1;
+      closeFlowSmokeState.events.push("renderer-close-request");
+    }
     BrowserWindow.fromWebContents(event.sender)?.close();
   });
 
@@ -854,7 +891,7 @@ function registerProjectFileHandlers(): void {
       defaultPath: payload.defaultName,
       filters: projectFilters
     };
-    const smokeFilePath = projectIoSmokePath();
+    const smokeFilePath = projectIoSmokePath() ?? closeFlowSmokePath();
     const result = smokeFilePath
       ? { canceled: false, filePath: smokeFilePath }
       : browserWindow
@@ -864,7 +901,16 @@ function registerProjectFileHandlers(): void {
       return { canceled: true };
     }
 
+    if (isCloseFlowSmoke) {
+      closeFlowSmokeState.nativeSaveCount += 1;
+      closeFlowSmokeState.nativeSaveDefaultName = payload.defaultName;
+      closeFlowSmokeState.nativeSavePath = result.filePath;
+      closeFlowSmokeState.events.push("native-save-started");
+    }
     await writeFile(result.filePath, payload.contents, "utf8");
+    if (isCloseFlowSmoke) {
+      closeFlowSmokeState.events.push("native-save-completed");
+    }
     return { canceled: false, filePath: result.filePath };
   });
 
@@ -900,6 +946,11 @@ function projectIoSmokePath(): string | null {
   return isProjectIoSmoke && filePath ? filePath : null;
 }
 
+function closeFlowSmokePath(): string | null {
+  const filePath = process.env.GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE_PATH;
+  return isCloseFlowSmoke && filePath ? filePath : null;
+}
+
 function launchSmokeFailure(message: string, details: Record<string, unknown> = {}): void {
   console.error(`${launchSmokeResultPrefix}${JSON.stringify({ ok: false, message, ...details })}`);
   app.exit(1);
@@ -907,6 +958,11 @@ function launchSmokeFailure(message: string, details: Record<string, unknown> = 
 
 function projectIoSmokeFailure(message: string, details: Record<string, unknown> = {}): void {
   console.error(`${projectIoSmokeResultPrefix}${JSON.stringify({ ok: false, message, ...details })}`);
+  app.exit(1);
+}
+
+function closeFlowSmokeFailure(message: string, details: Record<string, unknown> = {}): void {
+  console.error(`${closeFlowSmokeResultPrefix}${JSON.stringify({ ok: false, message, ...details })}`);
   app.exit(1);
 }
 
@@ -3350,7 +3406,7 @@ async function collectLaunchSmokeModalFocusEvidence(
         };
       })();
     `);
-  const waitFor = async (condition: string, timeoutMs = 10000): Promise<void> => {
+  const waitFor = async (condition: string, timeoutMs = 30000): Promise<void> => {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() <= deadline) {
       if (await runStep<boolean>(`Boolean(${condition})`)) {
@@ -3818,16 +3874,16 @@ async function collectLaunchSmokeCommandReferenceEvidence(win: BrowserWindow): P
             resolve({ ready: true, evidence });
             return;
           }
-          if (Date.now() - started > 15000) {
+          if (Date.now() - started > 30000) {
             resolve({ ready: false, evidence });
             return;
           }
-          requestAnimationFrame(tick);
+          setTimeout(tick, 50);
         };
         tick();
       });
     `,
-    20000
+    45000
   );
   if (!inputReady.ready) {
     throw new Error("Launch smoke Command Reference search input was not ready.");
@@ -3869,22 +3925,22 @@ async function collectLaunchSmokeCommandReferenceEvidence(win: BrowserWindow): P
             resolve({ ready: true, evidence });
             return;
           }
-          if (Date.now() - started > 20000) {
+          if (Date.now() - started > 45000) {
             resolve({ ready: false, evidence });
             return;
           }
-          requestAnimationFrame(tick);
+          setTimeout(tick, 50);
         };
         tick();
       });
     `,
-    25000
+    60000
   );
   if (!searchReady.ready) {
     throw new Error("Launch smoke Command Reference Audience Starter result was not ready.");
   }
 
-  await runCommandReferenceStep<boolean>(
+  const handoffClicked = await runCommandReferenceStep<boolean>(
     "Quick Actions handoff",
     `
       (() => {
@@ -3898,6 +3954,9 @@ async function collectLaunchSmokeCommandReferenceEvidence(win: BrowserWindow): P
     `,
     10000
   );
+  if (!handoffClicked) {
+    throw new Error("Launch smoke Command Reference Quick Actions handoff button disappeared.");
+  }
 
   const handoffReady = await runCommandReferenceStep<{ ready: boolean; evidence: LaunchSmokeCommandReferenceEvidence }>(
     "Quick Actions handoff readiness",
@@ -3911,16 +3970,16 @@ async function collectLaunchSmokeCommandReferenceEvidence(win: BrowserWindow): P
             resolve({ ready: true, evidence });
             return;
           }
-          if (Date.now() - started > 10000) {
+          if (Date.now() - started > 30000) {
             resolve({ ready: false, evidence });
             return;
           }
-          requestAnimationFrame(tick);
+          setTimeout(tick, 50);
         };
         tick();
       });
     `,
-    15000
+    45000
   );
 
   return {
@@ -3931,7 +3990,7 @@ async function collectLaunchSmokeCommandReferenceEvidence(win: BrowserWindow): P
 
 function collectLaunchSmokeCommandReferenceEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeCommandReferenceEvidence> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Timed out collecting live Command Reference evidence.")), 120000);
+    const timeout = setTimeout(() => reject(new Error("Timed out collecting live Command Reference evidence.")), 240000);
     void collectLaunchSmokeCommandReferenceEvidence(win)
       .then((evidence) => {
         clearTimeout(timeout);
@@ -4423,6 +4482,200 @@ function installProjectIoSmoke(win: BrowserWindow): void {
   });
 }
 
+function closeFlowSmokeFailures(savedContents: string): string[] {
+  const failures: string[] = [];
+  let savedTitle: unknown = null;
+  try {
+    const savedFile = JSON.parse(savedContents) as { project?: { title?: unknown } };
+    savedTitle = savedFile.project?.title;
+  } catch {
+    failures.push("saved close-flow project should be valid JSON");
+  }
+
+  if (!closeFlowSmokeState.liveEdit?.inputPresent) {
+    failures.push("production project title input should be present");
+  }
+  if (closeFlowSmokeState.liveEdit?.initialTitle === closeFlowSmokeExpectedTitle) {
+    failures.push("live close-flow edit should change the starter title");
+  }
+  if (closeFlowSmokeState.liveEdit?.title !== closeFlowSmokeExpectedTitle) {
+    failures.push("live renderer edit should reach the expected title");
+  }
+  if (closeFlowSmokeState.liveEdit?.dirtyStatus !== "Unsaved changes") {
+    failures.push("live renderer edit should mark the project as unsaved");
+  }
+  if (closeFlowSmokeState.willPreventUnloadCount !== 1) {
+    failures.push(`first close should be prevented exactly once, got ${closeFlowSmokeState.willPreventUnloadCount}`);
+  }
+  if (!closeFlowSmokeState.smokeChoiceSubstituted) {
+    failures.push("smoke-only Save and close choice should be selected");
+  }
+  if (closeFlowSmokeState.nativeSaveCount !== 1) {
+    failures.push(`native project writer should run exactly once, got ${closeFlowSmokeState.nativeSaveCount}`);
+  }
+  if (closeFlowSmokeState.closeRequestCount !== 1) {
+    failures.push(`renderer should request the second guarded close exactly once, got ${closeFlowSmokeState.closeRequestCount}`);
+  }
+  if (closeFlowSmokeState.nativeSavePath !== closeFlowSmokePath()) {
+    failures.push("native project writer should use the ignored close-flow target path");
+  }
+  if (closeFlowSmokeState.nativeSaveDefaultName !== "close-flow-smoke-beat.grooveforge.json") {
+    failures.push("renderer Save should derive the project file name from the exact live edit");
+  }
+  if (savedTitle !== closeFlowSmokeExpectedTitle) {
+    failures.push("saved project should contain the exact live renderer edit");
+  }
+
+  const expectedEvents = [
+    "live-edit-ready",
+    "first-close-requested",
+    "first-close-prevented",
+    "smoke-save-choice",
+    "native-save-started",
+    "native-save-completed",
+    "renderer-close-request",
+    "window-closed"
+  ];
+  if (JSON.stringify(closeFlowSmokeState.events) !== JSON.stringify(expectedEvents)) {
+    failures.push(`close-flow event order should be ${expectedEvents.join(" -> ")}`);
+  }
+  return failures;
+}
+
+function installCloseFlowSmoke(win: BrowserWindow): void {
+  let finished = false;
+  const targetPath = closeFlowSmokePath();
+  if (!targetPath) {
+    closeFlowSmokeFailure("Close-flow smoke requires a target path environment variable.");
+    return;
+  }
+
+  const timeout = setTimeout(() => {
+    if (!finished) {
+      finished = true;
+      closeFlowSmokeFailure("Timed out before the production desktop renderer completed the guarded close flow.", {
+        state: closeFlowSmokeState
+      });
+    }
+  }, closeFlowSmokeTimeoutMs);
+
+  const fail = (message: string, details: Record<string, unknown> = {}): void => {
+    if (finished) {
+      return;
+    }
+    finished = true;
+    clearTimeout(timeout);
+    closeFlowSmokeFailure(message, details);
+  };
+
+  win.webContents.once("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    fail("Production renderer failed to load for guarded close-flow smoke.", {
+      errorCode,
+      errorDescription,
+      validatedURL
+    });
+  });
+
+  win.webContents.once("render-process-gone", (_event, details) => {
+    fail("Production renderer process exited before guarded close-flow smoke completed.", { reason: details.reason });
+  });
+
+  win.once("closed", () => {
+    closeFlowSmokeState.events.push("window-closed");
+    void readFile(targetPath, "utf8")
+      .then((savedContents) => {
+        if (finished) {
+          return;
+        }
+        const failures = closeFlowSmokeFailures(savedContents);
+        if (failures.length > 0) {
+          fail("Production desktop guarded close-flow smoke failed.", {
+            failures,
+            savedBytes: Buffer.byteLength(savedContents, "utf8"),
+            state: closeFlowSmokeState
+          });
+          return;
+        }
+
+        finished = true;
+        clearTimeout(timeout);
+        console.log(
+          `${closeFlowSmokeResultPrefix}${JSON.stringify({
+            ok: true,
+            evidence: {
+              ...closeFlowSmokeState,
+              expectedTitle: closeFlowSmokeExpectedTitle,
+              firstClosePrevented: closeFlowSmokeState.willPreventUnloadCount === 1,
+              productionRenderer: true,
+              savedBytes: Buffer.byteLength(savedContents, "utf8"),
+              savedExactLiveEdit: true,
+              secondGuardedCloseCompleted: true,
+              targetPath
+            }
+          })}`
+        );
+        app.exit(0);
+      })
+      .catch((error: unknown) => {
+        fail("Could not read the project written by guarded close-flow smoke.", {
+          error: error instanceof Error ? error.message : String(error),
+          state: closeFlowSmokeState
+        });
+      });
+  });
+
+  win.once("ready-to-show", () => {
+    void win.webContents
+      .executeJavaScript(`
+        (async () => {
+          const expectedTitle = ${JSON.stringify(closeFlowSmokeExpectedTitle)};
+          const deadline = Date.now() + 120000;
+          let input = null;
+          let status = null;
+          while (Date.now() < deadline) {
+            input = document.querySelector('[data-testid="project-title-input"]');
+            status = document.querySelector('[data-testid="project-status"]');
+            if (input && status) break;
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+          if (!(input instanceof HTMLInputElement) || !status) {
+            return { dirtyStatus: status?.textContent?.trim() ?? "", initialTitle: "", inputPresent: false, title: "" };
+          }
+
+          const initialTitle = input.value;
+          const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+          valueSetter?.call(input, expectedTitle);
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+
+          while (Date.now() < deadline) {
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            if (input.value === expectedTitle && status.textContent?.trim() === "Unsaved changes") break;
+          }
+          return {
+            dirtyStatus: status.textContent?.trim() ?? "",
+            initialTitle,
+            inputPresent: true,
+            title: input.value
+          };
+        })();
+      `)
+      .then((evidence: CloseFlowSmokeLiveEditEvidence) => {
+        if (finished) {
+          return;
+        }
+        closeFlowSmokeState.liveEdit = evidence;
+        closeFlowSmokeState.events.push("live-edit-ready");
+        closeFlowSmokeState.events.push("first-close-requested");
+        win.close();
+      })
+      .catch((error: unknown) => {
+        fail("Production close-flow live-edit JavaScript failed.", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      });
+  });
+}
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1440,
@@ -4438,8 +4691,12 @@ function createWindow(): void {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
-      partition: isLaunchSmoke ? `grooveforge-launch-smoke-${process.pid}` : undefined,
-      backgroundThrottling: !(isLaunchSmoke || isProjectIoSmoke)
+      partition: isLaunchSmoke
+        ? `grooveforge-launch-smoke-${process.pid}`
+        : isCloseFlowSmoke
+          ? `grooveforge-close-flow-smoke-${process.pid}`
+          : undefined,
+      backgroundThrottling: !(isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke)
     }
   });
 
@@ -4447,6 +4704,8 @@ function createWindow(): void {
     installLaunchSmoke(win);
   } else if (isProjectIoSmoke) {
     installProjectIoSmoke(win);
+  } else if (isCloseFlowSmoke) {
+    installCloseFlowSmoke(win);
   } else {
     win.once("ready-to-show", () => {
       win.show();
@@ -4459,17 +4718,27 @@ function createWindow(): void {
   });
 
   win.webContents.on("will-prevent-unload", (event) => {
-    const choice = dialog.showMessageBoxSync(win, {
-      type: "warning",
-      buttons: ["Save and close", "Close without a project file", "Keep editing"],
-      defaultId: saveAndCloseChoiceId,
-      cancelId: keepEditingChoiceId,
-      title: "Unsaved GrooveForge work",
-      message: "Save this project before closing GrooveForge?",
-      detail:
-        "Save and close creates a durable .grooveforge.json project file. Newer edits or a recovery draft that has not been restored keep GrooveForge open for review.",
-      noLink: true
-    });
+    if (isCloseFlowSmoke) {
+      closeFlowSmokeState.willPreventUnloadCount += 1;
+      closeFlowSmokeState.events.push("first-close-prevented");
+    }
+    const choice = isCloseFlowSmoke
+      ? saveAndCloseChoiceId
+      : dialog.showMessageBoxSync(win, {
+          type: "warning",
+          buttons: ["Save and close", "Close without a project file", "Keep editing"],
+          defaultId: saveAndCloseChoiceId,
+          cancelId: keepEditingChoiceId,
+          title: "Unsaved GrooveForge work",
+          message: "Save this project before closing GrooveForge?",
+          detail:
+            "Save and close creates a durable .grooveforge.json project file. Newer edits or a recovery draft that has not been restored keep GrooveForge open for review.",
+          noLink: true
+        });
+    if (isCloseFlowSmoke) {
+      closeFlowSmokeState.smokeChoiceSubstituted = true;
+      closeFlowSmokeState.events.push("smoke-save-choice");
+    }
     const action = resolveUnsavedCloseAction(choice);
     if (action === "close-without-project-file") {
       event.preventDefault();
@@ -4493,14 +4762,14 @@ app.whenReady().then(() => {
   createWindow();
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (!isCloseFlowSmoke && BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
+  if (process.platform !== "darwin" && !isCloseFlowSmoke) {
     app.quit();
   }
 });

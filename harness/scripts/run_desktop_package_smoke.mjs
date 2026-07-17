@@ -20,7 +20,7 @@ const entitlementsPath = path.join(root, "harness", "fixtures", "macos-hardened-
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 // Keep the parent harness alive beyond the app's 640-second launch-smoke timeout
 // so a valid result or the app's structured failure can reach stdout.
-const timeoutMs = 660000;
+const timeoutMs = 1820000;
 const outputRoot = path.join(root, "build", "desktop", `${appName}-${process.platform}-${process.arch}`);
 const packagedApp = path.join(outputRoot, `${appName}.app`);
 const failures = [];
