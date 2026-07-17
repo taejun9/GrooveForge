@@ -67,6 +67,8 @@ Project-replacement guard coverage adds no media artifact. Runtime smoke exhaust
 
 Project Save completion coverage also adds no media artifact. Runtime smoke exhausts current-snapshot, changed-snapshot, and both stale-request identity paths through the dependency-free completion resolver. Renderer smoke verifies request sequencing occurs before the native await, focused ceiling resolution precedes snapshot capture, full-project replacement invalidates pending completion before establishing its own identity, stale cancel/failure/success results return without overwriting newer feedback, exact saved snapshots alone clear recovery and dirty state, and changed snapshots retain both with an explicit save-again warning. Browser download fallback uses the same decision contract. Sample QA therefore retains schema 17, 41 playable WAVs, 33 full mixes with tail content, and the established audience hashes.
 
+Unsaved-close coverage adds no media artifact. Runtime smoke exhausts clean, dirty, recovery-only, and combined close decisions, proves only dirty states request a synchronous current-project draft refresh, and proves the Electron dialog accepts only the explicit close-without-project-file response. Renderer smoke verifies `beforeunload` registration and cleanup, focused Limiter resolution, current-ref recovery writing, browser cancellation semantics, and the main-process `will-prevent-unload` dialog with `Keep editing` as both default and cancel. Desktop launch and project-I/O smoke teardown remains noninteractive through `app.exit` or process termination. Sample QA retains schema 17 and the existing 41-WAV matrix.
+
 ## Agent Readability
 
 Agents should be able to answer these questions from repo files alone:

@@ -1046,6 +1046,7 @@ import {
   fileDisplayName
 } from "./workstationPatternTools";
 import { resolveLocalDraftWriteGate } from "./localDraftLifecycle";
+import { resolveProjectCloseGuard } from "./projectCloseGuard";
 import { resolveProjectReplacementGuard } from "./projectReplacementGuard";
 import { resolveProjectSaveCompletion } from "./projectSaveCompletion";
 import {
@@ -2223,6 +2224,33 @@ export function App(): ReactElement {
       setLocalDraftRecoveryDeferred(false);
     }
   }, [localDraftWriteArmed, project]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent): void => {
+      commitMasterCeilingDraft();
+      const closeGuard = resolveProjectCloseGuard(
+        projectHasUnsavedChangesRef.current,
+        localDraftRecovery !== null
+      );
+      if (!closeGuard.requiresConfirmation) {
+        return;
+      }
+
+      if (closeGuard.shouldRefreshLocalDraft) {
+        const savedAt = writeLocalDraft(projectRef.current);
+        if (savedAt) {
+          setLocalDraftSavedAt(savedAt);
+          setLocalDraftRecovery(null);
+          setLocalDraftRecoveryDeferred(false);
+        }
+      }
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [localDraftRecovery, masterCeilingDraft, masterCeilingEditing]);
 
   useEffect(() => {
     setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, project.arrangement.length - 1)));

@@ -31,8 +31,10 @@ const handoff = await import("../../src/audio/handoff.ts");
 const deliveryBundle = await import("../../src/audio/deliveryBundle.ts");
 const downloads = await import("../../src/platform/downloads.ts");
 const localDraftLifecycle = await import("../../src/ui/localDraftLifecycle.ts");
+const projectCloseGuard = await import("../../src/ui/projectCloseGuard.ts");
 const projectReplacementGuard = await import("../../src/ui/projectReplacementGuard.ts");
 const projectSaveCompletion = await import("../../src/ui/projectSaveCompletion.ts");
+const unsavedCloseDialog = await import("../../electron/unsavedCloseDialog.ts");
 const coreTrackTypes = new Set(["drum_rack", "bass_808", "synth", "chord", "fx_return", "master"]);
 const smokeKey = "F minor";
 const smokeScope = "sample-free first-run starter project plus all-style 8-bar beats with local project-file roundtrips, bounded mixer-topology recovery, Handoff Sheet checks, and mocked download-path checks without writing media artifacts";
@@ -162,6 +164,35 @@ function validateProjectReplacementGuard() {
   }
 
   return { paths: cases.length, protectedPaths: cases.filter((entry) => entry.confirm).length };
+}
+
+function validateProjectCloseGuard() {
+  const cases = [
+    { dirty: false, recovery: false, confirm: false, refresh: false },
+    { dirty: true, recovery: false, confirm: true, refresh: true },
+    { dirty: false, recovery: true, confirm: true, refresh: false },
+    { dirty: true, recovery: true, confirm: true, refresh: true }
+  ];
+  for (const entry of cases) {
+    const decision = projectCloseGuard.resolveProjectCloseGuard(entry.dirty, entry.recovery);
+    check(
+      decision.requiresConfirmation === entry.confirm &&
+        decision.shouldRefreshLocalDraft === entry.refresh,
+      `project-close-guard:${entry.dirty}/${entry.recovery} should resolve confirmation ${entry.confirm} and refresh ${entry.refresh}`
+    );
+  }
+  check(
+    unsavedCloseDialog.shouldAllowUnsavedClose(unsavedCloseDialog.closeWithoutProjectFileChoiceId) === true &&
+      unsavedCloseDialog.shouldAllowUnsavedClose(unsavedCloseDialog.keepEditingChoiceId) === false &&
+      unsavedCloseDialog.shouldAllowUnsavedClose(-1) === false,
+    "unsaved-close-dialog should allow only the explicit close-without-project-file choice"
+  );
+
+  return {
+    paths: cases.length,
+    protectedPaths: cases.filter((entry) => entry.confirm).length,
+    refreshPaths: cases.filter((entry) => entry.refresh).length
+  };
 }
 
 function validateProjectSaveCompletion() {
@@ -1711,6 +1742,7 @@ const deliveryMetadataRuntimeSafetySummary = await validateDeliveryMetadataRunti
 const handoffRuntimeSafetySummary = await validateHandoffRuntimeSafety();
 const snapshotRuntimeSafetySummary = await validateSnapshotRuntimeSafety();
 const localDraftWriteGateSummary = validateLocalDraftWriteGate();
+const projectCloseGuardSummary = validateProjectCloseGuard();
 const projectReplacementGuardSummary = validateProjectReplacementGuard();
 const projectSaveCompletionSummary = validateProjectSaveCompletion();
 
@@ -1746,6 +1778,7 @@ console.log(`- Delivery metadata runtime safety: ${deliveryMetadataRuntimeSafety
 console.log(`- Handoff runtime safety: ${handoffRuntimeSafetySummary.source} -> ${handoffRuntimeSafetySummary.repaired} / normalized paths ${handoffRuntimeSafetySummary.normalizedPaths}/8 / Handoff ${handoffRuntimeSafetySummary.handoffBytes} bytes / MIDI ${handoffRuntimeSafetySummary.midiBytes} bytes / WAV ${handoffRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Snapshot runtime safety: ${snapshotRuntimeSafetySummary.source} -> ${snapshotRuntimeSafetySummary.repaired} / normalized paths ${snapshotRuntimeSafetySummary.normalizedPaths}/11 / Handoff ${snapshotRuntimeSafetySummary.handoffBytes} bytes / MIDI ${snapshotRuntimeSafetySummary.midiBytes} bytes / WAV ${snapshotRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Local draft write gate: ${localDraftWriteGateSummary.paths}/4 boolean paths / first edit write eligible ${localDraftWriteGateSummary.firstEditWriteEligible ? "yes" : "no"}`);
+console.log(`- Project close guard: ${projectCloseGuardSummary.paths}/4 dirty/recovery paths / protected ${projectCloseGuardSummary.protectedPaths}/3 / synchronous draft refresh ${projectCloseGuardSummary.refreshPaths}/2`);
 console.log(`- Project replacement guard: ${projectReplacementGuardSummary.paths}/4 dirty/recovery paths / protected loss paths ${projectReplacementGuardSummary.protectedPaths}/3`);
 console.log(`- Project Save completion: ${projectSaveCompletionSummary.paths}/4 async paths / stale completions ${projectSaveCompletionSummary.stalePaths}/2 / changed snapshot ${projectSaveCompletionSummary.changedPaths}/1`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);

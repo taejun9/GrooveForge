@@ -3,6 +3,10 @@ import type { MenuItemConstructorOptions, OpenDialogOptions, SaveDialogOptions }
 import { readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  keepEditingChoiceId,
+  shouldAllowUnsavedClose
+} from "./unsavedCloseDialog.js";
 import { resolveUpdateFeedConfig } from "./updateFeedConfig.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -4445,6 +4449,23 @@ function createWindow(): void {
   win.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
     return { action: "deny" };
+  });
+
+  win.webContents.on("will-prevent-unload", (event) => {
+    const choice = dialog.showMessageBoxSync(win, {
+      type: "warning",
+      buttons: ["Close without a project file", "Keep editing"],
+      defaultId: keepEditingChoiceId,
+      cancelId: keepEditingChoiceId,
+      title: "Unsaved GrooveForge work",
+      message: "Keep editing before closing GrooveForge?",
+      detail:
+        "Unsaved project work or a recovery draft is still available. Keep the window open and use Save for a durable .grooveforge.json project file.",
+      noLink: true
+    });
+    if (shouldAllowUnsavedClose(choice)) {
+      event.preventDefault();
+    }
   });
 
   if (isDev) {

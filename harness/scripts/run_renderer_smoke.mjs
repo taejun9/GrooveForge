@@ -9,6 +9,7 @@ import { createServer } from "vite";
 const failures = [];
 const styles = readFileSync(new URL("../../src/styles.css", import.meta.url), "utf8");
 const appSource = readFileSync(new URL("../../src/ui/App.tsx", import.meta.url), "utf8");
+const electronMainSource = readFileSync(new URL("../../electron/main.ts", import.meta.url), "utf8");
 const composePanelsSource = readFileSync(new URL("../../src/ui/workstationComposePanels.tsx", import.meta.url), "utf8");
 const graphSource = readFileSync(new URL("../../src/ui/workstationAppQuickActionGraph.ts", import.meta.url), "utf8");
 const quickActionSource = readFileSync(new URL("../../src/ui/workstationAppQuickActions.tsx", import.meta.url), "utf8");
@@ -151,6 +152,47 @@ function validateProjectReplacementGuard(replacementGuard) {
       loadSource.includes("projectHasUnsavedChangesRef.current,") &&
       loadSource.includes("localDraftRecovery !== null"),
     "project replacement confirmation should read current dirty and recovery-draft state"
+  );
+}
+
+function validateProjectCloseGuard(closeGuard) {
+  const clean = closeGuard.resolveProjectCloseGuard(false, false);
+  const dirty = closeGuard.resolveProjectCloseGuard(true, false);
+  const recoveryOnly = closeGuard.resolveProjectCloseGuard(false, true);
+  const dirtyRecovery = closeGuard.resolveProjectCloseGuard(true, true);
+  check(
+    clean.requiresConfirmation === false &&
+      clean.shouldRefreshLocalDraft === false &&
+      dirty.requiresConfirmation === true &&
+      dirty.shouldRefreshLocalDraft === true &&
+      recoveryOnly.requiresConfirmation === true &&
+      recoveryOnly.shouldRefreshLocalDraft === false &&
+      dirtyRecovery.requiresConfirmation === true &&
+      dirtyRecovery.shouldRefreshLocalDraft === true,
+    "project close guard should protect dirty/recovery states and refresh only the current dirty project"
+  );
+
+  const createWindowSource = printNamedFunction(electronMainSource, "main.ts", "createWindow");
+  const unloadGuardIndex = appSource.indexOf('window.addEventListener("beforeunload", handleBeforeUnload);');
+  check(
+    unloadGuardIndex >= 0 &&
+      appSource.includes('window.removeEventListener("beforeunload", handleBeforeUnload)') &&
+      appSource.includes("commitMasterCeilingDraft();") &&
+      appSource.includes("resolveProjectCloseGuard(") &&
+      appSource.includes("projectHasUnsavedChangesRef.current,") &&
+      appSource.includes("localDraftRecovery !== null") &&
+      appSource.includes("writeLocalDraft(projectRef.current)") &&
+      appSource.includes("event.preventDefault();") &&
+      appSource.includes('event.returnValue = "";'),
+    "renderer beforeunload should resolve focused input, protect current dirty/recovery state, refresh the current draft, and unregister cleanly"
+  );
+  check(
+    createWindowSource.includes('win.webContents.on("will-prevent-unload"') &&
+      createWindowSource.includes('buttons: ["Close without a project file", "Keep editing"]') &&
+      createWindowSource.includes("defaultId: keepEditingChoiceId") &&
+      createWindowSource.includes("cancelId: keepEditingChoiceId") &&
+      /if \(shouldAllowUnsavedClose\(choice\)\) \{\s*event\.preventDefault\(\);/u.test(createWindowSource),
+    "Electron close confirmation should default/cancel to keeping the window and override unload only for the explicit close choice"
   );
 }
 
@@ -3318,6 +3360,7 @@ try {
   const { App } = await server.ssrLoadModule("/src/ui/App.tsx");
   validateProjectFileLoadErrorStatus(await server.ssrLoadModule("/src/ui/workstationUiModel.ts"));
   validateMasterCeilingDraftLifecycle(await server.ssrLoadModule("/src/domain/workstation.ts"));
+  validateProjectCloseGuard(await server.ssrLoadModule("/src/ui/projectCloseGuard.ts"));
   validateProjectReplacementGuard(await server.ssrLoadModule("/src/ui/projectReplacementGuard.ts"));
   validateProjectSaveCompletion(await server.ssrLoadModule("/src/ui/projectSaveCompletion.ts"));
   const html = renderToStaticMarkup(React.createElement(App));
@@ -3442,6 +3485,7 @@ try {
     console.log("- Audience Delivery Proof Bridge palette: route readout plus both proof lanes are searchable and return focused proof metrics");
     console.log("- Quick Actions lifecycle: graph module loads on demand with explicit wait/retry UI; one open session reuses its complete graph; reopen builds a fresh graph");
     console.log("- Local draft recovery: Not now is session-only; Project Safety keeps recovery discoverable; successful replacement drops stale restore state");
+    console.log("- Unsaved close guard: clean exit is silent; dirty/recovery work blocks unload; Electron defaults and Escape keep editing");
     console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack, Delivery Bundle ZIP");
   }
 } finally {
