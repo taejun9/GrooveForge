@@ -606,9 +606,9 @@ function validateCompactStudioTransportSource() {
   );
   check(
     launchBearingPackageSources.every(
-      (source) => source.includes("const timeoutMs = 660000") && source.includes("640-second launch-smoke timeout")
+      (source) => source.includes("const timeoutMs = 1820000") && source.includes("1,800-second launch-smoke timeout")
     ),
-    "launch-bearing package parents should remain bounded above the app's 640-second launch collector"
+    "launch-bearing package parents should remain bounded above the app's 1,800-second launch collector"
   );
 }
 

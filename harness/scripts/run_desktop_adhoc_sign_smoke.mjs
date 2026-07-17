@@ -22,7 +22,7 @@ const requiredEntitlements = [
   "com.apple.security.cs.allow-unsigned-executable-memory",
   "com.apple.security.cs.disable-library-validation"
 ];
-// Keep the parent harness alive beyond the app's 640-second launch-smoke timeout.
+// Keep the parent harness alive beyond the app's 1,800-second launch-smoke timeout.
 const timeoutMs = 1820000;
 const failures = [];
 
