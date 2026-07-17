@@ -1,4 +1,5 @@
 export type ProjectSaveCompletion = "stale" | "saved-current" | "saved-snapshot";
+export type ProjectSaveAttempt = ProjectSaveCompletion | "canceled" | "failed";
 
 export function resolveProjectSaveCompletion(
   requestId: number,
@@ -9,4 +10,8 @@ export function resolveProjectSaveCompletion(
     return "stale";
   }
   return savedProjectIsCurrent ? "saved-current" : "saved-snapshot";
+}
+
+export function shouldCloseAfterProjectSave(attempt: ProjectSaveAttempt): boolean {
+  return attempt === "saved-current";
 }

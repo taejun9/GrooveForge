@@ -182,16 +182,27 @@ function validateProjectCloseGuard() {
     );
   }
   check(
-    unsavedCloseDialog.shouldAllowUnsavedClose(unsavedCloseDialog.closeWithoutProjectFileChoiceId) === true &&
-      unsavedCloseDialog.shouldAllowUnsavedClose(unsavedCloseDialog.keepEditingChoiceId) === false &&
-      unsavedCloseDialog.shouldAllowUnsavedClose(-1) === false,
-    "unsaved-close-dialog should allow only the explicit close-without-project-file choice"
+    projectCloseGuard.resolveSaveBeforeCloseDecision(false, true) === "review-recovery" &&
+      projectCloseGuard.resolveSaveBeforeCloseDecision(true, false) === "save-current" &&
+      projectCloseGuard.resolveSaveBeforeCloseDecision(true, true) === "save-current" &&
+      projectCloseGuard.resolveSaveBeforeCloseDecision(false, false) === "save-current",
+    "Save and close should keep a recovery-only session open instead of saving the unrelated visible project"
+  );
+  check(
+    unsavedCloseDialog.resolveUnsavedCloseAction(unsavedCloseDialog.saveAndCloseChoiceId) === "save-and-close" &&
+      unsavedCloseDialog.resolveUnsavedCloseAction(unsavedCloseDialog.closeWithoutProjectFileChoiceId) ===
+        "close-without-project-file" &&
+      unsavedCloseDialog.resolveUnsavedCloseAction(unsavedCloseDialog.keepEditingChoiceId) === "keep-editing" &&
+      unsavedCloseDialog.resolveUnsavedCloseAction(-1) === "keep-editing",
+    "unsaved-close-dialog should resolve Save, explicit close, cancel, and unknown choices conservatively"
   );
 
   return {
     paths: cases.length,
     protectedPaths: cases.filter((entry) => entry.confirm).length,
-    refreshPaths: cases.filter((entry) => entry.refresh).length
+    refreshPaths: cases.filter((entry) => entry.refresh).length,
+    nativeActions: 3,
+    saveGates: 4
   };
 }
 
@@ -213,11 +224,18 @@ function validateProjectSaveCompletion() {
       `project-save-completion:${entry.requestId}/${entry.latestRequestId}/${entry.current} should resolve ${entry.expected}`
     );
   }
+  const closeAttempts = ["saved-current", "saved-snapshot", "stale", "canceled", "failed"];
+  check(
+    closeAttempts.filter((attempt) => projectSaveCompletion.shouldCloseAfterProjectSave(attempt)).join(",") ===
+      "saved-current",
+    "Save and close should close only after the exact current-project success"
+  );
 
   return {
     paths: cases.length,
     stalePaths: cases.filter((entry) => entry.expected === "stale").length,
-    changedPaths: cases.filter((entry) => entry.expected === "saved-snapshot").length
+    changedPaths: cases.filter((entry) => entry.expected === "saved-snapshot").length,
+    closeAttempts: closeAttempts.length
   };
 }
 
@@ -1778,9 +1796,9 @@ console.log(`- Delivery metadata runtime safety: ${deliveryMetadataRuntimeSafety
 console.log(`- Handoff runtime safety: ${handoffRuntimeSafetySummary.source} -> ${handoffRuntimeSafetySummary.repaired} / normalized paths ${handoffRuntimeSafetySummary.normalizedPaths}/8 / Handoff ${handoffRuntimeSafetySummary.handoffBytes} bytes / MIDI ${handoffRuntimeSafetySummary.midiBytes} bytes / WAV ${handoffRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Snapshot runtime safety: ${snapshotRuntimeSafetySummary.source} -> ${snapshotRuntimeSafetySummary.repaired} / normalized paths ${snapshotRuntimeSafetySummary.normalizedPaths}/11 / Handoff ${snapshotRuntimeSafetySummary.handoffBytes} bytes / MIDI ${snapshotRuntimeSafetySummary.midiBytes} bytes / WAV ${snapshotRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Local draft write gate: ${localDraftWriteGateSummary.paths}/4 boolean paths / first edit write eligible ${localDraftWriteGateSummary.firstEditWriteEligible ? "yes" : "no"}`);
-console.log(`- Project close guard: ${projectCloseGuardSummary.paths}/4 dirty/recovery paths / protected ${projectCloseGuardSummary.protectedPaths}/3 / synchronous draft refresh ${projectCloseGuardSummary.refreshPaths}/2`);
+console.log(`- Project close guard: ${projectCloseGuardSummary.paths}/4 dirty/recovery paths / protected ${projectCloseGuardSummary.protectedPaths}/3 / synchronous draft refresh ${projectCloseGuardSummary.refreshPaths}/2 / save gates ${projectCloseGuardSummary.saveGates}/4 / native actions ${projectCloseGuardSummary.nativeActions}/3`);
 console.log(`- Project replacement guard: ${projectReplacementGuardSummary.paths}/4 dirty/recovery paths / protected loss paths ${projectReplacementGuardSummary.protectedPaths}/3`);
-console.log(`- Project Save completion: ${projectSaveCompletionSummary.paths}/4 async paths / stale completions ${projectSaveCompletionSummary.stalePaths}/2 / changed snapshot ${projectSaveCompletionSummary.changedPaths}/1`);
+console.log(`- Project Save completion: ${projectSaveCompletionSummary.paths}/4 async paths / stale completions ${projectSaveCompletionSummary.stalePaths}/2 / changed snapshot ${projectSaveCompletionSummary.changedPaths}/1 / close outcomes ${projectSaveCompletionSummary.closeAttempts}/5`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

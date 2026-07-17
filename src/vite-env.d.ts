@@ -3,6 +3,7 @@
 type NativeMenuCommand =
   | "open-project"
   | "save-project"
+  | "save-project-and-close"
   | "undo"
   | "redo"
   | "quick-actions"
@@ -457,6 +458,7 @@ interface Window {
     reportLaunchSmokeDrumGridSnapshot?: (payload: unknown) => void;
     reportLaunchSmokeNoteGridSnapshot?: (payload: unknown) => void;
     saveProject?: (contents: string, defaultName: string) => Promise<{ canceled: boolean; filePath?: string }>;
+    closeWindow?: () => void;
     openProject?: () => Promise<{ canceled: boolean; filePath?: string; contents?: string }>;
     onMenuCommand?: (callback: (command: NativeMenuCommand) => void) => () => void;
   };

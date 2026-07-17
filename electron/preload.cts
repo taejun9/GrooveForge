@@ -4,6 +4,7 @@ import type { IpcRendererEvent } from "electron";
 type NativeMenuCommand =
   | "open-project"
   | "save-project"
+  | "save-project-and-close"
   | "undo"
   | "redo"
   | "quick-actions"
@@ -14,6 +15,7 @@ type NativeMenuCommand =
 const nativeMenuCommands = new Set<NativeMenuCommand>([
   "open-project",
   "save-project",
+  "save-project-and-close",
   "undo",
   "redo",
   "quick-actions",
@@ -42,6 +44,7 @@ contextBridge.exposeInMainWorld("grooveforge", {
   },
   saveProject: (contents: string, defaultName: string) =>
     ipcRenderer.invoke("grooveforge:save-project", { contents, defaultName }) as Promise<{ canceled: boolean; filePath?: string }>,
+  closeWindow: () => ipcRenderer.send("grooveforge:close-window"),
   openProject: () =>
     ipcRenderer.invoke("grooveforge:open-project") as Promise<{ canceled: boolean; filePath?: string; contents?: string }>,
   onMenuCommand: (callback: (command: NativeMenuCommand) => void) => {

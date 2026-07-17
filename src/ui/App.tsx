@@ -1046,9 +1046,10 @@ import {
   fileDisplayName
 } from "./workstationPatternTools";
 import { resolveLocalDraftWriteGate } from "./localDraftLifecycle";
-import { resolveProjectCloseGuard } from "./projectCloseGuard";
+import { resolveProjectCloseGuard, resolveSaveBeforeCloseDecision } from "./projectCloseGuard";
 import { resolveProjectReplacementGuard } from "./projectReplacementGuard";
-import { resolveProjectSaveCompletion } from "./projectSaveCompletion";
+import { resolveProjectSaveCompletion, shouldCloseAfterProjectSave } from "./projectSaveCompletion";
+import type { ProjectSaveAttempt } from "./projectSaveCompletion";
 import {
   activeReferenceAlignmentQuickActionCard,
   activeSessionBriefCompassQuickActionCard,
@@ -1327,12 +1328,13 @@ export function App(): ReactElement {
   const [projectFileResult, setProjectFileResult] = useState<ProjectFileResult | null>(null);
   const [localDraftRecoveryResult, setLocalDraftRecoveryResult] = useState<LocalDraftRecoveryResult | null>(null);
   const [tapTempo, setTapTempo] = useState<TapTempoState>({ taps: 0, bpm: null, applied: true });
-  const [localDraftRecovery, setLocalDraftRecovery] = useState<LocalDraftRecovery | null>(() => readLocalDraftRecovery());
+  const [localDraftRecovery, setLocalDraftRecoveryState] = useState<LocalDraftRecovery | null>(() => readLocalDraftRecovery());
   const [localDraftRecoveryDeferred, setLocalDraftRecoveryDeferred] = useState(false);
   const [localDraftSavedAt, setLocalDraftSavedAt] = useState<string | null>(localDraftRecovery?.savedAt ?? null);
   const [localDraftWriteArmed, setLocalDraftWriteArmed] = useState(false);
   const projectRef = useRef<ProjectState>(starterProject);
   const projectHasUnsavedChangesRef = useRef(false);
+  const localDraftRecoveryRef = useRef(localDraftRecovery);
   const projectSaveRequestIdRef = useRef(0);
   const handoffExportReceiptRef = useRef<HandoffExportReceipt | null>(null);
   const tapTempoTimesRef = useRef<number[]>([]);
@@ -2230,7 +2232,7 @@ export function App(): ReactElement {
       commitMasterCeilingDraft();
       const closeGuard = resolveProjectCloseGuard(
         projectHasUnsavedChangesRef.current,
-        localDraftRecovery !== null
+        localDraftRecoveryRef.current !== null
       );
       if (!closeGuard.requiresConfirmation) {
         return;
@@ -2250,7 +2252,7 @@ export function App(): ReactElement {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [localDraftRecovery, masterCeilingDraft, masterCeilingEditing]);
+  }, [masterCeilingDraft, masterCeilingEditing]);
 
   useEffect(() => {
     setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, project.arrangement.length - 1)));
@@ -2564,6 +2566,10 @@ export function App(): ReactElement {
         commitMasterCeilingDraft();
         void handleSaveProject();
         return;
+      case "save-project-and-close":
+        commitMasterCeilingDraft();
+        void handleSaveProjectAndClose();
+        return;
       case "undo":
         resetMasterCeilingEditor(projectRef.current);
         undoProject();
@@ -2682,6 +2688,11 @@ export function App(): ReactElement {
   function setProjectHasUnsavedChanges(value: boolean): void {
     projectHasUnsavedChangesRef.current = value;
     setProjectHasUnsavedChangesState(value);
+  }
+
+  function setLocalDraftRecovery(value: LocalDraftRecovery | null): void {
+    localDraftRecoveryRef.current = value;
+    setLocalDraftRecoveryState(value);
   }
 
   function updateProjectView(update: (current: ProjectState) => ProjectState, status: string): void {
@@ -7051,7 +7062,23 @@ export function App(): ReactElement {
     }
   }
 
-  async function handleSaveProject(): Promise<void> {
+  async function handleSaveProjectAndClose(): Promise<void> {
+    const decision = resolveSaveBeforeCloseDecision(
+      projectHasUnsavedChangesRef.current,
+      localDraftRecoveryRef.current !== null
+    );
+    if (decision === "review-recovery") {
+      setLocalDraftRecoveryDeferred(false);
+      setProjectStatus("Restore or clear the recovery draft before closing");
+      return;
+    }
+    const completion = await handleSaveProject();
+    if (shouldCloseAfterProjectSave(completion)) {
+      window.grooveforge?.closeWindow?.();
+    }
+  }
+
+  async function handleSaveProject(): Promise<ProjectSaveAttempt> {
     const requestId = ++projectSaveRequestIdRef.current;
     try {
       commitMasterCeilingDraft();
@@ -7062,12 +7089,12 @@ export function App(): ReactElement {
       if (result) {
         if (result.canceled) {
           if (requestId !== projectSaveRequestIdRef.current) {
-            return;
+            return "stale";
           }
           setProjectFileResult(null);
           setLocalDraftRecoveryResult(null);
           setProjectStatus("Save canceled");
-          return;
+          return "canceled";
         }
 
         const completion = resolveProjectSaveCompletion(
@@ -7076,7 +7103,7 @@ export function App(): ReactElement {
           projectRef.current === projectToSave
         );
         if (completion === "stale") {
-          return;
+          return completion;
         }
         const fileLabel = fileDisplayName(result.filePath);
         setProjectFileLabel(fileLabel);
@@ -7093,7 +7120,7 @@ export function App(): ReactElement {
         setProjectStatus(
           completion === "saved-current" ? `Saved ${fileLabel}` : `Saved ${fileLabel}; newer changes remain unsaved`
         );
-        return;
+        return completion;
       }
 
       downloadProjectFile(contents, defaultName);
@@ -7103,7 +7130,7 @@ export function App(): ReactElement {
         projectRef.current === projectToSave
       );
       if (completion === "stale") {
-        return;
+        return completion;
       }
       setProjectFileLabel(defaultName);
       if (completion === "saved-current") {
@@ -7121,14 +7148,16 @@ export function App(): ReactElement {
           ? `Downloaded ${defaultName}`
           : `Downloaded ${defaultName}; newer changes remain unsaved`
       );
+      return completion;
     } catch (error) {
       console.error(error);
       if (requestId !== projectSaveRequestIdRef.current) {
-        return;
+        return "stale";
       }
       setProjectFileResult(null);
       setLocalDraftRecoveryResult(null);
       setProjectStatus("Save failed");
+      return "failed";
     }
   }
 
@@ -10228,7 +10257,9 @@ export function App(): ReactElement {
     onCheckProjectSafety: checkProjectSafetyReadout,
     onRedo: redoProject,
     onRestoreLocalDraft: restoreLocalDraft,
-    onSaveProject: handleSaveProject,
+    onSaveProject: async () => {
+      await handleSaveProject();
+    },
     onSaveSnapshot: saveCurrentSnapshot,
     onClearLocalDraftRecovery: clearLocalDraftRecovery,
     onSelectTransportLoopScope: selectTransportLoopScope,

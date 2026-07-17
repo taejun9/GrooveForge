@@ -64,7 +64,7 @@ function validateProjectFileLoadErrorStatus(uiModel) {
     "project loading should route parser failures through the actionable status helper"
   );
   check(
-    /async function handleSaveProject\(\): Promise<void> \{\s*const requestId = \+\+projectSaveRequestIdRef\.current;\s*try \{\s*commitMasterCeilingDraft\(\);\s*const projectToSave = projectRef\.current;\s*const contents = serializeProjectFile\(projectToSave\);/u.test(appSource),
+    /async function handleSaveProject\(\): Promise<ProjectSaveAttempt> \{\s*const requestId = \+\+projectSaveRequestIdRef\.current;\s*try \{\s*commitMasterCeilingDraft\(\);\s*const projectToSave = projectRef\.current;\s*const contents = serializeProjectFile\(projectToSave\);/u.test(appSource),
     "project serialization should stay inside the Save failure boundary and use the current project reference"
   );
   check(
@@ -180,7 +180,8 @@ function validateProjectCloseGuard(closeGuard) {
       appSource.includes("commitMasterCeilingDraft();") &&
       appSource.includes("resolveProjectCloseGuard(") &&
       appSource.includes("projectHasUnsavedChangesRef.current,") &&
-      appSource.includes("localDraftRecovery !== null") &&
+      appSource.includes("localDraftRecoveryRef.current !== null") &&
+      appSource.includes("localDraftRecoveryRef.current = value;") &&
       appSource.includes("writeLocalDraft(projectRef.current)") &&
       appSource.includes("event.preventDefault();") &&
       appSource.includes('event.returnValue = "";'),
@@ -188,11 +189,27 @@ function validateProjectCloseGuard(closeGuard) {
   );
   check(
     createWindowSource.includes('win.webContents.on("will-prevent-unload"') &&
-      createWindowSource.includes('buttons: ["Close without a project file", "Keep editing"]') &&
-      createWindowSource.includes("defaultId: keepEditingChoiceId") &&
+      createWindowSource.includes('buttons: ["Save and close", "Close without a project file", "Keep editing"]') &&
+      createWindowSource.includes("defaultId: saveAndCloseChoiceId") &&
       createWindowSource.includes("cancelId: keepEditingChoiceId") &&
-      /if \(shouldAllowUnsavedClose\(choice\)\) \{\s*event\.preventDefault\(\);/u.test(createWindowSource),
-    "Electron close confirmation should default/cancel to keeping the window and override unload only for the explicit close choice"
+      createWindowSource.includes('action === "save-and-close"') &&
+      createWindowSource.includes('win.webContents.send(menuCommandChannel, "save-project-and-close")') &&
+      /if \(action === "close-without-project-file"\) \{\s*event\.preventDefault\(\);/u.test(createWindowSource),
+    "Electron close confirmation should default to Save, cancel to editing, route asynchronous Save, and override unload only for explicit close"
+  );
+
+  const saveAndCloseSource = printNamedFunction(appSource, "App.tsx", "handleSaveProjectAndClose");
+  check(
+    saveAndCloseSource.includes("resolveSaveBeforeCloseDecision(") &&
+      saveAndCloseSource.includes('decision === "review-recovery"') &&
+      saveAndCloseSource.includes("setLocalDraftRecoveryDeferred(false);") &&
+      saveAndCloseSource.includes("Restore or clear the recovery draft before closing") &&
+      saveAndCloseSource.indexOf("return;") < saveAndCloseSource.indexOf("const completion = await handleSaveProject();") &&
+      saveAndCloseSource.includes("const completion = await handleSaveProject();") &&
+      saveAndCloseSource.includes("shouldCloseAfterProjectSave(completion)") &&
+      saveAndCloseSource.includes("window.grooveforge?.closeWindow?.();") &&
+      !saveAndCloseSource.includes('completion === "saved-snapshot"'),
+    "Save and close should request a guarded normal close only after the exact current project is durable"
   );
 }
 
@@ -3485,7 +3502,7 @@ try {
     console.log("- Audience Delivery Proof Bridge palette: route readout plus both proof lanes are searchable and return focused proof metrics");
     console.log("- Quick Actions lifecycle: graph module loads on demand with explicit wait/retry UI; one open session reuses its complete graph; reopen builds a fresh graph");
     console.log("- Local draft recovery: Not now is session-only; Project Safety keeps recovery discoverable; successful replacement drops stale restore state");
-    console.log("- Unsaved close guard: clean exit is silent; dirty/recovery work blocks unload; Electron defaults and Escape keep editing");
+    console.log("- Unsaved close guard: clean exit is silent; dirty/recovery work blocks unload; Electron defaults to Save and Escape keeps editing");
     console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack, Delivery Bundle ZIP");
   }
 } finally {

@@ -10,6 +10,7 @@ const failures = [];
 const expectedNativeMenuCommands = [
   "open-project",
   "save-project",
+  "save-project-and-close",
   "undo",
   "redo",
   "quick-actions",
@@ -20,6 +21,7 @@ const expectedNativeMenuCommands = [
 const expectedRendererMenuHandlers = {
   "open-project": "void handleOpenProject();",
   "save-project": "void handleSaveProject();",
+  "save-project-and-close": "void handleSaveProjectAndClose();",
   undo: "undoProject();",
   redo: "redoProject();",
   "quick-actions": "openQuickActions();",
@@ -404,6 +406,8 @@ function checkElectronMainContract() {
   checkIncludes(source, "win.webContents.setWindowOpenHandler", label);
   checkIncludes(source, 'return { action: "deny" }', label);
   checkIncludes(source, "registerProjectFileHandlers();", label);
+  checkIncludes(source, "ipcMain.on(closeWindowChannel", label);
+  checkIncludes(source, "BrowserWindow.fromWebContents(event.sender)?.close();", label);
   checkIncludes(source, "Menu.setApplicationMenu(createNativeCommandMenu())", label);
   checkIncludes(source, "createWindow();", label);
   checkIncludes(source, "autoUpdater", label);
@@ -431,6 +435,7 @@ function checkElectronMainContract() {
   }
   checkIncludes(built, "../dist/index.html", "dist-electron/main.js");
   checkIncludes(built, "preload.cjs", "dist-electron/main.js");
+  checkIncludes(built, "grooveforge:close-window", "dist-electron/main.js");
 }
 
 function checkPreloadContract() {
@@ -441,6 +446,7 @@ function checkPreloadContract() {
   checkIncludes(source, 'contextBridge.exposeInMainWorld("grooveforge"', label);
   checkIncludes(source, 'appKind: "desktop"', label);
   checkIncludes(source, 'ipcRenderer.invoke("grooveforge:save-project"', label);
+  checkIncludes(source, 'ipcRenderer.send("grooveforge:close-window")', label);
   checkIncludes(source, 'ipcRenderer.invoke("grooveforge:open-project")', label);
   checkIncludes(source, 'ipcRenderer.on("grooveforge:menu-command"', label);
   checkIncludes(source, "isNativeMenuCommand(command)", label);
@@ -453,6 +459,7 @@ function checkPreloadContract() {
   checkIncludes(built, "grooveforge", "dist-electron/preload.cjs");
   checkIncludes(built, "desktop", "dist-electron/preload.cjs");
   checkIncludes(built, "grooveforge:save-project", "dist-electron/preload.cjs");
+  checkIncludes(built, "grooveforge:close-window", "dist-electron/preload.cjs");
   checkIncludes(built, "grooveforge:open-project", "dist-electron/preload.cjs");
   checkIncludes(built, "grooveforge:menu-command", "dist-electron/preload.cjs");
 }

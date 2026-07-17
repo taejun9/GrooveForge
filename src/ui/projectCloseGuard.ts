@@ -3,6 +3,8 @@ export type ProjectCloseGuardDecision = {
   shouldRefreshLocalDraft: boolean;
 };
 
+export type SaveBeforeCloseDecision = "save-current" | "review-recovery";
+
 export function resolveProjectCloseGuard(
   hasUnsavedChanges: boolean,
   hasLocalRecovery: boolean
@@ -11,4 +13,11 @@ export function resolveProjectCloseGuard(
     requiresConfirmation: hasUnsavedChanges || hasLocalRecovery,
     shouldRefreshLocalDraft: hasUnsavedChanges
   };
+}
+
+export function resolveSaveBeforeCloseDecision(
+  hasUnsavedChanges: boolean,
+  hasLocalRecovery: boolean
+): SaveBeforeCloseDecision {
+  return !hasUnsavedChanges && hasLocalRecovery ? "review-recovery" : "save-current";
 }

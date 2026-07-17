@@ -5,13 +5,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   keepEditingChoiceId,
-  shouldAllowUnsavedClose
+  resolveUnsavedCloseAction,
+  saveAndCloseChoiceId
 } from "./unsavedCloseDialog.js";
 import { resolveUpdateFeedConfig } from "./updateFeedConfig.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
 const menuCommandChannel = "grooveforge:menu-command";
+const closeWindowChannel = "grooveforge:close-window";
 const isLaunchSmoke = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1";
 const isProjectIoSmoke = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE === "1";
 const launchSmokeDrumGridSnapshotChannel = "grooveforge:launch-smoke-drum-grid-snapshot";
@@ -27,6 +29,7 @@ const maxNativeProjectFileBytes = maxNativeProjectFileCharacters * 4;
 type NativeMenuCommand =
   | "open-project"
   | "save-project"
+  | "save-project-and-close"
   | "undo"
   | "redo"
   | "quick-actions"
@@ -836,6 +839,10 @@ function createNativeCommandMenu(): Menu {
 }
 
 function registerProjectFileHandlers(): void {
+  ipcMain.on(closeWindowChannel, (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.close();
+  });
+
   ipcMain.handle("grooveforge:save-project", async (event, payload: unknown) => {
     if (!isSaveProjectPayload(payload)) {
       throw new Error("Invalid save project payload.");
@@ -4454,17 +4461,22 @@ function createWindow(): void {
   win.webContents.on("will-prevent-unload", (event) => {
     const choice = dialog.showMessageBoxSync(win, {
       type: "warning",
-      buttons: ["Close without a project file", "Keep editing"],
-      defaultId: keepEditingChoiceId,
+      buttons: ["Save and close", "Close without a project file", "Keep editing"],
+      defaultId: saveAndCloseChoiceId,
       cancelId: keepEditingChoiceId,
       title: "Unsaved GrooveForge work",
-      message: "Keep editing before closing GrooveForge?",
+      message: "Save this project before closing GrooveForge?",
       detail:
-        "Unsaved project work or a recovery draft is still available. Keep the window open and use Save for a durable .grooveforge.json project file.",
+        "Save and close creates a durable .grooveforge.json project file. Newer edits or a recovery draft that has not been restored keep GrooveForge open for review.",
       noLink: true
     });
-    if (shouldAllowUnsavedClose(choice)) {
+    const action = resolveUnsavedCloseAction(choice);
+    if (action === "close-without-project-file") {
       event.preventDefault();
+      return;
+    }
+    if (action === "save-and-close") {
+      win.webContents.send(menuCommandChannel, "save-project-and-close");
     }
   });
 
