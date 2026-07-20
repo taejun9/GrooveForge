@@ -15,6 +15,7 @@ const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformAr
 const summaryRoot = path.join(root, "build", "desktop");
 const readinessDocPath = path.join(root, "docs", "release", "readiness.md");
 const readmePath = path.join(root, "README.md");
+const readmeEnPath = path.join(root, "readme-en.md");
 const qualityRulesPath = path.join(root, "docs", "quality", "rules.md");
 const nativeProjectIoPath = path.join(
   summaryRoot,
@@ -194,6 +195,7 @@ function projectIoEvidenceReady(report, readyKey) {
 function buildRequirementAudit(input) {
   const {
     readme,
+    readmeEn,
     readinessDoc,
     qualityRules,
     nativeProjectIo,
@@ -209,18 +211,26 @@ function buildRequirementAudit(input) {
     privateInputs
   } = input;
   const productScopeReady =
-    hasAll(readme, ["making beats across genres", "direct beat composition", "Sampling stays a later optional sound-source module"]) &&
+    hasAll(readme, [
+      "여러 장르의 비트를 직접 만들기 위한 데스크톱용 이벤트 기반 미니 DAW",
+      "GrooveForge의 중심은 샘플 탐색이 아니라 직접 비트를 작곡하고 소리를 설계하는 과정입니다.",
+      "샘플링은 이후 추가할 수 있는 선택형 음원 모듈입니다."
+    ]) &&
+    hasAll(readmeEn, ["making beats across genres", "direct beat composition", "Sampling stays a later optional sound-source module"]) &&
     hasAll(readinessDoc, ["Direct beat composition is the product spine", "Sampling is secondary and optional."]) &&
     hasAll(qualityRules, ["Korean concept-brief checks must treat", "샘플링은 부가 기능"]);
   const beginnerReady =
     hasAll(readinessDoc, ["First-time composers get a guided setup -> compose -> arrange -> mix -> deliver path."]) &&
-    hasAll(readme, ["First Beat Path", "Guide Quick Start"]);
+    hasAll(readme, ["처음 비트를 만드는 사용자", "Guided", "설정 → 작곡 → 편곡 → 믹싱 → 전달"]) &&
+    hasAll(readmeEn, ["First Beat Path", "Guide Quick Start"]);
   const producerReady =
     hasAll(readinessDoc, ["Working producers can bypass guidance and edit fast."]) &&
-    hasAll(readme, ["Studio mode", "Quick Actions"]);
+    hasAll(readme, ["숙련된 프로듀서", "Studio 모드", "Review Queue"]) &&
+    hasAll(readmeEn, ["Studio mode", "Quick Actions"]);
   const exportReady =
     hasAll(readinessDoc, ["A sample-free 8-bar beat can be generated and exported.", "All supported genres have editable starts."]) &&
-    hasAll(readme, ["sample-free 8-bar beat", "WAV headers"]);
+    hasAll(readme, ["가져온 오디오 없이 완성하는 8마디 비트", "실제 WAV 렌더", "44.1 kHz / 16-bit stereo PCM 디코딩"]) &&
+    hasAll(readmeEn, ["sample-free 8-bar beat", "WAV headers"]);
   const desktopProjectIoReady =
     projectIoEvidenceReady(nativeProjectIo, "nativeProjectIoReady") &&
     projectIoEvidenceReady(packagedProjectIo, "packagedProjectIoReady") &&
@@ -387,6 +397,7 @@ This local completion audit does not claim Developer ID signing, notarization, G
 
 async function createCompletionAuditSummary() {
   const readme = await readTextIfExists(readmePath);
+  const readmeEn = await readTextIfExists(readmeEnPath);
   const readinessDoc = await readTextIfExists(readinessDocPath);
   const qualityRules = await readTextIfExists(qualityRulesPath);
   const nativeProjectIo = await readJsonIfExists(nativeProjectIoPath);
@@ -410,6 +421,7 @@ async function createCompletionAuditSummary() {
   const privateInputs = await readJsonIfExists(privateInputsPath);
   const requirementAudit = buildRequirementAudit({
     readme,
+    readmeEn,
     readinessDoc,
     qualityRules,
     nativeProjectIo,
@@ -436,7 +448,14 @@ async function createCompletionAuditSummary() {
   const externalDistributionReady = privateInputs?.externalDistributionReady === true;
   const evidenceArtifacts = [
     artifact("Release readiness doc", readinessDocPath, readinessDoc, readinessDoc.includes("GrooveForge Release Readiness Evidence")),
-    artifact("README", readmePath, readme, readme.includes("making beats across genres")),
+    artifact(
+      "README",
+      readmePath,
+      readme,
+      readme.includes("여러 장르의 비트를 직접 만들기 위한 데스크톱용 이벤트 기반 미니 DAW") &&
+        readme.includes("[English](readme-en.md)") &&
+        readmeEn.includes("making beats across genres")
+    ),
     artifact("Native project IO", nativeProjectIoPath, nativeProjectIo, nativeProjectIoReady),
     artifact("Packaged project IO", packagedProjectIoPath, packagedProjectIo, packagedProjectIoReady),
     artifact("PKG payload project IO", pkgPayloadProjectIoPath, pkgPayloadProjectIo, pkgPayloadProjectIoReady),
