@@ -20,6 +20,7 @@ const isCloseFlowSmoke = process.env.GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE === "1
 const launchSmokeDrumGridSnapshotChannel = "grooveforge:launch-smoke-drum-grid-snapshot";
 const launchSmokeNoteGridSnapshotChannel = "grooveforge:launch-smoke-note-grid-snapshot";
 const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
+const launchSmokeProgressPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_PROGRESS ";
 const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
 const closeFlowSmokeResultPrefix = "GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE_RESULT ";
 const launchSmokeTimeoutMs = 1800000;
@@ -3763,12 +3764,16 @@ async function collectLaunchSmokeModalFocusEvidence(
   };
 }
 
-function collectLaunchSmokeModalFocusEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeModalFocusCoreEvidence> {
+function collectLaunchSmokeModalFocusEvidenceWithTimeout(
+  win: BrowserWindow,
+  onStep: (step: string) => void = () => {}
+): Promise<LaunchSmokeModalFocusCoreEvidence> {
   return new Promise((resolve, reject) => {
     let step = "starting";
     const timeout = setTimeout(() => reject(new Error(`Timed out collecting live modal focus evidence at ${step}.`)), 600000);
     void collectLaunchSmokeModalFocusEvidence(win, (nextStep) => {
       step = nextStep;
+      onStep(nextStep);
     })
       .then((evidence) => {
         clearTimeout(timeout);
@@ -4106,6 +4111,20 @@ function installLaunchSmoke(win: BrowserWindow): void {
   let noteGridKeyboardEvidence: LaunchSmokeNoteGridKeyboardEvidence | null = null;
   let minimumWindowEvidence: LaunchSmokeMinimumWindowEvidence | null = null;
   let lastProgress: Record<string, unknown> = { phase: "waiting-ready-to-show" };
+  let lastReportedProgress = "";
+  const updateProgress = (progress: Record<string, unknown>): void => {
+    lastProgress = progress;
+    const publicProgress = {
+      phase: typeof progress.phase === "string" ? progress.phase : "unknown",
+      ...(typeof progress.step === "string" ? { step: progress.step } : {})
+    };
+    const serialized = JSON.stringify(publicProgress);
+    if (serialized !== lastReportedProgress) {
+      lastReportedProgress = serialized;
+      console.log(`${launchSmokeProgressPrefix}${serialized}`);
+    }
+  };
+  updateProgress(lastProgress);
   const timeout = setTimeout(() => {
     if (!finished) {
       finished = true;
@@ -4131,7 +4150,7 @@ function installLaunchSmoke(win: BrowserWindow): void {
   });
 
   const poll = (deadline: number): void => {
-    lastProgress = { phase: "collecting-dom" };
+    updateProgress({ phase: "collecting-dom" });
     void collectLaunchSmokeEvidenceWithTimeout(win)
       .then((evidence) => {
         if (minimumWindowEvidence) {
@@ -4148,20 +4167,20 @@ function installLaunchSmoke(win: BrowserWindow): void {
         }
 
         const failures = launchSmokeFailures(evidence);
-        lastProgress = { phase: "dom-collected", evidence, failures };
+        updateProgress({ phase: "dom-collected", evidence, failures });
         if (failures.length === 0) {
           if (!closedDetailsEvidence) {
-            lastProgress = { phase: "collecting-closed-details", evidence };
+            updateProgress({ phase: "collecting-closed-details", evidence });
             return collectLaunchSmokeClosedDetailsEvidenceWithTimeout(win)
               .then((collectedEvidence) => {
                 if (finished) {
                   return;
                 }
                 closedDetailsEvidence = collectedEvidence;
-                lastProgress = {
+                updateProgress({
                   phase: "closed-details-collected",
                   evidence: { ...evidence, closedDetails: collectedEvidence }
-                };
+                });
                 setTimeout(() => poll(deadline), 100);
               })
               .catch((error: unknown) => {
@@ -4171,17 +4190,17 @@ function installLaunchSmoke(win: BrowserWindow): void {
               });
           }
           if (!drumGridKeyboardEvidence) {
-            lastProgress = { phase: "collecting-drum-grid-keyboard", evidence };
+            updateProgress({ phase: "collecting-drum-grid-keyboard", evidence });
             return collectLaunchSmokeDrumGridKeyboardEvidenceWithTimeout(win)
               .then((collectedEvidence) => {
                 if (finished) {
                   return;
                 }
                 drumGridKeyboardEvidence = collectedEvidence;
-                lastProgress = {
+                updateProgress({
                   phase: "drum-grid-keyboard-collected",
                   evidence: { ...evidence, drumGrid: collectedEvidence }
-                };
+                });
                 setTimeout(() => poll(deadline), 100);
               })
               .catch((error: unknown) => {
@@ -4191,17 +4210,17 @@ function installLaunchSmoke(win: BrowserWindow): void {
               });
           }
           if (!noteGridKeyboardEvidence) {
-            lastProgress = { phase: "collecting-note-grid-keyboard", evidence };
+            updateProgress({ phase: "collecting-note-grid-keyboard", evidence });
             return collectLaunchSmokeNoteGridKeyboardEvidenceWithTimeout(win)
               .then((collectedEvidence) => {
                 if (finished) {
                   return;
                 }
                 noteGridKeyboardEvidence = collectedEvidence;
-                lastProgress = {
+                updateProgress({
                   phase: "note-grid-keyboard-collected",
                   evidence: { ...evidence, drumGrid: drumGridKeyboardEvidence, noteGrid: collectedEvidence }
-                };
+                });
                 setTimeout(() => poll(deadline), 100);
               })
               .catch((error: unknown) => {
@@ -4210,7 +4229,7 @@ function installLaunchSmoke(win: BrowserWindow): void {
                 });
               });
           }
-          lastProgress = { phase: "collecting-bridge-direct", evidence };
+          updateProgress({ phase: "collecting-bridge-direct", evidence });
           return collectLaunchSmokeBridgeDirectEvidenceWithTimeout(win)
             .then((bridgeDirectEvidence) => {
               if (finished) {
@@ -4219,7 +4238,7 @@ function installLaunchSmoke(win: BrowserWindow): void {
 
               const bridgeDirectFailures = launchSmokeBridgeDirectFailures(bridgeDirectEvidence);
               const evidenceWithBridgeDirect = { ...evidence, bridgeDirect: bridgeDirectEvidence };
-              lastProgress = { phase: "bridge-direct-collected", evidence: evidenceWithBridgeDirect, failures: bridgeDirectFailures };
+              updateProgress({ phase: "bridge-direct-collected", evidence: evidenceWithBridgeDirect, failures: bridgeDirectFailures });
               if (bridgeDirectFailures.length > 0) {
                 if (Date.now() >= deadline) {
                   fail("Production desktop Audience Route Bridge direct button smoke failed.", {
@@ -4232,7 +4251,7 @@ function installLaunchSmoke(win: BrowserWindow): void {
                 return;
               }
 
-              lastProgress = { phase: "collecting-palette", evidence: evidenceWithBridgeDirect };
+              updateProgress({ phase: "collecting-palette", evidence: evidenceWithBridgeDirect });
               return collectLaunchSmokePaletteEvidenceWithTimeout(win)
                 .then((paletteEvidence) => {
                   if (finished) {
@@ -4241,7 +4260,7 @@ function installLaunchSmoke(win: BrowserWindow): void {
 
                   const paletteFailures = launchSmokePaletteFailures(paletteEvidence);
                   const evidenceWithPalette = { ...evidenceWithBridgeDirect, palette: paletteEvidence };
-                  lastProgress = { phase: "palette-collected", evidence: evidenceWithPalette, failures: paletteFailures };
+                  updateProgress({ phase: "palette-collected", evidence: evidenceWithPalette, failures: paletteFailures });
                   if (paletteFailures.length > 0) {
                     if (Date.now() >= deadline) {
                       fail("Production desktop live Quick Actions palette smoke failed.", {
@@ -4254,13 +4273,15 @@ function installLaunchSmoke(win: BrowserWindow): void {
                     return;
                   }
 
-                  lastProgress = { phase: "collecting-starter-landing", evidence: evidenceWithPalette };
+                  updateProgress({ phase: "collecting-starter-landing", evidence: evidenceWithPalette });
                   return collectLaunchSmokeStarterLandingEvidenceWithTimeout(win)
                     .then((starterLandingEvidence) => {
                       const evidenceWithStarterLanding = { ...evidenceWithPalette, starterLanding: starterLandingEvidence };
-                      lastProgress = { phase: "starter-landing-collected", evidence: evidenceWithStarterLanding };
-                      lastProgress = { phase: "collecting-modal-focus", evidence: evidenceWithStarterLanding };
-                      return collectLaunchSmokeModalFocusEvidenceWithTimeout(win)
+                      updateProgress({ phase: "starter-landing-collected", evidence: evidenceWithStarterLanding });
+                      updateProgress({ phase: "collecting-modal-focus", evidence: evidenceWithStarterLanding });
+                      return collectLaunchSmokeModalFocusEvidenceWithTimeout(win, (step) => {
+                        updateProgress({ phase: "collecting-modal-focus", step, evidence: evidenceWithStarterLanding });
+                      })
                         .then(
                           (modalFocusCoreEvidence): LaunchSmokeModalFocusEvidence => ({
                             ...modalFocusCoreEvidence,
@@ -4275,11 +4296,11 @@ function installLaunchSmoke(win: BrowserWindow): void {
                           }
                           const modalFocusFailures = launchSmokeModalFocusFailures(modalFocusEvidence);
                           const evidenceWithModalFocus = { ...evidenceWithStarterLanding, modalFocus: modalFocusEvidence };
-                          lastProgress = {
+                          updateProgress({
                             phase: "modal-focus-collected",
                             evidence: evidenceWithModalFocus,
                             failures: modalFocusFailures
-                          };
+                          });
                           if (modalFocusFailures.length > 0) {
                             fail("Production desktop modal focus lifecycle smoke failed.", {
                               evidence: evidenceWithModalFocus,
@@ -4288,7 +4309,7 @@ function installLaunchSmoke(win: BrowserWindow): void {
                             return;
                           }
 
-                          lastProgress = { phase: "collecting-command-reference", evidence: evidenceWithModalFocus };
+                          updateProgress({ phase: "collecting-command-reference", evidence: evidenceWithModalFocus });
                           return collectLaunchSmokeCommandReferenceEvidenceWithTimeout(win)
                         .then((commandReferenceEvidence) => {
                       if (finished) {
@@ -4297,11 +4318,11 @@ function installLaunchSmoke(win: BrowserWindow): void {
 
                       const commandReferenceFailures = launchSmokeCommandReferenceFailures(commandReferenceEvidence);
                       const evidenceWithCommandReference = { ...evidenceWithModalFocus, commandReference: commandReferenceEvidence };
-                      lastProgress = {
+                      updateProgress({
                         phase: "command-reference-collected",
                         evidence: evidenceWithCommandReference,
                         failures: commandReferenceFailures
-                      };
+                      });
                       if (commandReferenceFailures.length > 0) {
                         if (Date.now() >= deadline) {
                           fail("Production desktop Command Reference launch smoke failed.", {
@@ -4314,7 +4335,7 @@ function installLaunchSmoke(win: BrowserWindow): void {
                         return;
                       }
 
-                      lastProgress = { phase: "collecting-visual", evidence: evidenceWithCommandReference };
+                      updateProgress({ phase: "collecting-visual", evidence: evidenceWithCommandReference });
                       return collectLaunchSmokeVisualEvidenceWithTimeout(win)
                         .then((visualEvidence) => {
                           if (finished) {
@@ -4322,12 +4343,12 @@ function installLaunchSmoke(win: BrowserWindow): void {
                           }
 
                           const visualFailures = launchSmokeVisualFailures(visualEvidence);
-                          lastProgress = {
+                          updateProgress({
                             phase: "visual-collected",
                             evidence: evidenceWithCommandReference,
                             visualEvidence,
                             failures: visualFailures
-                          };
+                          });
                           if (visualFailures.length > 0) {
                             if (Date.now() >= deadline) {
                               fail("Production desktop visual launch smoke failed.", {
@@ -4386,11 +4407,11 @@ function installLaunchSmoke(win: BrowserWindow): void {
                 return;
               }
 
-              lastProgress = {
+              updateProgress({
                 phase: "bridge-direct-retrying",
                 evidence,
                 error: error instanceof Error ? error.message : String(error)
-              };
+              });
               setTimeout(() => poll(deadline), 250);
             });
         }
@@ -4415,11 +4436,11 @@ function installLaunchSmoke(win: BrowserWindow): void {
   };
 
   win.once("ready-to-show", () => {
-    lastProgress = { phase: "collecting-minimum-window" };
+    updateProgress({ phase: "collecting-minimum-window" });
     void collectLaunchSmokeMinimumWindowEvidence(win)
       .then((evidence) => {
         minimumWindowEvidence = evidence;
-        lastProgress = { phase: "minimum-window-collected", evidence };
+        updateProgress({ phase: "minimum-window-collected", evidence });
         poll(Date.now() + launchSmokeTimeoutMs - 35000);
       })
       .catch((error: unknown) => {
