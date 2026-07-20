@@ -1772,6 +1772,7 @@ function validateFirstRunRenderer(html) {
   const handoffPackIndex = html.indexOf('data-testid="handoff-pack"');
   const handoffRouteIndex = html.indexOf('data-testid="handoff-pack-route-readout"');
   const handoffDirectIndex = html.indexOf('data-testid="handoff-pack-direct"');
+  const handoffWavPreviewIndex = html.indexOf('data-testid="handoff-pack-preview-wav"');
   const handoffGridIndex = html.indexOf('data-testid="handoff-pack-grid"');
   const handoffWavActionIndex = html.indexOf('data-testid="handoff-pack-action-wav"');
   const handoffStatusIndex = html.indexOf('data-testid="handoff-status-tools"');
@@ -1782,12 +1783,13 @@ function validateFirstRunRenderer(html) {
       handoffPackIndex > workspaceIndex &&
       handoffRouteIndex > handoffPackIndex &&
       handoffDirectIndex > handoffRouteIndex &&
-      handoffGridIndex > handoffDirectIndex &&
+      handoffWavPreviewIndex > handoffDirectIndex &&
+      handoffGridIndex > handoffWavPreviewIndex &&
       handoffWavActionIndex > handoffGridIndex &&
       handoffStatusIndex > handoffWavActionIndex &&
       handoffAuditIndex > handoffStatusIndex &&
       handoffManifestIndex > handoffAuditIndex,
-    "Delivery hierarchy should stay outside optional guidance after the workspace and keep route, direct exports, delivery status, and package proof in order"
+    "Delivery hierarchy should stay outside optional guidance after the workspace and keep route, rendered WAV preview, direct exports, delivery status, and package proof in order"
   );
   check(
     !html.includes('<details class="handoff-status-tools" data-testid="handoff-status-tools" open="">') &&
@@ -1995,6 +1997,7 @@ function validateFirstRunRenderer(html) {
     ],
     "delivery actions first": [
       'data-testid="handoff-pack-direct"',
+      'data-testid="handoff-pack-preview-wav"',
       'data-testid="handoff-pack-grid"',
       'data-testid="handoff-pack-action-wav"',
       'data-testid="handoff-pack-action-stems"',
@@ -2007,6 +2010,7 @@ function validateFirstRunRenderer(html) {
       'data-testid="handoff-audit-toggle"',
       "Choose a deliverable",
       "Export directly",
+      "Preview WAV",
       "Delivery Status &amp; Receipt",
       "Format &amp; Package Proof"
     ],

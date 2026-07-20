@@ -46,6 +46,7 @@ import { exportMidi, midiFileName } from "../audio/midi";
 import {
   analyzeExport,
   analyzeStemExports,
+  createMixWavBlob,
   ExportAnalysis,
   exportStems,
   exportWav,
@@ -1144,6 +1145,7 @@ export function App(): ReactElement {
   const [undoStack, setUndoStack] = useState<EditHistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<EditHistoryEntry[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isMixPreviewing, setIsMixPreviewing] = useState(false);
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>("arrangement");
   const [transportLoopScope, setTransportLoopScope] = useState<TransportLoopScope>("arrangement");
   const [playbackPosition, setPlaybackPosition] = useState<PlaybackSnapshot | null>(null);
@@ -1344,6 +1346,8 @@ export function App(): ReactElement {
   const selectedEventDeleteSelectionGuardRef = useRef(false);
   const controllerRef = useRef<PlaybackController | null>(null);
   const auditionControllerRef = useRef<PlaybackController | null>(null);
+  const mixPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const mixPreviewUrlRef = useRef<string | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const styleInspectorRef = useRef<HTMLElement | null>(null);
   const beatPassportPanelRef = useRef<HTMLElement | null>(null);
@@ -2201,12 +2205,24 @@ export function App(): ReactElement {
       controllerRef.current = null;
       auditionControllerRef.current?.stop();
       auditionControllerRef.current = null;
+      mixPreviewAudioRef.current?.pause();
+      mixPreviewAudioRef.current = null;
+      if (mixPreviewUrlRef.current) {
+        URL.revokeObjectURL(mixPreviewUrlRef.current);
+        mixPreviewUrlRef.current = null;
+      }
       if (tapTempoCommitTimerRef.current !== null) {
         window.clearTimeout(tapTempoCommitTimerRef.current);
         tapTempoCommitTimerRef.current = null;
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (mixPreviewAudioRef.current) {
+      stopMixPreview("WAV preview stopped after project change");
+    }
+  }, [project]);
 
   useEffect(() => {
     if (!localDraftReadyRef.current) {
@@ -5500,6 +5516,7 @@ export function App(): ReactElement {
   }
 
   function auditionSelectedDrumHit(): void {
+    stopMixPreview();
     const outcome = auditionSelectedDrumHitEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedDrumStep);
     if (outcome.ok) {
       setEditorAuditionResult(createDrumEditorAuditionResult());
@@ -5509,6 +5526,7 @@ export function App(): ReactElement {
   }
 
   function auditionSelectedNote(): void {
+    stopMixPreview();
     const outcome = auditionSelectedNoteEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedNote);
     if (outcome.ok) {
       setEditorAuditionResult(createNoteEditorAuditionResult());
@@ -5518,6 +5536,7 @@ export function App(): ReactElement {
   }
 
   function auditionSelectedChord(): void {
+    stopMixPreview();
     const outcome = auditionSelectedChordEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedChord);
     if (outcome.ok) {
       setEditorAuditionResult(createChordEditorAuditionResult());
@@ -7042,6 +7061,7 @@ export function App(): ReactElement {
     }
 
     try {
+      stopMixPreview();
       setIsPlaying(true);
       controllerRef.current = startRealtimePlayback(projectRef.current, {
         mode: transportLoopMode,
@@ -7059,6 +7079,62 @@ export function App(): ReactElement {
       console.error(error);
       setIsPlaying(false);
       setPlaybackPosition(null);
+    }
+  }
+
+  function stopMixPreview(status?: string): void {
+    const audio = mixPreviewAudioRef.current;
+    const objectUrl = mixPreviewUrlRef.current;
+    mixPreviewAudioRef.current = null;
+    mixPreviewUrlRef.current = null;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+    }
+    setIsMixPreviewing(false);
+    if (status && (audio || objectUrl)) {
+      setProjectStatus(status);
+    }
+  }
+
+  function toggleMixPreview(): void {
+    if (mixPreviewAudioRef.current) {
+      stopMixPreview("Stopped rendered WAV preview");
+      return;
+    }
+
+    controllerRef.current?.stop();
+    controllerRef.current = null;
+    auditionControllerRef.current?.stop();
+    auditionControllerRef.current = null;
+    setPlaybackPosition(null);
+    setIsPlaying(false);
+
+    try {
+      const objectUrl = URL.createObjectURL(createMixWavBlob(projectRef.current));
+      mixPreviewUrlRef.current = objectUrl;
+      const audio = new Audio(objectUrl);
+      mixPreviewAudioRef.current = audio;
+      audio.addEventListener("ended", () => {
+        if (mixPreviewAudioRef.current === audio) {
+          stopMixPreview("Finished rendered WAV preview");
+        }
+      }, { once: true });
+      setIsMixPreviewing(true);
+      setProjectStatus("Previewing rendered mix WAV");
+      void audio.play().catch((error) => {
+        console.error(error);
+        if (mixPreviewAudioRef.current === audio) {
+          stopMixPreview("WAV preview unavailable");
+        }
+      });
+    } catch (error) {
+      console.error(error);
+      stopMixPreview();
+      setProjectStatus("WAV preview unavailable");
     }
   }
 
@@ -14707,6 +14783,7 @@ export function App(): ReactElement {
         packageCheckSummary={handoffPackageCheckSummary}
         packageCheckResult={handoffPackageCheckResult}
         project={project}
+        isWavPreviewing={isMixPreviewing}
         sectionRef={deliverPanelRef}
         statusOpen={deliveryStatusOpen}
         stemAnalyses={stemAnalyses}
@@ -14715,6 +14792,7 @@ export function App(): ReactElement {
         onExportMidi={handleExportMidi}
         onExportStems={handleExportStems}
         onExportWav={handleExportWav}
+        onToggleWavPreview={toggleMixPreview}
         onFocusExportFormat={focusHandoffExportFormatMetric}
         onFocusPackageCheck={focusHandoffPackageCheckCard}
         onToggleAudit={() => setDeliveryAuditOpen((open) => !open)}

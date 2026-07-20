@@ -6778,6 +6778,7 @@ export function HandoffPack({
   packageCheckSummary,
   packageCheckResult,
   project,
+  isWavPreviewing,
   sectionRef,
   statusOpen,
   auditOpen,
@@ -6787,6 +6788,7 @@ export function HandoffPack({
   onExportMidi,
   onExportStems,
   onExportWav,
+  onToggleWavPreview,
   onFocusExportFormat,
   onFocusPackageCheck,
   onToggleStatus,
@@ -6800,6 +6802,7 @@ export function HandoffPack({
   packageCheckSummary: HandoffPackageCheckSummary;
   packageCheckResult: HandoffPackageCheckFocusResult | null;
   project: ProjectState;
+  isWavPreviewing: boolean;
   sectionRef?: Ref<HTMLElement>;
   statusOpen: boolean;
   auditOpen: boolean;
@@ -6809,6 +6812,7 @@ export function HandoffPack({
   onExportMidi: () => void;
   onExportStems: () => void;
   onExportWav: () => void;
+  onToggleWavPreview: () => void;
   onFocusExportFormat: (metric: HandoffExportFormatMetric) => void;
   onFocusPackageCheck: (card: HandoffPackageCheckCard) => void;
   onToggleStatus: () => void;
@@ -6870,6 +6874,17 @@ export function HandoffPack({
           <span>Choose a deliverable</span>
           <strong>Export directly</strong>
           <small>WAV is the finished mix. Stems and MIDI keep the session editable; Sheet and Bundle package the handoff.</small>
+          <button
+            aria-pressed={isWavPreviewing}
+            className={isWavPreviewing ? "active" : ""}
+            data-testid="handoff-pack-preview-wav"
+            onClick={onToggleWavPreview}
+            title={isWavPreviewing ? "Stop the rendered WAV preview" : "Preview the exact rendered mix WAV before export"}
+            type="button"
+          >
+            {isWavPreviewing ? <CircleStop size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
+            <span>{isWavPreviewing ? "Stop preview" : "Preview WAV"}</span>
+          </button>
         </div>
         <div className="handoff-pack-grid" data-testid="handoff-pack-grid">
           {items.map((item) => (
