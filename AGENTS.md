@@ -116,6 +116,7 @@ Run the validation commands documented in `docs/quality/rules.md`.
 Root Markdown files are limited to:
 
 - `README.md`
+- `readme-en.md`
 - `AGENTS.md`
 
 All other durable knowledge belongs under `docs/`.

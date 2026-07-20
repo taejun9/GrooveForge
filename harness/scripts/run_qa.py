@@ -54,7 +54,7 @@ QUALITY_COMMAND_BLOCK_REQUIRED = [
 ]
 
 DOCUMENTED_COMMAND_COVERAGE_FILES = [
-    "README.md",
+    "readme-en.md",
     "docs/release/readiness.md",
     "docs/architecture/harness.md",
     "docs/quality/rules.md",
@@ -82,6 +82,7 @@ COMPLETION_CITATION_RE = re.compile(
 REQUIRED_PATHS = [
     "AGENTS.md",
     "README.md",
+    "readme-en.md",
     "package.json",
     "index.html",
     "assets/brand/grooveforge-icon.svg",
@@ -269,7 +270,7 @@ SAMPLING_FIRST_UI_PHRASES = [
 ]
 
 TEXT_EXPECTATIONS = {
-    "README.md": [
+    "readme-en.md": [
         "making beats across genres",
         "It opens on direct beat composition with built-in instruments and editable musical events",
         "so the first read is a beat workstation built around making music directly",
@@ -1375,6 +1376,24 @@ TEXT_EXPECTATIONS = {
         "Runtime arrangement editing also exposes a visible Selected Block Edit Preview Decision action, a visible Selected Block Priority action, the Quick Actions Selected Block Edit Decision and Selected Block Priority commands, and selected-block edit commands for copy, paste, duplicate, move, split, merge, and delete with a UI-local Selected Block Edit Preview Decision Readout, Selected Block Edit Priority Readout, and local Selected Block Edit Result feedback while preserving existing arrangement handler behavior.",
         "Handoff Sheet text export",
         "npm run desktop",
+    ],
+    "README.md": [
+        "[한국어](README.md) · [English](readme-en.md)",
+        "여러 장르의 비트를 직접 만들기 위한 데스크톱용 이벤트 기반 미니 DAW",
+        "GrooveForge의 중심은 샘플 탐색이 아니라 직접 비트를 작곡하고 소리를 설계하는 과정입니다.",
+        "BPM/키/스타일 → 패턴 프로그래밍 → 드럼 → 808/베이스 → 멜로디/코드",
+        "샘플링은 이후 추가할 수 있는 선택형 음원 모듈입니다.",
+        "가져온 오디오 없이 완성하는 8마디 비트",
+        "Guided / 82 BPM / A minor / Lo-fi / 8-bar Starter Sketch",
+        "npm run qa",
+        "npm run typecheck",
+        "npm run renderer:smoke",
+        "npm run workflow:smoke",
+        "npm run sample-audio:qa",
+        "npm run desktop:launch-smoke",
+        "npm run verify",
+        "npm run release:check",
+        "readme-en.md       # 기존 영문 전체 문서",
     ],
     "AGENTS.md": [
         "No Exec Plan, No Work",
@@ -29852,7 +29871,13 @@ def check_tracked_text_sources_are_binary_free(errors: list[str]) -> None:
         ".yaml",
         ".yml",
     }
-    text_files = [ROOT / "README.md", ROOT / "AGENTS.md", ROOT / "package.json", ROOT / "package-lock.json"]
+    text_files = [
+        ROOT / "README.md",
+        ROOT / "readme-en.md",
+        ROOT / "AGENTS.md",
+        ROOT / "package.json",
+        ROOT / "package-lock.json",
+    ]
     for source_root in (ROOT / "src", ROOT / "electron", ROOT / "harness", ROOT / "docs"):
         text_files.extend(path for path in source_root.rglob("*") if path.is_file() and path.suffix in text_extensions)
 
@@ -29862,7 +29887,7 @@ def check_tracked_text_sources_are_binary_free(errors: list[str]) -> None:
 
 
 def check_root_markdown(errors: list[str]) -> None:
-    allowed = {"README.md", "AGENTS.md"}
+    allowed = {"README.md", "readme-en.md", "AGENTS.md"}
     found = {path.name for path in ROOT.glob("*.md")}
     extra = sorted(found - allowed)
     if extra:
@@ -29948,11 +29973,11 @@ def completion_citation_commands(file_path: str, errors: list[str]) -> set[str]:
 
 def check_readme_completion_citation_coverage(errors: list[str]) -> None:
     readiness_commands = completion_citation_commands("docs/release/readiness.md", errors)
-    readme_commands = completion_citation_commands("README.md", errors)
+    readme_commands = completion_citation_commands("readme-en.md", errors)
     missing = sorted(readiness_commands - readme_commands)
     if missing:
         formatted = ", ".join(f"npm run {command}" for command in missing)
-        errors.append(f"README.md completion proof trail missing release readiness citation commands: {formatted}")
+        errors.append(f"readme-en.md completion proof trail missing release readiness citation commands: {formatted}")
 
 
 def check_official_sources(errors: list[str]) -> None:
@@ -30029,33 +30054,30 @@ def check_composition_first_ui_copy(errors: list[str]) -> None:
 def check_first_read_framing(errors: list[str]) -> None:
     readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
     product_text = (ROOT / "docs/product/product.md").read_text(encoding="utf-8")
-    readme_spine = readme_text.split("## MVP Target", 1)[0]
+    readme_spine = readme_text.split("## MVP 목표", 1)[0]
     product_definition = product_text.split("## Product Boundary", 1)[0]
 
     direct_readme_markers = [
-        "directly composing beats",
-        "Pattern Programming",
-        "Drum Sequencing",
-        "808/Bass Synthesis",
-        "Melody/Chord Composition",
-        "Sound Design",
-        "Arrangement",
-        "Mixing",
-        "Mastering",
-        "Export",
+        "직접 비트를 작곡",
+        "패턴 프로그래밍",
+        "드럼",
+        "808/베이스",
+        "멜로디/코드",
+        "사운드 디자인",
+        "편곡",
+        "믹싱",
+        "마스터링",
+        "내보내기",
     ]
     for marker in direct_readme_markers:
         if marker not in readme_spine:
             errors.append(f"README Product Spine must lead with direct beat production marker: {marker}")
 
     misplaced_readme_guardrails = [
-        "Concept audit rule:",
-        "Core model rule:",
-        "Attached-brief intake rule:",
-        "Brief correction rule:",
-        "Attached Korean brief rewrite:",
-        "Korean concept-brief rule:",
-        "Latest brief verdict:",
+        "AudioClipEvent",
+        "TrackType =",
+        "sample import",
+        "sampler track",
     ]
     for marker in misplaced_readme_guardrails:
         if marker in readme_spine:
