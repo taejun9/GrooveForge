@@ -12,6 +12,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const appName = "GrooveForge";
 const bundleId = "app.grooveforge.desktop";
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
+const progressPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_PROGRESS ";
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${process.platform}-${process.arch}`);
 const packagedApp = path.join(packageRoot, `${appName}.app`);
 const executable = path.join(packagedApp, "Contents", "MacOS", appName);
@@ -217,6 +218,7 @@ async function launchSignedApp() {
     });
     let stdout = "";
     let stderr = "";
+    let progressBuffer = "";
     let settled = false;
     const timeout = setTimeout(() => {
       if (settled) {
@@ -231,6 +233,14 @@ async function launchSignedApp() {
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
       stdout += chunk;
+      progressBuffer += chunk;
+      const lines = progressBuffer.split(/\r?\n/);
+      progressBuffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (line.startsWith(progressPrefix)) {
+          console.log(line);
+        }
+      }
     });
     child.stderr.on("data", (chunk) => {
       stderr += chunk;

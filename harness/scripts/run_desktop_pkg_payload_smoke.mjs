@@ -23,6 +23,7 @@ const payloadRoot = path.join(packageRoot, "pkg-payload-smoke", "payload");
 const reportJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-pkg-payload-smoke.json`);
 const reportMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-pkg-payload-smoke.md`);
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
+const progressPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_PROGRESS ";
 // Keep the parent harness alive beyond the app's 1,800-second launch-smoke timeout.
 const timeoutMs = 1820000;
 const failures = [];
@@ -373,6 +374,7 @@ async function launchExtractedApp(extractedExecutable, extractedAppRoot) {
     });
     let stdout = "";
     let stderr = "";
+    let progressBuffer = "";
     let settled = false;
     const timeout = setTimeout(() => {
       if (settled) {
@@ -387,6 +389,14 @@ async function launchExtractedApp(extractedExecutable, extractedAppRoot) {
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
       stdout += chunk;
+      progressBuffer += chunk;
+      const lines = progressBuffer.split(/\r?\n/);
+      progressBuffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (line.startsWith(progressPrefix)) {
+          console.log(line);
+        }
+      }
     });
     child.stderr.on("data", (chunk) => {
       stderr += chunk;
