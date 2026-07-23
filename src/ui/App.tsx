@@ -188,6 +188,7 @@ import {
   projectFileName,
   projectMasterCeilingDb,
   projectSnapshotSummary,
+  projectTimeSignature,
   renameProjectSnapshot,
   resolveMasterCeilingDraft,
   retargetProjectKey,
@@ -12222,6 +12223,8 @@ export function App(): ReactElement {
           <label className="field compact">
             <span>BPM</span>
             <input
+              aria-label="Project BPM"
+              data-testid="project-bpm-input"
               type="number"
               min={minProjectBpm}
               max={maxProjectBpm}
@@ -12251,12 +12254,30 @@ export function App(): ReactElement {
           </div>
           <label className="field">
             <span>Key</span>
-            <select value={project.key} onChange={(event) => applyProjectKey(event.target.value)}>
+            <select
+              aria-label="Project key"
+              data-testid="project-key-select"
+              value={project.key}
+              onChange={(event) => applyProjectKey(event.target.value)}
+            >
               {keys.map((key) => (
                 <option key={key}>{key}</option>
               ))}
             </select>
           </label>
+          <div
+            aria-label={`Time signature ${projectTimeSignature}, fixed grid`}
+            className="field time-signature-field"
+            data-testid="project-time-signature"
+            role="group"
+            title="GrooveForge currently uses a fixed 4/4 project grid"
+          >
+            <span>Time signature</span>
+            <output data-testid="project-time-signature-value">
+              <strong>{projectTimeSignature}</strong>
+              <small>Fixed grid</small>
+            </output>
+          </div>
           <label className="field">
             <span className="style-field-label">
               Style

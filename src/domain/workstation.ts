@@ -259,6 +259,7 @@ export type AudienceStarterProjectId = "beginner" | "producer";
 
 export const steps = Array.from({ length: 16 }, (_, index) => index);
 export const stepsPerBar = 16;
+export const projectTimeSignature = "4/4" as const;
 export const minArrangementBars = 1;
 export const maxArrangementBars = 16;
 export const maxProjectArrangementBars = 64;

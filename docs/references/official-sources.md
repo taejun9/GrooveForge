@@ -27,6 +27,8 @@ Record official documentation, platform docs, standards, laws, policies, or vend
 | Apple GarageBand for Mac User Guide | https://support.apple.com/guide/garageband/welcome/mac | Official beginner music-production user guide entry point | 2026-06-19 | Benchmark context for approachable desktop music-making workflows |
 | Bitwig Studio User Guide: Working with Audio Events | https://www.bitwig.com/userguide/latest/working_with_audio_events/ | Official audio-event, stretch, onset, and clip editing reference | 2026-06-19 | Optional sampling/clip-extension research only |
 | Image-Line FL Studio Manual: Levels, Mixing & Clipping | https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/mixer_levelsandmixing.htm | Official mixing, clipping, and mixing-before-mastering guidance | 2026-06-19 | Mixer/master stage separation and output-posture research |
+| Ableton Live 12 Reference Manual: Live Concepts | https://www.ableton.com/en/manual/live-concepts/ | Official Control Bar grouping for tempo, time signature, metronome, scale, and transport controls | 2026-07-23 | Musical project-context readout placement benchmark |
+| Apple Logic Pro User Guide: Set the project time signature | https://support.apple.com/guide/logicpro/set-the-project-time-signature-lgcpce102b95/mac | Official project meter definition and LCD time-signature control reference | 2026-07-23 | Time-signature meaning and persistent project-context benchmark |
 
 ## Rules
 
