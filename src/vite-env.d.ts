@@ -207,7 +207,32 @@ type GrooveforgeLaunchSmokeStarterLandingRouteEvidence = {
 
 type GrooveforgeLaunchSmokeStarterLandingEvidence = {
   beginner: GrooveforgeLaunchSmokeStarterLandingRouteEvidence;
+  projectChangeSafety: GrooveforgeLaunchSmokeProjectChangeSafetyEvidence;
   producer: GrooveforgeLaunchSmokeStarterLandingRouteEvidence;
+};
+
+type GrooveforgeLaunchSmokeProjectChangeSafetyEvidence = {
+  applyChangedStyle: boolean;
+  applyDialogClosed: boolean;
+  applyOutcome: string;
+  applySelectedPatternA: boolean;
+  backwardFocusWrap: boolean;
+  cancelFocusRestored: boolean;
+  cancelInitialFocus: string;
+  cancelOutcome: string;
+  cancelProjectUnchanged: boolean;
+  dialogOpened: boolean;
+  dirtyGuardActive: boolean;
+  dockCoveredDuringDialog: boolean;
+  dockVisibleDuringDialog: boolean;
+  escapeClosed: boolean;
+  forwardFocusWrap: boolean;
+  previewPatternCount: number;
+  starterCancelOutcome: boolean;
+  starterCancelProjectUnchanged: boolean;
+  starterConfirmCalled: boolean;
+  starterUndoPostureUnchanged: boolean;
+  undoRestoredProject: boolean;
 };
 
 type GrooveforgeLaunchSmokeAudienceNextStepRailEvidence = {

@@ -1387,7 +1387,7 @@ export function createQuickActionResult(
   action: QuickAction,
   beforeProject: ProjectState,
   afterProject: ProjectState,
-  outcome: "complete" | "failed",
+  outcome: "complete" | "canceled" | "failed",
   selectedArrangementIndex = 0,
   handoffExportReceipt: HandoffExportReceipt | null = null,
   inputSetupResult: QuickActionInputSetupResultState | null = null
@@ -1637,6 +1637,8 @@ export function createQuickActionResult(
     tone:
       outcome === "failed"
         ? "danger"
+        : outcome === "canceled"
+          ? "warn"
         : previewOnly || blueprintPreviewDecisionOnly || cueOnly || focusOnly || audienceSessionRouteOnly || uiLocal || exportOnly
           ? "good"
           : nextMoveQuickActionOnly
@@ -1647,7 +1649,13 @@ export function createQuickActionResult(
             ? "good"
             : "warn"
   };
-  const followup = quickActionResultFollowup(action, afterProject, outcome);
+  const followup =
+    outcome === "canceled"
+      ? {
+          auditionCue: "The current project stayed unchanged; no listening check is needed.",
+          nextCheck: "Run the action again only when replacing the current project state is intended."
+        }
+      : quickActionResultFollowup(action, afterProject, outcome);
 
   return {
     actionId: action.id,
@@ -1655,6 +1663,8 @@ export function createQuickActionResult(
     status:
       outcome === "failed"
         ? "Failed"
+        : outcome === "canceled"
+          ? "Canceled"
         : previewOnly
           ? "Previewed"
           : blueprintPreviewDecisionOnly
@@ -1706,6 +1716,8 @@ export function createQuickActionResult(
     tone:
       outcome === "failed"
         ? "danger"
+        : outcome === "canceled"
+          ? "warn"
         : previewOnly || blueprintPreviewDecisionOnly || cueOnly || focusOnly || audienceSessionRouteOnly || uiLocal || exportOnly
           ? "good"
           : nextMoveQuickActionOnly

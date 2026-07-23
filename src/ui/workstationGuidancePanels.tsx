@@ -33,6 +33,7 @@ import type {
   ProductionSnapshotMetric,
   ProductionSnapshotSummary,
   QuickAction,
+  QuickActionRunOutcome,
   QuickActionResult,
   ReferenceAlignmentCard,
   ReferenceAlignmentCardId,
@@ -1774,7 +1775,7 @@ export function createAudienceSessionQuickActions({
   onSelectAudience,
   summary
 }: {
-  onCreateStarter: (starterId: AudienceStarterProjectId) => void;
+  onCreateStarter: (starterId: AudienceStarterProjectId) => QuickActionRunOutcome;
   onSelectAudience: (row: AudienceSessionReadoutRow) => void;
   summary: AudienceSessionReadoutSummary;
 }): QuickAction[] {

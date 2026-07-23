@@ -43,6 +43,7 @@ const localDraftLifecycle = await import("../../src/ui/localDraftLifecycle.ts");
 const projectCloseGuard = await import("../../src/ui/projectCloseGuard.ts");
 const projectReplacementGuard = await import("../../src/ui/projectReplacementGuard.ts");
 const projectSaveCompletion = await import("../../src/ui/projectSaveCompletion.ts");
+const styleChangePreview = await import("../../src/ui/styleChangePreview.ts");
 const unsavedCloseDialog = await import("../../electron/unsavedCloseDialog.ts");
 const coreTrackTypes = new Set(["drum_rack", "bass_808", "synth", "chord", "fx_return", "master"]);
 const smokeKey = "F minor";
@@ -238,7 +239,76 @@ function validateProjectReplacementGuard() {
     );
   }
 
-  return { paths: cases.length, protectedPaths: cases.filter((entry) => entry.confirm).length };
+  const starterClean = projectReplacementGuard.resolveStarterProjectReplacementGuard(false, false, "Guided 8-bar beat starter project");
+  const starterDirty = projectReplacementGuard.resolveStarterProjectReplacementGuard(true, false, "Guided 8-bar beat starter project");
+  const starterRecovery = projectReplacementGuard.resolveStarterProjectReplacementGuard(false, true, "Studio starter pass project");
+  const starterDirtyRecovery = projectReplacementGuard.resolveStarterProjectReplacementGuard(true, true, "Studio starter pass project");
+  check(starterClean.requiresConfirmation === false && starterClean.warning === null, "starter-replacement-guard: clean first run should stay one click");
+  check(
+    starterDirty.requiresConfirmation === true &&
+      starterDirty.warning?.includes("Guided 8-bar beat starter project") === true &&
+      starterDirty.warning?.includes("unsaved changes") === true &&
+      starterDirty.warning?.includes("Cancel to keep the current beat") === true,
+    "starter-replacement-guard: dirty project should name the starter, loss state, and keep-current choice"
+  );
+  check(
+    starterRecovery.warning?.includes("local recovery draft") === true &&
+      starterDirtyRecovery.warning?.includes("unsaved changes and the current local recovery draft") === true,
+    "starter-replacement-guard: recovery-only and combined loss states should remain explicit"
+  );
+
+  return { paths: cases.length + 4, protectedPaths: cases.filter((entry) => entry.confirm).length + 3 };
+}
+
+function validateStyleChangePreview() {
+  const source = structuredClone(workstation.starterProject);
+  source.selectedPattern = "C";
+  source.bpm = 91;
+  source.swing = 0.11;
+  const beforeFingerprint = JSON.stringify(source);
+  const preview = styleChangePreview.createStyleChangePreview(source, "house");
+  check(preview !== null, "style-change-preview: supported target should create a preview");
+  check(
+    preview?.currentStyleName === "Lo-fi" &&
+      preview.targetStyleName === "House" &&
+      preview.currentBpm === 91 &&
+      preview.targetBpm === 124 &&
+      preview.currentSwingPercent === 11 &&
+      preview.selectedPatternBefore === "C",
+    "style-change-preview: current and target style posture should be explicit before apply"
+  );
+  check(
+    preview?.patterns.length === workstation.patternSlots.length &&
+      preview.patterns.every((pattern) => pattern.beforeEvents >= 0 && pattern.afterEvents > 0),
+    "style-change-preview: Pattern A/B/C replacement counts should be visible"
+  );
+  check(
+    JSON.stringify(source) === beforeFingerprint,
+    "style-change-preview: preview creation must not mutate project data"
+  );
+
+  const applied = styleChangePreview.applyStyleChange(source, "house");
+  const expectedPatterns = workstation.createStylePatternSet("house", source.key);
+  check(
+    applied !== source &&
+      applied.styleId === "house" &&
+      applied.selectedPattern === "A" &&
+      applied.bpm === 124 &&
+      applied.swing === workstation.getStyle(applied).defaultSwing &&
+      JSON.stringify(applied.patterns) === JSON.stringify(expectedPatterns),
+    "style-change-apply: explicit Apply should rebuild style posture and Pattern A/B/C exactly once"
+  );
+  check(
+    JSON.stringify(source) === beforeFingerprint,
+    "style-change-apply: applying to a new project value must leave the undo source unchanged"
+  );
+
+  return {
+    target: preview?.targetStyleName ?? "missing",
+    patterns: preview?.patterns.length ?? 0,
+    beforeEvents: preview?.beforeEventTotal ?? 0,
+    afterEvents: preview?.afterEventTotal ?? 0
+  };
 }
 
 function validateProjectCloseGuard() {
@@ -1842,6 +1912,7 @@ const localDraftWriteGateSummary = validateLocalDraftWriteGate();
 const projectCloseGuardSummary = validateProjectCloseGuard();
 const projectReplacementGuardSummary = validateProjectReplacementGuard();
 const projectSaveCompletionSummary = validateProjectSaveCompletion();
+const styleChangePreviewSummary = validateStyleChangePreview();
 const allGenreBassVoiceSummary = await validateAllGenreBassVoiceRuntime();
 
 if (failures.length > 0) {
@@ -1877,8 +1948,9 @@ console.log(`- Handoff runtime safety: ${handoffRuntimeSafetySummary.source} -> 
 console.log(`- Snapshot runtime safety: ${snapshotRuntimeSafetySummary.source} -> ${snapshotRuntimeSafetySummary.repaired} / normalized paths ${snapshotRuntimeSafetySummary.normalizedPaths}/11 / Handoff ${snapshotRuntimeSafetySummary.handoffBytes} bytes / MIDI ${snapshotRuntimeSafetySummary.midiBytes} bytes / WAV ${snapshotRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Local draft write gate: ${localDraftWriteGateSummary.paths}/4 boolean paths / first edit write eligible ${localDraftWriteGateSummary.firstEditWriteEligible ? "yes" : "no"}`);
 console.log(`- Project close guard: ${projectCloseGuardSummary.paths}/4 dirty/recovery paths / protected ${projectCloseGuardSummary.protectedPaths}/3 / synchronous draft refresh ${projectCloseGuardSummary.refreshPaths}/2 / save gates ${projectCloseGuardSummary.saveGates}/4 / native actions ${projectCloseGuardSummary.nativeActions}/3`);
-console.log(`- Project replacement guard: ${projectReplacementGuardSummary.paths}/4 dirty/recovery paths / protected loss paths ${projectReplacementGuardSummary.protectedPaths}/3`);
+console.log(`- Project replacement guard: ${projectReplacementGuardSummary.paths}/8 open/starter dirty/recovery paths / protected loss paths ${projectReplacementGuardSummary.protectedPaths}/6`);
 console.log(`- Project Save completion: ${projectSaveCompletionSummary.paths}/4 async paths / stale completions ${projectSaveCompletionSummary.stalePaths}/2 / changed snapshot ${projectSaveCompletionSummary.changedPaths}/1 / close outcomes ${projectSaveCompletionSummary.closeAttempts}/5`);
+console.log(`- Style change preview: ${styleChangePreviewSummary.target} / Pattern A/B/C ${styleChangePreviewSummary.patterns}/3 / ${styleChangePreviewSummary.beforeEvents}->${styleChangePreviewSummary.afterEvents} events / preview immutable`);
 console.log(`- All-genre Bass Voice: ${allGenreBassVoiceSummary.distinctBassStems}/${allGenreBassVoiceSummary.voices} distinct voice stems / connected glide audible ${allGenreBassVoiceSummary.glideAudible ? "yes" : "no"} / durable bass_808 id preserved`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {

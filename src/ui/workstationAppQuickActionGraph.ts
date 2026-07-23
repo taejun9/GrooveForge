@@ -394,6 +394,7 @@ import type {
   MasterAutomationResult,
   TransportLoopScope,
   QuickAction,
+  QuickActionRunOutcome,
   QuickActionPinnedResult,
   QuickActionPinnedResultKind,
   QuickActionRecent,
@@ -1893,9 +1894,9 @@ export function createQuickActions({
   onFollowAudibleArrangementBlock: () => void;
   onSelectArrangementBlock: (index: number) => void;
   onSelectPattern: (pattern: PatternSlot) => void;
-  onSelectStyle: (styleId: ProjectState["styleId"]) => void;
+  onSelectStyle: (styleId: ProjectState["styleId"]) => void | Promise<QuickActionRunOutcome>;
   onSelectAudienceSessionRow: (row: AudienceSessionReadoutRow) => void;
-  onCreateAudienceStarter: (starterId: AudienceStarterProjectId) => void;
+  onCreateAudienceStarter: (starterId: AudienceStarterProjectId) => QuickActionRunOutcome;
   onFocusAudienceDeliveryProofBridgeReadout: () => void;
   onFocusAudienceSessionAcceptanceReadout: () => void;
   onFocusAudienceSessionProofHandoffReadout: () => void;
@@ -4780,8 +4781,8 @@ export function createQuickActions({
     const selected = profile.id === project.styleId;
     return {
       id: `style-quick-${profile.id}`,
-      title: `${selected ? "Reapply" : "Apply"} ${profile.name} style`,
-      detail: `${profile.defaultBpm} BPM / ${percentLabel(profile.defaultSwing)} swing / ${bassStyleRoleLabel(
+      title: `Preview ${selected ? `reapply ${profile.name}` : `${profile.name} style`} change`,
+      detail: `Review before Apply / rebuild Pattern A/B/C / ${profile.defaultBpm} BPM / ${percentLabel(profile.defaultSwing)} swing / ${bassStyleRoleLabel(
         profile.bassStyle
       )} / ${melodyStyleRoleLabel(profile.melodyStyle)}`,
       group: "Create",

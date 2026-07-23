@@ -274,6 +274,7 @@ import type {
   MasterAutomationResult,
   TransportLoopScope,
   QuickAction,
+  QuickActionRunOutcome,
   QuickActionPinnedResult,
   QuickActionPinnedResultKind,
   QuickActionRecent,
@@ -1380,7 +1381,7 @@ export function StyleInspector({
   onCueGoal: (goal: StyleGoalCard) => void;
   onFocus: (item: StyleInspectorFocusItem) => void;
   onRunGoalAction: (action: ComposerAction) => void;
-  onSelectStyle: (styleId: ProjectState["styleId"]) => void;
+  onSelectStyle: (styleId: ProjectState["styleId"]) => void | Promise<QuickActionRunOutcome>;
   selectedStyleId: ProjectState["styleId"];
   summary: StyleInspectorSummary;
 }): ReactElement {
@@ -1530,13 +1531,14 @@ export function StyleInspector({
           const selected = profile.id === selectedStyleId;
           return (
             <button
+              aria-label={`Preview ${profile.name} style change`}
               aria-pressed={selected}
               className={selected ? "selected" : ""}
               data-testid={`style-quick-${profile.id}`}
               key={profile.id}
               onClick={() => onSelectStyle(profile.id)}
               style={{ "--quick-style-color": profile.color } as CSSProperties}
-              title={`Apply ${profile.name} groove`}
+              title={`Preview ${profile.name} BPM, swing, sound, and Pattern A/B/C before applying`}
               type="button"
             >
               <span>{profile.name}</span>

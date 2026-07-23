@@ -1122,6 +1122,8 @@ export type MasterAutomationResult = {
 
 export type TransportLoopScope = "arrangement" | "block" | "transition" | "pattern";
 
+export type QuickActionRunOutcome = "complete" | "canceled";
+
 export type QuickAction = {
   id: string;
   title: string;
@@ -1130,7 +1132,7 @@ export type QuickAction = {
   keywords: string;
   disabled?: boolean;
   resultTargetId?: string;
-  run: () => void | Promise<void>;
+  run: () => void | QuickActionRunOutcome | Promise<void | QuickActionRunOutcome>;
 };
 
 export type QuickActionRecent = {

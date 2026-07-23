@@ -322,7 +322,32 @@ type LaunchSmokeStarterLandingRouteEvidence = {
 
 type LaunchSmokeStarterLandingEvidence = {
   beginner: LaunchSmokeStarterLandingRouteEvidence;
+  projectChangeSafety: LaunchSmokeProjectChangeSafetyEvidence;
   producer: LaunchSmokeStarterLandingRouteEvidence;
+};
+
+type LaunchSmokeProjectChangeSafetyEvidence = {
+  applyChangedStyle: boolean;
+  applyDialogClosed: boolean;
+  applyOutcome: string;
+  applySelectedPatternA: boolean;
+  backwardFocusWrap: boolean;
+  cancelFocusRestored: boolean;
+  cancelInitialFocus: string;
+  cancelOutcome: string;
+  cancelProjectUnchanged: boolean;
+  dialogOpened: boolean;
+  dirtyGuardActive: boolean;
+  dockCoveredDuringDialog: boolean;
+  dockVisibleDuringDialog: boolean;
+  escapeClosed: boolean;
+  forwardFocusWrap: boolean;
+  previewPatternCount: number;
+  starterCancelOutcome: boolean;
+  starterCancelProjectUnchanged: boolean;
+  starterConfirmCalled: boolean;
+  starterUndoPostureUnchanged: boolean;
+  undoRestoredProject: boolean;
 };
 
 type LaunchSmokeCommandReferenceEvidence = {
@@ -2639,7 +2664,7 @@ function collectLaunchSmokeStarterLandingEvidenceWithTimeout(win: BrowserWindow)
         .executeJavaScript(`window.__grooveforgeLaunchSmokeStarterLandingStep ?? "unknown"`)
         .then((step: unknown) => reject(new Error(`Timed out collecting Audience Starter landing evidence at ${String(step)}.`)))
         .catch(() => reject(new Error("Timed out collecting Audience Starter landing evidence.")));
-    }, 150000);
+    }, 280000);
     void collectLaunchSmokeStarterLandingEvidence(win)
       .then((evidence) => {
         clearTimeout(timeout);

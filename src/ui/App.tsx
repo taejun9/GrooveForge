@@ -125,7 +125,6 @@ import {
   createNextChordEvent,
   createPatternChain,
   createPatternVariation,
-  createStylePatternSet,
   createEmptyPatternData,
   createAudienceStarterProject,
   defaultCustomDeliveryTarget,
@@ -292,6 +291,7 @@ import type {
   MasterAutomationResult,
   TransportLoopScope,
   QuickAction,
+  QuickActionRunOutcome,
   QuickActionPinnedResult,
   QuickActionPinnedResultKind,
   QuickActionRecent,
@@ -1050,9 +1050,18 @@ import {
 } from "./workstationPatternTools";
 import { resolveLocalDraftWriteGate } from "./localDraftLifecycle";
 import { resolveProjectCloseGuard, resolveSaveBeforeCloseDecision } from "./projectCloseGuard";
-import { resolveProjectReplacementGuard } from "./projectReplacementGuard";
+import {
+  resolveProjectReplacementGuard,
+  resolveStarterProjectReplacementGuard
+} from "./projectReplacementGuard";
 import { resolveProjectSaveCompletion, shouldCloseAfterProjectSave } from "./projectSaveCompletion";
 import type { ProjectSaveAttempt } from "./projectSaveCompletion";
+import { StyleChangeDialog } from "./StyleChangeDialog";
+import {
+  applyStyleChange,
+  createStyleChangePreview,
+  type StyleChangePreview
+} from "./styleChangePreview";
 import {
   activeReferenceAlignmentQuickActionCard,
   activeSessionBriefCompassQuickActionCard,
@@ -1203,6 +1212,7 @@ export function App(): ReactElement {
   const modalReturnFocusRef = useRef<HTMLElement | null>(null);
   const [guidanceCenterOpen, setGuidanceCenterOpen] = useState(false);
   const [launchpadOpen, setLaunchpadOpen] = useState(true);
+  const [styleChangePreview, setStyleChangePreview] = useState<StyleChangePreview | null>(null);
   const [workspaceCommandDockVisible, setWorkspaceCommandDockVisible] = useState(false);
   const [quickActionQuery, setQuickActionQuery] = useState("");
   const [quickActionSearchHintResult, setQuickActionSearchHintResult] = useState<QuickActionSearchHintResult | null>(null);
@@ -1351,6 +1361,9 @@ export function App(): ReactElement {
   const mixPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
   const mixPreviewUrlRef = useRef<string | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const styleSelectRef = useRef<HTMLSelectElement | null>(null);
+  const styleChangeReturnFocusRef = useRef<HTMLElement | null>(null);
+  const styleChangeRequestResolveRef = useRef<((outcome: QuickActionRunOutcome) => void) | null>(null);
   const styleInspectorRef = useRef<HTMLElement | null>(null);
   const beatPassportPanelRef = useRef<HTMLElement | null>(null);
   const productionSnapshotPanelRef = useRef<HTMLElement | null>(null);
@@ -2217,6 +2230,9 @@ export function App(): ReactElement {
         window.clearTimeout(tapTempoCommitTimerRef.current);
         tapTempoCommitTimerRef.current = null;
       }
+      styleChangeRequestResolveRef.current?.("canceled");
+      styleChangeRequestResolveRef.current = null;
+      styleChangeReturnFocusRef.current = null;
     };
   }, []);
 
@@ -2429,6 +2445,7 @@ export function App(): ReactElement {
     selectedChordIndex,
     quickActionsOpen,
     commandReferenceOpen,
+    styleChangePreview,
     keyboardCaptureEnabled,
     keyboardCaptureTarget,
     keyboardCaptureDefaults,
@@ -2451,6 +2468,7 @@ export function App(): ReactElement {
     selectedChordIndex,
     quickActionsOpen,
     commandReferenceOpen,
+    styleChangePreview,
     keyboardCaptureEnabled,
     keyboardCaptureTarget,
     keyboardCaptureDefaults,
@@ -2470,6 +2488,10 @@ export function App(): ReactElement {
     const wantsRedo = withCommandModifier && ((event.shiftKey && key === "z") || key === "y");
     const wantsSave = withCommandModifier && !event.shiftKey && key === "s";
     const wantsOpen = withCommandModifier && !event.shiftKey && key === "o";
+
+    if (styleChangePreview) {
+      return;
+    }
 
     if (wantsCommandReference) {
       event.preventDefault();
@@ -2575,6 +2597,10 @@ export function App(): ReactElement {
   }
 
   function handleNativeMenuCommand(command: NativeMenuCommand): void {
+    if (styleChangePreview) {
+      return;
+    }
+
     switch (command) {
       case "open-project":
         commitMasterCeilingDraft();
@@ -7774,29 +7800,71 @@ export function App(): ReactElement {
     }
   }
 
-  function selectStyle(styleId: ProjectState["styleId"]): void {
-    const nextStyle = styleProfiles.find((candidate) => candidate.id === styleId);
-    if (!nextStyle) {
+  function settleStyleChangeRequest(outcome: QuickActionRunOutcome): void {
+    const resolve = styleChangeRequestResolveRef.current;
+    styleChangeRequestResolveRef.current = null;
+    resolve?.(outcome);
+  }
+
+  function restoreStyleChangeFocus(): void {
+    const requestedTarget = styleChangeReturnFocusRef.current;
+    styleChangeReturnFocusRef.current = null;
+    window.requestAnimationFrame(() => {
+      if (requestedTarget?.isConnected) {
+        requestedTarget.focus();
+        return;
+      }
+      styleSelectRef.current?.focus();
+    });
+  }
+
+  function cancelStyleChange(): void {
+    const preview = styleChangePreview;
+    setStyleChangePreview(null);
+    if (preview) {
+      setProjectStatus(`Style change canceled; ${preview.currentStyleName} beat kept`);
+    }
+    settleStyleChangeRequest("canceled");
+    restoreStyleChangeFocus();
+  }
+
+  function confirmStyleChange(): void {
+    const preview = styleChangePreview;
+    if (!preview) {
+      settleStyleChangeRequest("canceled");
       return;
     }
-    updateProject(
-      (current) => {
-        const soundPreset = styleSoundPreset(styleId);
-        return {
-          ...current,
-          styleId,
-          selectedPattern: "A",
-          bpm: nextStyle.defaultBpm,
-          swing: nextStyle.defaultSwing,
-          sound: soundPresetDesign(soundPreset),
-          patterns: createStylePatternSet(styleId, current.key)
-        };
-      },
-      `Applied ${nextStyle.name} groove`
+
+    const changed = updateProject(
+      (current) => applyStyleChange(current, preview.targetStyleId),
+      `Applied ${preview.targetStyleName} groove`
     );
-    setSelectedNote(null);
-    setSelectedDrumStep(null);
-    setSelectedChordIndex(0);
+    setStyleChangePreview(null);
+    if (changed) {
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(0);
+    }
+    settleStyleChangeRequest("complete");
+    restoreStyleChangeFocus();
+  }
+
+  function selectStyle(styleId: ProjectState["styleId"]): Promise<QuickActionRunOutcome> {
+    const preview = createStyleChangePreview(projectRef.current, styleId);
+    if (!preview) {
+      return Promise.resolve("canceled");
+    }
+
+    settleStyleChangeRequest("canceled");
+    styleChangeReturnFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : styleSelectRef.current;
+    setStyleChangePreview(preview);
+    setProjectStatus(
+      `Review ${preview.currentStyleName} to ${preview.targetStyleName} style change; current beat unchanged`
+    );
+    return new Promise<QuickActionRunOutcome>((resolve) => {
+      styleChangeRequestResolveRef.current = resolve;
+    });
   }
 
   function applySelectedBeatBlueprint(blueprintId: BeatBlueprintId): void {
@@ -7881,13 +7949,35 @@ export function App(): ReactElement {
     }, 0);
   }
 
-  function createAudienceStarter(starterId: AudienceStarterProjectId) {
+  function createAudienceStarter(
+    starterId: AudienceStarterProjectId,
+    options: { verifyReplacementGuard?: boolean } = {}
+  ) {
     const label = audienceStarterProjectLabel(starterId);
+    const pendingMasterCeilingChange =
+      masterCeilingEditing &&
+      resolveMasterCeilingDraft(projectRef.current, masterCeilingDraft) !== projectMasterCeilingDb(projectRef.current);
+    const replacementGuard = resolveStarterProjectReplacementGuard(
+      projectHasUnsavedChangesRef.current || pendingMasterCeilingChange,
+      localDraftRecoveryRef.current !== null,
+      `${label} starter project`
+    );
+    if (
+      replacementGuard.requiresConfirmation &&
+      replacementGuard.warning &&
+      (!quickActionsAuditActive || options.verifyReplacementGuard === true) &&
+      !window.confirm(replacementGuard.warning)
+    ) {
+      setProjectStatus(`Starter canceled; ${projectRef.current.title} kept`);
+      return null;
+    }
+
     const beforeProject = projectRef.current;
     const resultAction = quickActions.find((action) => action.id === `audience-starter-${starterId}`) ?? null;
     const changed = updateProject(() => createAudienceStarterProject(starterId), `Built ${label} starter project`);
     setLaunchpadOpen(false);
     if (changed) {
+      resetMasterCeilingEditor(projectRef.current);
       setSelectedNote(null);
       setSelectedDrumStep(null);
       setSelectedChordIndex(0);
@@ -7913,6 +8003,10 @@ export function App(): ReactElement {
       setProjectStatus(`Built ${label} starter project`);
     }
     return null;
+  }
+
+  function runAudienceStarterQuickAction(starterId: AudienceStarterProjectId): QuickActionRunOutcome {
+    return createAudienceStarter(starterId) ? "complete" : "canceled";
   }
 
   function openAudienceStarterFollowup(starterId: AudienceStarterProjectId, route: AudienceStarterFollowupRoute): void {
@@ -9493,12 +9587,12 @@ export function App(): ReactElement {
     closeQuickActions(false);
     try {
       void Promise.resolve(action.run())
-        .then(() => {
+        .then((runOutcome) => {
           const result = createQuickActionResult(
             action,
             beforeProject,
             projectRef.current,
-            "complete",
+            runOutcome === "canceled" ? "canceled" : "complete",
             selectedArrangementIndex,
             handoffExportReceiptRef.current,
             inputSetupResult
@@ -10197,7 +10291,7 @@ export function App(): ReactElement {
     onSelectPattern: selectPattern,
     onSelectStyle: selectStyle,
     onSelectAudienceSessionRow: selectAudienceSessionRow,
-    onCreateAudienceStarter: createAudienceStarter,
+    onCreateAudienceStarter: runAudienceStarterQuickAction,
     onFocusAudienceDeliveryProofBridgeReadout: focusAudienceDeliveryProofBridgeReadout,
     onFocusAudienceSessionAcceptanceReadout: focusAudienceSessionAcceptanceReadout,
     onFocusAudienceSessionProofHandoffReadout: focusAudienceSessionProofHandoffReadout,
@@ -11717,6 +11811,129 @@ export function App(): ReactElement {
     };
 
     const collectAudienceStarterLandingEvidence = async (): Promise<GrooveforgeLaunchSmokeStarterLandingEvidence> => {
+      const collectProjectChangeSafetyEvidence = async (): Promise<GrooveforgeLaunchSmokeProjectChangeSafetyEvidence> => {
+        const settleTask = async (): Promise<void> => {
+          await new Promise<void>((resolve) => {
+            const channel = new MessageChannel();
+            channel.port1.onmessage = () => {
+              channel.port1.close();
+              channel.port2.close();
+              resolve();
+            };
+            channel.port2.postMessage(null);
+          });
+        };
+        const settleFocus = async (): Promise<void> => {
+          await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+          await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+        };
+        window.__grooveforgeLaunchSmokeStarterLandingStep = "project-change-showing-dock";
+        flushSync(() => setWorkspaceCommandDockVisible(true));
+        const beforeFingerprint = JSON.stringify(projectRef.current);
+        const targetStyleId = projectRef.current.styleId === "house" ? "lofi" : "house";
+        const styleSelect = document.querySelector<HTMLSelectElement>('[data-testid="style-select"]');
+        styleSelect?.focus({ preventScroll: true });
+        window.__grooveforgeLaunchSmokeStarterLandingStep = "project-change-cancel";
+        let cancelDecision!: Promise<QuickActionRunOutcome>;
+        flushSync(() => {
+          cancelDecision = selectStyle(targetStyleId);
+        });
+        await settleFocus();
+        const dialogOpened = document.querySelector('[data-testid="style-change-dialog"]') !== null;
+        const overlay = document.querySelector<HTMLElement>('[data-testid="style-change-preview"]');
+        const dock = document.querySelector<HTMLElement>('[data-testid="workspace-command-dock"]');
+        const dockRect = dock?.getBoundingClientRect();
+        const dockHitTarget = dockRect
+          ? document.elementFromPoint(dockRect.left + dockRect.width / 2, dockRect.top + dockRect.height / 2)
+          : null;
+        const dockVisibleDuringDialog =
+          Boolean(dock && dockRect && dockRect.width > 0 && dockRect.height > 0) &&
+          getComputedStyle(dock as HTMLElement).display !== "none";
+        const dockCoveredDuringDialog =
+          dockVisibleDuringDialog &&
+          Boolean(overlay) &&
+          Number.parseInt(getComputedStyle(overlay as HTMLElement).zIndex, 10) >
+            Number.parseInt(getComputedStyle(dock as HTMLElement).zIndex, 10) &&
+          !dock?.contains(dockHitTarget);
+        const cancelInitialFocus = document.activeElement?.getAttribute("data-testid") ?? "";
+        const previewPatternCount = document.querySelectorAll('[data-testid^="style-change-pattern-"]').length;
+        const dialog = document.querySelector<HTMLElement>('[data-testid="style-change-dialog"]');
+        const closeButton = document.querySelector<HTMLButtonElement>('[data-testid="style-change-close"]');
+        const applyButton = document.querySelector<HTMLButtonElement>('[data-testid="style-change-apply"]');
+        applyButton?.focus();
+        applyButton?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Tab" }));
+        const forwardFocusWrap = document.activeElement === closeButton;
+        closeButton?.focus();
+        closeButton?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Tab", shiftKey: true }));
+        const backwardFocusWrap = document.activeElement === applyButton;
+        dialog?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
+        const cancelOutcome = await cancelDecision;
+        await settleFocus();
+        const cancelProjectUnchanged = JSON.stringify(projectRef.current) === beforeFingerprint;
+        const escapeClosed = document.querySelector('[data-testid="style-change-dialog"]') === null;
+        const cancelFocusRestored = document.activeElement === styleSelect;
+
+        window.__grooveforgeLaunchSmokeStarterLandingStep = "project-change-apply";
+        let applyDecision!: Promise<QuickActionRunOutcome>;
+        flushSync(() => {
+          applyDecision = selectStyle(targetStyleId);
+        });
+        await settleTask();
+        document.querySelector<HTMLButtonElement>('[data-testid="style-change-apply"]')?.click();
+        const applyOutcome = await applyDecision;
+        await settleTask();
+        const applyChangedStyle = projectRef.current.styleId === targetStyleId;
+        const applySelectedPatternA = projectRef.current.selectedPattern === "A";
+        const applyDialogClosed = document.querySelector('[data-testid="style-change-dialog"]') === null;
+        document.querySelector<HTMLButtonElement>('[data-testid="undo-button"]')?.click();
+        await settleTask();
+        const undoRestoredProject = JSON.stringify(projectRef.current) === beforeFingerprint;
+
+        window.__grooveforgeLaunchSmokeStarterLandingStep = "project-change-starter-cancel";
+        const starterBeforeFingerprint = JSON.stringify(projectRef.current);
+        const undoButton = document.querySelector<HTMLButtonElement>('[data-testid="undo-button"]');
+        const undoTitleBeforeStarter = undoButton?.title ?? "";
+        let starterConfirmCallCount = 0;
+        const originalConfirm = window.confirm;
+        window.confirm = () => {
+          starterConfirmCallCount += 1;
+          return false;
+        };
+        let starterResult: ReturnType<typeof createAudienceStarter> = null;
+        try {
+          starterResult = createAudienceStarter("beginner", { verifyReplacementGuard: true });
+        } finally {
+          window.confirm = originalConfirm;
+        }
+        await settleTask();
+        flushSync(() => setWorkspaceCommandDockVisible(false));
+        return {
+          applyChangedStyle,
+          applyDialogClosed,
+          applyOutcome,
+          applySelectedPatternA,
+          backwardFocusWrap,
+          cancelFocusRestored,
+          cancelInitialFocus,
+          cancelOutcome,
+          cancelProjectUnchanged,
+          dialogOpened,
+          dirtyGuardActive: projectHasUnsavedChangesRef.current,
+          dockCoveredDuringDialog,
+          dockVisibleDuringDialog,
+          escapeClosed,
+          forwardFocusWrap,
+          previewPatternCount,
+          starterCancelOutcome: starterResult === null,
+          starterCancelProjectUnchanged: JSON.stringify(projectRef.current) === starterBeforeFingerprint,
+          starterConfirmCalled: starterConfirmCallCount === 1,
+          starterUndoPostureUnchanged:
+            (document.querySelector<HTMLButtonElement>('[data-testid="undo-button"]')?.title ?? "") === undoTitleBeforeStarter,
+          undoRestoredProject
+        };
+      };
+
+      const projectChangeSafety = await collectProjectChangeSafetyEvidence();
       window.__grooveforgeLaunchSmokeStarterLandingStep = "building-beginner";
       createAudienceStarter("beginner");
       setSelectedDrumStep({ lane: "kick", step: 0 });
@@ -11747,7 +11964,7 @@ export function App(): ReactElement {
       window.__grooveforgeLaunchSmokeStarterLandingStep = "reading-producer";
       const producer = readAudienceStarterLanding("producer");
       window.__grooveforgeLaunchSmokeStarterLandingStep = "complete";
-      return { beginner, producer };
+      return { beginner, producer, projectChangeSafety };
     };
 
     window.__grooveforgeLaunchSmoke = {
@@ -12282,13 +12499,18 @@ export function App(): ReactElement {
           <label className="field">
             <span className="style-field-label">
               Style
-              <small data-testid="style-starting-point">Starting point · {styleProfiles.length} editable styles</small>
+              <small data-testid="style-starting-point" id="style-change-behavior">
+                Starting point · {styleProfiles.length} editable styles · review before Apply
+              </small>
             </span>
             <select
+              aria-describedby="style-change-behavior"
               aria-label="Style"
               data-testid="style-select"
+              ref={styleSelectRef}
+              title={`${styleProfiles.length} editable styles · review BPM, swing, sound, and Pattern A/B/C before apply`}
               value={project.styleId}
-              onChange={(event) => selectStyle(event.target.value as ProjectState["styleId"])}
+              onChange={(event) => void selectStyle(event.target.value as ProjectState["styleId"])}
             >
               {styleProfiles.map((profile) => (
                 <option key={profile.id} value={profile.id}>
@@ -12689,6 +12911,11 @@ export function App(): ReactElement {
         open={commandReferenceOpen}
         onClose={closeCommandReference}
         onOpenQuickActions={openQuickActions}
+      />
+      <StyleChangeDialog
+        preview={styleChangePreview}
+        onApply={confirmStyleChange}
+        onCancel={cancelStyleChange}
       />
 
       {localDraftRecovery && !localDraftRecoveryDeferred && (

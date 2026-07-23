@@ -7500,6 +7500,7 @@ h2 {
   color: rgba(244, 239, 231, 0.5);
 }
 
+.project-change-overlay,
 .quick-actions-overlay {
   position: fixed;
   z-index: 20;
@@ -7508,6 +7509,251 @@ h2 {
   place-items: start center;
   background: rgba(17, 16, 15, 0.68);
   padding-block-start: 82px;
+}
+
+.project-change-overlay {
+  z-index: 40;
+  padding-inline: 24px;
+}
+
+.project-change-dialog {
+  display: grid;
+  width: min(640px, calc(100vw - 48px));
+  max-height: min(680px, calc(100vh - 120px));
+  gap: 14px;
+  border: 1px solid rgba(240, 195, 106, 0.3);
+  border-radius: 10px;
+  background: #171716;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.52);
+  overflow: auto;
+  padding: 16px;
+}
+
+.project-change-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.project-change-heading > span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  color: #f0c36a;
+  background: rgba(240, 195, 106, 0.1);
+}
+
+.project-change-heading > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.project-change-heading small {
+  color: rgba(240, 195, 106, 0.78);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.project-change-heading h2 {
+  margin: 0;
+  color: #f4efe7;
+  font-size: 19px;
+}
+
+.project-change-heading > button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  background: rgba(244, 239, 231, 0.05);
+  padding: 0;
+}
+
+.project-change-description {
+  margin: 0;
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.style-change-comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.style-change-comparison > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  border: 1px solid rgba(244, 239, 231, 0.11);
+  border-radius: 8px;
+  background: rgba(244, 239, 231, 0.035);
+  padding: 11px;
+}
+
+.style-change-comparison > div.target {
+  border-color: rgba(240, 195, 106, 0.28);
+  background: rgba(240, 195, 106, 0.06);
+}
+
+.style-change-comparison > svg {
+  color: rgba(240, 195, 106, 0.72);
+}
+
+.style-change-comparison span,
+.style-change-comparison strong,
+.style-change-comparison small,
+.style-change-comparison em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.style-change-comparison span {
+  color: rgba(244, 239, 231, 0.54);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.style-change-comparison strong {
+  color: #f4efe7;
+  font-size: 14px;
+}
+
+.style-change-comparison small,
+.style-change-comparison em {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.style-change-patterns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.style-change-patterns > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.16);
+  border-radius: 7px;
+  background: rgba(130, 215, 255, 0.035);
+  padding: 9px;
+}
+
+.style-change-patterns span,
+.style-change-patterns small {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+}
+
+.style-change-patterns strong {
+  color: #f4efe7;
+  font-size: 13px;
+}
+
+.project-change-safety {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  border: 1px solid rgba(120, 240, 200, 0.2);
+  border-radius: 8px;
+  color: #78f0c8;
+  background: rgba(120, 240, 200, 0.05);
+  padding: 10px;
+}
+
+.project-change-safety span {
+  display: grid;
+  gap: 2px;
+}
+
+.project-change-safety strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.project-change-safety small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+}
+
+.project-change-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.project-change-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  gap: 7px;
+  border: 1px solid rgba(244, 239, 231, 0.14);
+  border-radius: 8px;
+  color: #f4efe7;
+  background: rgba(244, 239, 231, 0.055);
+  padding: 8px 12px;
+  font-weight: 800;
+}
+
+.project-change-actions button.primary {
+  border-color: rgba(240, 195, 106, 0.64);
+  color: #11100f;
+  background: #f0c36a;
+}
+
+.project-change-actions button:hover {
+  border-color: rgba(244, 239, 231, 0.3);
+  background: rgba(244, 239, 231, 0.09);
+}
+
+.project-change-actions button.primary:hover {
+  border-color: #f4d390;
+  background: #f4d390;
+}
+
+@media (max-width: 600px) {
+  .project-change-overlay {
+    padding: 18px 12px;
+  }
+
+  .project-change-dialog {
+    width: 100%;
+    max-height: calc(100vh - 36px);
+  }
+
+  .style-change-comparison {
+    grid-template-columns: 1fr;
+  }
+
+  .style-change-comparison > svg {
+    justify-self: center;
+    transform: rotate(90deg);
+  }
+
+  .style-change-patterns,
+  .project-change-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .quick-actions-panel {

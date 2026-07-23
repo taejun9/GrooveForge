@@ -251,6 +251,12 @@ Desktop shortcut routing recognizes only modified Ctrl/Cmd+K and Ctrl/Cmd+/ comm
 
 Quick Actions keyboard selection is also UI-local component state. It is derived only from the currently visible enabled results, resets when the palette opens or its query or scope changes, and keeps DOM focus in the search input while ArrowUp, ArrowDown, Home, and End update the selected action id. Enter resolves that selected action through the existing command run path. Selection styling, scrolling, and live status do not alter command definitions, result filtering, pinning, recent actions, project data, undo history, save/load, playback, render/export, or remote behavior.
 
+## Project Change Safety Rule
+
+Controls that can replace authored project data must disclose their scope before mutation. Style changes from the header, Style Inspector, or Quick Actions share one UI-local preview derived from the current project and target `StyleProfile`; it shows BPM, swing, sound, selected-Pattern reset, and Pattern A/B/C event-count deltas without entering project data or undo history. Only Apply calls the existing style generation/update path, once, so Undo restores the prior beat. Cancel, Escape, or outside click clears the preview and restores the invoking control when it remains mounted, with the header Style selector as fallback.
+
+Audience Starter creation shares the project-replacement loss predicate with Open. Unsaved project state or a recoverable local draft requires explicit confirmation before starter generation; clean first-run state remains direct. This guard does not add project-schema state, autosave, remote storage, or another generation path.
+
 ## Arrangement Action Semantics
 
 Primary arrangement structure controls must carry their direction in both visible text and stable accessible names. The selected-block move controls remain wired to the existing left/right handlers, selection alignment, undo history, and arrangement data; label clarity is a renderer contract and must not introduce a second action path or project-schema field.

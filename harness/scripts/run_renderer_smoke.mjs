@@ -15,6 +15,8 @@ const composePanelsSource = readFileSync(new URL("../../src/ui/workstationCompos
 const graphSource = readFileSync(new URL("../../src/ui/workstationAppQuickActionGraph.ts", import.meta.url), "utf8");
 const quickActionSource = readFileSync(new URL("../../src/ui/workstationAppQuickActions.tsx", import.meta.url), "utf8");
 const shellSource = readFileSync(new URL("../../src/ui/workstationShellPanels.tsx", import.meta.url), "utf8");
+const styleChangeDialogSource = readFileSync(new URL("../../src/ui/StyleChangeDialog.tsx", import.meta.url), "utf8");
+const styleChangePreviewSource = readFileSync(new URL("../../src/ui/styleChangePreview.ts", import.meta.url), "utf8");
 const launchBearingPackageSources = [
   "run_desktop_package_smoke.mjs",
   "run_desktop_adhoc_sign_smoke.mjs",
@@ -153,6 +155,129 @@ function validateProjectReplacementGuard(replacementGuard) {
       loadSource.includes("projectHasUnsavedChangesRef.current,") &&
       loadSource.includes("localDraftRecovery !== null"),
     "project replacement confirmation should read current dirty and recovery-draft state"
+  );
+
+  const starterClean = replacementGuard.resolveStarterProjectReplacementGuard(false, false, "Guided 8-bar beat starter project");
+  const starterDirty = replacementGuard.resolveStarterProjectReplacementGuard(true, false, "Guided 8-bar beat starter project");
+  const starterRecovery = replacementGuard.resolveStarterProjectReplacementGuard(false, true, "Studio starter pass project");
+  const starterSource = printNamedFunction(appSource, "App.tsx", "createAudienceStarter");
+  const starterGuardIndex = starterSource.indexOf("resolveStarterProjectReplacementGuard(");
+  const starterConfirmIndex = starterSource.indexOf("window.confirm(replacementGuard.warning)");
+  const starterMutationIndex = starterSource.indexOf("updateProject(() => createAudienceStarterProject");
+  check(
+    starterClean.requiresConfirmation === false &&
+      starterDirty.requiresConfirmation === true &&
+      starterRecovery.requiresConfirmation === true &&
+      starterDirty.warning?.includes("Cancel to keep the current beat") === true,
+    "Starter replacement guard should keep clean first-run entry direct and protect dirty/recovery work"
+  );
+  check(
+    starterSource.includes("pendingMasterCeilingChange") &&
+      starterSource.includes("resolveMasterCeilingDraft(projectRef.current, masterCeilingDraft)") &&
+      starterSource.includes("projectHasUnsavedChangesRef.current || pendingMasterCeilingChange") &&
+      starterGuardIndex >= 0 &&
+      starterConfirmIndex > starterGuardIndex &&
+      starterMutationIndex > starterConfirmIndex &&
+      starterSource.includes("localDraftRecoveryRef.current !== null") &&
+      starterSource.includes("Starter canceled;") &&
+      /!window\.confirm\(replacementGuard\.warning\)\)[\s\S]*?return null;/u.test(starterSource),
+    "Starter replacement should resolve current dirty/recovery state and allow cancellation before mutation"
+  );
+}
+
+function validateStyleChangeSafety(styleChange) {
+  const source = structuredClone(styleChange.workstation.starterProject);
+  source.selectedPattern = "C";
+  source.bpm = 91;
+  const before = JSON.stringify(source);
+  const preview = styleChange.module.createStyleChangePreview(source, "house");
+  const applied = styleChange.module.applyStyleChange(source, "house");
+  check(
+    preview?.currentStyleName === "Lo-fi" &&
+      preview.targetStyleName === "House" &&
+      preview.currentBpm === 91 &&
+      preview.targetBpm === 124 &&
+      preview.selectedPatternBefore === "C" &&
+      preview.patterns.length === 3,
+    "Style change preview should expose current-to-target posture and Pattern A/B/C scope"
+  );
+  check(
+    JSON.stringify(source) === before &&
+      applied !== source &&
+      applied.styleId === "house" &&
+      applied.selectedPattern === "A" &&
+      applied.bpm === 124,
+    "Style preview should be immutable while explicit Apply returns the existing generated style posture"
+  );
+
+  const requestSource = printNamedFunction(appSource, "App.tsx", "selectStyle");
+  const applySource = printNamedFunction(appSource, "App.tsx", "confirmStyleChange");
+  const cancelSource = printNamedFunction(appSource, "App.tsx", "cancelStyleChange");
+  check(
+    requestSource.includes("createStyleChangePreview(projectRef.current, styleId)") &&
+      requestSource.includes("setStyleChangePreview(preview)") &&
+      requestSource.includes("current beat unchanged") &&
+      !requestSource.includes("updateProject(") &&
+      applySource.includes("updateProject(") &&
+      applySource.includes("applyStyleChange(current, preview.targetStyleId)") &&
+      cancelSource.includes("Style change canceled;") &&
+      !cancelSource.includes("updateProject("),
+    "Style selectors should only open preview while Apply owns the single undoable mutation and Cancel stays read-only"
+  );
+  check(
+    appSource.includes("<StyleChangeDialog") &&
+      appSource.includes('aria-describedby="style-change-behavior"') &&
+      appSource.includes("review before Apply") &&
+      !appSource.includes('aria-haspopup="dialog"') &&
+      appSource.includes("styleChangeReturnFocusRef.current") &&
+      appSource.includes("requestedTarget?.isConnected") &&
+      appSource.includes("void selectStyle(event.target.value") &&
+      styleChangeDialogSource.includes('aria-modal="true"') &&
+      styleChangeDialogSource.includes('role="dialog"') &&
+      styleChangeDialogSource.includes('data-testid="style-change-cancel"') &&
+      styleChangeDialogSource.includes('data-testid="style-change-apply"') &&
+      styleChangeDialogSource.includes('event.key === "Escape"') &&
+      styleChangeDialogSource.includes("useModalFocusTrap(preview !== null") &&
+      styleChangeDialogSource.includes("Nothing has changed yet") &&
+      styleChangeDialogSource.includes("Undo restores the current beat") &&
+      styleChangePreviewSource.includes("patterns: createStylePatternSet(styleId, project.key)"),
+    "Style confirmation dialog should expose preview/apply/cancel, keyboard focus, and undo guidance"
+  );
+  check(
+    styles.includes(".project-change-overlay") &&
+      styles.includes(".project-change-dialog") &&
+      styles.includes(".style-change-comparison") &&
+      styles.includes(".project-change-actions button") &&
+      styles.includes("z-index: 40;") &&
+      styles.includes("min-height: 44px;"),
+    "Style confirmation dialog should provide a contained responsive surface with direct-size actions"
+  );
+  check(
+    graphSource.includes("Preview ${selected ? `reapply ${profile.name}` : `${profile.name} style`} change") &&
+      graphSource.includes("Review before Apply / rebuild Pattern A/B/C") &&
+      appSource.includes("return new Promise<QuickActionRunOutcome>") &&
+      appSource.includes("styleChangeRequestResolveRef.current = resolve") &&
+      appSource.includes('settleStyleChangeRequest("canceled")') &&
+      appSource.includes('settleStyleChangeRequest("complete")') &&
+      appSource.includes('runOutcome === "canceled" ? "canceled" : "complete"'),
+    "Style Quick Actions should wait for the same explicit preview decision before reporting completion"
+  );
+  const quickAction = {
+    id: "style-quick-house",
+    title: "Preview House style change",
+    detail: "Review before Apply",
+    group: "Create",
+    keywords: [],
+    run: () => undefined
+  };
+  const canceledResult = styleChange.quickActions.createQuickActionResult(quickAction, source, source, "canceled");
+  const appliedResult = styleChange.quickActions.createQuickActionResult(quickAction, source, applied, "complete");
+  check(
+    canceledResult.status === "Canceled" &&
+      canceledResult.auditionCue.includes("stayed unchanged") &&
+      canceledResult.tone === "warn" &&
+      appliedResult.status === "Applied",
+    "Style Quick Actions should distinguish Cancel from Apply in post-run result feedback"
   );
 }
 
@@ -3424,6 +3549,11 @@ try {
   validateMasterCeilingDraftLifecycle(await server.ssrLoadModule("/src/domain/workstation.ts"));
   validateProjectCloseGuard(await server.ssrLoadModule("/src/ui/projectCloseGuard.ts"));
   validateProjectReplacementGuard(await server.ssrLoadModule("/src/ui/projectReplacementGuard.ts"));
+  validateStyleChangeSafety({
+    module: await server.ssrLoadModule("/src/ui/styleChangePreview.ts"),
+    quickActions: await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
+    workstation: await server.ssrLoadModule("/src/domain/workstation.ts")
+  });
   validateProjectSaveCompletion(await server.ssrLoadModule("/src/ui/projectSaveCompletion.ts"));
   const html = renderToStaticMarkup(React.createElement(App));
   validateFirstRunRenderer(html);

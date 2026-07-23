@@ -473,6 +473,30 @@ function checkResult(result) {
     `live producer starter should open and focus a visible Review Queue while its selected-note tools remain readable, unique, and contained (${JSON.stringify(evidence?.starterLanding?.producer ?? null)})`
   );
   check(
+    evidence?.starterLanding?.projectChangeSafety?.dialogOpened === true &&
+      evidence?.starterLanding?.projectChangeSafety?.cancelInitialFocus === "style-change-cancel" &&
+      evidence?.starterLanding?.projectChangeSafety?.previewPatternCount === 3 &&
+      evidence?.starterLanding?.projectChangeSafety?.forwardFocusWrap === true &&
+      evidence?.starterLanding?.projectChangeSafety?.backwardFocusWrap === true &&
+      evidence?.starterLanding?.projectChangeSafety?.cancelOutcome === "canceled" &&
+      evidence?.starterLanding?.projectChangeSafety?.cancelProjectUnchanged === true &&
+      evidence?.starterLanding?.projectChangeSafety?.escapeClosed === true &&
+      evidence?.starterLanding?.projectChangeSafety?.cancelFocusRestored === true &&
+      evidence?.starterLanding?.projectChangeSafety?.applyOutcome === "complete" &&
+      evidence?.starterLanding?.projectChangeSafety?.applyChangedStyle === true &&
+      evidence?.starterLanding?.projectChangeSafety?.applySelectedPatternA === true &&
+      evidence?.starterLanding?.projectChangeSafety?.applyDialogClosed === true &&
+      evidence?.starterLanding?.projectChangeSafety?.undoRestoredProject === true &&
+      evidence?.starterLanding?.projectChangeSafety?.dirtyGuardActive === true &&
+      evidence?.starterLanding?.projectChangeSafety?.dockVisibleDuringDialog === true &&
+      evidence?.starterLanding?.projectChangeSafety?.dockCoveredDuringDialog === true &&
+      evidence?.starterLanding?.projectChangeSafety?.starterConfirmCalled === true &&
+      evidence?.starterLanding?.projectChangeSafety?.starterCancelOutcome === true &&
+      evidence?.starterLanding?.projectChangeSafety?.starterCancelProjectUnchanged === true &&
+      evidence?.starterLanding?.projectChangeSafety?.starterUndoPostureUnchanged === true,
+    `live project change safety should prove Style preview Escape/Tab/focus, Apply/Undo, and dirty Starter cancellation (${JSON.stringify(evidence?.starterLanding?.projectChangeSafety ?? null)})`
+  );
+  check(
     evidence?.layout?.feedbackOutsideGuidance === true && evidence?.layout?.feedbackAfterGuidance === true,
     "live desktop global command feedback should remain outside and after optional guidance"
   );
