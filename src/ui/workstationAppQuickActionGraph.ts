@@ -3568,7 +3568,7 @@ export function createQuickActions({
   const midiInputConnectReady = midiCaptureStatus !== "unsupported" && midiCaptureStatus !== "requesting";
   const midiInputConnectTitle =
     midiCaptureStatus === "ready" || midiCaptureStatus === "listening" ? "Refresh MIDI input" : "Connect MIDI input";
-  const keyboardCaptureTargetLabel = keyboardCaptureTarget === "bass" ? "808" : "Synth";
+  const keyboardCaptureTargetLabel = keyboardCaptureTarget === "bass" ? "Bass" : "Synth";
   const connectedMidiInputCount = midiInputOptions.filter((input) => input.connected).length;
   const midiInputArmReady =
     midiCaptureStatus !== "unsupported" &&
@@ -3719,7 +3719,7 @@ export function createQuickActions({
     onSetKeyboardCaptureStepMode
   });
   const captureTargetActions: QuickAction[] = [
-    { id: "capture-target-bass", target: "bass" as NoteTrack, targetLabel: "808" },
+    { id: "capture-target-bass", target: "bass" as NoteTrack, targetLabel: "Bass" },
     { id: "capture-target-melody", target: "melody" as NoteTrack, targetLabel: "Synth" }
   ].map(({ id, target, targetLabel }) => {
     return {
@@ -3799,11 +3799,11 @@ export function createQuickActions({
     },
     {
       id: "capture-default-glide-toggle",
-      title: activeCaptureDefaults.glide ? "Turn 808 capture glide off" : "Turn 808 capture glide on",
+      title: activeCaptureDefaults.glide ? "Turn Bass capture glide off" : "Turn Bass capture glide on",
       detail:
         keyboardCaptureTarget === "bass"
-          ? `808 captured notes will use glide ${activeCaptureDefaults.glide ? "Off" : "On"} next.`
-          : "Switch capture target to 808 to edit glide defaults.",
+          ? `Bass captured notes will use glide ${activeCaptureDefaults.glide ? "Off" : "On"} next.`
+          : "Switch capture target to Bass to edit glide defaults.",
       group: "Create",
       keywords: "capture default 808 bass glide toggle slide keyboard midi input notes beginner producer",
       disabled: keyboardCaptureTarget !== "bass",

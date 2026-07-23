@@ -21,6 +21,8 @@ import {
   stemWavFileNames
 } from "./render";
 import type { ExportAnalysis, StemExportAnalyses, StemTrackId } from "./render";
+import { wavBitDepth, wavChannels, wavSampleRate } from "./render";
+import { createSoundCloudUploadSheet, soundCloudUploadSheetFileName } from "./soundcloud";
 
 export type DeliveryBundleEntryKind =
   | "project-json"
@@ -28,6 +30,7 @@ export type DeliveryBundleEntryKind =
   | "stem-wav"
   | "arrangement-midi"
   | "handoff-sheet"
+  | "soundcloud-upload-sheet"
   | "manifest-json"
   | "manifest-markdown";
 
@@ -50,6 +53,9 @@ export type DeliveryBundleManifest = {
   bpm: number;
   key: string;
   styleId: string;
+  wavSampleRate: number;
+  wavChannels: number;
+  wavBitDepth: number;
   artifactCount: number;
   artifactBytes: number;
   entries: DeliveryBundleManifestEntry[];
@@ -242,6 +248,7 @@ async function createBaseBundleEntries(
   const root = deliveryBundleRoot(project);
   const projectJson = serializeProjectFile(project);
   const handoffSheet = createHandoffSheet(project, analysis, stemAnalyses);
+  const soundCloudUploadSheet = createSoundCloudUploadSheet(project);
   const mixBlob = createMixWavBlob(project);
   const stemFiles = stemWavFileNames(project);
   const stemEntries = await Promise.all(
@@ -278,6 +285,12 @@ async function createBaseBundleEntries(
       label: "Handoff Sheet",
       kind: "handoff-sheet",
       bytes: bytesFromText(handoffSheet)
+    },
+    {
+      path: `${root}/${soundCloudUploadSheetFileName(project)}`,
+      label: "SoundCloud Upload Sheet",
+      kind: "soundcloud-upload-sheet",
+      bytes: bytesFromText(soundCloudUploadSheet)
     }
   ];
 }
@@ -306,6 +319,9 @@ export function createDeliveryBundleManifest(
     bpm: projectBpm(project),
     key: projectKey(project),
     styleId: project.styleId,
+    wavSampleRate,
+    wavChannels,
+    wavBitDepth,
     artifactCount: manifestEntries.length + 2,
     artifactBytes: manifestEntries.reduce((sum, entry) => sum + entry.bytes, 0),
     entries: manifestEntries,
@@ -331,6 +347,7 @@ export function createDeliveryBundleManifestMarkdown(manifest: DeliveryBundleMan
     `Bundle: ${manifest.bundleFileName}`,
     `Artifacts: ${manifest.artifactCount}`,
     `Audio/project bytes: ${manifest.artifactBytes}`,
+    `WAV format: ${manifest.wavSampleRate / 1000} kHz / ${manifest.wavChannels === 2 ? "stereo" : `${manifest.wavChannels} channels`} / signed PCM ${manifest.wavBitDepth}-bit`,
     "",
     "| Label | Kind | Bytes | CRC-32 | Path |",
     "|---|---:|---:|---:|---|",

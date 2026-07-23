@@ -634,7 +634,7 @@ export function createKeyboardCapturePostureSummary(
   nextStep: number,
   stepMode: KeyboardCaptureStepMode
 ): KeyboardCapturePostureSummary {
-  const targetLabel = target === "bass" ? "808" : "Synth";
+  const targetLabel = target === "bass" ? "Bass" : "Synth";
   const statusLabel = enabled ? "Capture armed" : "Capture off";
   const stepModeLabel = stepMode === "next-free" ? "Next" : "Replace";
   const detailLabel =

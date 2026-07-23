@@ -23,11 +23,12 @@ const expectedArtifactLabels = [
   "Project file",
   "Full mix WAV",
   "Drums stem WAV",
-  "808 stem WAV",
+  "Bass stem WAV",
   "Synth stem WAV",
   "Chords stem WAV",
   "Arrangement MIDI",
-  "Handoff Sheet"
+  "Handoff Sheet",
+  "SoundCloud Upload Sheet"
 ];
 const failures = [];
 

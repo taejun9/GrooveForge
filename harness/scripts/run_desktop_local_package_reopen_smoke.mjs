@@ -19,11 +19,12 @@ const expectedArtifactLabels = [
   "Project file",
   "Full mix WAV",
   "Drums stem WAV",
-  "808 stem WAV",
+  "Bass stem WAV",
   "Synth stem WAV",
   "Chords stem WAV",
   "Arrangement MIDI",
-  "Handoff Sheet"
+  "Handoff Sheet",
+  "SoundCloud Upload Sheet"
 ];
 const failures = [];
 
@@ -31,6 +32,7 @@ const workstation = await import("../../src/domain/workstation.ts");
 const render = await import("../../src/audio/render.ts");
 const midi = await import("../../src/audio/midi.ts");
 const handoff = await import("../../src/audio/handoff.ts");
+const soundcloud = await import("../../src/audio/soundcloud.ts");
 
 function check(condition, message) {
   if (!condition) {
@@ -68,11 +70,15 @@ function checkNoSamplingText(text, label) {
 }
 
 function checkWavBytes(bytes, label) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   check(bytes.byteLength > 44, `${label} WAV should include audio data`);
   check(ascii(bytes, 0, 4) === "RIFF", `${label} WAV missing RIFF header`);
   check(ascii(bytes, 8, 4) === "WAVE", `${label} WAV missing WAVE header`);
   check(ascii(bytes, 12, 4) === "fmt ", `${label} WAV missing fmt chunk`);
   check(ascii(bytes, 36, 4) === "data", `${label} WAV missing data chunk`);
+  check(view.getUint32(28, true) === 264600, `${label} WAV must use 264600 byte rate`);
+  check(view.getUint16(32, true) === 6, `${label} WAV must use 6-byte block alignment`);
+  check(view.getUint16(34, true) === 24, `${label} WAV must use 24-bit samples`);
 }
 
 function checkMidiBytes(bytes, label) {
@@ -208,7 +214,7 @@ if (!existsSync(manifestJsonPath)) {
 
 const manifest = JSON.parse(await readFile(manifestJsonPath, "utf8"));
 check(manifest.localDeliveryPackageReady === true, "source local delivery package should be ready");
-check(manifest.artifactCount === 8, "source local delivery package should include 8 deliverable artifacts");
+check(manifest.artifactCount === 9, "source local delivery package should include 9 deliverable artifacts");
 check(manifest.packageRoot === relative(deliveryRoot), "source manifest should point at the current local delivery package root");
 check(expectedArtifactLabels.every((label) => manifest.artifacts?.some((artifact) => artifact.label === label)), "source manifest should include every expected local delivery artifact");
 check(manifest.privateValuesRecorded === false, "source manifest should not record private values");
@@ -227,8 +233,9 @@ const projectArtifact = artifactByLabel(artifactReads, "Project file");
 const mixArtifact = artifactByLabel(artifactReads, "Full mix WAV");
 const midiArtifact = artifactByLabel(artifactReads, "Arrangement MIDI");
 const handoffArtifact = artifactByLabel(artifactReads, "Handoff Sheet");
+const soundCloudArtifact = artifactByLabel(artifactReads, "SoundCloud Upload Sheet");
 
-if (!projectArtifact || !mixArtifact || !midiArtifact || !handoffArtifact) {
+if (!projectArtifact || !mixArtifact || !midiArtifact || !handoffArtifact || !soundCloudArtifact) {
   fail("Local package manifest is missing required artifacts.", failures.map((failure) => `- ${failure}`).join("\n"));
 }
 
@@ -237,6 +244,7 @@ const reopenedProject = workstation.parseProjectFile(projectContents);
 const reserializedProject = workstation.serializeProjectFile(reopenedProject);
 const reparsedProject = workstation.parseProjectFile(reserializedProject);
 const handoffContents = handoffArtifact.bytes.toString("utf8");
+const soundCloudContents = soundCloudArtifact.bytes.toString("utf8");
 const regeneratedMixBytes = await blobToBuffer(render.createMixWavBlob(reopenedProject));
 const regeneratedStemBytes = {};
 const regeneratedStemHashes = {};
@@ -245,6 +253,7 @@ const regeneratedMidiBytes = Buffer.from(midi.createMidiFile(reopenedProject));
 const mixAnalysis = render.analyzeExport(reopenedProject);
 const stemAnalyses = render.analyzeStemExports(reopenedProject);
 const regeneratedHandoff = handoff.createHandoffSheet(reopenedProject, mixAnalysis, stemAnalyses);
+const regeneratedSoundCloud = soundcloud.createSoundCloudUploadSheet(reopenedProject);
 
 check(reparsedProject.title === reopenedProject.title, "reopened project should survive a second serialize/parse roundtrip");
 check(reopenedProject.title === manifest.project.title, "reopened project title should match manifest");
@@ -259,6 +268,7 @@ check(workstation.projectFileName(reopenedProject) === path.basename(projectArti
 check(render.mixWavFileName(reopenedProject) === path.basename(mixArtifact.filePath), "reopened mix filename should match package artifact");
 check(midi.midiFileName(reopenedProject) === path.basename(midiArtifact.filePath), "reopened MIDI filename should match package artifact");
 check(handoff.handoffSheetFileName(reopenedProject) === path.basename(handoffArtifact.filePath), "reopened Handoff filename should match package artifact");
+check(soundcloud.soundCloudUploadSheetFileName(reopenedProject) === path.basename(soundCloudArtifact.filePath), "reopened SoundCloud filename should match package artifact");
 check(mixAnalysis.status !== "Silent", "reopened project mix should be audible");
 check(render.stemTrackIds.every((track) => stemAnalyses[track].status !== "Silent"), "reopened project stems should be audible");
 closeNumber(mixAnalysis.durationSeconds, manifest.mixAnalysis.durationSeconds, 0.01, "reopened mix duration");
@@ -295,6 +305,9 @@ check(handoffContents.includes("Session Brief"), "reopened Handoff Sheet should 
 check(handoffContents.includes("Arrangement Blocks"), "reopened Handoff Sheet should include arrangement blocks section");
 check(handoffContents.includes("Export Meter"), "reopened Handoff Sheet should include export meter section");
 check(handoffContents.includes("Stem Meter"), "reopened Handoff Sheet should include stem meter section");
+check(soundCloudContents === regeneratedSoundCloud, "regenerated SoundCloud Upload Sheet should match disk artifact");
+check(soundCloudContents.includes("# SoundCloud Upload Sheet"), "reopened SoundCloud Upload Sheet should include its title");
+check(soundCloudContents.includes("Initial privacy: Private") && soundCloudContents.includes("Downloads: Off"), "reopened SoundCloud Upload Sheet should keep private-first defaults");
 checkNoSamplingText(projectContents, "reopened project file");
 checkNoSamplingText(handoffContents, "reopened Handoff Sheet");
 checkNoSamplingText(JSON.stringify(manifest), "source manifest");

@@ -159,7 +159,7 @@ function encodeTempoTrack(project: ProjectState, endTick: number): number[] {
 function createTracks(): Record<"drums" | "bass" | "synth" | "chords", MidiTrack> {
   return {
     drums: { name: "GrooveForge Drums", channel: drumChannel, events: [] },
-    bass: { name: "GrooveForge 808", channel: 0, program: 38, events: [] },
+    bass: { name: "GrooveForge Bass", channel: 0, program: 38, events: [] },
     synth: { name: "GrooveForge Synth", channel: 1, program: 80, events: [] },
     chords: { name: "GrooveForge Chords", channel: 2, program: 88, events: [] }
   };

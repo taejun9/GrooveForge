@@ -39,6 +39,8 @@ import {
   sidechainGainForStep,
   SoundDesign
 } from "../domain/workstation";
+import { bassGlideProfile, bassVoiceProfileForProject } from "./bassVoice";
+import type { BassGlideProfile, BassVoiceProfile, BassWaveform } from "./bassVoice";
 
 export type PlaybackMode = "arrangement" | "pattern";
 
@@ -83,6 +85,16 @@ type TrackMix = {
   drive: number;
   glue: number;
   send: number;
+};
+
+type ScheduledToneOptions = {
+  drive?: number;
+  filterHz?: number;
+  highpassHz?: number;
+  air?: number;
+  release?: number;
+  startFrequency?: number;
+  glideDuration?: number;
 };
 
 const scheduleAheadSeconds = 0.12;
@@ -361,7 +373,7 @@ function scheduleTone(
   type: OscillatorType,
   mix: TrackMix,
   pan: number,
-  tone: { drive?: number; filterHz?: number; highpassHz?: number; air?: number; release?: number } = {}
+  tone: ScheduledToneOptions = {}
 ): void {
   if (gainValue <= 0) {
     return;
@@ -373,7 +385,10 @@ function scheduleTone(
   const gain = context.createGain();
   const panner = context.createStereoPanner();
   osc.type = type;
-  osc.frequency.setValueAtTime(frequency, time);
+  osc.frequency.setValueAtTime(tone.startFrequency ?? frequency, time);
+  if (tone.startFrequency !== undefined && (tone.glideDuration ?? 0) > 0) {
+    osc.frequency.linearRampToValueAtTime(frequency, time + Math.min(duration, tone.glideDuration ?? 0));
+  }
   highpass.type = "highpass";
   highpass.frequency.setValueAtTime(tone.highpassHz ?? 18, time);
   highpass.Q.setValueAtTime(0.7, time);
@@ -403,14 +418,47 @@ function driveCurve(amount: number): Float32Array<ArrayBuffer> {
   return curve;
 }
 
-function bassOscillator(sound: SoundDesign): OscillatorType {
-  if (sound.bassDrive > 0.64) {
-    return "sawtooth";
+function bassOscillator(waveform: BassWaveform): OscillatorType {
+  return waveform === "saw" ? "sawtooth" : waveform;
+}
+
+function scheduleBassTone(
+  context: AudioContext,
+  destination: PlaybackDestination,
+  time: number,
+  duration: number,
+  frequency: number,
+  gainValue: number,
+  mix: TrackMix,
+  voice: BassVoiceProfile,
+  glide: BassGlideProfile | null
+): void {
+  const tone: ScheduledToneOptions = {
+    drive: voice.drive,
+    filterHz: channelAirFilterHz(voice.filterHz, mix),
+    highpassHz: channelHighpassHz(mix),
+    air: mix.air,
+    release: voice.release,
+    ...(glide ? { startFrequency: glide.startFrequency, glideDuration: glide.durationSeconds } : {})
+  };
+  scheduleTone(context, destination, time, duration, frequency, gainValue, bassOscillator(voice.waveform), mix, mix.pan, tone);
+  if (voice.detuneRatio) {
+    scheduleTone(
+      context,
+      destination,
+      time,
+      duration,
+      frequency * voice.detuneRatio,
+      gainValue * 0.38,
+      bassOscillator(voice.waveform),
+      mix,
+      Math.max(-1, Math.min(1, mix.pan + 0.06)),
+      {
+        ...tone,
+        ...(tone.startFrequency ? { startFrequency: tone.startFrequency * voice.detuneRatio } : {})
+      }
+    );
   }
-  if (sound.bassDrive > 0.38) {
-    return "triangle";
-  }
-  return "sine";
 }
 
 function synthOscillator(sound: SoundDesign): OscillatorType {
@@ -458,6 +506,7 @@ function scheduleStep(
   const synthMix = arrangementTrackMix(project, "synth", mutedTracks);
   const chordMix = arrangementTrackMix(project, "chord", mutedTracks);
   const sound = normalizeSoundDesignControls(project.sound);
+  const bassVoice = bassVoiceProfileForProject(project, sound);
   const stepDuration = projectStepDurationSeconds(project);
   if (project.metronomeEnabled && patternStep % 4 === 0) {
     scheduleMetronomeClick(context, destination, time, patternStep);
@@ -514,29 +563,23 @@ function scheduleStep(
     );
   }
 
-  for (const note of pattern.bassNotes) {
+  for (const [noteIndex, note] of pattern.bassNotes.entries()) {
     if (note.step === patternStep && noteEventShouldPlay("bass", note, absoluteStep)) {
-      scheduleTone(
+      const duration = normalizePatternEventLength(note.length, note.step) * stepDuration * (0.74 + sound.bassDecay * 0.52) * bassVoice.durationScale;
+      scheduleBassTone(
         context,
         destination,
         time,
-        normalizePatternEventLength(note.length, note.step) * stepDuration * (0.74 + sound.bassDecay * 0.52),
+        duration,
         noteToFrequency(note.pitch),
         energyGain *
           note.velocity *
-          (0.42 + sound.bassDrive * 0.22) *
+          (0.42 + sound.bassDrive * 0.22) * bassVoice.gainScale *
           bassMix.gain *
           sidechainGainForStep(pattern, patternStep, sound.sidechainDuck, absoluteStep),
-        bassOscillator(sound),
         bassMix,
-        bassMix.pan,
-        {
-          drive: sound.bassDrive,
-          filterHz: channelAirFilterHz(260 + sound.bassDrive * 1500, bassMix),
-          highpassHz: channelHighpassHz(bassMix),
-          air: bassMix.air,
-          release: sound.bassDecay
-        }
+        bassVoice,
+        bassGlideProfile(pattern.bassNotes, noteIndex, duration, stepDuration)
       );
     }
   }
@@ -670,24 +713,20 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
   } else if (target.kind === "note" && target.track === "bass") {
     const note = target.note as BassNote;
     const bassMix = channelMix(mixerProject, "bass_808");
-    const duration = normalizePatternEventLength(note.length, note.step) * stepDuration * (0.74 + sound.bassDecay * 0.52);
-    scheduleTone(
+    const bassVoice = bassVoiceProfileForProject(mixerProject, sound);
+    const duration = normalizePatternEventLength(note.length, note.step) * stepDuration * (0.74 + sound.bassDecay * 0.52) * bassVoice.durationScale;
+    const notes = activePattern(mixerProject).bassNotes;
+    const noteIndex = notes.findIndex((candidate) => candidate.step === note.step && candidate.pitch === note.pitch);
+    scheduleBassTone(
       context,
       destination,
       time,
       duration,
       noteToFrequency(note.pitch),
-      normalizeNoteVelocity(note.velocity) * (0.42 + sound.bassDrive * 0.22) * bassMix.gain,
-      bassOscillator(sound),
+      normalizeNoteVelocity(note.velocity) * (0.42 + sound.bassDrive * 0.22) * bassVoice.gainScale * bassMix.gain,
       bassMix,
-      bassMix.pan,
-      {
-        drive: sound.bassDrive,
-        filterHz: channelAirFilterHz(260 + sound.bassDrive * 1500, bassMix),
-        highpassHz: channelHighpassHz(bassMix),
-        air: bassMix.air,
-        release: sound.bassDecay
-      }
+      bassVoice,
+      noteIndex >= 0 ? bassGlideProfile(notes, noteIndex, duration, stepDuration) : null
     );
     extendStop(duration + sound.bassDecay * 0.16);
   } else if (target.kind === "note") {

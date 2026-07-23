@@ -27,9 +27,14 @@ import {
 } from "../domain/workstation";
 import type { ArrangementBlock, ArrangementMuteTrack, ProjectState, SoundDesign, TrackType } from "../domain/workstation";
 import { downloadBlob } from "../platform/downloads";
+import { bassGlideProfile, bassVoiceProfileForProject } from "./bassVoice";
+import type { BassGlideProfile, BassVoiceProfile } from "./bassVoice";
 
-const sampleRate = 44100;
-const channels = 2;
+export const wavSampleRate = 44100;
+export const wavChannels = 2;
+export const wavBitDepth = 24;
+const sampleRate = wavSampleRate;
+const channels = wavChannels;
 const renderNoiseSeedSalt = 0x47524647;
 const minimumExportTailSeconds = 0.75;
 const exportTailSteps = 6;
@@ -39,6 +44,7 @@ export type StemTrackId = (typeof stemTrackIds)[number];
 export type ExportAnalysis = {
   sampleRate: number;
   channels: number;
+  bitDepth: number;
   durationSeconds: number;
   peakDb: number;
   rmsDb: number;
@@ -66,6 +72,13 @@ type ChannelMix = {
   send: number;
 };
 type RenderNoiseSeed = (start: number, duration: number, brightness: number) => number;
+type ToneOptions = {
+  drive?: number;
+  filter?: number;
+  decay?: number;
+  startFrequency?: number;
+  glideDuration?: number;
+};
 
 function stepDuration(project: ProjectState): number {
   return projectStepDurationSeconds(project);
@@ -194,7 +207,7 @@ function addTone(
   mix: ChannelMix,
   gainScale: number,
   shape: ToneShape,
-  tone: { drive?: number; filter?: number; decay?: number } = {}
+  tone: ToneOptions = {}
 ): void {
   if (mix.gain <= 0) {
     return;
@@ -208,7 +221,11 @@ function addTone(
   for (let index = 0; index < frames && startFrame + index < buffer[0].length; index += 1) {
     const t = index / sampleRate;
     const envelope = Math.exp(-decay * t / Math.max(0.01, duration));
-    const phase = 2 * Math.PI * frequency * t;
+    const startFrequency = tone.startFrequency ?? frequency;
+    const glideDuration = Math.max(0, Math.min(duration, tone.glideDuration ?? 0));
+    const phase = glideDuration > 0 && t < glideDuration
+      ? 2 * Math.PI * (startFrequency * t + ((frequency - startFrequency) * t * t) / (2 * glideDuration))
+      : 2 * Math.PI * (((startFrequency + frequency) * glideDuration) / 2 + frequency * (t - glideDuration));
     const fundamental = waveform(shape, phase);
     const harmonic = Math.sin(phase * 2) * drive * 0.28 + Math.sin(phase * 3) * drive * 0.12;
     const shaped = Math.tanh((fundamental + harmonic) * (1 + drive * 2.8));
@@ -227,7 +244,7 @@ function addToneWithSend(
   mix: ChannelMix,
   gainScale: number,
   shape: ToneShape,
-  tone: { drive?: number; filter?: number; decay?: number } = {}
+  tone: ToneOptions = {}
 ): void {
   addTone(buffer, start, duration, frequency, mix, gainScale, shape, tone);
   addTone(sendBuffer, start, duration * 1.08, frequency, spaceSendMix(mix), gainScale * 0.82, shape, {
@@ -235,6 +252,48 @@ function addToneWithSend(
     decay: Math.max(2.2, (tone.decay ?? 4) * 0.76),
     filter: Math.min(1, (tone.filter ?? 1) + 0.08)
   });
+}
+
+function addBassToneWithSend(
+  buffer: AudioChannels,
+  sendBuffer: AudioChannels,
+  start: number,
+  duration: number,
+  frequency: number,
+  mix: ChannelMix,
+  gainScale: number,
+  voice: BassVoiceProfile,
+  glide: BassGlideProfile | null
+): void {
+  const tone: ToneOptions = {
+    drive: voice.drive,
+    filter: Math.max(0.42, Math.min(1, voice.filterHz / 3200)),
+    decay: voice.decay,
+    startFrequency: glide?.startFrequency,
+    glideDuration: glide?.durationSeconds
+  };
+  addToneWithSend(buffer, sendBuffer, start, duration, frequency, mix, gainScale, voice.waveform, tone);
+  if (voice.detuneRatio) {
+    const detunedMix = {
+      ...mix,
+      left: Math.max(0, Math.min(1, mix.left * 0.94)),
+      right: Math.max(0, Math.min(1, mix.right + 0.06))
+    };
+    addToneWithSend(
+      buffer,
+      sendBuffer,
+      start,
+      duration,
+      frequency * voice.detuneRatio,
+      detunedMix,
+      gainScale * 0.38,
+      voice.waveform,
+      {
+        ...tone,
+        startFrequency: tone.startFrequency ? tone.startFrequency * voice.detuneRatio : undefined
+      }
+    );
+  }
 }
 
 function waveform(shape: ToneShape, phase: number): number {
@@ -356,16 +415,6 @@ function hashNumbers(...values: number[]): number {
   return hash >>> 0;
 }
 
-function bassShape(sound: SoundDesign): ToneShape {
-  if (sound.bassDrive > 0.64) {
-    return "saw";
-  }
-  if (sound.bassDrive > 0.38) {
-    return "triangle";
-  }
-  return "sine";
-}
-
 function synthShape(sound: SoundDesign): ToneShape {
   if (sound.synthBrightness > 0.72) {
     return "square";
@@ -397,6 +446,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   const baseSynthMix = channelMix(mixerProject, "synth", stemTarget);
   const baseChordMix = channelMix(mixerProject, "chord", stemTarget);
   const sound = normalizeSoundDesignControls(project.sound);
+  const bassVoice = bassVoiceProfileForProject(project, sound);
   const outputGain = masterOutputGain(mixerProject);
   const automationEvents = normalizeProjectAutomationEvents(project.automation);
   const normalizedPatterns = {
@@ -468,24 +518,26 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
         });
       }
     }
-    for (const note of pattern.bassNotes) {
+    for (const [noteIndex, note] of pattern.bassNotes.entries()) {
       const absoluteStep = barOffset + note.step;
       if (!noteEventShouldPlay("bass", note, absoluteStep)) {
         continue;
       }
-      addToneWithSend(
+      const duration = normalizePatternEventLength(note.length, note.step) * step * (0.74 + sound.bassDecay * 0.52) * bassVoice.durationScale;
+      const glide = bassGlideProfile(pattern.bassNotes, noteIndex, duration, step);
+      addBassToneWithSend(
         buffer,
         sendBuffer,
         projectStepStartSeconds(project, absoluteStep),
-        normalizePatternEventLength(note.length, note.step) * step * (0.74 + sound.bassDecay * 0.52),
+        duration,
         noteToFrequency(note.pitch),
         bassMix,
         energyGain *
           note.velocity *
-          (0.52 + sound.bassDrive * 0.24) *
+          (0.52 + sound.bassDrive * 0.24) * bassVoice.gainScale *
           sidechainGainForStep(pattern, note.step, sound.sidechainDuck, absoluteStep),
-        bassShape(sound),
-        { drive: sound.bassDrive, filter: 0.72 + sound.bassDrive * 0.28, decay: 3.8 - sound.bassDecay * 1.4 }
+        bassVoice,
+        glide
       );
     }
     for (const note of pattern.melodyNotes) {
@@ -574,6 +626,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
     analysis: {
       sampleRate,
       channels,
+      bitDepth: wavBitDepth,
       durationSeconds: frames / sampleRate,
       peakDb,
       rmsDb,
@@ -596,7 +649,7 @@ function amplitudeToDb(value: number): number {
 export function stemTrackLabel(track: StemTrackId): string {
   const labels: Record<StemTrackId, string> = {
     drum_rack: "Drums",
-    bass_808: "808",
+    bass_808: "Bass",
     synth: "Synth",
     chord: "Chords"
   };
@@ -611,7 +664,7 @@ function writeString(view: DataView, offset: number, value: string): void {
 
 function encodeWav(buffer: AudioChannels): Blob {
   const frameCount = buffer[0].length;
-  const bytesPerSample = 2;
+  const bytesPerSample = wavBitDepth / 8;
   const blockAlign = channels * bytesPerSample;
   const dataSize = frameCount * blockAlign;
   const arrayBuffer = new ArrayBuffer(44 + dataSize);
@@ -634,7 +687,11 @@ function encodeWav(buffer: AudioChannels): Blob {
   for (let frame = 0; frame < frameCount; frame += 1) {
     for (let channel = 0; channel < channels; channel += 1) {
       const sample = Math.max(-1, Math.min(1, buffer[channel][frame]));
-      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      const signed = Math.round(sample < 0 ? sample * 0x800000 : sample * 0x7fffff);
+      const encoded = signed < 0 ? signed + 0x1000000 : signed;
+      view.setUint8(offset, encoded & 0xff);
+      view.setUint8(offset + 1, (encoded >>> 8) & 0xff);
+      view.setUint8(offset + 2, (encoded >>> 16) & 0xff);
       offset += bytesPerSample;
     }
   }
@@ -647,7 +704,13 @@ export function mixWavFileName(project: ProjectState): string {
 
 export function stemWavFileNames(project: ProjectState): string[] {
   const stem = projectFileStem(project);
-  return stemTrackIds.map((track) => `${stem}-${track.replace("_", "-")}-stem.wav`);
+  const fileSlugs: Record<StemTrackId, string> = {
+    drum_rack: "drum-rack",
+    bass_808: "bass",
+    synth: "synth",
+    chord: "chord"
+  };
+  return stemTrackIds.map((track) => `${stem}-${fileSlugs[track]}-stem.wav`);
 }
 
 function downloadWavBlob(blob: Blob, fileName: string): void {

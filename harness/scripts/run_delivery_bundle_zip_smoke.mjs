@@ -200,8 +200,10 @@ const entries = parsedZip.entries.map((entry) => ({
         ? "project-json"
         : entry.name.endsWith("manifest.json")
           ? "manifest-json"
-          : entry.name.endsWith("manifest.md")
-            ? "manifest-markdown"
+        : entry.name.endsWith("manifest.md")
+          ? "manifest-markdown"
+          : entry.name.endsWith("-soundcloud-upload.md")
+            ? "soundcloud-upload-sheet"
             : "handoff-sheet",
   label: entry.name.endsWith("manifest.json")
     ? "Checksum manifest JSON"
@@ -215,6 +217,8 @@ const entries = parsedZip.entries.map((entry) => ({
             ? "Arrangement MIDI"
             : entry.name.endsWith("-handoff.txt")
               ? "Handoff Sheet"
+              : entry.name.endsWith("-soundcloud-upload.md")
+                ? "SoundCloud Upload Sheet"
               : "Stem WAV"
 }));
 const entryByName = new Map(parsedZip.entries.map((entry) => [entry.name, entry]));
@@ -224,20 +228,35 @@ const projectEntry = parsedZip.entries.find((entry) => entry.name.endsWith(".gro
 const mixEntry = parsedZip.entries.find((entry) => entry.name.endsWith("-demo.wav") && !entry.name.includes("/stems/"));
 const midiEntry = parsedZip.entries.find((entry) => entry.name.endsWith(".mid"));
 const handoffEntry = parsedZip.entries.find((entry) => entry.name.endsWith("-handoff.txt"));
+const soundCloudEntry = parsedZip.entries.find((entry) => entry.name.endsWith("-soundcloud-upload.md"));
 const stemEntries = parsedZip.entries.filter((entry) => entry.name.includes("/stems/") && entry.name.endsWith(".wav"));
 const parsedManifest = manifestEntry ? JSON.parse(manifestEntry.data.toString("utf8")) : null;
 const bundleRoot = parsedZip.entries[0]?.name.split("/")[0] ?? "";
-const expectedEntryCount = 10;
+const expectedEntryCount = 11;
 const expectedManifestLabels = [
   "Project file",
   "Full mix WAV",
   "Drums stem WAV",
-  "808 stem WAV",
+  "Bass stem WAV",
   "Synth stem WAV",
   "Chords stem WAV",
   "Arrangement MIDI",
-  "Handoff Sheet"
+  "Handoff Sheet",
+  "SoundCloud Upload Sheet"
 ];
+
+function checkWavEntry(entry, label) {
+  if (!entry) {
+    check(false, `${label} entry missing`);
+    return;
+  }
+  check(entry.data.readUInt16LE(20) === 1, `${label} must use PCM format 1`);
+  check(entry.data.readUInt16LE(22) === 2, `${label} must be stereo`);
+  check(entry.data.readUInt32LE(24) === 44100, `${label} must use 44100 Hz`);
+  check(entry.data.readUInt32LE(28) === 264600, `${label} must use 264600 byte rate`);
+  check(entry.data.readUInt16LE(32) === 6, `${label} must use 6-byte block alignment`);
+  check(entry.data.readUInt16LE(34) === 24, `${label} must use 24-bit samples`);
+}
 
 check(exportAnalysis.status !== "Silent", "bundle smoke mix should be audible");
 check(stemEntries.length === render.stemTrackIds.length, "bundle ZIP should include four stem WAVs");
@@ -245,6 +264,9 @@ check(stemEntries.every((entry) => entry.data.subarray(0, 4).toString("ascii") =
 check(mixEntry?.data.subarray(0, 4).toString("ascii") === "RIFF", "mix ZIP entry should be a WAV file");
 check(midiEntry?.data.subarray(0, 4).toString("ascii") === "MThd", "MIDI ZIP entry should be a MIDI file");
 check(Boolean(handoffEntry?.data.toString("utf8").includes("GrooveForge Handoff Sheet")), "Handoff ZIP entry should include the sheet title");
+check(Boolean(soundCloudEntry?.data.toString("utf8").includes("# SoundCloud Upload Sheet")), "bundle ZIP should include the SoundCloud Upload Sheet");
+checkWavEntry(mixEntry, "mix WAV");
+for (const [index, entry] of stemEntries.entries()) checkWavEntry(entry, `stem WAV ${index + 1}`);
 check(Boolean(projectEntry), "bundle ZIP should include a project JSON entry");
 if (projectEntry) {
   check(workstation.parseProjectFile(projectEntry.data.toString("utf8")).title === project.title, "project JSON entry should roundtrip");
@@ -261,9 +283,10 @@ check(parsedZip.entries.every((entry) => entry.crc32 === entry.calculatedCrc32),
 check(Boolean(parsedManifest), "bundle manifest should parse as JSON");
 if (parsedManifest) {
   check(parsedManifest.app === "GrooveForge", "bundle manifest should name GrooveForge");
+  check(parsedManifest.wavSampleRate === 44100 && parsedManifest.wavChannels === 2 && parsedManifest.wavBitDepth === 24, "bundle manifest should record the 44.1kHz stereo 24-bit WAV contract");
   check(parsedManifest.bundleFileName === bundle.fileName, "bundle manifest should include ZIP file name");
   check(parsedManifest.artifactCount === expectedEntryCount, "bundle manifest artifact count should include manifest files");
-  check(parsedManifest.entries.length === expectedManifestLabels.length, "bundle manifest should list eight source deliverables");
+  check(parsedManifest.entries.length === expectedManifestLabels.length, "bundle manifest should list nine source deliverables");
   check(expectedManifestLabels.every((label) => parsedManifest.entries.some((entry) => entry.label === label)), "bundle manifest should list expected source labels");
   check(parsedManifest.entries.every((entry) => entryByName.has(entry.path)), "bundle manifest paths should exist in ZIP");
   check(
@@ -337,7 +360,7 @@ const reportMarkdown = buildMarkdown(report);
 
 check(zipStat.size === zipBytes.byteLength, "bundle ZIP file size should match generated bytes");
 check(report.deliveryBundleZipReady === true, "bundle ZIP report should be ready");
-check(report.entryCount === expectedEntryCount, "bundle ZIP report should include ten entries");
+check(report.entryCount === expectedEntryCount, "bundle ZIP report should include eleven entries");
 check(report.manifestEntryCount === expectedManifestLabels.length, "bundle manifest should list source deliverables");
 check(report.manifestArtifactCount === expectedEntryCount, "bundle manifest artifact count should match ZIP entries");
 check(report.zipStructure.eocdPresent === true, "bundle ZIP should include EOCD");
@@ -370,7 +393,7 @@ console.log(`- JSON: ${relative(reportJsonPath)}`);
 console.log(`- Markdown: ${relative(reportMarkdownPath)}`);
 console.log(`- Entries: ${report.entryCount}, ${report.zip.bytes} bytes`);
 console.log(`- Manifest entries: ${report.manifestEntryCount}, artifact count: ${report.manifestArtifactCount}`);
-console.log("- Verified: project JSON, mix WAV, four stem WAVs, MIDI, Handoff Sheet, manifest JSON/Markdown, EOCD, central directory, local headers, CRC-32, sizes, and safe entry names");
+console.log("- Verified: project JSON, 24-bit mix WAV, four 24-bit stem WAVs, MIDI, Handoff Sheet, SoundCloud Upload Sheet, manifest JSON/Markdown, EOCD, central directory, local headers, CRC-32, sizes, and safe entry names");
 console.log("- Network: no distribution channel probe, release upload, Apple notary submission, or signing attempted");
 console.log("- Not recorded: private values, private beats, real user audio, release URLs, support URLs, feed URLs, credentials, tokens, identity labels, channel values, or local env values");
 console.log("- Not claimed: Developer ID signing, notarization, Gatekeeper approval, auto-update, manual QA approval, app-store submission, or external distribution completion");

@@ -730,13 +730,13 @@ function validateNoteGridKeyboardNavigation(html, navigation) {
   }
   check(
     html.includes('data-testid="note-grid-bass"') &&
-      html.includes('aria-label="808 note sequencer"') &&
+      /aria-label="(?:808|Sub|Walking|Pluck|Reese|Minimal) Bass note sequencer"/.test(html) &&
       html.includes('aria-describedby="note-grid-keyboard-help-bass"') &&
       html.includes('data-testid="note-grid-melody"') &&
       html.includes('aria-label="Synth note sequencer"') &&
       html.includes('aria-describedby="note-grid-keyboard-help-melody"') &&
       (html.match(/Arrow keys move · Enter or Space toggles/g) ?? []).length >= 3,
-    "808 and Synth grids should expose separate named groups with visible and accessible keyboard guidance"
+    "Bass and Synth grids should expose separate named groups with visible and accessible keyboard guidance"
   );
   check(
     composePanelsSource.includes("function handleKeyDown") &&
@@ -3526,7 +3526,7 @@ try {
     console.log("- Deep editor commands: conditional fixed dock reuses Play, Actions, Undo, Redo, and Save after the full transport leaves view");
     console.log("- Minimum Studio transport: secondary Session Context and Exports stay compact through 1180px entry and resize while retaining manual reopen");
     console.log("- Drum grid keyboard: one roving Tab stop, bounded arrows/Home/End, explicit pressed state, Enter/Space toggle, and visible guidance");
-    console.log("- Note-grid keyboard: one Tab stop per 808/Synth grid, exhaustive spatial arrows/Home/End, pressed state, guarded Enter/Space, and guidance");
+    console.log("- Note-grid keyboard: one Tab stop per Bass/Synth grid, exhaustive spatial arrows/Home/End, pressed state, guarded Enter/Space, and guidance");
     console.log("- Closed disclosures: 24-panel inventory shares one non-summary containment rule; only the project launchpad starts open");
     console.log(
       "- Beginner path: Guide Quick Start, Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"

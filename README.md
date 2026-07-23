@@ -171,7 +171,7 @@ npm run verify
 
 - Guided Lo-fi와 Studio House 전체 믹스 및 네 개 스템
 - 지원하는 14개 스타일 프로필의 전체 믹스
-- 44.1 kHz / 16-bit stereo PCM 디코딩
+- 44.1 kHz / 24-bit stereo signed PCM 디코딩과 실제 하위 바이트 신호
 - 템포에 맞는 길이와 export tail
 - 렌더 경계 뒤의 잔향과 마지막 digital zero
 - Peak/RMS 분석, ceiling 안전성, full-scale 제외
@@ -179,6 +179,8 @@ npm run verify
 - 한국어·일본어 파일명과 정규화
 - 즉시 다시 렌더했을 때 byte-identical 결정성
 - 관련 없는 프로젝트 변경이 대상 스템을 바꾸지 않는 격리
+- 808, Sub, Walking, Pluck, Reese, Minimal Bass Voice와 실제 glide 렌더
+- Delivery Bundle의 SoundCloud 업로드 시트와 Private-first 권리 체크
 
 생성 파일은 `build/desktop/` 아래에 있으며 Git에 포함되지 않습니다. 자동 수치 검증은 사람의 최종 청취 판단을 대신하지 않습니다.
 

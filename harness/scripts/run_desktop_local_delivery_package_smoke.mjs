@@ -13,13 +13,14 @@ const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformAr
 const deliveryRoot = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-local-delivery-package`);
 const manifestJsonPath = path.join(deliveryRoot, `${appName}-${packageJson.version}-${platformArch}-local-delivery-package-manifest.json`);
 const manifestMarkdownPath = path.join(deliveryRoot, `${appName}-${packageJson.version}-${platformArch}-local-delivery-package-manifest.md`);
-const expectedStemArtifactLabels = ["Drums stem WAV", "808 stem WAV", "Synth stem WAV", "Chords stem WAV"];
+const expectedStemArtifactLabels = ["Drums stem WAV", "Bass stem WAV", "Synth stem WAV", "Chords stem WAV"];
 const failures = [];
 
 const workstation = await import("../../src/domain/workstation.ts");
 const render = await import("../../src/audio/render.ts");
 const midi = await import("../../src/audio/midi.ts");
 const handoff = await import("../../src/audio/handoff.ts");
+const soundcloud = await import("../../src/audio/soundcloud.ts");
 
 function check(condition, message) {
   if (!condition) {
@@ -57,11 +58,18 @@ function checkNoSamplingText(text, label) {
 }
 
 function checkWavBytes(bytes, label) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   check(bytes.byteLength > 44, `${label} WAV should include audio data`);
   check(ascii(bytes, 0, 4) === "RIFF", `${label} WAV missing RIFF header`);
   check(ascii(bytes, 8, 4) === "WAVE", `${label} WAV missing WAVE header`);
   check(ascii(bytes, 12, 4) === "fmt ", `${label} WAV missing fmt chunk`);
   check(ascii(bytes, 36, 4) === "data", `${label} WAV missing data chunk`);
+  check(view.getUint16(20, true) === 1, `${label} WAV must use PCM format 1`);
+  check(view.getUint16(22, true) === 2, `${label} WAV must be stereo`);
+  check(view.getUint32(24, true) === 44100, `${label} WAV must use 44100 Hz`);
+  check(view.getUint32(28, true) === 264600, `${label} WAV must use 264600 byte rate`);
+  check(view.getUint16(32, true) === 6, `${label} WAV must use 6-byte block alignment`);
+  check(view.getUint16(34, true) === 24, `${label} WAV must use 24-bit samples`);
 }
 
 function checkMidiBytes(bytes, label) {
@@ -90,14 +98,14 @@ function buildProject() {
   const targetProject = workstation.applyDeliveryTarget(blueprintProject, "starter_sketch");
   return {
     ...targetProject,
-    title: "Local Delivery Package Smoke Beat",
+    title: "GrooveForge Sub Bass",
     mode: "guided",
     arrangement: workstation.createPatternChain("eight_bar"),
     sessionBrief: {
-      artist: "Local producer",
-      vibe: "direct composition proof",
+      artist: "",
+      vibe: "late-night Seoul pocket / warm sub bass / original instrumental",
       reference: "built-in instruments",
-      notes: "Generated from editable events for local delivery QA."
+      notes: "Created locally from editable GrooveForge events and built-in synthesis only."
     },
     snapshots: []
   };
@@ -194,6 +202,7 @@ const analysis = render.analyzeExport(project);
 const stemAnalyses = render.analyzeStemExports(project);
 const projectContents = workstation.serializeProjectFile(project);
 const handoffContents = handoff.createHandoffSheet(project, analysis, stemAnalyses);
+const soundCloudContents = soundcloud.createSoundCloudUploadSheet(project);
 const mixBytes = await blobToBuffer(render.createMixWavBlob(project));
 const stemArtifacts = [];
 const stemFileNames = render.stemWavFileNames(project);
@@ -215,6 +224,7 @@ for (const [index, track] of render.stemTrackIds.entries()) {
 
 artifacts.push(await writeArtifact("Arrangement MIDI", "midi", midi.midiFileName(project), midiBytes));
 artifacts.push(await writeArtifact("Handoff Sheet", "handoff", handoff.handoffSheetFileName(project), Buffer.from(handoffContents, "utf8")));
+artifacts.push(await writeArtifact("SoundCloud Upload Sheet", "soundcloud-upload", soundcloud.soundCloudUploadSheetFileName(project), Buffer.from(soundCloudContents, "utf8")));
 
 const manifest = buildManifest(project, analysis, stemAnalyses, artifacts);
 const manifestMarkdown = buildMarkdown(manifest);
@@ -228,6 +238,7 @@ check(workstation.arrangementTotalBars(project) === 8, "local delivery package s
 check(workstation.activeDeliveryTarget(project).id === "starter_sketch", "local delivery package should use the starter sketch delivery target");
 check(analysis.status !== "Silent", "local delivery mix should be audible");
 check(render.stemTrackIds.every((track) => stemAnalyses[track].status !== "Silent"), "local delivery stems should be audible");
+check(stemFileNames[1] === `${workstation.projectFileStem(project)}-bass-stem.wav`, "local delivery package should use a generic Bass stem filename");
 checkWavBytes(mixBytes, "local delivery full mix");
 for (const stem of stemArtifacts) {
   checkWavBytes(stem.bytes, `local delivery ${stem.track} stem`);
@@ -238,7 +249,11 @@ check(handoffContents.endsWith("\n"), "local delivery Handoff Sheet should end w
 check(handoffContents.includes("GrooveForge Handoff Sheet"), "local delivery Handoff Sheet should include its title");
 check(handoffContents.includes("Export Meter"), "local delivery Handoff Sheet should include export meter");
 check(handoffContents.includes("Stem Meter"), "local delivery Handoff Sheet should include stem meter");
-check(manifest.artifactCount === 8, "local delivery package should include project, mix, four stems, MIDI, and Handoff artifacts");
+check(handoffContents.includes("signed PCM 24-bit"), "local delivery Handoff Sheet should include the 24-bit format");
+check(handoffContents.includes("SoundCloud Preparation"), "local delivery Handoff Sheet should include SoundCloud preparation context");
+check(soundCloudContents.includes("# SoundCloud Upload Sheet"), "local delivery package should include a SoundCloud Upload Sheet");
+check(soundCloudContents.includes("Initial privacy: Private") && soundCloudContents.includes("Downloads: Off"), "SoundCloud Upload Sheet should use private-first safe defaults");
+check(manifest.artifactCount === 9, "local delivery package should include project, mix, four stems, MIDI, Handoff, and SoundCloud artifacts");
 check(manifest.artifacts.every((artifact) => artifact.bytes > 0), "local delivery artifacts should be non-empty");
 check(manifest.artifacts.every((artifact) => /^[a-f0-9]{64}$/.test(artifact.sha256)), "local delivery artifacts should have SHA-256 checksums");
 check(expectedStemArtifactLabels.every((label) => manifest.artifacts.some((artifact) => artifact.label === label)), "local delivery package should include all expected stem WAV labels");
@@ -264,7 +279,7 @@ console.log(`- Package: ${relative(deliveryRoot)}`);
 console.log(`- Manifest: ${relative(manifestJsonPath)}`);
 console.log(`- Markdown: ${relative(manifestMarkdownPath)}`);
 console.log(`- Project: ${project.title}, ${project.bpm} BPM ${project.key}, ${workstation.arrangementTotalBars(project)} bars`);
-console.log("- Package contents: project JSON, full mix WAV, four stem WAVs, arrangement MIDI, Handoff Sheet, checksum manifest");
+console.log("- Package contents: project JSON, full mix WAV, four stem WAVs, arrangement MIDI, Handoff Sheet, SoundCloud Upload Sheet, checksum manifest");
 console.log(`- Artifacts: ${manifest.artifactCount}, ${manifest.totalBytes} bytes`);
 console.log(`- Mix: ${render.mixWavFileName(project)}, ${mixBytes.byteLength} bytes, ${analysis.status}`);
 console.log(`- Stems: ${stemArtifacts.map((stem) => `${stem.track}:${stem.bytes.byteLength}`).join(", ")}`);

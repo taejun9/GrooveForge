@@ -13,8 +13,9 @@ import {
   styleProfiles
 } from "../domain/workstation";
 import type { PatternSlot, ProjectState } from "../domain/workstation";
-import { stemTrackIds, stemTrackLabel } from "./render";
+import { stemTrackIds, stemTrackLabel, wavBitDepth } from "./render";
 import type { ExportAnalysis, StemExportAnalyses } from "./render";
+import { soundCloudUploadSheetFileName } from "./soundcloud";
 
 function barCountLabel(bars: number): string {
   return `${bars} ${bars === 1 ? "bar" : "bars"}`;
@@ -100,6 +101,7 @@ export function createHandoffSheet(
     ...arrangementLines,
     "",
     "Export Meter",
+    `Format: ${analysis.sampleRate / 1000} kHz / ${analysis.channels === 2 ? "stereo" : `${analysis.channels} channels`} / signed PCM ${analysis.bitDepth || wavBitDepth}-bit`,
     `Status: ${analysis.status}`,
     `Duration: ${analysis.durationSeconds.toFixed(2)} sec`,
     `Peak: ${formatDb(analysis.peakDb)}`,
@@ -110,6 +112,13 @@ export function createHandoffSheet(
     "",
     "Stem Meter",
     ...stemLines,
+    "",
+    "SoundCloud Preparation",
+    `Upload Sheet: ${soundCloudUploadSheetFileName(project)}`,
+    "Initial Privacy: Private",
+    "Downloads: Off",
+    "Rights: Replace artist/rightsholder placeholders and confirm audio/artwork permissions before upload.",
+    "Playback Check: Approve the processed stream before making the track Public or enabling monetization/distribution.",
     "",
     "Notes",
     "Peak, RMS, dynamics, headroom, and limiter activity are local render checks, not platform-compliance, true-peak, LUFS, publishing, or mastering guarantees.",

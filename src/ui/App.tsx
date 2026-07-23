@@ -42,6 +42,7 @@ import {
   isDrumGridNavigationKey
 } from "./drumGridKeyboardNavigation";
 import { deliveryBundleZipFileName, exportDeliveryBundleZip } from "../audio/deliveryBundle";
+import { bassStyleLabel } from "../audio/bassVoice";
 import { exportMidi, midiFileName } from "../audio/midi";
 import {
   analyzeExport,
@@ -5941,7 +5942,7 @@ export function App(): ReactElement {
     const pad = basslinePadDefinitions.find((candidate) => candidate.id === padId);
     if (!pad) {
       setBassMoveResult(null);
-      setProjectStatus("808 bassline pad not found");
+      setProjectStatus("Bassline pad not found");
       return;
     }
 
@@ -5949,11 +5950,11 @@ export function App(): ReactElement {
     const bassNotes = createBasslinePadNotes(projectRef.current.key, pad);
     const changed = updateCurrentPattern(
       (pattern) => (sameBassNotes(pattern.bassNotes, bassNotes) ? pattern : { ...pattern, bassNotes }),
-      `${pad.label} 808 bassline applied to Pattern ${projectRef.current.selectedPattern}`
+      `${pad.label} bassline applied to Pattern ${projectRef.current.selectedPattern}`
     );
     if (!changed) {
       setBassMoveResult(null);
-      setProjectStatus(`${pad.label} 808 bassline already selected`);
+      setProjectStatus(`${pad.label} bassline already selected`);
       return;
     }
 
@@ -5968,14 +5969,14 @@ export function App(): ReactElement {
     const pad = bassGlidePadDefinitions.find((candidate) => candidate.id === padId);
     if (!pad) {
       setBassMoveResult(null);
-      setProjectStatus("808 glide pad not found");
+      setProjectStatus("Bass glide pad not found");
       return;
     }
 
     const currentBassNotes = projectRef.current.patterns[projectRef.current.selectedPattern].bassNotes;
     if (currentBassNotes.length === 0) {
       setBassMoveResult(null);
-      setProjectStatus(`Add an 808 note before using ${pad.label} glide`);
+      setProjectStatus(`Add a Bass note before using ${pad.label} glide`);
       return;
     }
 
@@ -5983,11 +5984,11 @@ export function App(): ReactElement {
     const bassNotes = applyBassGlidePadToNotes(currentBassNotes, pad.id);
     const changed = updateCurrentPattern(
       (pattern) => (sameBassNotes(pattern.bassNotes, bassNotes) ? pattern : { ...pattern, bassNotes }),
-      `${pad.label} 808 glide applied to Pattern ${projectRef.current.selectedPattern}`
+      `${pad.label} Bass glide applied to Pattern ${projectRef.current.selectedPattern}`
     );
     if (!changed) {
       setBassMoveResult(null);
-      setProjectStatus(`${pad.label} 808 glide already selected`);
+      setProjectStatus(`${pad.label} Bass glide already selected`);
       return;
     }
 
@@ -6002,14 +6003,14 @@ export function App(): ReactElement {
     const contour = bassContourDefinitions.find((candidate) => candidate.id === contourId);
     if (!contour) {
       setBassMoveResult(null);
-      setProjectStatus("808 contour pad not found");
+      setProjectStatus("Bass contour pad not found");
       return;
     }
 
     const currentBassNotes = projectRef.current.patterns[projectRef.current.selectedPattern].bassNotes;
     if (currentBassNotes.length === 0) {
       setBassMoveResult(null);
-      setProjectStatus(`Add an 808 note before using ${contour.label} contour`);
+      setProjectStatus(`Add a Bass note before using ${contour.label} contour`);
       return;
     }
 
@@ -6017,11 +6018,11 @@ export function App(): ReactElement {
     const bassNotes = applyBassContourToNotes(projectRef.current.key, currentBassNotes, contour.id);
     const changed = updateCurrentPattern(
       (pattern) => (sameBassNotes(pattern.bassNotes, bassNotes) ? pattern : { ...pattern, bassNotes }),
-      `${contour.label} 808 contour applied to Pattern ${projectRef.current.selectedPattern}`
+      `${contour.label} Bass contour applied to Pattern ${projectRef.current.selectedPattern}`
     );
     if (!changed) {
       setBassMoveResult(null);
-      setProjectStatus(`${contour.label} 808 contour already selected`);
+      setProjectStatus(`${contour.label} Bass contour already selected`);
       return;
     }
 
@@ -6153,7 +6154,7 @@ export function App(): ReactElement {
     );
   }
 
-  function updateSelectedGlide(glide: boolean, status = "Edited 808 glide"): void {
+  function updateSelectedGlide(glide: boolean, status = "Edited Bass glide"): void {
     if (!selectedNote || selectedNote.track !== "bass") {
       return;
     }
@@ -9742,16 +9743,16 @@ export function App(): ReactElement {
     const target = activeBassMoveQuickActionTarget(project, bassMovePreviewSummary);
     const routeLabel = target
       ? target.kind === "Bassline"
-        ? "808 Bassline route"
+        ? "Bassline route"
         : target.kind === "Glide"
-          ? "808 Glide route"
-          : "808 Contour route"
-      : "no 808 route";
+          ? "Bass Glide route"
+          : "Bass Contour route"
+      : "no Bass route";
     composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
       target
-        ? `808 Move Route Readout Pattern ${project.selectedPattern}: route ${routeLabel} / target ${target.label} ${target.kind} / direct command 808-move / ${bassMovePreviewSummary.moveLabel} / direct 808 move unchanged`
-        : `808 Move Route Readout Pattern ${project.selectedPattern}: ${bassMovePreviewSummary.statusLabel} / no 808 move route needed / ${bassMovePreviewSummary.moveLabel} / direct 808 move unchanged`
+        ? `Bass Move Route Readout Pattern ${project.selectedPattern}: route ${routeLabel} / target ${target.label} ${target.kind} / direct command 808-move / ${bassMovePreviewSummary.moveLabel} / direct Bass move unchanged`
+        : `Bass Move Route Readout Pattern ${project.selectedPattern}: ${bassMovePreviewSummary.statusLabel} / no Bass move route needed / ${bassMovePreviewSummary.moveLabel} / direct Bass move unchanged`
     );
   }
 
@@ -13484,7 +13485,7 @@ export function App(): ReactElement {
         </section>
 
         <section className="panel piano-panel" data-testid="note-editor-panel" aria-label="Bass and melody editor">
-          <PanelTitle icon={<KeyboardMusic size={18} />} title="808 / Melody" meta="scale locked grid" />
+          <PanelTitle icon={<KeyboardMusic size={18} />} title="Bass / Melody" meta={`${bassStyleLabel(style.bassStyle)} voice · scale locked grid`} />
           <details
             className="capture-ideas"
             data-testid="capture-ideas"
@@ -13500,7 +13501,7 @@ export function App(): ReactElement {
                 <small>Keyboard, MIDI, bass moves, and melody starters</small>
               </span>
               <span className="capture-ideas-context">
-                {keyboardCaptureTarget === "bass" ? "808" : "Synth"} · {keyboardCaptureEnabled ? "Keys armed" : "Keys off"} ·{" "}
+                {keyboardCaptureTarget === "bass" ? `${bassStyleLabel(style.bassStyle)} Bass` : "Synth"} · {keyboardCaptureEnabled ? "Keys armed" : "Keys off"} ·{" "}
                 {midiCaptureArmed ? "MIDI armed" : midiCaptureSummary.statusLabel}
               </span>
               <ArrowDown className="capture-ideas-chevron" size={16} aria-hidden="true" />
@@ -13547,7 +13548,7 @@ export function App(): ReactElement {
           </details>
           <div className="note-lanes">
             <NoteEditor
-              title="808"
+              title={`${bassStyleLabel(style.bassStyle)} Bass`}
               track="bass"
               notes={currentPattern.bassNotes}
               pitches={bassPitches}
@@ -13680,8 +13681,8 @@ export function App(): ReactElement {
                 <Device icon={<Drum size={17} />} name="Drum Rack" value={`${soundPresetLabel(project.sound.preset)} kit`} color="#78f0c8" />
                 <Device
                   icon={<Waves size={17} />}
-                  name="808 Engine"
-                  value={`drive ${percentLabel(project.sound.bassDrive)} / duck ${percentLabel(project.sound.sidechainDuck)}`}
+                  name="Bass Engine"
+                  value={`${bassStyleLabel(style.bassStyle)} voice / drive ${percentLabel(project.sound.bassDrive)} / duck ${percentLabel(project.sound.sidechainDuck)}`}
                   color="#ff7a4f"
                 />
                 <Device icon={<Music2 size={17} />} name="Synth" value={`${style.melodyStyle} / bright ${percentLabel(project.sound.synthBrightness)}`} color="#8aa8ff" />

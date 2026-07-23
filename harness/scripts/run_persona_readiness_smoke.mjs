@@ -19,7 +19,7 @@ const personaReadinessMarkdownPath = path.join(packageRoot, `${appName}-${packag
 const personaReadinessJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-persona-readiness.json`);
 const failures = [];
 const forbiddenSamplingText = /AudioClipEvent|sample import|sample browser|chop pads|sampler track|audio clip/i;
-const expectedPersonaArtifactLabels = ["Project file", "Full mix WAV", "Drums stem WAV", "808 stem WAV", "Synth stem WAV", "Chords stem WAV", "Arrangement MIDI", "Handoff Sheet"];
+const expectedPersonaArtifactLabels = ["Project file", "Full mix WAV", "Drums stem WAV", "Bass stem WAV", "Synth stem WAV", "Chords stem WAV", "Arrangement MIDI", "Handoff Sheet"];
 const expectedPersonaArtifactCount = expectedPersonaArtifactLabels.length;
 
 function check(condition, message) {
@@ -53,11 +53,15 @@ function checkNoSamplingText(text, label) {
 }
 
 function checkWavBytes(bytes, label) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   check(bytes.byteLength > 44, `${label} WAV should include audio data`);
   check(ascii(bytes, 0, 4) === "RIFF", `${label} WAV missing RIFF header`);
   check(ascii(bytes, 8, 4) === "WAVE", `${label} WAV missing WAVE header`);
   check(ascii(bytes, 12, 4) === "fmt ", `${label} WAV missing fmt chunk`);
   check(ascii(bytes, 36, 4) === "data", `${label} WAV missing data chunk`);
+  check(view.getUint32(28, true) === 264600, `${label} WAV must use 264600 byte rate`);
+  check(view.getUint16(32, true) === 6, `${label} WAV must use 6-byte block alignment`);
+  check(view.getUint16(34, true) === 24, `${label} WAV must use 24-bit samples`);
 }
 
 function styleProfile(workstation, styleId) {

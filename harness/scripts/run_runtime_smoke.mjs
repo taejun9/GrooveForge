@@ -17,11 +17,18 @@ async function blobBytes(blob) {
 }
 
 function checkWavBytes(bytes, label) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   check(bytes.byteLength > 44, `${label} WAV is too small`);
   check(ascii(bytes, 0, 4) === "RIFF", `${label} WAV missing RIFF header`);
   check(ascii(bytes, 8, 4) === "WAVE", `${label} WAV missing WAVE header`);
   check(ascii(bytes, 12, 4) === "fmt ", `${label} WAV missing fmt chunk`);
   check(ascii(bytes, 36, 4) === "data", `${label} WAV missing data chunk`);
+  check(view.getUint16(20, true) === 1, `${label} WAV must use PCM format 1`);
+  check(view.getUint16(22, true) === 2, `${label} WAV must be stereo`);
+  check(view.getUint32(24, true) === 44100, `${label} WAV must use 44100 Hz`);
+  check(view.getUint32(28, true) === 264600, `${label} WAV must use 264600 byte rate`);
+  check(view.getUint16(32, true) === 6, `${label} WAV must use 6-byte block alignment`);
+  check(view.getUint16(34, true) === 24, `${label} WAV must use 24-bit samples`);
 }
 
 const workstation = await import("../../src/domain/workstation.ts");
@@ -29,6 +36,8 @@ const render = await import("../../src/audio/render.ts");
 const midi = await import("../../src/audio/midi.ts");
 const handoff = await import("../../src/audio/handoff.ts");
 const deliveryBundle = await import("../../src/audio/deliveryBundle.ts");
+const bassVoice = await import("../../src/audio/bassVoice.ts");
+const soundcloud = await import("../../src/audio/soundcloud.ts");
 const downloads = await import("../../src/platform/downloads.ts");
 const localDraftLifecycle = await import("../../src/ui/localDraftLifecycle.ts");
 const projectCloseGuard = await import("../../src/ui/projectCloseGuard.ts");
@@ -38,6 +47,72 @@ const unsavedCloseDialog = await import("../../electron/unsavedCloseDialog.ts");
 const coreTrackTypes = new Set(["drum_rack", "bass_808", "synth", "chord", "fx_return", "master"]);
 const smokeKey = "F minor";
 const smokeScope = "sample-free first-run starter project plus all-style 8-bar beats with local project-file roundtrips, bounded mixer-topology recovery, Handoff Sheet checks, and mocked download-path checks without writing media artifacts";
+
+async function validateAllGenreBassVoiceRuntime() {
+  const styleIdsByVoice = {
+    "808": "trap",
+    sub: "rnb",
+    walking: "boom_bap",
+    pluck: "house",
+    reese: "experimental",
+    minimal: "lofi"
+  };
+  const baseProject = {
+    ...structuredClone(workstation.starterProject),
+    title: "All Genre Bass Voice Runtime Beat",
+    arrangement: [{ section: "Intro", pattern: "A", energy: 0.8, bars: 1, mutedTracks: [] }],
+    snapshots: []
+  };
+  const bassCrcByVoice = {};
+  const drumCrcs = [];
+  for (const [voice, styleId] of Object.entries(styleIdsByVoice)) {
+    const project = { ...structuredClone(baseProject), styleId };
+    const style = workstation.getStyle(project);
+    const profile = bassVoice.bassVoiceProfileForProject(project, project.sound);
+    const bassBytes = await blobBytes(render.createStemWavBlob(project, "bass_808"));
+    const drumBytes = await blobBytes(render.createStemWavBlob(project, "drum_rack"));
+    bassCrcByVoice[voice] = deliveryBundle.formatCrc32(deliveryBundle.crc32(bassBytes));
+    drumCrcs.push(deliveryBundle.formatCrc32(deliveryBundle.crc32(drumBytes)));
+    check(style.bassStyle === voice, `bass-voice:${voice} style route must resolve the expected voice`);
+    check(profile.label === bassVoice.bassStyleLabel(style.bassStyle), `bass-voice:${voice} profile label must match its style`);
+    checkWavBytes(bassBytes, `bass-voice:${voice} stem`);
+  }
+  check(new Set(Object.values(bassCrcByVoice)).size === Object.keys(styleIdsByVoice).length, "bass-voice: all six voices must render distinct bass stems from the same events and mix");
+  check(new Set(drumCrcs).size === 1, "bass-voice: changing only style Bass Voice must not change the Drums stem");
+
+  const baseNotes = baseProject.patterns.A.bassNotes.map((note) => ({ ...note, glide: false }));
+  const glideNotes = baseNotes.map((note, index) => ({ ...note, glide: index === 1 }));
+  const firstOnlyGlideNotes = baseNotes.map((note, index) => ({ ...note, glide: index === 0 }));
+  const projectWithNotes = (notes) => ({
+    ...structuredClone(baseProject),
+    styleId: "trap",
+    patterns: { ...structuredClone(baseProject.patterns), A: { ...structuredClone(baseProject.patterns.A), bassNotes: notes } }
+  });
+  const cleanBytes = await blobBytes(render.createStemWavBlob(projectWithNotes(baseNotes), "bass_808"));
+  const glideBytes = await blobBytes(render.createStemWavBlob(projectWithNotes(glideNotes), "bass_808"));
+  const firstOnlyGlideBytes = await blobBytes(render.createStemWavBlob(projectWithNotes(firstOnlyGlideNotes), "bass_808"));
+  check(deliveryBundle.crc32(cleanBytes) !== deliveryBundle.crc32(glideBytes), "bass-glide: a connected glide note must change the offline Bass stem");
+  check(deliveryBundle.crc32(cleanBytes) === deliveryBundle.crc32(firstOnlyGlideBytes), "bass-glide: a first note without a predecessor must remain safe and unchanged");
+  const outOfOrderNotes = [glideNotes[1], glideNotes[0], ...glideNotes.slice(2)];
+  const outOfOrderGlide = bassVoice.bassGlideProfile(outOfOrderNotes, 0, 0.5, 0.1);
+  check(
+    outOfOrderGlide?.startFrequency === workstation.noteToFrequency(glideNotes[0].pitch),
+    "bass-glide: the nearest earlier musical note must drive glide even when event storage order is not chronological"
+  );
+  check(deliveryBundle.crc32(glideBytes) === deliveryBundle.crc32(await blobBytes(render.createStemWavBlob(projectWithNotes(glideNotes), "bass_808"))), "bass-glide: immediate glide rerender must be deterministic");
+
+  const roundTrip = workstation.parseProjectFile(workstation.serializeProjectFile(projectWithNotes(glideNotes)));
+  check(roundTrip.mixer.some((channel) => channel.id === "bass_808"), "bass-voice-legacy: durable mixer id bass_808 must survive roundtrip");
+  check(roundTrip.arrangement.every((block) => block.mutedTracks.every((track) => track !== "bass")), "bass-voice-legacy: arrangement mute ids must remain compatible tokens");
+
+  const uploadSheet = soundcloud.createSoundCloudUploadSheet(baseProject);
+  check(uploadSheet.includes("# SoundCloud Upload Sheet"), "soundcloud-sheet: title must be present");
+  check(uploadSheet.includes("Initial privacy: Private") && uploadSheet.includes("Downloads: Off"), "soundcloud-sheet: private-first defaults must be present");
+  check(uploadSheet.includes("[RIGHTSHOLDER NAME — replace before upload]"), "soundcloud-sheet: rightsholder placeholder must be explicit");
+  check(!/oauth|access token|upload complete/i.test(uploadSheet), "soundcloud-sheet: local sheet must not claim credential or upload completion state");
+
+  return { voices: Object.keys(styleIdsByVoice).length, distinctBassStems: new Set(Object.values(bassCrcByVoice)).size, glideAudible: deliveryBundle.crc32(cleanBytes) !== deliveryBundle.crc32(glideBytes) };
+}
 
 function cloneMixerForSmoke() {
   return workstation.starterProject.mixer.map((channel) => ({
@@ -1414,6 +1489,7 @@ function validateHandoffSheet(project, label, analysis, stemAnalyses) {
     "Arrangement Blocks",
     "Export Meter",
     "Stem Meter",
+    "SoundCloud Preparation",
     "Notes"
   ]) {
     check(sheet.includes(section), `${label} Handoff Sheet missing ${section} section`);
@@ -1442,6 +1518,8 @@ function validateHandoffSheet(project, label, analysis, stemAnalyses) {
   });
 
   check(sheet.includes(`Status: ${analysis.status}`), `${label} Handoff Sheet should include export status`);
+  check(sheet.includes(`signed PCM ${analysis.bitDepth}-bit`), `${label} Handoff Sheet should include WAV bit depth`);
+  check(sheet.includes("Initial Privacy: Private") && sheet.includes("Downloads: Off"), `${label} Handoff Sheet should include safe SoundCloud defaults`);
   check(sheet.includes("Duration:"), `${label} Handoff Sheet should include export duration`);
   check(sheet.includes("Peak:"), `${label} Handoff Sheet should include export peak`);
   check(sheet.includes("RMS:"), `${label} Handoff Sheet should include export RMS`);
@@ -1663,6 +1741,7 @@ async function validateProjectExportSmoke(smokeCase) {
   const stemAnalyses = render.analyzeStemExports(project);
   const stemNames = render.stemWavFileNames(project);
   check(stemNames.length === render.stemTrackIds.length, `${label} stem file count should match stem track count`);
+  check(stemNames[1] === `${workstation.projectFileStem(project)}-bass-stem.wav`, `${label} public Bass stem filename should not expose the legacy bass_808 id`);
   for (const [index, track] of render.stemTrackIds.entries()) {
     const analysis = stemAnalyses[track];
     check(stemNames[index]?.endsWith("-stem.wav"), `${label} ${track} stem file name should end in -stem.wav`);
@@ -1763,6 +1842,7 @@ const localDraftWriteGateSummary = validateLocalDraftWriteGate();
 const projectCloseGuardSummary = validateProjectCloseGuard();
 const projectReplacementGuardSummary = validateProjectReplacementGuard();
 const projectSaveCompletionSummary = validateProjectSaveCompletion();
+const allGenreBassVoiceSummary = await validateAllGenreBassVoiceRuntime();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -1799,6 +1879,7 @@ console.log(`- Local draft write gate: ${localDraftWriteGateSummary.paths}/4 boo
 console.log(`- Project close guard: ${projectCloseGuardSummary.paths}/4 dirty/recovery paths / protected ${projectCloseGuardSummary.protectedPaths}/3 / synchronous draft refresh ${projectCloseGuardSummary.refreshPaths}/2 / save gates ${projectCloseGuardSummary.saveGates}/4 / native actions ${projectCloseGuardSummary.nativeActions}/3`);
 console.log(`- Project replacement guard: ${projectReplacementGuardSummary.paths}/4 dirty/recovery paths / protected loss paths ${projectReplacementGuardSummary.protectedPaths}/3`);
 console.log(`- Project Save completion: ${projectSaveCompletionSummary.paths}/4 async paths / stale completions ${projectSaveCompletionSummary.stalePaths}/2 / changed snapshot ${projectSaveCompletionSummary.changedPaths}/1 / close outcomes ${projectSaveCompletionSummary.closeAttempts}/5`);
+console.log(`- All-genre Bass Voice: ${allGenreBassVoiceSummary.distinctBassStems}/${allGenreBassVoiceSummary.voices} distinct voice stems / connected glide audible ${allGenreBassVoiceSummary.glideAudible ? "yes" : "no"} / durable bass_808 id preserved`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

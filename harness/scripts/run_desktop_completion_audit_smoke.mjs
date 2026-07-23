@@ -229,7 +229,7 @@ function buildRequirementAudit(input) {
     hasAll(readmeEn, ["Studio mode", "Quick Actions"]);
   const exportReady =
     hasAll(readinessDoc, ["A sample-free 8-bar beat can be generated and exported.", "All supported genres have editable starts."]) &&
-    hasAll(readme, ["가져온 오디오 없이 완성하는 8마디 비트", "실제 WAV 렌더", "44.1 kHz / 16-bit stereo PCM 디코딩"]) &&
+    hasAll(readme, ["가져온 오디오 없이 완성하는 8마디 비트", "실제 WAV 렌더", "44.1 kHz / 24-bit stereo signed PCM 디코딩"]) &&
     hasAll(readmeEn, ["sample-free 8-bar beat", "WAV headers"]);
   const desktopProjectIoReady =
     projectIoEvidenceReady(nativeProjectIo, "nativeProjectIoReady") &&

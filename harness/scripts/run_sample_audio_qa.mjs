@@ -44,6 +44,11 @@ async function blobToBuffer(blob) {
   return Buffer.from(await blob.arrayBuffer());
 }
 
+function readInt24Le(bytes, offset) {
+  const unsigned = bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16);
+  return unsigned & 0x800000 ? unsigned - 0x1000000 : unsigned;
+}
+
 function parseCanonicalPcmWav(bytes, label, musicalDurationSeconds) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const ascii = (start, length) => bytes.subarray(start, start + length).toString("ascii");
@@ -66,9 +71,9 @@ function parseCanonicalPcmWav(bytes, label, musicalDurationSeconds) {
   check(audioFormat === 1, `${label}: audio format must be integer PCM (1)`);
   check(channels === 2, `${label}: channel count must be stereo (2)`);
   check(sampleRate === 44100, `${label}: sample rate must be 44100 Hz`);
-  check(byteRate === 176400, `${label}: byte rate must be 176400`);
-  check(blockAlign === 4, `${label}: block alignment must be 4 bytes`);
-  check(bitsPerSample === 16, `${label}: samples must be 16-bit`);
+  check(byteRate === 264600, `${label}: byte rate must be 264600`);
+  check(blockAlign === 6, `${label}: block alignment must be 6 bytes`);
+  check(bitsPerSample === 24, `${label}: samples must be 24-bit`);
   check(ascii(36, 4) === "data", `${label}: missing data chunk`);
   check(dataSize === bytes.byteLength - 44, `${label}: data size does not match file length`);
   check(dataSize % blockAlign === 0, `${label}: data size must contain complete stereo frames`);
@@ -79,19 +84,23 @@ function parseCanonicalPcmWav(bytes, label, musicalDurationSeconds) {
   let fullScaleSamples = 0;
   let postBoundaryNonZeroSamples = 0;
   let postBoundaryPeak = 0;
+  let lowerByteActiveSamples = 0;
   let firstNonZeroFrame = null;
   const channelNonZeroSamples = Array.from({ length: channels }, () => 0);
-  const sampleCount = Math.floor(dataSize / 2);
+  const bytesPerSample = bitsPerSample / 8;
+  const sampleCount = Math.floor(dataSize / bytesPerSample);
   const frames = dataSize / blockAlign;
   const musicalBoundaryFrame = Math.max(0, Math.min(frames, Math.round(musicalDurationSeconds * sampleRate)));
   for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += 1) {
-    const raw = view.getInt16(44 + sampleIndex * 2, true);
-    const normalized = raw < 0 ? raw / 32768 : raw / 32767;
+    const sampleOffset = 44 + sampleIndex * bytesPerSample;
+    const raw = readInt24Le(bytes, sampleOffset);
+    const normalized = raw < 0 ? raw / 8388608 : raw / 8388607;
     const absolute = Math.abs(normalized);
     peak = Math.max(peak, absolute);
     squareSum += normalized * normalized;
     if (raw !== 0) {
       nonZeroSamples += 1;
+      if (bytes[sampleOffset] !== 0) lowerByteActiveSamples += 1;
       channelNonZeroSamples[sampleIndex % channels] += 1;
       if (firstNonZeroFrame === null) firstNonZeroFrame = Math.floor(sampleIndex / channels);
     }
@@ -99,14 +108,14 @@ function parseCanonicalPcmWav(bytes, label, musicalDurationSeconds) {
       if (raw !== 0) postBoundaryNonZeroSamples += 1;
       postBoundaryPeak = Math.max(postBoundaryPeak, absolute);
     }
-    if (raw === -32768 || raw === 32767) fullScaleSamples += 1;
+    if (raw === -8388608 || raw === 8388607) fullScaleSamples += 1;
   }
 
   const rms = sampleCount > 0 ? Math.sqrt(squareSum / sampleCount) : 0;
   let finalFramePeak = 0;
   for (let channel = 0; channel < channels && frames > 0; channel += 1) {
-    const raw = view.getInt16(44 + ((frames - 1) * channels + channel) * 2, true);
-    const normalized = raw < 0 ? raw / 32768 : raw / 32767;
+    const raw = readInt24Le(bytes, 44 + ((frames - 1) * channels + channel) * bytesPerSample);
+    const normalized = raw < 0 ? raw / 8388608 : raw / 8388607;
     finalFramePeak = Math.max(finalFramePeak, Math.abs(normalized));
   }
   return {
@@ -116,6 +125,8 @@ function parseCanonicalPcmWav(bytes, label, musicalDurationSeconds) {
     rmsDb: db(rms),
     nonZeroSamples,
     nonZeroPercent: sampleCount > 0 ? (nonZeroSamples / sampleCount) * 100 : 0,
+    lowerByteActiveSamples,
+    lowerByteActivePercent: nonZeroSamples > 0 ? (lowerByteActiveSamples / nonZeroSamples) * 100 : 0,
     channelNonZeroSamples,
     fullScaleSamples,
     musicalDurationSeconds,
@@ -133,6 +144,7 @@ function validateDecodedAudio(decoded, analysis, expectedTailDurationSeconds, re
   check(Math.abs(decoded.tailDurationSeconds - expectedTailDurationSeconds) <= durationTolerance, `${label}: decoded WAV must preserve the expected export tail within one frame`);
   check(decoded.nonZeroSamples > 0, `${label}: decoded PCM must not be silent`);
   check(decoded.nonZeroPercent >= 0.01, `${label}: decoded PCM nonzero population is unexpectedly sparse`);
+  check(decoded.lowerByteActivePercent >= 50, `${label}: 24-bit lower byte activity is too low and may be zero-padded 16-bit audio`);
   check(decoded.channelNonZeroSamples.every((count) => count > 0), `${label}: both stereo channels must contain audio`);
   check(Number.isFinite(decoded.peakDb), `${label}: decoded peak must be finite`);
   check(Number.isFinite(decoded.rmsDb), `${label}: decoded RMS must be finite`);
@@ -163,7 +175,7 @@ async function renderArtifact({ blobFactory, analysis, fileName, label, caseRoot
       ...decoded,
       durationSeconds: round(decoded.durationSeconds), musicalDurationSeconds: round(decoded.musicalDurationSeconds),
       tailDurationSeconds: round(decoded.tailDurationSeconds), peakDb: round(decoded.peakDb), rmsDb: round(decoded.rmsDb),
-      nonZeroPercent: round(decoded.nonZeroPercent), postBoundaryPeak: round(decoded.postBoundaryPeak), finalFramePeak: round(decoded.finalFramePeak)
+      nonZeroPercent: round(decoded.nonZeroPercent), lowerByteActivePercent: round(decoded.lowerByteActivePercent), postBoundaryPeak: round(decoded.postBoundaryPeak), finalFramePeak: round(decoded.finalFramePeak)
     },
     rendererAnalysis: {
       ...analysis,
@@ -1291,7 +1303,7 @@ function markdownReport(report) {
     `## Snapshot Runtime Safety\n\nA direct snapshot source of **${snapshotRuntimeSafety.source.bpm} BPM / ${snapshotRuntimeSafety.source.key} / ${snapshotRuntimeSafety.source.bars} bars / ${snapshotRuntimeSafety.source.energy * 100}% / ${snapshotRuntimeSafety.source.notesLength} note characters** is stored and restored as **${snapshotRuntimeSafety.repaired.bpm} BPM / ${snapshotRuntimeSafety.repaired.key} / ${snapshotRuntimeSafety.repaired.bars} bar / ${snapshotRuntimeSafety.repaired.energy * 100}% / ${snapshotRuntimeSafety.repaired.notesLength} characters**. The producer-facing summary is **${snapshotRuntimeSafety.summary}**, and restored/direct versus imported WAV, MIDI, and Handoff output match without source mutation.\n\n| Local WAV | Local MIDI | Local Handoff | Delivered | Peak | RMS | Handoff bytes | Tail content | Zero end |\n|---|---|---|---:|---:|---:|---:|---|---|\n| \`${snapshotRuntimeSafety.artifact.path}\` | \`${snapshotRuntimeSafety.midi.path}\` | \`${snapshotRuntimeSafety.handoff.path}\` | ${snapshotRuntimeSafety.artifact.decoded.durationSeconds.toFixed(2)} s | ${snapshotRuntimeSafety.artifact.decoded.peakDb.toFixed(2)} dB | ${snapshotRuntimeSafety.artifact.decoded.rmsDb.toFixed(2)} dB | ${snapshotRuntimeSafety.handoff.bytes} | ${snapshotRuntimeSafety.artifact.decoded.postBoundaryNonZeroSamples > 0 ? "yes" : "no"} | ${snapshotRuntimeSafety.artifact.decoded.finalFramePeak === 0 ? "yes" : "no"} |\n\n` +
     `## Export Tail Safety\n\nExpected tail length and digital-zero ending: **${report.tailSafety.allArtifactsSafe ? "yes" : "no"}** (${report.tailSafety.zeroEndedCount}/${report.tailSafety.artifactCount} artifacts). Full mixes preserving post-boundary content: **${report.tailSafety.fullMixTailContentCount}/${report.tailSafety.fullMixCount}**.\n\n` +
     `## Render Isolation\n\nUnrelated edits isolated: **${report.renderIsolation.unrelatedEditsIsolated ? "yes" : "no"}** (${report.renderIsolation.unrelatedEditCount} cases). Target mixer sensitivity: **${report.renderIsolation.targetMixerSensitive ? "yes" : "no"}**. Noise-sound sensitivity: **${report.renderIsolation.noiseSoundSensitive ? "yes" : "no"}**. Drums solo equals Drums stem: **${report.renderIsolation.soloMatchesStem ? "yes" : "no"}**.\n\n` +
-    `Checks: canonical stereo PCM WAV, 44.1kHz, 16-bit, complete frames, audible decoded PCM, musical-boundary tail preservation, terminal digital zero, analysis agreement, ceiling safety, no digital full-scale samples, unique stems, and byte-identical immediate rerender.\n`;
+    `Checks: canonical stereo PCM WAV, 44.1kHz, 24-bit, complete frames, real lower-byte activity, audible decoded PCM, musical-boundary tail preservation, terminal digital zero, analysis agreement, ceiling safety, no digital full-scale samples, unique stems, and byte-identical immediate rerender.\n`;
 }
 
 await rm(outputRoot, { recursive: true, force: true });

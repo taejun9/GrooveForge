@@ -12821,7 +12821,7 @@ export function createHandoffExportFormatSummary(
   const stemFiles = stemWavFileNames(project);
   const target = activeDeliveryTarget(project);
   const briefFields = sessionBriefFilledFields(project.sessionBrief);
-  const formatLabel = `${sampleRateLabel(analysis.sampleRate)} ${channelCountLabel(analysis.channels)} WAV`;
+  const formatLabel = `${sampleRateLabel(analysis.sampleRate)} ${channelCountLabel(analysis.channels)} ${analysis.bitDepth}-bit PCM WAV`;
   const durationLabel = `${formatExportDuration(analysis.durationSeconds)} / ${barCountLabel(bars)}`;
   const exportTone = analysis.status === "Silent" ? "danger" : analysis.status === "Ready" ? "good" : "warn";
   const stemTone = audibleStems.length === stemTrackIds.length ? "good" : audibleStems.length > 0 ? "warn" : "danger";

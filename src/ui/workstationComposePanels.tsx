@@ -765,10 +765,10 @@ export function BasslinePads({
   return (
     <div className="bassline-pad-panel" data-testid="bassline-pads">
       <div className="bassline-pad-heading">
-        <span>808 Basslines</span>
+        <span>Basslines</span>
         <strong>Low end</strong>
       </div>
-      <div className="bassline-pad-row" aria-label="808 Bassline Pads">
+      <div className="bassline-pad-row" aria-label="Bassline Pads">
         {pads.map((pad) => (
           <button
             data-testid={`bassline-pad-${pad.id}`}
@@ -797,10 +797,10 @@ export function BassGlidePads({
   return (
     <div className="bass-glide-panel" data-testid="bass-glide-pads">
       <div className="bass-glide-heading">
-        <span>808 Glide</span>
+        <span>Bass Glide</span>
         <strong>Length + Chance</strong>
       </div>
-      <div className="bass-glide-row" aria-label="808 Glide Pads">
+      <div className="bass-glide-row" aria-label="Bass Glide Pads">
         {pads.map((pad) => (
           <button
             data-testid={`bass-glide-${pad.id}`}
@@ -829,10 +829,10 @@ export function BassContourPads({
   return (
     <div className="bass-contour-panel" data-testid="bass-contour-pads">
       <div className="bass-contour-heading">
-        <span>808 Contour</span>
+        <span>Bass Contour</span>
         <strong>Pitch Shape</strong>
       </div>
-      <div className="bass-contour-row" aria-label="808 Contour Pads">
+      <div className="bass-contour-row" aria-label="Bass Contour Pads">
         {contours.map((contour) => (
           <button
             data-testid={`bass-contour-${contour.id}`}
@@ -1155,7 +1155,7 @@ export function KeyboardCapturePanel({
             className={defaults.glide ? "mini-toggle selected" : "mini-toggle"}
             data-testid="keyboard-capture-glide"
             onClick={() => onDefaultsChange({ glide: !defaults.glide })}
-            title="Toggle captured 808 glide"
+            title="Toggle captured Bass glide"
             type="button"
           >
             Glide {defaults.glide ? "On" : "Off"}

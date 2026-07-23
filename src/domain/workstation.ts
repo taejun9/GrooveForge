@@ -20,13 +20,15 @@ export type StyleId =
   | "garage"
   | "experimental";
 
+export type BassStyle = "808" | "sub" | "walking" | "pluck" | "reese" | "minimal";
+
 export type StyleProfile = {
   id: StyleId;
   name: string;
   bpmRange: [number, number];
   defaultBpm: number;
   defaultSwing: number;
-  bassStyle: "808" | "sub" | "walking" | "pluck" | "reese" | "minimal";
+  bassStyle: BassStyle;
   melodyStyle: "riff" | "chordal" | "loop" | "ambient" | "none";
   color: string;
 };
@@ -291,7 +293,7 @@ export const maxProjectMixerChannels = requiredMixerChannelIds.length;
 type RequiredMixerChannelId = (typeof requiredMixerChannelIds)[number];
 const defaultRequiredMixerChannels: Record<RequiredMixerChannelId, MixerChannel> = {
   drum_rack: { id: "drum_rack", name: "Drums", volumeDb: -4, pan: 0, lowCut: 0.08, air: 0.24, drive: 0.16, glue: 0.26, send: 0.14, muted: false, solo: false, accent: "#78f0c8" },
-  bass_808: { id: "bass_808", name: "808", volumeDb: -6, pan: 0, lowCut: 0, air: 0.1, drive: 0.22, glue: 0.18, send: 0.04, muted: false, solo: false, accent: "#ff7a4f" },
+  bass_808: { id: "bass_808", name: "Bass", volumeDb: -6, pan: 0, lowCut: 0, air: 0.1, drive: 0.22, glue: 0.18, send: 0.04, muted: false, solo: false, accent: "#ff7a4f" },
   synth: { id: "synth", name: "Synth", volumeDb: -8, pan: -12, lowCut: 0.18, air: 0.36, drive: 0.08, glue: 0.12, send: 0.26, muted: false, solo: false, accent: "#8aa8ff" },
   chord: { id: "chord", name: "Chord", volumeDb: -10, pan: 16, lowCut: 0.12, air: 0.28, drive: 0.06, glue: 0.18, send: 0.32, muted: false, solo: false, accent: "#d58cff" },
   master: { id: "master", name: "Master", volumeDb: -1, pan: 0, lowCut: 0, air: 0, drive: 0, glue: 0, send: 0, muted: false, solo: false, accent: "#f0c36a" }
@@ -324,7 +326,7 @@ export const patternChainLabels: Record<PatternChainId, string> = {
 };
 export const arrangementMuteTrackLabels: Record<ArrangementMuteTrack, string> = {
   drum_rack: "Drums",
-  bass_808: "808",
+  bass_808: "Bass",
   synth: "Synth",
   chord: "Chords"
 };
@@ -432,7 +434,7 @@ export const patternVariationPresetLabels: Record<PatternVariationPreset, string
 };
 export const patternFillPresetLabels: Record<PatternFillPreset, string> = {
   drum_fill: "Drum Fill",
-  bass_pickup: "808 Pickup",
+  bass_pickup: "Bass Pickup",
   melody_turn: "Melody Turn",
   clear_tail: "Clear Tail"
 };
