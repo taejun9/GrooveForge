@@ -9,6 +9,7 @@ import { createServer } from "vite";
 const failures = [];
 const styles = readFileSync(new URL("../../src/styles.css", import.meta.url), "utf8");
 const appSource = readFileSync(new URL("../../src/ui/App.tsx", import.meta.url), "utf8");
+const workstationSource = readFileSync(new URL("../../src/domain/workstation.ts", import.meta.url), "utf8");
 const electronMainSource = readFileSync(new URL("../../electron/main.ts", import.meta.url), "utf8");
 const composePanelsSource = readFileSync(new URL("../../src/ui/workstationComposePanels.tsx", import.meta.url), "utf8");
 const graphSource = readFileSync(new URL("../../src/ui/workstationAppQuickActionGraph.ts", import.meta.url), "utf8");
@@ -1317,7 +1318,7 @@ function validateFirstRunRenderer(html) {
       styles.includes('"launch launch commands"') &&
       styles.includes("grid-template-columns: 220px minmax(0, 1fr) 340px;") &&
       styles.includes(".brand-start {\n    display: contents;") &&
-      styles.includes("grid-template-columns: 127px 68px 104px 100px minmax(0, 1fr);") &&
+      styles.includes("grid-template-columns: minmax(100px, 127px) minmax(56px, 68px) 96px minmax(84px, 100px) 72px minmax(125px, 1fr);") &&
       styles.includes("grid-template-columns: minmax(180px, 0.85fr) repeat(2, minmax(190px, 1fr));") &&
       styles.includes(".command-strip .transport-essential-controls,") &&
       styles.includes("grid-template-columns: repeat(4, minmax(0, 1fr));") &&
@@ -1332,7 +1333,7 @@ function validateFirstRunRenderer(html) {
       styles.includes('"launch launch"') &&
       styles.includes('"commands commands"') &&
       styles.includes("grid-template-columns: 200px minmax(0, 1fr);") &&
-      styles.includes("grid-template-columns: 140px 64px 104px 100px minmax(0, 1fr);") &&
+      styles.includes("grid-template-columns: minmax(110px, 140px) minmax(56px, 64px) 96px minmax(84px, 100px) 72px minmax(125px, 1fr);") &&
       styles.includes("grid-template-columns: minmax(180px, 0.8fr) repeat(2, minmax(190px, 1fr));") &&
       styles.includes(".command-strip .transport-essential-controls {") &&
       styles.includes("grid-column: 2 / 4;") &&
@@ -1470,9 +1471,37 @@ function validateFirstRunRenderer(html) {
       styles.includes(".tempo-nudge-pads button strong,") &&
       styles.includes(".tempo-nudge-pads button small {") &&
       styles.includes("min-height: 25px;") &&
-      styles.includes("grid-template-columns: 127px 68px 104px 100px minmax(0, 1fr);") &&
-      styles.includes("grid-template-columns: 140px 64px 104px 100px minmax(0, 1fr);"),
+      styles.includes("grid-template-columns: minmax(100px, 127px) minmax(56px, 68px) 96px minmax(84px, 100px) 72px minmax(125px, 1fr);") &&
+      styles.includes("grid-template-columns: minmax(110px, 140px) minmax(56px, 64px) 96px minmax(84px, 100px) 72px minmax(125px, 1fr);"),
     "Tempo Nudge pads should retain a contained readable two-by-two setup-row treatment at wide and minimum desktop widths"
+  );
+  const bpmInputIndex = html.indexOf('data-testid="project-bpm-input"');
+  const keySelectIndex = html.indexOf('data-testid="project-key-select"');
+  const timeSignatureIndex = html.indexOf('data-testid="project-time-signature"');
+  const styleSelectIndex = html.indexOf('data-testid="style-select"');
+  check(
+    bpmInputIndex >= 0 &&
+      keySelectIndex > bpmInputIndex &&
+      timeSignatureIndex > keySelectIndex &&
+      styleSelectIndex > timeSignatureIndex &&
+      html.includes('aria-label="Project BPM"') &&
+      html.includes('aria-label="Project key"') &&
+      html.includes('aria-label="Time signature 4/4, fixed grid"') &&
+      html.includes('title="GrooveForge currently uses a fixed 4/4 project grid"') &&
+      html.includes('data-testid="project-time-signature-value"') &&
+      html.includes("<strong>4/4</strong>") &&
+      html.includes("<small>Fixed grid</small>"),
+    "Project setup should expose editable BPM and Key followed by an honest read-only 4/4 Time signature before Style"
+  );
+  check(
+    appSource.includes('projectTimeSignature') &&
+      workstationSource.includes('export const projectTimeSignature = "4/4" as const;') &&
+      styles.includes(".time-signature-field output,") &&
+      styles.includes(".time-signature-field strong,") &&
+      styles.includes(".time-signature-field small {") &&
+      styles.includes("text-overflow: clip;") &&
+      styles.includes("white-space: nowrap;"),
+    "Time signature should reuse the domain-owned fixed meter and retain a contained two-line setup treatment"
   );
   const transportBandIndex = html.indexOf('data-testid="workflow-target-transport"');
   const transportStatusControlsIndex = html.indexOf('data-testid="transport-status-controls"');
@@ -1503,6 +1532,9 @@ function validateFirstRunRenderer(html) {
   check(
     [
       'data-testid="project-title-input"',
+      'data-testid="project-bpm-input"',
+      'data-testid="project-key-select"',
+      'data-testid="project-time-signature"',
       'aria-keyshortcuts="Control+K Meta+K"',
       'aria-keyshortcuts="? Control+/ Meta+/"',
       'aria-keyshortcuts="Space"',

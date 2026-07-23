@@ -796,6 +796,7 @@ h2 {
 
 .field input,
 .field select,
+.time-signature-field output,
 .master-panel select {
   min-height: 36px;
   border: 1px solid rgba(244, 239, 231, 0.13);
@@ -803,6 +804,45 @@ h2 {
   color: #f4efe7;
   background: #141413;
   padding: 0 10px;
+}
+
+.time-signature-field {
+  min-width: 0;
+}
+
+.time-signature-field > span {
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.time-signature-field output {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  gap: 1px;
+  padding-block: 3px;
+  text-align: center;
+}
+
+.time-signature-field strong,
+.time-signature-field small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.time-signature-field strong {
+  font-size: 12px;
+  line-height: 1.05;
+}
+
+.time-signature-field small {
+  color: rgba(120, 240, 200, 0.72);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.05;
 }
 
 .field select {
@@ -4947,7 +4987,7 @@ h2 {
   .transport-controls {
     display: grid;
     grid-area: setup;
-    grid-template-columns: 127px 68px 104px 100px minmax(0, 1fr);
+    grid-template-columns: minmax(100px, 127px) minmax(56px, 68px) 96px minmax(84px, 100px) 72px minmax(125px, 1fr);
     align-items: end;
     min-height: 55px;
   }
@@ -5118,7 +5158,7 @@ h2 {
   .transport-controls {
     display: grid;
     grid-area: setup;
-    grid-template-columns: 140px 64px 104px 100px minmax(0, 1fr);
+    grid-template-columns: minmax(110px, 140px) minmax(56px, 64px) 96px minmax(84px, 100px) 72px minmax(125px, 1fr);
     align-items: end;
     min-height: 55px;
   }
