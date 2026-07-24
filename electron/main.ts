@@ -1,8 +1,17 @@
 import { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import type { MenuItemConstructorOptions, OpenDialogOptions, SaveDialogOptions } from "electron";
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { rmSync } from "node:fs";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ProjectLibrary } from "./projectLibrary.js";
+import {
+  atomicWriteUtf8File,
+  ensureProjectWorkspace,
+  resolveProjectWorkspacePaths,
+  type ProjectWorkspacePaths
+} from "./projectWorkspace.js";
 import {
   keepEditingChoiceId,
   resolveUnsavedCloseAction,
@@ -17,6 +26,11 @@ const closeWindowChannel = "grooveforge:close-window";
 const isLaunchSmoke = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1";
 const isProjectIoSmoke = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE === "1";
 const isCloseFlowSmoke = process.env.GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE === "1";
+const isDesktopSmoke = isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke;
+const ownsSingleInstanceLock = isDesktopSmoke || app.requestSingleInstanceLock();
+if (!ownsSingleInstanceLock) {
+  app.quit();
+}
 const launchSmokeDrumGridSnapshotChannel = "grooveforge:launch-smoke-drum-grid-snapshot";
 const launchSmokeNoteGridSnapshotChannel = "grooveforge:launch-smoke-note-grid-snapshot";
 const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
@@ -613,6 +627,7 @@ type ProjectIoSmokeEvidence = {
   defaultName: string;
   hasOpenProject: boolean;
   hasPreloadBridge: boolean;
+  hasRecoveryBridge: boolean;
   hasSaveProject: boolean;
   location: string;
   launchpadCollapsedAfterUiOpen: boolean;
@@ -623,10 +638,18 @@ type ProjectIoSmokeEvidence = {
     filePath?: string;
   };
   readyState: string;
+  recoveryResult: {
+    cleared: boolean;
+    contentsMatched: boolean;
+    emptyAfterClear: boolean;
+    narrowSaveResponse: boolean;
+    savedAtReady: boolean;
+  };
   projectOpenButtonPresent: boolean;
   samplingTextPresent: boolean;
   saveResult: {
     canceled: boolean;
+    databaseStored?: boolean;
     filePath?: string;
   };
   sourceLength: number;
@@ -666,6 +689,28 @@ const closeFlowSmokeState: CloseFlowSmokeState = {
 const projectFilters = [{ name: "GrooveForge Project", extensions: ["json"] }];
 let updateHandlersRegistered = false;
 let updateCheckInProgress = false;
+let recoveryOperationQueue: Promise<void> = Promise.resolve();
+let projectLibraryInstance: ProjectLibrary | null = null;
+let generatedSmokeWorkspaceRoot: string | null = null;
+
+function closeProjectStorage(): void {
+  projectLibraryInstance?.close();
+  projectLibraryInstance = null;
+  if (!generatedSmokeWorkspaceRoot) {
+    return;
+  }
+  try {
+    rmSync(generatedSmokeWorkspaceRoot, { recursive: true, force: true });
+  } catch {
+    console.warn("Unable to remove generated desktop smoke workspace.");
+  }
+  generatedSmokeWorkspaceRoot = null;
+}
+
+function exitDesktopSmoke(exitCode: number): void {
+  closeProjectStorage();
+  app.exit(exitCode);
+}
 
 function isSaveProjectPayload(value: unknown): value is SaveProjectPayload {
   return (
@@ -675,8 +720,67 @@ function isSaveProjectPayload(value: unknown): value is SaveProjectPayload {
     "defaultName" in value &&
     typeof value.contents === "string" &&
     value.contents.length <= maxNativeProjectFileCharacters &&
-    typeof value.defaultName === "string"
+    typeof value.defaultName === "string" &&
+    value.defaultName.length > 0 &&
+    value.defaultName.length <= 512 &&
+    value.defaultName !== "." &&
+    value.defaultName !== ".." &&
+    !/[\\/]/u.test(value.defaultName)
   );
+}
+
+function isRecoveryProjectPayload(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= maxNativeProjectFileCharacters &&
+    Buffer.byteLength(value, "utf8") <= maxNativeProjectFileBytes
+  );
+}
+
+function desktopProjectWorkspace(): ProjectWorkspacePaths {
+  const isWorkspaceSmoke = isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke;
+  const configuredSmokeRoot = process.env.GROOVEFORGE_DESKTOP_WORKSPACE_ROOT;
+  const smokeRoot = isWorkspaceSmoke
+    ? configuredSmokeRoot ?? path.join(app.getPath("temp"), `GrooveForge-${process.pid}-smoke`)
+    : undefined;
+  if (isWorkspaceSmoke && !configuredSmokeRoot && smokeRoot) {
+    generatedSmokeWorkspaceRoot = smokeRoot;
+  }
+  return resolveProjectWorkspacePaths(app.getPath("home"), smokeRoot);
+}
+
+async function projectLibrary(workspace: ProjectWorkspacePaths): Promise<ProjectLibrary> {
+  await ensureProjectWorkspace(workspace);
+  projectLibraryInstance ??= new ProjectLibrary(workspace.databaseFile);
+  return projectLibraryInstance;
+}
+
+async function existingProjectLibrary(workspace: ProjectWorkspacePaths): Promise<ProjectLibrary | null> {
+  if (projectLibraryInstance) {
+    return projectLibraryInstance;
+  }
+  try {
+    const databaseStats = await stat(workspace.databaseFile);
+    if (!databaseStats.isFile()) {
+      throw new Error("GrooveForge SQLite project library path is not a regular file.");
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+  return projectLibrary(workspace);
+}
+
+function runRecoveryOperation<T>(operation: () => Promise<T>): Promise<T> {
+  const result = recoveryOperationQueue.then(operation, operation);
+  recoveryOperationQueue = result.then(
+    () => undefined,
+    () => undefined
+  );
+  return result;
 }
 
 function sendMenuCommand(command: NativeMenuCommand): void {
@@ -898,6 +1002,8 @@ function createNativeCommandMenu(): Menu {
 }
 
 function registerProjectFileHandlers(): void {
+  const workspace = desktopProjectWorkspace();
+
   ipcMain.on(closeWindowChannel, (event) => {
     if (isCloseFlowSmoke) {
       closeFlowSmokeState.closeRequestCount += 1;
@@ -911,10 +1017,11 @@ function registerProjectFileHandlers(): void {
       throw new Error("Invalid save project payload.");
     }
 
+    await ensureProjectWorkspace(workspace);
     const browserWindow = BrowserWindow.fromWebContents(event.sender);
     const options: SaveDialogOptions = {
       title: "Save GrooveForge Project",
-      defaultPath: payload.defaultName,
+      defaultPath: path.join(workspace.projects, payload.defaultName),
       filters: projectFilters
     };
     const smokeFilePath = projectIoSmokePath() ?? closeFlowSmokePath();
@@ -933,17 +1040,28 @@ function registerProjectFileHandlers(): void {
       closeFlowSmokeState.nativeSavePath = result.filePath;
       closeFlowSmokeState.events.push("native-save-started");
     }
-    await writeFile(result.filePath, payload.contents, "utf8");
+    await atomicWriteUtf8File(result.filePath, payload.contents, maxNativeProjectFileCharacters);
+    let databaseStored = true;
+    try {
+      const library = await projectLibrary(workspace);
+      const storageKey = createHash("sha256").update(path.resolve(result.filePath)).digest("hex");
+      library.recordSavedProject(storageKey, path.basename(result.filePath), payload.contents);
+    } catch {
+      databaseStored = false;
+      console.warn("SQLite project library update failed after the project file was saved.");
+    }
     if (isCloseFlowSmoke) {
       closeFlowSmokeState.events.push("native-save-completed");
     }
-    return { canceled: false, filePath: result.filePath };
+    return { canceled: false, filePath: result.filePath, databaseStored };
   });
 
   ipcMain.handle("grooveforge:open-project", async (event) => {
+    await ensureProjectWorkspace(workspace);
     const browserWindow = BrowserWindow.fromWebContents(event.sender);
     const options: OpenDialogOptions = {
       title: "Open GrooveForge Project",
+      defaultPath: workspace.projects,
       filters: projectFilters,
       properties: ["openFile"]
     };
@@ -965,6 +1083,31 @@ function registerProjectFileHandlers(): void {
     const contents = await readFile(filePath, "utf8");
     return { canceled: false, filePath, contents };
   });
+
+  ipcMain.handle("grooveforge:save-project-recovery", (_event, payload: unknown) => {
+    if (!isRecoveryProjectPayload(payload)) {
+      throw new Error("Invalid project recovery payload.");
+    }
+    return runRecoveryOperation(async () => {
+      const library = await projectLibrary(workspace);
+      return { savedAt: library.saveRecovery(payload).savedAt };
+    });
+  });
+
+  ipcMain.handle("grooveforge:load-project-recovery", () =>
+    runRecoveryOperation(async () => {
+      const library = await existingProjectLibrary(workspace);
+      return library?.loadRecovery() ?? null;
+    })
+  );
+
+  ipcMain.handle("grooveforge:clear-project-recovery", () =>
+    runRecoveryOperation(async () => {
+      const library = await existingProjectLibrary(workspace);
+      library?.clearRecovery();
+      return { cleared: true };
+    })
+  );
 }
 
 function projectIoSmokePath(): string | null {
@@ -979,17 +1122,17 @@ function closeFlowSmokePath(): string | null {
 
 function launchSmokeFailure(message: string, details: Record<string, unknown> = {}): void {
   console.error(`${launchSmokeResultPrefix}${JSON.stringify({ ok: false, message, ...details })}`);
-  app.exit(1);
+  exitDesktopSmoke(1);
 }
 
 function projectIoSmokeFailure(message: string, details: Record<string, unknown> = {}): void {
   console.error(`${projectIoSmokeResultPrefix}${JSON.stringify({ ok: false, message, ...details })}`);
-  app.exit(1);
+  exitDesktopSmoke(1);
 }
 
 function closeFlowSmokeFailure(message: string, details: Record<string, unknown> = {}): void {
   console.error(`${closeFlowSmokeResultPrefix}${JSON.stringify({ ok: false, message, ...details })}`);
-  app.exit(1);
+  exitDesktopSmoke(1);
 }
 
 function launchSmokeFailures(evidence: LaunchSmokeEvidence): string[] {
@@ -4060,6 +4203,10 @@ async function collectProjectIoSmokeEvidence(win: BrowserWindow): Promise<Projec
       const bodyText = document.body?.textContent ?? "";
       const saveResult = await bridge?.saveProject?.(sourceContents, defaultName);
       const openResult = await bridge?.openProject?.();
+      const recoverySaveResult = await bridge?.saveProjectRecovery?.(sourceContents);
+      const recoveryLoadResult = await bridge?.loadProjectRecovery?.();
+      const recoveryClearResult = await bridge?.clearProjectRecovery?.();
+      const recoveryAfterClear = await bridge?.loadProjectRecovery?.();
       const projectOpenButton = document.querySelector('[data-testid="project-open"]');
       projectOpenButton?.click();
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -4068,6 +4215,10 @@ async function collectProjectIoSmokeEvidence(win: BrowserWindow): Promise<Projec
         defaultName,
         hasOpenProject: typeof bridge?.openProject === "function",
         hasPreloadBridge: Boolean(bridge),
+        hasRecoveryBridge:
+          typeof bridge?.saveProjectRecovery === "function" &&
+          typeof bridge?.loadProjectRecovery === "function" &&
+          typeof bridge?.clearProjectRecovery === "function",
         hasSaveProject: typeof bridge?.saveProject === "function",
         location: window.location.href,
         launchpadCollapsedAfterUiOpen:
@@ -4079,10 +4230,23 @@ async function collectProjectIoSmokeEvidence(win: BrowserWindow): Promise<Projec
           filePath: openResult?.filePath
         },
         readyState: document.readyState,
+        recoveryResult: {
+          cleared: recoveryClearResult?.cleared === true,
+          contentsMatched: recoveryLoadResult?.contents === sourceContents,
+          emptyAfterClear: recoveryAfterClear === null,
+          narrowSaveResponse:
+            recoverySaveResult !== null &&
+            typeof recoverySaveResult === "object" &&
+            !("contents" in recoverySaveResult),
+          savedAtReady:
+            typeof recoverySaveResult?.savedAt === "string" &&
+            recoverySaveResult.savedAt === recoveryLoadResult?.savedAt
+        },
         projectOpenButtonPresent: projectOpenButton !== null,
         samplingTextPresent: /AudioClipEvent|sample import|sample browser|chop pads|sampler track|audio clip/i.test(bodyText),
         saveResult: {
           canceled: saveResult?.canceled === true,
+          databaseStored: saveResult?.databaseStored,
           filePath: saveResult?.filePath
         },
         sourceLength: sourceContents.length,
@@ -4108,8 +4272,8 @@ function projectIoSmokeFailures(evidence: ProjectIoSmokeEvidence): string[] {
   if (evidence.appKind !== "desktop") {
     failures.push(`preload appKind should be desktop, got ${String(evidence.appKind)}`);
   }
-  if (!evidence.hasPreloadBridge || !evidence.hasSaveProject || !evidence.hasOpenProject) {
-    failures.push("preload bridge should expose appKind, saveProject, and openProject");
+  if (!evidence.hasPreloadBridge || !evidence.hasSaveProject || !evidence.hasOpenProject || !evidence.hasRecoveryBridge) {
+    failures.push("preload bridge should expose project file and recovery operations");
   }
   if (!evidence.projectOpenButtonPresent || !evidence.launchpadCollapsedAfterUiOpen) {
     failures.push("project Open UI should load the configured project and collapse the first-run launchpad");
@@ -4131,6 +4295,15 @@ function projectIoSmokeFailures(evidence: ProjectIoSmokeEvidence): string[] {
   }
   if (evidence.openResult.contentsMatched !== true) {
     failures.push("native openProject should return the exact saved project contents");
+  }
+  if (
+    !evidence.recoveryResult.contentsMatched ||
+    !evidence.recoveryResult.savedAtReady ||
+    !evidence.recoveryResult.cleared ||
+    !evidence.recoveryResult.emptyAfterClear ||
+    !evidence.recoveryResult.narrowSaveResponse
+  ) {
+    failures.push("native SQLite recovery should save, load, and clear the exact project contents");
   }
   if (evidence.samplingTextPresent) {
     failures.push("renderer should not expose sampling-first language in project IO smoke");
@@ -4401,7 +4574,7 @@ function installLaunchSmoke(win: BrowserWindow): void {
                           console.log(
                             `${launchSmokeResultPrefix}${JSON.stringify({ ok: true, evidence: { ...evidenceWithCommandReference, visual: visualEvidence } })}`
                           );
-                          app.exit(0);
+                          exitDesktopSmoke(0);
                         })
                         .catch((error: unknown) => {
                           fail("Production desktop screenshot capture failed.", {
@@ -4527,7 +4700,7 @@ function installProjectIoSmoke(win: BrowserWindow): void {
         finished = true;
         clearTimeout(timeout);
         console.log(`${projectIoSmokeResultPrefix}${JSON.stringify({ ok: true, evidence })}`);
-        app.exit(0);
+        exitDesktopSmoke(0);
       })
       .catch((error: unknown) => {
         fail("Production project IO smoke JavaScript failed.", {
@@ -4669,7 +4842,7 @@ function installCloseFlowSmoke(win: BrowserWindow): void {
             }
           })}`
         );
-        app.exit(0);
+        exitDesktopSmoke(0);
       })
       .catch((error: unknown) => {
         fail("Could not read the project written by guarded close-flow smoke.", {
@@ -4811,20 +4984,43 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
-  registerProjectFileHandlers();
-  Menu.setApplicationMenu(createNativeCommandMenu());
-  createWindow();
+if (ownsSingleInstanceLock) {
+  if (!isDesktopSmoke) {
+    app.on("second-instance", () => {
+      const existingWindow = BrowserWindow.getAllWindows()[0];
+      if (!existingWindow) {
+        if (app.isReady()) {
+          createWindow();
+        }
+        return;
+      }
+      if (existingWindow.isMinimized()) {
+        existingWindow.restore();
+      }
+      existingWindow.show();
+      existingWindow.focus();
+    });
+  }
 
-  app.on("activate", () => {
-    if (!isCloseFlowSmoke && BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+  void app.whenReady().then(() => {
+    registerProjectFileHandlers();
+    Menu.setApplicationMenu(createNativeCommandMenu());
+    createWindow();
+
+    app.on("activate", () => {
+      if (!isCloseFlowSmoke && BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
   });
-});
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin" && !isCloseFlowSmoke) {
     app.quit();
   }
+});
+
+app.on("will-quit", () => {
+  closeProjectStorage();
 });

@@ -1048,7 +1048,7 @@ import {
   downloadTextFile,
   fileDisplayName
 } from "./workstationPatternTools";
-import { resolveLocalDraftWriteGate } from "./localDraftLifecycle";
+import { resolveLocalDraftWriteGate, shouldCommitLocalDraftClear } from "./localDraftLifecycle";
 import { resolveProjectCloseGuard, resolveSaveBeforeCloseDecision } from "./projectCloseGuard";
 import {
   resolveProjectReplacementGuard,
@@ -1140,6 +1140,7 @@ const tempoNudgePadVisibleLabels: Record<TempoNudgePadId, string> = {
   half: "Half",
   double: "Double"
 };
+const nativeRecoveryDebounceMs = 750;
 
 function isCompactTransportViewport(): boolean {
   if (typeof window === "undefined") {
@@ -1353,6 +1354,8 @@ export function App(): ReactElement {
   const handoffExportReceiptRef = useRef<HandoffExportReceipt | null>(null);
   const tapTempoTimesRef = useRef<number[]>([]);
   const tapTempoCommitTimerRef = useRef<number | null>(null);
+  const nativeRecoveryWriteTimerRef = useRef<number | null>(null);
+  const localDraftClearRequestIdRef = useRef(0);
   const localDraftReadyRef = useRef(false);
   const localDraftSkipNextWriteRef = useRef(false);
   const selectedEventDeleteSelectionGuardRef = useRef(false);
@@ -2230,6 +2233,10 @@ export function App(): ReactElement {
         window.clearTimeout(tapTempoCommitTimerRef.current);
         tapTempoCommitTimerRef.current = null;
       }
+      if (nativeRecoveryWriteTimerRef.current !== null) {
+        window.clearTimeout(nativeRecoveryWriteTimerRef.current);
+        nativeRecoveryWriteTimerRef.current = null;
+      }
       styleChangeRequestResolveRef.current?.("canceled");
       styleChangeRequestResolveRef.current = null;
       styleChangeReturnFocusRef.current = null;
@@ -2241,6 +2248,43 @@ export function App(): ReactElement {
       stopMixPreview("WAV preview stopped after project change");
     }
   }, [project]);
+
+  useEffect(() => {
+    const loadProjectRecovery = window.grooveforge?.loadProjectRecovery;
+    if (!loadProjectRecovery) {
+      return;
+    }
+
+    let active = true;
+    void loadProjectRecovery()
+      .then((nativeRecovery) => {
+        if (!active || !nativeRecovery || projectHasUnsavedChangesRef.current) {
+          return;
+        }
+        const currentRecovery = localDraftRecoveryRef.current;
+        const currentSavedAt = currentRecovery ? Date.parse(currentRecovery.savedAt) : Number.NEGATIVE_INFINITY;
+        const nativeSavedAt = Date.parse(nativeRecovery.savedAt);
+        if (currentRecovery && (!Number.isFinite(nativeSavedAt) || currentSavedAt >= nativeSavedAt)) {
+          return;
+        }
+
+        const recovery: LocalDraftRecovery = {
+          savedAt: nativeRecovery.savedAt,
+          project: parseProjectFile(nativeRecovery.contents),
+          characterCount: nativeRecovery.contents.length
+        };
+        setLocalDraftRecovery(recovery);
+        setLocalDraftSavedAt(recovery.savedAt);
+        setLocalDraftRecoveryDeferred(false);
+      })
+      .catch(() => {
+        console.warn("SQLite project recovery is unavailable.");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!localDraftReadyRef.current) {
@@ -2259,6 +2303,7 @@ export function App(): ReactElement {
       setLocalDraftRecovery(null);
       setLocalDraftRecoveryDeferred(false);
     }
+    scheduleNativeProjectRecovery(project);
   }, [localDraftWriteArmed, project]);
 
   useEffect(() => {
@@ -2279,6 +2324,7 @@ export function App(): ReactElement {
           setLocalDraftRecovery(null);
           setLocalDraftRecoveryDeferred(false);
         }
+        flushNativeProjectRecovery(projectRef.current);
       }
       event.preventDefault();
       event.returnValue = "";
@@ -3137,8 +3183,53 @@ export function App(): ReactElement {
     setUndoRedoResult(createUndoRedoResult("redo", nextEntry.label, nextEntry.project, remainingUndoDepth, remainingRedoDepth));
   }
 
-  function clearLocalDraftState(): void {
+  function cancelScheduledNativeProjectRecovery(): void {
+    if (nativeRecoveryWriteTimerRef.current !== null) {
+      window.clearTimeout(nativeRecoveryWriteTimerRef.current);
+      nativeRecoveryWriteTimerRef.current = null;
+    }
+  }
+
+  function persistNativeProjectRecovery(projectToRecover: ProjectState): void {
+    const saveProjectRecovery = window.grooveforge?.saveProjectRecovery;
+    if (!saveProjectRecovery) {
+      return;
+    }
+
+    try {
+      const contents = serializeProjectFile(projectToRecover);
+      void saveProjectRecovery(contents).catch(() => {
+        console.warn("Unable to update SQLite project recovery.");
+      });
+    } catch {
+      console.warn("Unable to serialize SQLite project recovery.");
+    }
+  }
+
+  function scheduleNativeProjectRecovery(projectToRecover: ProjectState): void {
+    if (!window.grooveforge?.saveProjectRecovery) {
+      return;
+    }
+    cancelScheduledNativeProjectRecovery();
+    nativeRecoveryWriteTimerRef.current = window.setTimeout(() => {
+      nativeRecoveryWriteTimerRef.current = null;
+      persistNativeProjectRecovery(projectToRecover);
+    }, nativeRecoveryDebounceMs);
+  }
+
+  function flushNativeProjectRecovery(projectToRecover: ProjectState): void {
+    cancelScheduledNativeProjectRecovery();
+    persistNativeProjectRecovery(projectToRecover);
+  }
+
+  function clearLocalDraftState(requestNativeClear = true): void {
+    cancelScheduledNativeProjectRecovery();
     clearLocalDraftStorage();
+    if (requestNativeClear) {
+      void window.grooveforge?.clearProjectRecovery?.().catch(() => {
+        console.warn("Unable to clear SQLite project recovery.");
+      });
+    }
     setLocalDraftRecovery(null);
     setLocalDraftRecoveryDeferred(false);
     setLocalDraftSavedAt(null);
@@ -3185,14 +3276,48 @@ export function App(): ReactElement {
     }
   }
 
-  function clearLocalDraftRecovery(): void {
+  async function clearLocalDraftRecovery(): Promise<void> {
     if (!localDraftRecovery) {
       setLocalDraftRecoveryResult(null);
       return;
     }
 
+    const requestId = ++localDraftClearRequestIdRef.current;
     const recovery = localDraftRecovery;
-    clearLocalDraftState();
+    const projectAtStart = projectRef.current;
+    const clearProjectRecovery = window.grooveforge?.clearProjectRecovery;
+    if (clearProjectRecovery) {
+      try {
+        const result = await clearProjectRecovery();
+        if (!result.cleared) {
+          setLocalDraftRecoveryResult(null);
+          setProjectStatus("Could not clear SQLite recovery; retry");
+          return;
+        }
+      } catch {
+        console.warn("Unable to clear SQLite project recovery.");
+        setLocalDraftRecoveryResult(null);
+        setProjectStatus("Could not clear SQLite recovery; retry");
+        return;
+      }
+    }
+
+    if (
+      !shouldCommitLocalDraftClear(
+        requestId,
+        localDraftClearRequestIdRef.current,
+        recovery,
+        localDraftRecoveryRef.current,
+        projectAtStart,
+        projectRef.current
+      )
+    ) {
+      setLocalDraftRecoveryResult(null);
+      setProjectStatus("Recovery changed while clearing; current work kept");
+      return;
+    }
+
+    clearLocalDraftState(false);
     setLocalDraftRecoveryResult(createLocalDraftRecoveryResult("clear", recovery, projectRef.current));
     setProjectStatus("Cleared local draft recovery");
   }
@@ -7219,11 +7344,19 @@ export function App(): ReactElement {
         }
         setLocalDraftRecoveryResult(null);
         setProjectFileResult(
-          createProjectFileResult("save", fileLabel, projectToSave, completion === "saved-snapshot")
+          createProjectFileResult(
+            "save",
+            fileLabel,
+            projectToSave,
+            completion === "saved-snapshot",
+            result.databaseStored !== false
+          )
         );
-        setProjectStatus(
-          completion === "saved-current" ? `Saved ${fileLabel}` : `Saved ${fileLabel}; newer changes remain unsaved`
-        );
+        const statusParts = [
+          completion === "saved-current" ? `Saved ${fileLabel}` : `Saved ${fileLabel}; newer changes remain unsaved`,
+          ...(result.databaseStored === false ? ["SQLite library update failed"] : [])
+        ];
+        setProjectStatus(statusParts.join("; "));
         return completion;
       }
 
@@ -7352,7 +7485,8 @@ export function App(): ReactElement {
     action: ProjectFileResult["action"],
     fileLabel: string,
     resultProject: ProjectState,
-    newerChangesRemain = false
+    newerChangesRemain = false,
+    databaseStored = true
   ): ProjectFileResult {
     const statusByAction: Record<ProjectFileResult["action"], ProjectFileResult["status"]> = {
       save: "Saved",
@@ -7367,13 +7501,19 @@ export function App(): ReactElement {
       import: "Imported project"
     };
     const savedAction = action === "save" || action === "download";
-    const safetyCue = newerChangesRemain
-      ? "This durable copy contains the project from when Save started; newer local edits and recovery remain unsaved."
+    const safetyCue = !databaseStored
+      ? newerChangesRemain
+        ? "The project file contains the Save snapshot, but SQLite library indexing failed and newer local edits remain recoverable."
+        : "The project file is durable, but its SQLite library mirror could not be updated."
+      : newerChangesRemain
+        ? "This durable copy contains the project from when Save started; newer local edits and recovery remain unsaved."
       : savedAction
         ? "Local draft recovery was cleared after this durable project copy."
         : "Loaded file is now current; undo and redo history were reset for this project.";
     const nextCheck = newerChangesRemain
       ? "Save again to include the newer edits in a durable project copy."
+      : !databaseStored
+        ? "Keep the project file; save again after checking local storage access."
       : savedAction
         ? "Keep composing; save again after the next meaningful edit."
         : `Play Pattern ${resultProject.selectedPattern}; confirm the loaded beat before editing.`;
@@ -7389,7 +7529,7 @@ export function App(): ReactElement {
       metricValue: `${projectEventTotal(resultProject)} events / Pattern ${resultProject.selectedPattern}`,
       safetyCue,
       nextCheck,
-      tone: newerChangesRemain ? "warn" : "good"
+      tone: newerChangesRemain || !databaseStored ? "warn" : "good"
     };
   }
 

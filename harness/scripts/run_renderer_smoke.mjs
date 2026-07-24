@@ -11,6 +11,9 @@ const styles = readFileSync(new URL("../../src/styles.css", import.meta.url), "u
 const appSource = readFileSync(new URL("../../src/ui/App.tsx", import.meta.url), "utf8");
 const workstationSource = readFileSync(new URL("../../src/domain/workstation.ts", import.meta.url), "utf8");
 const electronMainSource = readFileSync(new URL("../../electron/main.ts", import.meta.url), "utf8");
+const electronPreloadSource = readFileSync(new URL("../../electron/preload.cts", import.meta.url), "utf8");
+const projectLibrarySource = readFileSync(new URL("../../electron/projectLibrary.ts", import.meta.url), "utf8");
+const projectWorkspaceSource = readFileSync(new URL("../../electron/projectWorkspace.ts", import.meta.url), "utf8");
 const composePanelsSource = readFileSync(new URL("../../src/ui/workstationComposePanels.tsx", import.meta.url), "utf8");
 const graphSource = readFileSync(new URL("../../src/ui/workstationAppQuickActionGraph.ts", import.meta.url), "utf8");
 const quickActionSource = readFileSync(new URL("../../src/ui/workstationAppQuickActions.tsx", import.meta.url), "utf8");
@@ -383,10 +386,79 @@ function validateProjectSaveCompletion(saveCompletion) {
   );
   check(
     resultSource.includes("newerChangesRemain = false") &&
+      resultSource.includes("databaseStored = true") &&
       resultSource.includes("newer local edits and recovery remain unsaved") &&
+      resultSource.includes("SQLite library mirror could not be updated") &&
       resultSource.includes("Save again to include the newer edits") &&
-      resultSource.includes('tone: newerChangesRemain ? "warn" : "good"'),
-    "Save result feedback should explain changed-snapshot safety and the required follow-up"
+      resultSource.includes('tone: newerChangesRemain || !databaseStored ? "warn" : "good"'),
+    "Save result feedback should explain changed-snapshot and SQLite mirror safety"
+  );
+}
+
+function validateSqliteProjectStorage() {
+  const clearRecoverySource = printNamedFunction(appSource, "App.tsx", "clearLocalDraftRecovery");
+  check(
+    projectWorkspaceSource.includes('pathApi.join(userHome, "GrooveForge")') &&
+      projectWorkspaceSource.includes('pathApi.join(root, "Projects")') &&
+      projectWorkspaceSource.includes('pathApi.join(root, "Data")') &&
+      projectWorkspaceSource.includes('pathApi.join(data, "grooveforge.db")'),
+    "desktop project storage should resolve the GrooveForge/Projects and GrooveForge/Data workspace below the current user home"
+  );
+  check(
+    electronMainSource.includes('app.getPath("home")') &&
+      electronMainSource.includes("new ProjectLibrary(workspace.databaseFile)") &&
+      electronMainSource.includes('createHash("sha256")') &&
+      electronMainSource.includes("databaseStored = false") &&
+      electronMainSource.includes("app.requestSingleInstanceLock()") &&
+      electronMainSource.includes('app.on("second-instance"') &&
+      electronMainSource.includes('ipcMain.handle("grooveforge:save-project-recovery"') &&
+      electronMainSource.includes('ipcMain.handle("grooveforge:load-project-recovery"') &&
+      electronMainSource.includes('ipcMain.handle("grooveforge:clear-project-recovery"') &&
+      electronMainSource.includes("return { savedAt: library.saveRecovery(payload).savedAt };"),
+    "Electron main should own the user-home workspace, SQLite library mirror, and recovery IPC"
+  );
+  check(
+    projectLibrarySource.includes('import { DatabaseSync } from "node:sqlite"') &&
+      projectLibrarySource.includes('openSync(databasePath, "wx", 0o600)') &&
+      projectWorkspaceSource.includes("chmod(paths.data, 0o700)") &&
+      projectLibrarySource.includes("PRAGMA journal_mode = WAL") &&
+      projectLibrarySource.includes("PRAGMA synchronous = FULL") &&
+      projectLibrarySource.includes("PRAGMA trusted_schema = OFF") &&
+      projectLibrarySource.includes("PRAGMA quick_check") &&
+      projectLibrarySource.includes("CREATE TABLE project_recovery") &&
+      projectLibrarySource.includes("CREATE TABLE saved_projects") &&
+      projectLibrarySource.includes(".run(contents, savedAt)") &&
+      projectLibrarySource.includes(".run(id, storageKey, fileName, contents, savedAt)"),
+    "SQLite project storage should use the built-in driver, durability and integrity pragmas, and bound parameters"
+  );
+  check(
+    electronPreloadSource.includes("saveProjectRecovery: (contents: string)") &&
+      electronPreloadSource.includes("loadProjectRecovery: ()") &&
+      electronPreloadSource.includes("clearProjectRecovery: ()") &&
+      !electronPreloadSource.includes("DatabaseSync") &&
+      !electronPreloadSource.includes("grooveforge.db"),
+    "the preload bridge should expose recovery operations without exposing SQL or database paths"
+  );
+  check(
+    appSource.includes("const nativeRecoveryDebounceMs = 750;") &&
+      appSource.includes("const loadProjectRecovery = window.grooveforge?.loadProjectRecovery;") &&
+      appSource.includes("projectHasUnsavedChangesRef.current") &&
+      appSource.includes("project: parseProjectFile(nativeRecovery.contents)") &&
+      appSource.includes("scheduleNativeProjectRecovery(project);") &&
+      appSource.includes("flushNativeProjectRecovery(projectRef.current);"),
+    "the renderer should restore validated SQLite recovery, debounce edits, and flush pending recovery on unload"
+  );
+  check(
+    clearRecoverySource.includes("const result = await clearProjectRecovery();") &&
+      clearRecoverySource.includes("if (!result.cleared)") &&
+      clearRecoverySource.includes("Could not clear SQLite recovery; retry") &&
+      clearRecoverySource.includes("shouldCommitLocalDraftClear(") &&
+      clearRecoverySource.includes("projectAtStart") &&
+      clearRecoverySource.includes("localDraftRecoveryRef.current") &&
+      clearRecoverySource.includes("Recovery changed while clearing; current work kept") &&
+      clearRecoverySource.indexOf("await clearProjectRecovery()") <
+        clearRecoverySource.indexOf("clearLocalDraftState(false)"),
+    "explicit Clear should retain visible recovery until SQLite confirms deletion and no intervening edit changed the target"
   );
 }
 
@@ -3555,6 +3627,7 @@ try {
     workstation: await server.ssrLoadModule("/src/domain/workstation.ts")
   });
   validateProjectSaveCompletion(await server.ssrLoadModule("/src/ui/projectSaveCompletion.ts"));
+  validateSqliteProjectStorage();
   const html = renderToStaticMarkup(React.createElement(App));
   validateFirstRunRenderer(html);
   validateWorkspaceCommandDockSource(html);

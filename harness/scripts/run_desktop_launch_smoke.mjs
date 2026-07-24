@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +11,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const require = createRequire(import.meta.url);
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const progressPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_PROGRESS ";
+const smokeWorkspaceRoot = path.join(root, "build", "desktop", "GrooveForge-launch-smoke-workspace");
 const timeoutMs = 1820000;
 const failures = [];
 const expectedLiveTestIds = [
@@ -124,6 +125,7 @@ function check(condition, message) {
 }
 
 function fail(message, details = "") {
+  rmSync(smokeWorkspaceRoot, { recursive: true, force: true });
   console.error("GrooveForge desktop launch smoke failed:");
   console.error(`- ${message}`);
   if (details.trim().length > 0) {
@@ -1291,9 +1293,12 @@ if (blockDetails) {
   fail("Refusing to start Electron in a restricted macOS GUI context.", blockDetails);
 }
 
+rmSync(smokeWorkspaceRoot, { recursive: true, force: true });
+mkdirSync(smokeWorkspaceRoot, { recursive: true, mode: 0o700 });
 const env = {
   ...process.env,
   GROOVEFORGE_DESKTOP_LAUNCH_SMOKE: "1",
+  GROOVEFORGE_DESKTOP_WORKSPACE_ROOT: smokeWorkspaceRoot,
   NO_COLOR: "1"
 };
 delete env.ELECTRON_RUN_AS_NODE;
@@ -1366,6 +1371,8 @@ child.on("exit", (code, signal) => {
     fail(`Electron launch smoke returned a failing result (code ${code ?? "null"}, signal ${signal ?? "null"}).`, details);
   }
 
+  rmSync(smokeWorkspaceRoot, { recursive: true, force: true });
+  check(!existsSync(smokeWorkspaceRoot), "launch smoke workspace should be removed after Electron exits");
   checkResult(result);
   if (failures.length > 0) {
     fail("Launch smoke evidence validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));

@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
+import { DatabaseSync } from "node:sqlite";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +20,8 @@ const sourcePath = path.join(smokeRoot, "native-project-io-source.grooveforge.js
 const targetPath = path.join(smokeRoot, "native-project-io-smoke-beat.grooveforge.json");
 const reportJsonPath = path.join(smokeRoot, `${appName}-${packageJson.version}-${platformArch}-project-io-smoke.json`);
 const reportMarkdownPath = path.join(smokeRoot, `${appName}-${packageJson.version}-${platformArch}-project-io-smoke.md`);
+const workspaceRoot = path.join(smokeRoot, "workspace");
+const databasePath = path.join(workspaceRoot, "Data", "grooveforge.db");
 const resultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
 const timeoutMs = 210000;
 const failures = [];
@@ -192,12 +195,19 @@ function checkElectronRoundtripResult(result, sourceContents, roundtripTargetPat
   check(result?.evidence?.hasPreloadBridge === true, `${label} project IO smoke should expose the preload bridge`);
   check(result?.evidence?.hasSaveProject === true, `${label} project IO smoke should expose saveProject`);
   check(result?.evidence?.hasOpenProject === true, `${label} project IO smoke should expose openProject`);
+  check(result?.evidence?.hasRecoveryBridge === true, `${label} project IO smoke should expose the narrow recovery bridge`);
   check(result?.evidence?.saveResult?.canceled === false, `${label} native saveProject should not be canceled`);
+  check(result?.evidence?.saveResult?.databaseStored === true, `${label} native saveProject should update the SQLite library`);
   check(result?.evidence?.saveResult?.filePath === roundtripTargetPath, `${label} native saveProject should return the smoke target path`);
   check(result?.evidence?.openResult?.canceled === false, `${label} native openProject should not be canceled`);
   check(result?.evidence?.openResult?.filePath === roundtripTargetPath, `${label} native openProject should return the smoke target path`);
   check(result?.evidence?.openResult?.contentsMatched === true, `${label} native openProject should return exact saved contents`);
   check(result?.evidence?.openResult?.contentsLength === sourceContents.length, `${label} native openProject should return the saved content length`);
+  check(result?.evidence?.recoveryResult?.contentsMatched === true, `${label} SQLite recovery should return exact project contents`);
+  check(result?.evidence?.recoveryResult?.savedAtReady === true, `${label} SQLite recovery should preserve its save timestamp`);
+  check(result?.evidence?.recoveryResult?.cleared === true, `${label} SQLite recovery clear should confirm completion`);
+  check(result?.evidence?.recoveryResult?.emptyAfterClear === true, `${label} SQLite recovery should be empty after clear`);
+  check(result?.evidence?.recoveryResult?.narrowSaveResponse === true, `${label} recovery save response should not echo project JSON`);
 }
 
 function buildAudienceStarterRoundtripReport(spec, roundtrip) {
@@ -225,7 +235,7 @@ function buildAudienceStarterRoundtripReport(spec, roundtrip) {
   };
 }
 
-function buildReport(project, result, sourceContents, savedContents, audienceStarterRoundtrips) {
+function buildReport(project, result, sourceContents, savedContents, audienceStarterRoundtrips, sqliteEvidence) {
   const target = workstation.activeDeliveryTarget(project);
   return {
     appName,
@@ -259,6 +269,7 @@ function buildReport(project, result, sourceContents, savedContents, audienceSta
     audienceStarterRoundtripReady: audienceStarterRoundtrips.every((roundtrip) => roundtrip.roundtripReady),
     audienceStarterRoundtripCount: audienceStarterRoundtrips.length,
     audienceStarterRoundtrips,
+    sqliteEvidence,
     nativeProjectIoReady: true,
     localEnvValueRecorded: false,
     privateValuesRecorded: false,
@@ -303,6 +314,27 @@ function buildMarkdown(report) {
 - Save bridge present: ${report.electronEvidence.hasSaveProject ? "yes" : "no"}
 - Open bridge present: ${report.electronEvidence.hasOpenProject ? "yes" : "no"}
 - Contents matched: ${report.electronEvidence.openResult.contentsMatched ? "yes" : "no"}
+- Recovery bridge present: ${report.electronEvidence.hasRecoveryBridge ? "yes" : "no"}
+- Recovery save/load/clear matched: ${
+    report.electronEvidence.recoveryResult.contentsMatched &&
+    report.electronEvidence.recoveryResult.savedAtReady &&
+    report.electronEvidence.recoveryResult.cleared &&
+    report.electronEvidence.recoveryResult.emptyAfterClear &&
+    report.electronEvidence.recoveryResult.narrowSaveResponse
+      ? "yes"
+      : "no"
+  }
+
+## SQLite Project Library
+
+- Database stored by Electron: ${report.electronEvidence.saveResult.databaseStored ? "yes" : "no"}
+- Schema version: ${report.sqliteEvidence.schemaVersion}
+- Application id ready: ${report.sqliteEvidence.applicationIdReady ? "yes" : "no"}
+- Journal mode: ${report.sqliteEvidence.journalMode}
+- Integrity check: ${report.sqliteEvidence.quickCheck}
+- Recovery rows after clear: ${report.sqliteEvidence.recoveryCount}
+- Saved project rows: ${report.sqliteEvidence.savedProjectCount}
+- Smoke-only workspace: ${report.sqliteEvidence.smokeWorkspaceReady ? "yes" : "no"}
 
 ## Audience Starter Roundtrips
 
@@ -341,6 +373,7 @@ async function runElectronProjectIoSmoke(roundtripSourcePath, roundtripTargetPat
     GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE: "1",
     GROOVEFORGE_DESKTOP_PROJECT_IO_SOURCE_PATH: roundtripSourcePath,
     GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_PATH: roundtripTargetPath,
+    GROOVEFORGE_DESKTOP_WORKSPACE_ROOT: workspaceRoot,
     NO_COLOR: "1"
   };
   delete env.ELECTRON_RUN_AS_NODE;
@@ -458,11 +491,38 @@ for (const spec of buildAudienceStarterRoundtripSpecs()) {
   audienceStarterRoundtrips.push(buildAudienceStarterRoundtripReport(spec, roundtrip));
 }
 
-const report = buildReport(reopenedProject, result, sourceContents, savedContents, audienceStarterRoundtrips);
+const sqliteDatabase = new DatabaseSync(databasePath, { readOnly: true });
+const sqliteEvidence = {
+  applicationIdReady: sqliteDatabase.prepare("PRAGMA application_id").get().application_id === 0x47524647,
+  databasePath: relative(databasePath),
+  journalMode: sqliteDatabase.prepare("PRAGMA journal_mode").get().journal_mode,
+  quickCheck: sqliteDatabase.prepare("PRAGMA quick_check").get().quick_check,
+  recoveryCount: sqliteDatabase.prepare("SELECT COUNT(*) AS count FROM project_recovery").get().count,
+  savedProjectCount: sqliteDatabase.prepare("SELECT COUNT(*) AS count FROM saved_projects").get().count,
+  schemaVersion: sqliteDatabase.prepare("PRAGMA user_version").get().user_version,
+  smokeWorkspaceReady: databasePath.startsWith(smokeRoot)
+};
+sqliteDatabase.close();
+
+const report = buildReport(
+  reopenedProject,
+  result,
+  sourceContents,
+  savedContents,
+  audienceStarterRoundtrips,
+  sqliteEvidence
+);
 const reportMarkdown = buildMarkdown(report);
 check(report.nativeProjectIoReady === true, "native project IO report should be ready");
 check(report.audienceStarterRoundtripReady === true, "native project IO report should include ready Audience Starter roundtrips");
 check(report.audienceStarterRoundtripCount === 2, "native project IO report should include both Audience Starter roundtrips");
+check(report.sqliteEvidence.schemaVersion === 1, "native project IO SQLite schema should be version 1");
+check(report.sqliteEvidence.applicationIdReady === true, "native project IO SQLite application id should match GrooveForge");
+check(report.sqliteEvidence.journalMode === "wal", "native project IO SQLite library should use WAL mode");
+check(report.sqliteEvidence.quickCheck === "ok", "native project IO SQLite library should pass quick_check");
+check(report.sqliteEvidence.recoveryCount === 0, "native project IO SQLite recovery should remain empty after explicit clear");
+check(report.sqliteEvidence.savedProjectCount === 3, "native project IO SQLite library should index all three saved projects");
+check(report.sqliteEvidence.smokeWorkspaceReady === true, "native project IO SQLite library should stay under the smoke workspace");
 check(reportMarkdown.includes("Audience Starter Roundtrips"), "native project IO Markdown should include Audience Starter roundtrips");
 check(reportMarkdown.includes("first-time composer"), "native project IO Markdown should include first-time composer starter roundtrip");
 check(reportMarkdown.includes("professional producer"), "native project IO Markdown should include professional producer starter roundtrip");
@@ -489,6 +549,9 @@ console.log(`- Report JSON: ${relative(reportJsonPath)}`);
 console.log(`- Report Markdown: ${relative(reportMarkdownPath)}`);
 console.log(`- Project: ${reopenedProject.title}, ${reopenedProject.bpm} BPM ${reopenedProject.key}, ${workstation.arrangementTotalBars(reopenedProject)} bars`);
 console.log(`- Native bridge: saveProject/openProject roundtrip matched ${report.savedBytes} bytes, sha256 ${report.savedSha256.slice(0, 16)}...`);
+console.log(
+  `- SQLite library: schema ${report.sqliteEvidence.schemaVersion}, ${report.sqliteEvidence.savedProjectCount} catalog rows, ${report.sqliteEvidence.recoveryCount} recovery rows after clear, ${report.sqliteEvidence.journalMode} journal, ${report.sqliteEvidence.quickCheck} integrity`
+);
 console.log(
   `- Audience Starter roundtrips: ${report.audienceStarterRoundtripCount}/2 ready (${report.audienceStarterRoundtrips
     .map((roundtrip) => `${roundtrip.audience}: ${roundtrip.mode}, ${roundtrip.styleId}, ${roundtrip.totalBars} bars, ${roundtrip.editableEventCount} events`)

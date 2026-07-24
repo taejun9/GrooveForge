@@ -476,6 +476,7 @@ The first usable result is an Electron desktop workstation that can create a sam
 - Quick Actions Recent Commands keeps a UI-local, session-only list of the latest explicit command-palette actions with explicit inspect and rerun controls, plus UI-local Recent Command Result feedback for inspected command status, availability, target, last result, and next explicit-rerun check, and a recent-command inspector that shows status, group, target, and last-result metadata before an explicit rerun, without changing command ranking, Enter behavior, shortcuts, Pinned Commands, project files, localStorage, or undo history.
 - Undo/redo edit history with a command-strip readout for undo/redo depth plus next undo/redo labels across pattern, arrangement, mixer, sound, and master experimentation, plus UI-local Undo/Redo Result feedback after successful recovery actions.
 - Local draft recovery that keeps a bounded browser/Electron renderer draft in localStorage, shows a project safety readout that distinguishes local draft safety, current file identity, unsaved edits, and durable `.grooveforge.json` saves, adds UI-local Project File Result feedback after successful save/download/open/import actions, then shows explicit Restore Draft and Clear Draft controls plus matching Project-scope Quick Actions and UI-local Local Draft Recovery Result feedback without replacing `.grooveforge.json` Save/Open.
+- Local project-library storage that uses the Electron current-user home to place portable `.grooveforge.json` files under `GrooveForge/Projects` by default and a main-process-only SQLite3 catalog plus one bounded latest recovery document at `GrooveForge/Data/grooveforge.db`; native recovery mirrors the established renderer localStorage fallback without marking unsaved work as an explicit Save.
 - Project Snapshots for local idea slots that can save, rename, restore, and delete beat states inside the project file, with a slot role readout for save/compare readiness.
 - Snapshot Compare for local read-only comparison of the current beat against saved snapshots by setup, length, readiness, export, stems, and master posture.
 - Snapshot Compare Focus adds explicit Focus controls for saved-take setup, length, readiness, export, stems, and master comparison lanes, routing clicks and Quick Actions Snapshot Compare focus/metric commands only to existing Compose, Arrange, Master, or Deliver panels and showing a UI-local Focus Result with saved-take lane, destination, comparison metric, audition cue, and next-check feedback without restoring, deleting, renaming, saving, exporting, or mutating snapshots.
@@ -698,6 +699,7 @@ npm run desktop:local-package-reopen-smoke
 npm run desktop:local-delivery-zip-smoke
 npm run delivery:bundle-zip-smoke
 npm run typecheck
+npm run project-workspace:smoke
 npm run build
 npm run quick-actions:bundle-smoke
 npm run desktop:smoke
