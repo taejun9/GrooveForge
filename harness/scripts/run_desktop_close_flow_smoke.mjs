@@ -17,6 +17,7 @@ const smokeRoot = path.join(root, "build", "desktop", `${appName}-${packageJson.
 const targetPath = path.join(smokeRoot, "close-flow-smoke-beat.grooveforge.json");
 const reportJsonPath = path.join(smokeRoot, `${appName}-${packageJson.version}-${platformArch}-close-flow-smoke.json`);
 const reportMarkdownPath = path.join(smokeRoot, `${appName}-${packageJson.version}-${platformArch}-close-flow-smoke.md`);
+const workspaceRoot = path.join(smokeRoot, "workspace");
 const resultPrefix = "GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE_RESULT ";
 const expectedTitle = "Close Flow Smoke Beat";
 const expectedEvents = [
@@ -109,6 +110,7 @@ async function runElectronCloseFlowSmoke() {
     ...process.env,
     GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE: "1",
     GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE_PATH: targetPath,
+    GROOVEFORGE_DESKTOP_WORKSPACE_ROOT: workspaceRoot,
     NO_COLOR: "1"
   };
   delete env.ELECTRON_RUN_AS_NODE;
@@ -271,6 +273,8 @@ check(report.networkProbeAttempted === false, "report should not probe remote ch
 check(report.releaseUploadAttempted === false, "report should not upload release artifacts");
 check(report.releaseGateClaimedExternalDistribution === false, "report should not claim external distribution completion");
 check(!/https?:\/\//i.test(reportMarkdown), "report should not include URL values");
+await rm(workspaceRoot, { recursive: true, force: true });
+check(!existsSync(workspaceRoot), "close-flow smoke workspace should be removed after Electron exits");
 
 if (failures.length > 0) {
   fail("Desktop guarded close-flow validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));

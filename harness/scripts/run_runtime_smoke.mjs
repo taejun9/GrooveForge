@@ -220,7 +220,42 @@ function validateLocalDraftWriteGate() {
     "local-draft-write-gate: replacement should not write while the first later edit remains write eligible"
   );
 
-  return { paths: cases.length, firstEditWriteEligible: firstEdit.shouldWrite };
+  const recovery = {};
+  const project = {};
+  const clearCommitCases = [
+    {
+      label: "same request/recovery/project",
+      expected: true,
+      values: [1, 1, recovery, recovery, project, project]
+    },
+    {
+      label: "newer clear request",
+      expected: false,
+      values: [1, 2, recovery, recovery, project, project]
+    },
+    {
+      label: "recovery changed while awaiting native clear",
+      expected: false,
+      values: [1, 1, recovery, {}, project, project]
+    },
+    {
+      label: "project edited while awaiting native clear",
+      expected: false,
+      values: [1, 1, recovery, recovery, project, {}]
+    }
+  ];
+  for (const entry of clearCommitCases) {
+    check(
+      localDraftLifecycle.shouldCommitLocalDraftClear(...entry.values) === entry.expected,
+      `local-draft-clear:${entry.label} should resolve to ${entry.expected}`
+    );
+  }
+
+  return {
+    paths: cases.length,
+    firstEditWriteEligible: firstEdit.shouldWrite,
+    clearCommitPaths: clearCommitCases.length
+  };
 }
 
 function validateProjectReplacementGuard() {
@@ -1946,7 +1981,7 @@ console.log(`- Master ceiling runtime safety: ${masterCeilingRuntimeSafetySummar
 console.log(`- Delivery metadata runtime safety: ${deliveryMetadataRuntimeSafetySummary.source} -> ${deliveryMetadataRuntimeSafetySummary.repaired} / normalized paths ${deliveryMetadataRuntimeSafetySummary.normalizedPaths}/9 / MIDI ${deliveryMetadataRuntimeSafetySummary.midiBytes} bytes / WAV ${deliveryMetadataRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Handoff runtime safety: ${handoffRuntimeSafetySummary.source} -> ${handoffRuntimeSafetySummary.repaired} / normalized paths ${handoffRuntimeSafetySummary.normalizedPaths}/8 / Handoff ${handoffRuntimeSafetySummary.handoffBytes} bytes / MIDI ${handoffRuntimeSafetySummary.midiBytes} bytes / WAV ${handoffRuntimeSafetySummary.wavBytes} bytes`);
 console.log(`- Snapshot runtime safety: ${snapshotRuntimeSafetySummary.source} -> ${snapshotRuntimeSafetySummary.repaired} / normalized paths ${snapshotRuntimeSafetySummary.normalizedPaths}/11 / Handoff ${snapshotRuntimeSafetySummary.handoffBytes} bytes / MIDI ${snapshotRuntimeSafetySummary.midiBytes} bytes / WAV ${snapshotRuntimeSafetySummary.wavBytes} bytes`);
-console.log(`- Local draft write gate: ${localDraftWriteGateSummary.paths}/4 boolean paths / first edit write eligible ${localDraftWriteGateSummary.firstEditWriteEligible ? "yes" : "no"}`);
+console.log(`- Local draft write gate: ${localDraftWriteGateSummary.paths}/4 boolean paths / first edit write eligible ${localDraftWriteGateSummary.firstEditWriteEligible ? "yes" : "no"} / delayed Clear guards ${localDraftWriteGateSummary.clearCommitPaths}/4`);
 console.log(`- Project close guard: ${projectCloseGuardSummary.paths}/4 dirty/recovery paths / protected ${projectCloseGuardSummary.protectedPaths}/3 / synchronous draft refresh ${projectCloseGuardSummary.refreshPaths}/2 / save gates ${projectCloseGuardSummary.saveGates}/4 / native actions ${projectCloseGuardSummary.nativeActions}/3`);
 console.log(`- Project replacement guard: ${projectReplacementGuardSummary.paths}/8 open/starter dirty/recovery paths / protected loss paths ${projectReplacementGuardSummary.protectedPaths}/6`);
 console.log(`- Project Save completion: ${projectSaveCompletionSummary.paths}/4 async paths / stale completions ${projectSaveCompletionSummary.stalePaths}/2 / changed snapshot ${projectSaveCompletionSummary.changedPaths}/1 / close outcomes ${projectSaveCompletionSummary.closeAttempts}/5`);

@@ -9,3 +9,18 @@ export function resolveLocalDraftWriteGate(writeArmed: boolean, skipNextWrite: b
   }
   return { shouldWrite: writeArmed, skipNextWrite: false };
 }
+
+export function shouldCommitLocalDraftClear(
+  requestId: number,
+  latestRequestId: number,
+  recoveryAtStart: unknown,
+  currentRecovery: unknown,
+  projectAtStart: unknown,
+  currentProject: unknown
+): boolean {
+  return (
+    requestId === latestRequestId &&
+    recoveryAtStart === currentRecovery &&
+    projectAtStart === currentProject
+  );
+}

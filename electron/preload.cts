@@ -43,7 +43,19 @@ contextBridge.exposeInMainWorld("grooveforge", {
     }
   },
   saveProject: (contents: string, defaultName: string) =>
-    ipcRenderer.invoke("grooveforge:save-project", { contents, defaultName }) as Promise<{ canceled: boolean; filePath?: string }>,
+    ipcRenderer.invoke("grooveforge:save-project", { contents, defaultName }) as Promise<{
+      canceled: boolean;
+      filePath?: string;
+      databaseStored?: boolean;
+    }>,
+  saveProjectRecovery: (contents: string) =>
+    ipcRenderer.invoke("grooveforge:save-project-recovery", contents) as Promise<{ savedAt: string }>,
+  loadProjectRecovery: () =>
+    ipcRenderer.invoke("grooveforge:load-project-recovery") as Promise<
+      { contents: string; savedAt: string } | null
+    >,
+  clearProjectRecovery: () =>
+    ipcRenderer.invoke("grooveforge:clear-project-recovery") as Promise<{ cleared: boolean }>,
   closeWindow: () => ipcRenderer.send("grooveforge:close-window"),
   openProject: () =>
     ipcRenderer.invoke("grooveforge:open-project") as Promise<{ canceled: boolean; filePath?: string; contents?: string }>,

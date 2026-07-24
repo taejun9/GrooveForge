@@ -10,6 +10,10 @@ Record official documentation, platform docs, standards, laws, policies, or vend
 | W3C Web MIDI API | https://webaudio.github.io/web-midi-api/ | Browser MIDI devices, messages, permission gating, and System Exclusive boundary | 2026-06-17 | Web MIDI input capture for explicit local 808/Synth note entry |
 | MDN IndexedDB API | https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API | Browser local structured data and blob storage | 2026-06-15 | Local project and asset cache |
 | Electron Docs | https://www.electronjs.org/docs/latest/ | Cross-platform desktop app shell using JavaScript, HTML, and CSS | 2026-06-15 | Desktop MVP shell |
+| Electron 39.0 release | https://www.electronjs.org/blog/electron-39-0 | Electron 39 Chromium/V8/Node runtime versions | 2026-07-24 | Confirm Node 22 runtime basis for built-in SQLite3 |
+| Node.js SQLite API | https://nodejs.org/api/sqlite.html | Built-in SQLite DatabaseSync, prepared statements, transactions, and backup API | 2026-07-24 | Main-process SQLite3 project-library adapter |
+| SQLite Write-Ahead Logging | https://www.sqlite.org/wal.html | WAL durability, checkpoint, sidecar, concurrency, and persistence behavior | 2026-07-24 | Local project-library journal and shutdown policy |
+| SQLite PRAGMA Reference | https://www.sqlite.org/pragma.html | user_version, application_id, synchronous, foreign_keys, trusted_schema, secure_delete, integrity, and busy timeout behavior | 2026-07-24 | SQLite schema identity, safety settings, and QA |
 | Apple Developer Documentation: Hardened Runtime | https://developer.apple.com/documentation/security/hardened-runtime | Apple hardened runtime documentation entry point | 2026-06-28 | macOS hardened runtime readiness evidence |
 | Apple Developer Documentation: Notarizing macOS software before distribution | https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution | Apple notarization documentation entry point | 2026-06-28 | macOS notarization readiness boundaries |
 | Vite Guide | https://vite.dev/guide/ | Dev server and production build tool for modern web projects | 2026-06-15 | Renderer build system |
