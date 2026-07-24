@@ -21,6 +21,18 @@ const personaReadinessJsonPath = path.join(packageRoot, `${appName}-${packageJso
 const deliveryManifestJsonPath = path.join(deliveryRoot, `${appName}-${packageJson.version}-${platformArch}-local-delivery-package-manifest.json`);
 const packageReopenJsonPath = path.join(deliveryRoot, `${appName}-${packageJson.version}-${platformArch}-local-package-reopen.json`);
 const releaseDoctorJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-doctor.json`);
+const expectedLocalDeliveryArtifactLabels = [
+  "Project file",
+  "Full mix WAV",
+  "Drums stem WAV",
+  "Bass stem WAV",
+  "Synth stem WAV",
+  "Chords stem WAV",
+  "Arrangement MIDI",
+  "Handoff Sheet",
+  "SoundCloud Upload Sheet"
+];
+const expectedLocalDeliveryArtifactCount = expectedLocalDeliveryArtifactLabels.length;
 const failures = [];
 const handoffCommands = [
   {
@@ -174,12 +186,13 @@ function buildReport({ persona, deliveryManifest, packageReopen, releaseDoctor, 
   const styleCoverage = persona.styleCoverage ?? {};
   const localDeliveryReady =
     deliveryManifest.localDeliveryPackageReady === true &&
-    deliveryManifest.artifactCount === 8 &&
+    deliveryManifest.artifactCount === expectedLocalDeliveryArtifactCount &&
+    expectedLocalDeliveryArtifactLabels.every((label) => deliveryManifest.artifacts?.some((artifact) => artifact.label === label)) &&
     deliveryManifest.totalBytes > 0;
   const localPackageReopenReady =
     packageReopen.localPackageReopenReady === true &&
-    packageReopen.sourceArtifactCount === 8 &&
-    packageReopen.verifiedArtifactCount === 8 &&
+    packageReopen.sourceArtifactCount === expectedLocalDeliveryArtifactCount &&
+    packageReopen.verifiedArtifactCount === expectedLocalDeliveryArtifactCount &&
     packageReopen.projectRoundtripReady === true &&
     packageReopen.diskChecksumsReady === true &&
     packageReopen.regeneratedExportsMatchDisk === true;
@@ -463,12 +476,19 @@ function validateReport(report, markdown) {
   check(report.personaDeliveryPackagesReopenReady === true, "release audience completion handoff should prove persona delivery package reopen");
   check(report.audienceAcceptanceReady === true && report.audienceAcceptanceRowCount === 10, "release audience completion handoff should prove audience acceptance matrix");
   check(report.localDeliveryPackageReady === true, "release audience completion handoff should prove local delivery package readiness");
-  check(report.localDeliveryPackageArtifactCount === 8, "release audience completion handoff should prove eight local delivery artifacts");
+  check(
+    report.localDeliveryPackageArtifactCount === expectedLocalDeliveryArtifactCount,
+    "release audience completion handoff should prove every expected local delivery artifact"
+  );
   check(report.localDeliveryPackageTotalBytes > 0, "release audience completion handoff should prove non-empty local delivery artifacts");
   check(report.localDeliveryPackageBars === 8, "release audience completion handoff should prove sample-free 8-bar local package");
   check(report.localDeliveryPackageMixStatus === "Ready", "release audience completion handoff should prove local delivery mix readiness");
   check(report.localPackageReopenReady === true, "release audience completion handoff should prove package reopen readiness");
-  check(report.localPackageReopenVerifiedArtifactCount === 8 && report.localPackageReopenSourceArtifactCount === 8, "release audience completion handoff should prove local package reopen artifact coverage");
+  check(
+    report.localPackageReopenVerifiedArtifactCount === expectedLocalDeliveryArtifactCount &&
+      report.localPackageReopenSourceArtifactCount === expectedLocalDeliveryArtifactCount,
+    "release audience completion handoff should prove local package reopen artifact coverage"
+  );
   check(report.localPackageReopenRegeneratedExportsMatchDisk === true, "release audience completion handoff should prove regenerated exports match disk");
   check(report.releaseDoctorReady === true, "release audience completion handoff should include release doctor evidence");
   check(report.completionGapStatus === "external proof pending", "release audience completion handoff should keep external proof pending");
