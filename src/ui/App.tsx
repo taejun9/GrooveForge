@@ -831,8 +831,8 @@ import {
   keyboardCapturePitchLanes,
   clampKeyboardCaptureOctave,
   isKeyboardCaptureKey,
-  shouldReplaceKeyboardCaptureStep,
   resolveKeyboardCaptureStep,
+  resolveKeyboardCapturePlacement,
   createCaptureStepModeActions,
   addKeyboardCaptureNote,
   isMidiInputSupported,
@@ -1360,6 +1360,9 @@ export function App(): ReactElement {
   const localDraftSkipNextWriteRef = useRef(false);
   const selectedEventDeleteSelectionGuardRef = useRef(false);
   const controllerRef = useRef<PlaybackController | null>(null);
+  const playbackSessionRef = useRef(0);
+  const activePlaybackModeRef = useRef<PlaybackMode | null>(null);
+  const playbackPositionRef = useRef<PlaybackSnapshot | null>(null);
   const auditionControllerRef = useRef<PlaybackController | null>(null);
   const mixPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
   const mixPreviewUrlRef = useRef<string | null>(null);
@@ -1951,14 +1954,22 @@ export function App(): ReactElement {
     currentPattern,
     keyboardCaptureTarget,
     selectedNote,
-    keyboardCaptureStepMode
+    keyboardCaptureStepMode,
+    keyboardCaptureStepMode === "playhead" && playbackPosition?.mode === "pattern" && isPlaying
+      ? currentEditorStep
+      : null
   );
+  const keyboardCapturePlayheadStep =
+    keyboardCaptureStepMode === "playhead" && playbackPosition?.mode === "pattern" && isPlaying
+      ? currentEditorStep
+      : null;
   const keyboardCapturePosture = createKeyboardCapturePostureSummary(
     keyboardCaptureEnabled,
     keyboardCaptureTarget,
     activeKeyboardCaptureDefaults,
     keyboardCaptureNextStep,
-    keyboardCaptureStepMode
+    keyboardCaptureStepMode,
+    keyboardCapturePlayheadStep
   );
   const midiInputOptions = useMemo(() => createMidiInputOptions(midiAccess), [midiAccess, midiPortRevision]);
   const midiCaptureSummary = createMidiCaptureSummary(
@@ -2219,6 +2230,8 @@ export function App(): ReactElement {
 
   useEffect(() => {
     return () => {
+      playbackSessionRef.current += 1;
+      activePlaybackModeRef.current = null;
       controllerRef.current?.stop();
       controllerRef.current = null;
       auditionControllerRef.current?.stop();
@@ -2775,6 +2788,11 @@ export function App(): ReactElement {
     return true;
   }
 
+  function updatePlaybackPosition(position: PlaybackSnapshot | null): void {
+    playbackPositionRef.current = position;
+    setPlaybackPosition(position);
+  }
+
   function setProjectHasUnsavedChanges(value: boolean): void {
     projectHasUnsavedChangesRef.current = value;
     setProjectHasUnsavedChangesState(value);
@@ -3050,7 +3068,7 @@ export function App(): ReactElement {
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
-    setPlaybackPosition(null);
+    updatePlaybackPosition(null);
     setComposerActionResult(null);
     setComposerGuideResult(null);
     setKeyCompassResult(null);
@@ -3253,9 +3271,11 @@ export function App(): ReactElement {
 
     const recovery = localDraftRecovery;
 
+    playbackSessionRef.current += 1;
+    activePlaybackModeRef.current = null;
     controllerRef.current?.stop();
     controllerRef.current = null;
-    setPlaybackPosition(null);
+    updatePlaybackPosition(null);
     setIsPlaying(false);
 
     const draftProject = recovery.project;
@@ -3340,7 +3360,7 @@ export function App(): ReactElement {
       setSelectedNote(null);
       setSelectedDrumStep(null);
       setSelectedChordIndex(null);
-      setPlaybackPosition(null);
+      updatePlaybackPosition(null);
     }
   }
 
@@ -3400,9 +3420,13 @@ export function App(): ReactElement {
     }
   }
 
-  function updateCurrentPattern(update: (pattern: PatternData) => PatternData, status = "Unsaved changes"): boolean {
+  function updatePatternSlot(
+    patternSlot: PatternSlot,
+    update: (pattern: PatternData) => PatternData,
+    status = "Unsaved changes"
+  ): boolean {
     return updateProject((current) => {
-      const currentPatternData = current.patterns[current.selectedPattern];
+      const currentPatternData = current.patterns[patternSlot];
       const nextPatternData = update(currentPatternData);
       if (nextPatternData === currentPatternData) {
         return current;
@@ -3411,10 +3435,14 @@ export function App(): ReactElement {
         ...current,
         patterns: {
           ...current.patterns,
-          [current.selectedPattern]: nextPatternData
+          [patternSlot]: nextPatternData
         }
       };
     }, status);
+  }
+
+  function updateCurrentPattern(update: (pattern: PatternData) => PatternData, status = "Unsaved changes"): boolean {
+    return updatePatternSlot(projectRef.current.selectedPattern, update, status);
   }
 
   function updateKeyboardCaptureEnabled(enabled: boolean): void {
@@ -3422,6 +3450,20 @@ export function App(): ReactElement {
       setCaptureIdeasOpen(true);
     }
     setKeyboardCaptureEnabled(enabled);
+  }
+
+  function updateKeyboardCaptureStepMode(mode: KeyboardCaptureStepMode): void | "canceled" {
+    const activePlaybackMode = activePlaybackModeRef.current;
+    if (mode === "playhead" && activePlaybackMode !== null && activePlaybackMode !== "pattern") {
+      setProjectStatus("Stop Song, Block, or Turn playback before selecting Live Overdub");
+      return "canceled";
+    }
+    if (mode === "playhead" && activePlaybackMode === null) {
+      selectTransportLoopScope("pattern", false);
+      setProjectStatus(`Live Overdub ready for Pattern ${projectRef.current.selectedPattern}; press Play to record`);
+    }
+    setCaptureIdeasOpen(true);
+    setKeyboardCaptureStepMode(mode);
   }
 
   function updateMidiCaptureArmed(armed: boolean): void {
@@ -3501,7 +3543,8 @@ export function App(): ReactElement {
     step,
     pitch,
     defaults,
-    replaceStep
+    replaceStep,
+    liveOverdub
   }: {
     source: InputCaptureResult["source"];
     inputLabel: string;
@@ -3512,6 +3555,7 @@ export function App(): ReactElement {
     pitch: string;
     defaults: KeyboardCaptureDefaults;
     replaceStep: boolean;
+    liveOverdub: boolean;
   }): InputCaptureResult {
     const targetLabel = target === "bass" ? "808" : "Synth";
     const sourceLabel = source === "keyboard" ? "Keyboard" : "MIDI";
@@ -3520,7 +3564,7 @@ export function App(): ReactElement {
     const degreeIndex = keyboardCapturePitchLanes(projectKey, target, defaults).indexOf(pitch);
     const degreeLabel = degreeIndex >= 0 ? keyboardCaptureDegreeLabel(degreeIndex) : "Scale";
     const articulation = target === "bass" ? (defaults.glide ? "glide" : "no glide") : "melody";
-    const status = replaceStep ? "Replaced" : "Captured";
+    const status = liveOverdub ? "Overdubbed" : replaceStep ? "Replaced" : "Captured";
     const supportingLayers = target === "bass" ? "drums, chords, and Synth" : "drums, 808, and chords";
 
     return {
@@ -3528,14 +3572,18 @@ export function App(): ReactElement {
       targetId: `${source}-${patternSlot}-${target}-${step}-${pitch}`,
       status,
       title: `${targetLabel} ${pitch} step ${step + 1}`,
-      detail: `${sourceLabel} ${inputLabel} / ${replaceStep ? "replaced selected step" : "next free step"} / ${percentLabel(
+      detail: `${sourceLabel} ${inputLabel} / ${
+        liveOverdub ? "quantized to live playhead" : replaceStep ? "replaced selected step" : "next free step"
+      } / ${percentLabel(
         velocity
       )} velocity`,
       patternLabel: `Pattern ${patternSlot}`,
       metricLabel: "Capture",
       metricValue: `${degreeLabel} / length ${length} / ${articulation}`,
       captureCue: `Loop Pattern ${patternSlot}; hear the captured ${targetLabel} against ${supportingLayers}.`,
-      nextCheck: replaceStep
+      nextCheck: liveOverdub
+        ? "Keep the Pattern loop playing to overdub another event, then stop and edit the captured notes in the grid."
+        : replaceStep
         ? "Undo if the replacement missed the phrase, or switch Capture Step Mode back to Next for additive writing."
         : "Keep capturing while the idea is fresh, then audition the selected note before editing length, glide, or velocity.",
       tone: "good"
@@ -3553,7 +3601,6 @@ export function App(): ReactElement {
     }
 
     const current = projectRef.current;
-    const pattern = activePattern(current);
     const target = keyboardCaptureTarget;
     const captureDefaults = keyboardCaptureDefaults[target];
     const pitch = midiNoteToScalePitch(note.noteNumber, current.key, target);
@@ -3564,25 +3611,39 @@ export function App(): ReactElement {
       return;
     }
 
-    const step = resolveKeyboardCaptureStep(pattern, target, selectedNote, keyboardCaptureStepMode);
-    const replaceStep = shouldReplaceKeyboardCaptureStep(keyboardCaptureStepMode, selectedNote, target);
+    const placement = resolveKeyboardCapturePlacement(
+      current,
+      target,
+      selectedNote,
+      keyboardCaptureStepMode,
+      controllerRef.current ? playbackPositionRef.current : null
+    );
+    if (!placement) {
+      setInputCaptureResult(null);
+      setProjectStatus("Live Overdub needs active Pattern playback");
+      return;
+    }
+    const step = placement.step;
+    const replaceStep = placement.replaceStep;
     const midiDefaults: KeyboardCaptureDefaults = { ...captureDefaults, velocity: note.velocity };
     const result = createInputCaptureResult({
       source: "midi",
       inputLabel: midiNoteLabel(note.noteNumber),
-      patternSlot: current.selectedPattern,
+      patternSlot: placement.pattern,
       projectKey: current.key,
       target,
       step,
       pitch,
       defaults: midiDefaults,
-      replaceStep
+      replaceStep,
+      liveOverdub: placement.liveOverdub
     });
-    const changed = updateCurrentPattern(
+    const changed = updatePatternSlot(
+      placement.pattern,
       (currentPatternData) => addKeyboardCaptureNote(currentPatternData, target, step, pitch, midiDefaults, replaceStep),
-      `MIDI ${replaceStep ? "replaced" : "captured"} ${target === "bass" ? "808" : "Synth"} ${pitch}.${step + 1} on Pattern ${
-        current.selectedPattern
-      }`
+      `MIDI ${placement.liveOverdub ? "overdubbed" : replaceStep ? "replaced" : "captured"} ${
+        target === "bass" ? "808" : "Synth"
+      } ${pitch}.${step + 1} on Pattern ${placement.pattern}`
     );
     const noteLabel = `${midiNoteLabel(note.noteNumber)} -> ${pitch}.${step + 1} / ${Math.round(note.velocity * 100)}%`;
 
@@ -5922,7 +5983,6 @@ export function App(): ReactElement {
 
   function captureKeyboardNote(key: KeyboardCaptureKey): void {
     const current = projectRef.current;
-    const pattern = activePattern(current);
     const target = keyboardCaptureTarget;
     const captureDefaults = keyboardCaptureDefaults[target];
     const pitch = keyboardCapturePitchForKey(key, keyboardCapturePitchLanes(current.key, target, captureDefaults));
@@ -5932,24 +5992,38 @@ export function App(): ReactElement {
       return;
     }
 
-    const step = resolveKeyboardCaptureStep(pattern, target, selectedNote, keyboardCaptureStepMode);
-    const replaceStep = shouldReplaceKeyboardCaptureStep(keyboardCaptureStepMode, selectedNote, target);
+    const placement = resolveKeyboardCapturePlacement(
+      current,
+      target,
+      selectedNote,
+      keyboardCaptureStepMode,
+      controllerRef.current ? playbackPositionRef.current : null
+    );
+    if (!placement) {
+      setInputCaptureResult(null);
+      setProjectStatus("Live Overdub needs active Pattern playback");
+      return;
+    }
+    const step = placement.step;
+    const replaceStep = placement.replaceStep;
     const result = createInputCaptureResult({
       source: "keyboard",
       inputLabel: keyboardCaptureKeyLabels[key],
-      patternSlot: current.selectedPattern,
+      patternSlot: placement.pattern,
       projectKey: current.key,
       target,
       step,
       pitch,
       defaults: captureDefaults,
-      replaceStep
+      replaceStep,
+      liveOverdub: placement.liveOverdub
     });
-    const changed = updateCurrentPattern(
+    const changed = updatePatternSlot(
+      placement.pattern,
       (currentPatternData) => addKeyboardCaptureNote(currentPatternData, target, step, pitch, captureDefaults, replaceStep),
-      `${replaceStep ? "Replaced" : "Captured"} ${target === "bass" ? "808" : "Synth"} ${pitch}.${step + 1} length ${
-        captureDefaults.length
-      } on Pattern ${current.selectedPattern}`
+      `${placement.liveOverdub ? "Overdubbed" : replaceStep ? "Replaced" : "Captured"} ${
+        target === "bass" ? "808" : "Synth"
+      } ${pitch}.${step + 1} length ${captureDefaults.length} on Pattern ${placement.pattern}`
     );
 
     if (!changed) {
@@ -7201,9 +7275,11 @@ export function App(): ReactElement {
 
   function togglePlayback(): void {
     if (isPlaying) {
+      playbackSessionRef.current += 1;
+      activePlaybackModeRef.current = null;
       controllerRef.current?.stop();
       controllerRef.current = null;
-      setPlaybackPosition(null);
+      updatePlaybackPosition(null);
       setIsPlaying(false);
       return;
     }
@@ -7213,6 +7289,9 @@ export function App(): ReactElement {
       return;
     }
 
+    const playbackSession = playbackSessionRef.current + 1;
+    playbackSessionRef.current = playbackSession;
+    activePlaybackModeRef.current = transportLoopMode;
     try {
       stopMixPreview();
       setIsPlaying(true);
@@ -7221,17 +7300,30 @@ export function App(): ReactElement {
         bars: transportLoopBars,
         startBar: transportLoopStartBar,
         getProject: () => projectRef.current,
-        onStep: setPlaybackPosition,
+        onStep: (position) => {
+          if (playbackSessionRef.current === playbackSession) {
+            updatePlaybackPosition(position);
+          }
+        },
         onStop: () => {
+          if (playbackSessionRef.current !== playbackSession) {
+            return;
+          }
+          activePlaybackModeRef.current = null;
           controllerRef.current = null;
-          setPlaybackPosition(null);
+          updatePlaybackPosition(null);
           setIsPlaying(false);
         }
       });
     } catch (error) {
       console.error(error);
-      setIsPlaying(false);
-      setPlaybackPosition(null);
+      if (playbackSessionRef.current === playbackSession) {
+        playbackSessionRef.current += 1;
+        activePlaybackModeRef.current = null;
+        controllerRef.current = null;
+        setIsPlaying(false);
+        updatePlaybackPosition(null);
+      }
     }
   }
 
@@ -7259,11 +7351,13 @@ export function App(): ReactElement {
       return;
     }
 
+    playbackSessionRef.current += 1;
+    activePlaybackModeRef.current = null;
     controllerRef.current?.stop();
     controllerRef.current = null;
     auditionControllerRef.current?.stop();
     auditionControllerRef.current = null;
-    setPlaybackPosition(null);
+    updatePlaybackPosition(null);
     setIsPlaying(false);
 
     try {
@@ -7547,11 +7641,13 @@ export function App(): ReactElement {
         setProjectStatus("Open canceled; current project kept");
         return;
       }
+      playbackSessionRef.current += 1;
+      activePlaybackModeRef.current = null;
       controllerRef.current?.stop();
       controllerRef.current = null;
       replaceProject(nextProject, `Loaded ${sourceName}`, sourceName);
       setLaunchpadOpen(false);
-      setPlaybackPosition(null);
+      updatePlaybackPosition(null);
       setIsPlaying(false);
       setLocalDraftRecoveryResult(null);
       setProjectFileResult(createProjectFileResult(action, sourceName, nextProject));
@@ -10441,7 +10537,7 @@ export function App(): ReactElement {
     onSwitchMode: switchProjectMode,
     onUsePatternInSelectedBlock: usePatternInSelectedBlockFromCompare,
     onSetKeyboardCaptureEnabled: updateKeyboardCaptureEnabled,
-    onSetKeyboardCaptureStepMode: setKeyboardCaptureStepMode,
+    onSetKeyboardCaptureStepMode: updateKeyboardCaptureStepMode,
     onSetKeyboardCaptureTarget: setKeyboardCaptureTarget,
     onUpdateKeyboardCaptureDefaults: updateKeyboardCaptureDefaults,
     onSetMidiCaptureArmed: updateMidiCaptureArmed,
@@ -13879,9 +13975,10 @@ export function App(): ReactElement {
             enabled={keyboardCaptureEnabled}
             keyMap={keyboardCaptureKeyMap}
             nextStep={keyboardCaptureNextStep}
+            playheadStep={keyboardCapturePlayheadStep}
             onDefaultsChange={updateKeyboardCaptureDefaults}
             onEnabledChange={updateKeyboardCaptureEnabled}
-            onStepModeChange={setKeyboardCaptureStepMode}
+            onStepModeChange={updateKeyboardCaptureStepMode}
             onTargetChange={setKeyboardCaptureTarget}
             selectedNote={selectedNote}
             stepMode={keyboardCaptureStepMode}

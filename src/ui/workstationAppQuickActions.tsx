@@ -1352,6 +1352,9 @@ export function applyQuickActionInputSetupSnapshot(
   if (action.id === "capture-step-mode-replace") {
     next.keyboardCaptureStepMode = "replace-selected";
   }
+  if (action.id === "capture-step-mode-playhead") {
+    next.keyboardCaptureStepMode = "playhead";
+  }
 
   const target = next.keyboardCaptureTarget;
   const targetDefaults = next.keyboardCaptureDefaults[target];
@@ -1392,13 +1395,20 @@ export function createQuickActionResult(
   handoffExportReceipt: HandoffExportReceipt | null = null,
   inputSetupResult: QuickActionInputSetupResultState | null = null
 ): QuickActionResult {
+  const resolvedInputSetupResult =
+    outcome === "canceled" && inputSetupResult
+      ? {
+          before: cloneQuickActionInputSetupSnapshot(inputSetupResult.before),
+          after: cloneQuickActionInputSetupSnapshot(inputSetupResult.before)
+        }
+      : inputSetupResult;
   const beforeMetric = quickActionResultMetricSnapshot(
     beforeProject,
     action,
     selectedArrangementIndex,
     "before",
     handoffExportReceipt,
-    inputSetupResult
+    resolvedInputSetupResult
   );
   const afterMetric = quickActionResultMetricSnapshot(
     afterProject,
@@ -1406,7 +1416,7 @@ export function createQuickActionResult(
     selectedArrangementIndex,
     "after",
     handoffExportReceipt,
-    inputSetupResult
+    resolvedInputSetupResult
   );
   const nextMoveQuickAction = nextMoveQuickActionForProject(afterProject, action);
   const nextMoveQuickActionOnly = nextMoveQuickAction !== null;
@@ -1651,10 +1661,15 @@ export function createQuickActionResult(
   };
   const followup =
     outcome === "canceled"
-      ? {
-          auditionCue: "The current project stayed unchanged; no listening check is needed.",
-          nextCheck: "Run the action again only when replacing the current project state is intended."
-        }
+      ? action.id === "capture-step-mode-playhead"
+        ? {
+            auditionCue: "Arrangement playback stayed unchanged and no note was recorded.",
+            nextCheck: "Stop Song, Block, or Turn playback, then select Live Overdub again for the selected Pattern."
+          }
+        : {
+            auditionCue: "The current project stayed unchanged; no listening check is needed.",
+            nextCheck: "Run the action again only when replacing the current project state is intended."
+          }
       : quickActionResultFollowup(action, afterProject, outcome);
 
   return {
@@ -10369,7 +10384,7 @@ export function quickActionInputTargetLabel(target: NoteTrack): string {
 }
 
 export function quickActionCaptureStepModeLabel(mode: KeyboardCaptureStepMode): string {
-  return mode === "next-free" ? "Next empty" : "Replace selected";
+  return mode === "next-free" ? "Next empty" : mode === "replace-selected" ? "Replace selected" : "Live Overdub";
 }
 
 export function quickActionInputPitchMapLabel(project: ProjectState, snapshot: QuickActionInputSetupSnapshot): string {
@@ -10410,6 +10425,9 @@ export function quickActionCaptureStepCandidateLabel(
   project: ProjectState,
   snapshot: QuickActionInputSetupSnapshot
 ): string {
+  if (snapshot.keyboardCaptureStepMode === "playhead") {
+    return `current Pattern playhead while playback runs`;
+  }
   const pattern = activePattern(project);
   const step = resolveKeyboardCaptureStep(
     pattern,

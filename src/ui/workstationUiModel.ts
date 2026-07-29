@@ -340,7 +340,7 @@ export const keys = [...projectKeys];
 export const historyLimit = 50;
 export const keyboardCaptureKeys = ["a", "s", "d", "f", "g", "h", "j", "k"] as const;
 export type KeyboardCaptureKey = (typeof keyboardCaptureKeys)[number];
-export const keyboardCaptureStepModes = ["next-free", "replace-selected"] as const;
+export const keyboardCaptureStepModes = ["next-free", "replace-selected", "playhead"] as const;
 export type KeyboardCaptureStepMode = (typeof keyboardCaptureStepModes)[number];
 
 export const keyboardCaptureKeyLabels: Record<KeyboardCaptureKey, string> = {
@@ -1284,7 +1284,7 @@ export type InputCaptureResultSource = "keyboard" | "midi";
 export type InputCaptureResult = {
   source: InputCaptureResultSource;
   targetId: string;
-  status: "Captured" | "Replaced";
+  status: "Captured" | "Replaced" | "Overdubbed";
   title: string;
   detail: string;
   patternLabel: string;

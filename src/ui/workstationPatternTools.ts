@@ -632,17 +632,19 @@ export function createKeyboardCapturePostureSummary(
   target: NoteTrack,
   defaults: KeyboardCaptureDefaults,
   nextStep: number,
-  stepMode: KeyboardCaptureStepMode
+  stepMode: KeyboardCaptureStepMode,
+  playheadStep: number | null = null
 ): KeyboardCapturePostureSummary {
   const targetLabel = target === "bass" ? "Bass" : "Synth";
   const statusLabel = enabled ? "Capture armed" : "Capture off";
-  const stepModeLabel = stepMode === "next-free" ? "Next" : "Replace";
+  const stepModeLabel = stepMode === "next-free" ? "Next" : stepMode === "replace-selected" ? "Replace" : "Overdub";
+  const stepLabel = stepMode === "playhead" && playheadStep === null ? "Waiting for Pattern play" : `Step ${(playheadStep ?? nextStep) + 1}`;
   const detailLabel =
     target === "bass"
-      ? `Step ${nextStep + 1} / ${stepModeLabel} / Oct ${defaults.octave} / Len ${defaults.length} / ${
+      ? `${stepLabel} / ${stepModeLabel} / Oct ${defaults.octave} / Len ${defaults.length} / ${
           defaults.glide ? "Glide on" : "Glide off"
         }`
-      : `Step ${nextStep + 1} / ${stepModeLabel} / Oct ${defaults.octave} / Len ${defaults.length} / Vel ${Math.round(
+      : `${stepLabel} / ${stepModeLabel} / Oct ${defaults.octave} / Len ${defaults.length} / Vel ${Math.round(
           defaults.velocity * 100
         )}%`;
 
@@ -703,13 +705,63 @@ export function resolveKeyboardCaptureStep(
   pattern: PatternData,
   target: NoteTrack,
   selectedNote: SelectedNote | null,
-  stepMode: KeyboardCaptureStepMode
+  stepMode: KeyboardCaptureStepMode,
+  playheadStep: number | null = null
 ): number {
+  if (stepMode === "playhead" && playheadStep !== null) {
+    return normalizeStepModulo(playheadStep);
+  }
   if (shouldReplaceKeyboardCaptureStep(stepMode, selectedNote, target) && selectedNote) {
     return selectedNote.step;
   }
 
   return nextKeyboardCaptureStep(pattern, target, selectedNote?.track === target ? selectedNote.step + 1 : 0);
+}
+
+export type KeyboardCapturePlaybackPosition = {
+  mode: "arrangement" | "pattern";
+  pattern: PatternSlot;
+  loopStep: number;
+};
+
+export type KeyboardCapturePlacement = {
+  pattern: PatternSlot;
+  step: number;
+  replaceStep: boolean;
+  liveOverdub: boolean;
+};
+
+export function resolveKeyboardCapturePlacement(
+  project: ProjectState,
+  target: NoteTrack,
+  selectedNote: SelectedNote | null,
+  stepMode: KeyboardCaptureStepMode,
+  playbackPosition: KeyboardCapturePlaybackPosition | null = null
+): KeyboardCapturePlacement | null {
+  if (stepMode === "playhead") {
+    if (playbackPosition?.mode !== "pattern" || playbackPosition.pattern !== project.selectedPattern) {
+      return null;
+    }
+    return {
+      pattern: playbackPosition.pattern,
+      step: resolveKeyboardCaptureStep(
+        project.patterns[playbackPosition.pattern],
+        target,
+        selectedNote,
+        stepMode,
+        playbackPosition.loopStep
+      ),
+      replaceStep: false,
+      liveOverdub: true
+    };
+  }
+
+  return {
+    pattern: project.selectedPattern,
+    step: resolveKeyboardCaptureStep(project.patterns[project.selectedPattern], target, selectedNote, stepMode),
+    replaceStep: shouldReplaceKeyboardCaptureStep(stepMode, selectedNote, target),
+    liveOverdub: false
+  };
 }
 
 export function createCaptureStepModeActions({
@@ -729,7 +781,7 @@ export function createCaptureStepModeActions({
   selectedNote: SelectedNote | null;
   selectedNoteActive: boolean;
   selectedNoteLabel: string;
-  onSetKeyboardCaptureStepMode: (mode: KeyboardCaptureStepMode) => void;
+  onSetKeyboardCaptureStepMode: (mode: KeyboardCaptureStepMode) => void | "canceled";
 }): QuickAction[] {
   return [
     {
@@ -748,6 +800,13 @@ export function createCaptureStepModeActions({
           ? `Desktop keys and MIDI notes replace ${selectedNoteLabel} / Pattern ${selectedPattern}`
           : `Desktop keys and MIDI notes replace the selected ${keyboardCaptureTargetLabel} step when available`,
       keywords: `capture step mode replace selected overwrite correction keyboard midi input ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} producer beginner`
+    },
+    {
+      id: "capture-step-mode-playhead",
+      mode: "playhead" as KeyboardCaptureStepMode,
+      title: "Capture step mode: Live Overdub",
+      detail: `Desktop keys and MIDI notes quantize to the current Pattern playhead while playback runs / Pattern ${selectedPattern}`,
+      keywords: `capture step mode live overdub record playhead quantize pattern loop keyboard midi input ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} producer beginner`
     }
   ].map(({ id, mode, title, detail, keywords }) => ({
     id,
