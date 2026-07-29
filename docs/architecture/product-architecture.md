@@ -92,6 +92,10 @@ Drum-grid keyboard navigation is a UI-local focus state machine over the existin
 
 808/Synth note-grid keyboard navigation is a UI-local focus state machine over the existing `SelectedNote` plus each grid's rendered pitch order. The pure `noteGridNavigationTarget` helper bounds horizontal movement to 16 steps and vertical movement to the dynamic scale-plus-used-note rows, while Home/End stay pitch-local. Each instrument renderer owns one roving `tabIndex=0`; navigation moves DOM focus and exclusive note selection together through `onSelect` without calling a project update. Enter/Space are consumed at the focused button and forwarded once through the existing note click handler, preserving active-note selection/removal, undo history, default note data, inspector state, and the global Play/Stop guard. `aria-pressed` remains derived directly from Pattern A/B/C bass or melody note events, so visible state, accessibility state, playback, save/load, render, MIDI export, and Handoff stay on one event source of truth.
 
+Pattern Live Overdub is a UI/scheduler placement layer over that same Pattern event source of truth. `playbackPositionRef` mirrors the latest realtime `PlaybackSnapshot` synchronously so Desktop Keyboard and armed Web MIDI Note On handlers do not capture against a stale React render. A monotonic playback-session ref gates `onStep`, delayed `onStop`, and startup failure callbacks so an earlier controller cannot clear or overwrite a newer controller after a rapid Stop→Play transition. A separate active-playback-mode ref follows the same controller lifecycle, allowing cached Quick Actions to reject Song/Block/Turn playback without trusting an older render closure. The pure placement resolver accepts Live Overdub only when the snapshot is `pattern` mode and names the currently selected Pattern, maps `loopStep` into the bounded 16-step event grid, and returns no placement for Song/Block/Turn playback or another Pattern. The visible playhead uses the same selected-Pattern guard. The resulting note still uses the existing undoable Pattern-slot update, selection, local recovery, project serialization, realtime playback, WAV/stem rendering, and MIDI export paths. Next-empty and Replace-selected keep their prior placement rules. Capture mode, arming, playhead readout, and Input Capture Result remain UI-local; only an explicit note input creates durable event data.
+
+Live Overdub does not add audio recording, background recording, MIDI output/clock, device mapping, SysEx, or remote telemetry. Web MIDI access remains an explicit `navigator.requestMIDIAccess({ sysex: false })` action, connected-device state stays local, and neither raw MIDI messages nor device identity enters project data or QA logs.
+
 Pattern-tab keyboard navigation is a UI-local roving-focus layer over the existing `selectPattern` view-update boundary. The horizontal A/B/C tablist derives complete visible labels, event counts, `aria-selected`, edit state, and independent audible Playing state from current local project and playback data. ArrowLeft/ArrowRight wrap; Home/End select the first or last Pattern; automatic activation calls the same selection handler as clicks and 1/2/3 shortcuts, then moves DOM focus to the resulting sole `tabIndex=0`. Home/End on the already selected Pattern only retain focus so they do not clear a selected event unnecessarily. No new project field, undo entry, playback mutation, arrangement mutation, or export behavior is introduced.
 
 Transport loop-scope clarity is a presentation projection over the existing `transportLoopScope`, selected arrangement block, derived adjacent transition target, selected Pattern, and current project data. Song, Block, Turn, and Pattern remain the same four native action buttons and call the same selection handler; each adds a live target line and derives `aria-pressed`, accessible naming, and selected styling from the same UI-local scope. Turn keeps its established command vocabulary while exposing the actual adjacent section handoff. Event-count copy reuses the formatter's complete singular/plural result. This layer adds no playback, arrangement, Pattern, history, persistence, render, or export state.
@@ -152,7 +156,9 @@ Pattern groove controls are a presentation layer over the existing deterministic
 
 The workstation also owns a zero-specificity button foundation through `:where(button)`. It removes native appearance and supplies the minimum dark surface, border, radius, foreground, hover, focus-visible, and disabled contract while allowing every class- or component-scoped selector to override presentation. This is a rendering boundary only and must not alter event handlers, command routing, project mutation, keyboard shortcuts, playback, or export.
 
-The core project model should make composition events first-class. In the core architecture, a clip is a pattern, MIDI, or automation container, not an imported audio asset:
+The current version-1 implementation stores fixed Pattern A/B/C event collections for drums, bass, melody, and chords, plus fixed mixer roles, sound design, arrangement, master automation, render settings, and project metadata. It does not yet persist generic `Track`, `Clip`, or `Device` entities. The following model is the target migration architecture, and future work must preserve existing project roundtrips while moving toward it.
+
+The target core project model should make composition events first-class. In that target architecture, a clip is a pattern, MIDI, or automation container, not an imported audio asset:
 
 - `Project`: version, title, BPM, key/scale, swing, tracks, arrangement, master settings.
 - `SessionBrief`: bounded local artist, vibe, reference, and notes text for project intent and handoff context.
@@ -191,7 +197,7 @@ Sound-source nuance: a built-in drum rack may use internal one-shot sounds, and 
 
 MVP type examples must not place `AudioClipEvent`, `audio`, or `sampler` beside the core event, clip, or track unions. Those names are reserved for the optional sampling extension section unless the user explicitly starts sampling-phase work. External examples that include `AudioClipEvent` in `MusicalEvent` or include `audio`/`sampler` in `TrackType` must be split into a core MVP union plus a clearly labeled optional sampling extension.
 
-Attached-brief architecture rule: when a brief presents a single combined track, clip, or audio-engine list, split it before implementation. The MVP list is `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master` plus pattern/MIDI/automation clips; `audio`, `sampler`, `AudioClip`, `Sampler`, waveform editing, chop pads, and imported audio assets belong only to the optional sampling extension.
+Attached-brief architecture rule: when a brief presents a single combined track, clip, or audio-engine list, split it before implementation. The target core list after schema migration is `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master` plus pattern/MIDI/automation clips; `audio`, `sampler`, `AudioClip`, `Sampler`, waveform editing, chop pads, and imported audio assets belong only to the optional sampling extension.
 
 Korean concept-brief architecture rule: if a brief says GrooveForge is for "비트(모든 장르)를 만드는" work and sampling is "부가 기능", architecture must not promote sample import, chopping, loop stretching, sampler setup, `AudioClipEvent`, `audio`, or `sampler` into the core layer map, MVP track union, first-run project, or default device palette.
 
@@ -219,7 +225,7 @@ Roadmap and architecture plans should treat `audio` and `sampler` as extension t
 
 ## Track Types
 
-Initial track types:
+Target track types after a versioned Track/Device migration:
 
 - `drum_rack`
 - `bass_808`
@@ -228,9 +234,9 @@ Initial track types:
 - `fx_return`
 - `master`
 
-MVP tracks should be `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master`. `audio` and `sampler` must not appear in the MVP track union or default project track list.
+The current durable mixer topology is Drums, 808/Bass, Synth, Chord, and Master. The target track family is `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master`; `audio` and `sampler` must not appear in the core target union or default project track list.
 
-The MVP `fx_return` is a built-in Space send/return path for shared ambience. It is deterministic project processing, not plugin hosting, imported impulse responses, sample playback, or a sampling workflow.
+The current built-in Space effect is deterministic shared ambience driven by each musical mixer channel's `send` value, and import normalization discards inert persisted `fx_return` rows until a matching editable track/device schema exists. A future explicit `fx_return` entity must preserve that audible behavior; it is not plugin hosting, imported impulse responses, sample playback, or a sampling workflow.
 
 If a draft proposes a default Instrument Panel with `drum kit`, `808`, `synth`, `sampler`, and `FX`, rewrite the default list to `drum rack`, `synth 808/bass`, `simple synth`, `chord synth`, built-in FX, mixer, and master devices. Put `sampler` only under the optional sampling extension.
 

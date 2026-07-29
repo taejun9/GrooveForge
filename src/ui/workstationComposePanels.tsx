@@ -1015,6 +1015,7 @@ export function KeyboardCapturePanel({
   target,
   stepMode,
   nextStep,
+  playheadStep,
   keyMap,
   selectedNote,
   onDefaultsChange,
@@ -1027,6 +1028,7 @@ export function KeyboardCapturePanel({
   target: NoteTrack;
   stepMode: KeyboardCaptureStepMode;
   nextStep: number;
+  playheadStep: number | null;
   keyMap: KeyboardCaptureKeyMapItem[];
   selectedNote: SelectedNote | null;
   onDefaultsChange: (update: Partial<KeyboardCaptureDefaults>) => void;
@@ -1077,12 +1079,12 @@ export function KeyboardCapturePanel({
           </button>
         </div>
         <div className="capture-readout">
-          <span>Next</span>
-          <strong>{nextStep + 1}</strong>
+          <span>{stepMode === "playhead" ? "Playhead" : "Next"}</span>
+          <strong>{stepMode === "playhead" ? (playheadStep === null ? "Waiting" : playheadStep + 1) : nextStep + 1}</strong>
         </div>
         <div className="capture-readout">
           <span>Step Mode</span>
-          <strong>{stepMode === "next-free" ? "Next" : "Replace"}</strong>
+          <strong>{stepMode === "next-free" ? "Next" : stepMode === "replace-selected" ? "Replace" : "Overdub"}</strong>
         </div>
         <div className="capture-readout">
           <span>Selected</span>
@@ -1109,6 +1111,17 @@ export function KeyboardCapturePanel({
         >
           <span>Replace</span>
           <small>selected step</small>
+        </button>
+        <button
+          aria-pressed={stepMode === "playhead"}
+          className={stepMode === "playhead" ? "selected" : ""}
+          data-testid="keyboard-capture-step-mode-playhead"
+          onClick={() => onStepModeChange("playhead")}
+          title="Quantize Desktop Keyboard and MIDI notes to the current Pattern playhead"
+          type="button"
+        >
+          <span>Overdub</span>
+          <small>live playhead</small>
         </button>
       </div>
       <div className="capture-defaults" aria-label="Keyboard Capture defaults">

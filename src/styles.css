@@ -20588,8 +20588,15 @@ input[type="range"] {
 .capture-target-row,
 .capture-step-mode-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
+}
+
+.capture-target-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.capture-step-mode-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .capture-target-row button,

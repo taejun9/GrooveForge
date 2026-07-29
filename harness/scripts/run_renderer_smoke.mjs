@@ -490,6 +490,172 @@ function validateDemandMaterialization(palette) {
   check(reopened !== active, "reopened Quick Actions should not reuse the previous session graph");
 }
 
+function validateLiveOverdub(patternTools, workstation, midi, render, quickActions) {
+  const project = {
+    ...structuredClone(workstation.starterProject),
+    selectedPattern: "A",
+    patterns: {
+      ...structuredClone(workstation.starterProject.patterns),
+      A: workstation.createEmptyPatternData()
+    }
+  };
+  const nextPlacement = patternTools.resolveKeyboardCapturePlacement(project, "melody", null, "next-free", null);
+  check(
+    nextPlacement?.pattern === "A" && nextPlacement?.step === 0,
+    "Live Overdub should preserve the existing Next-empty capture path"
+  );
+  const replacePlacement = patternTools.resolveKeyboardCapturePlacement(
+    project,
+    "melody",
+    { track: "melody", step: 6, pitch: "E4" },
+    "replace-selected",
+    null
+  );
+  check(
+    replacePlacement?.step === 6 && replacePlacement?.replaceStep === true,
+    "Live Overdub should preserve the existing Replace-selected capture path"
+  );
+  check(
+    patternTools.resolveKeyboardCapturePlacement(
+      project,
+      "melody",
+      null,
+      "playhead",
+      { mode: "arrangement", pattern: "A", loopStep: 5 }
+    ) === null,
+    "Live Overdub must reject ambiguous arrangement playback"
+  );
+  check(
+    patternTools.resolveKeyboardCapturePlacement(
+      project,
+      "melody",
+      null,
+      "playhead",
+      { mode: "pattern", pattern: "B", loopStep: 5 }
+    ) === null,
+    "Live Overdub must reject a non-selected Pattern playhead"
+  );
+  const livePlacement = patternTools.resolveKeyboardCapturePlacement(
+    project,
+    "melody",
+    null,
+    "playhead",
+    { mode: "pattern", pattern: "A", loopStep: 19 }
+  );
+  check(
+    livePlacement?.pattern === "A" && livePlacement?.step === 3 && livePlacement?.liveOverdub === true,
+    "Live Overdub should quantize the Pattern playhead to the bounded 16-step event grid"
+  );
+  const capturedPattern = patternTools.addKeyboardCaptureNote(
+    project.patterns.A,
+    "melody",
+    livePlacement?.step ?? -1,
+    "E4",
+    { octave: 4, length: 2, velocity: 0.73, glide: false },
+    false
+  );
+  const capturedProject = {
+    ...project,
+    patterns: { ...project.patterns, A: capturedPattern },
+    arrangement: [{ section: "Intro", pattern: "A", energy: 0.8, bars: 1, mutedTracks: [] }]
+  };
+  const roundTrip = workstation.parseProjectFile(workstation.serializeProjectFile(capturedProject));
+  check(
+    roundTrip.patterns.A.melodyNotes.some(
+      (note) => note.step === 3 && note.pitch === "E4" && note.length === 2 && note.velocity === 0.73
+    ),
+    "Live Overdub events should survive the normal project save/load boundary"
+  );
+  check(midi.createMidiFile(roundTrip).byteLength > 128, "Live Overdub events should remain available to MIDI export");
+  check(
+    render.analyzeExport(roundTrip).status !== "Silent",
+    "Live Overdub events should remain audible in deterministic WAV rendering"
+  );
+  const actions = patternTools.createCaptureStepModeActions({
+    keyboardCaptureStepMode: "next-free",
+    keyboardCaptureTarget: "melody",
+    keyboardCaptureTargetLabel: "Synth",
+    selectedPattern: "A",
+    selectedNote: null,
+    selectedNoteActive: false,
+    selectedNoteLabel: "No selected note",
+    onSetKeyboardCaptureStepMode: () => {}
+  });
+  check(
+    actions.length === 3 &&
+      actions.some((action) => action.id === "capture-step-mode-playhead" && /Live Overdub/.test(action.title)),
+    "Quick Actions should expose Next, Replace, and the real Live Overdub placement mode"
+  );
+  const setupAction = {
+    id: "capture-step-mode-playhead",
+    title: "Capture step mode: Live Overdub",
+    detail: "Pattern playhead",
+    group: "Create",
+    keywords: "live overdub",
+    run: () => {}
+  };
+  const setupSnapshot = {
+    keyboardCaptureEnabled: true,
+    keyboardCaptureTarget: "melody",
+    keyboardCaptureDefaults: {
+      bass: { octave: 1, length: 2, velocity: 0.82, glide: false },
+      melody: { octave: 4, length: 1, velocity: 0.68, glide: false }
+    },
+    keyboardCaptureStepMode: "next-free",
+    midiCaptureStatus: "idle",
+    midiCaptureArmed: false,
+    midiInputCount: 0,
+    connectedMidiInputCount: 0,
+    midiStatusLabel: "MIDI not connected",
+    midiDetailLabel: "Connect",
+    midiSelectedInputId: "all",
+    midiSelectedInputLabel: "All connected inputs",
+    midiLastNoteLabel: "No MIDI note captured",
+    selectedNote: null,
+    selectedNoteActive: false,
+    selectedNoteLabel: "No selected note"
+  };
+  const setupResult = quickActions.createQuickActionInputSetupResultState(setupAction, setupSnapshot);
+  check(
+    setupResult?.after.keyboardCaptureStepMode === "playhead",
+    "Live Overdub Quick Actions should report the applied playhead mode in their after metric"
+  );
+  const canceledResult = quickActions.createQuickActionResult(
+    setupAction,
+    project,
+    project,
+    "canceled",
+    0,
+    null,
+    setupResult
+  );
+  check(
+    canceledResult.metric.before === canceledResult.metric.after,
+    "a rejected Live Overdub Quick Action should keep its before/after setup metric unchanged"
+  );
+  check(
+    /Stop Song, Block, or Turn playback/.test(canceledResult.nextCheck),
+    "a rejected Live Overdub Quick Action should explain how to return to valid Pattern playback"
+  );
+  check(
+    appSource.includes("const playbackSessionRef = useRef(0)") &&
+      appSource.includes("const activePlaybackModeRef = useRef<PlaybackMode | null>(null)") &&
+      appSource.includes("if (playbackSessionRef.current !== playbackSession)") &&
+      appSource.includes("if (playbackSessionRef.current === playbackSession)"),
+    "realtime callbacks should ignore stale playback sessions after a rapid Stop and Play"
+  );
+  check(
+    appSource.includes("const activePlaybackMode = activePlaybackModeRef.current") &&
+      appSource.includes('activePlaybackMode !== null && activePlaybackMode !== "pattern"') &&
+      appSource.includes('mode === "playhead" && activePlaybackMode === null'),
+    "Live Overdub mode selection should read current playback refs instead of a cached Quick Actions render closure"
+  );
+  check(
+    appSource.includes('? currentEditorStep\n      : null;'),
+    "Live Overdub readouts should share the selected-Pattern guard used by editor playheads"
+  );
+}
+
 const graphSharedHelperNames = [
   "patternCueSwitchSelectedBlockPlacement",
   "patternUseSelectedBlockPlacement",
@@ -750,7 +916,7 @@ function validateWorkspaceCommandDockSource(html) {
   );
   check(
     appSource.includes(
-      "controllerRef.current?.stop();\n      controllerRef.current = null;\n      setPlaybackPosition(null);\n      setIsPlaying(false);\n      return;"
+      "playbackSessionRef.current += 1;\n      activePlaybackModeRef.current = null;\n      controllerRef.current?.stop();\n      controllerRef.current = null;\n      updatePlaybackPosition(null);\n      setIsPlaying(false);\n      return;"
     ),
     "explicit Stop should update shared header and dock playback state immediately while the audio controller closes"
   );
@@ -3630,6 +3796,19 @@ try {
   validateSqliteProjectStorage();
   const html = renderToStaticMarkup(React.createElement(App));
   validateFirstRunRenderer(html);
+  check(
+    html.includes('data-testid="keyboard-capture-step-mode-playhead"') &&
+      html.includes("<span>Overdub</span>") &&
+      html.includes("<small>live playhead</small>"),
+    "Keyboard Capture should expose one direct Live Overdub mode that records against Pattern playback"
+  );
+  validateLiveOverdub(
+    await server.ssrLoadModule("/src/ui/workstationPatternTools.ts"),
+    await server.ssrLoadModule("/src/domain/workstation.ts"),
+    await server.ssrLoadModule("/src/audio/midi.ts"),
+    await server.ssrLoadModule("/src/audio/render.ts"),
+    await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx")
+  );
   validateWorkspaceCommandDockSource(html);
   validateCompactStudioTransportSource();
   validateDrumGridKeyboardNavigation(
@@ -3730,6 +3909,7 @@ try {
     console.log("- Minimum Studio transport: secondary Session Context and Exports stay compact through 1180px entry and resize while retaining manual reopen");
     console.log("- Drum grid keyboard: one roving Tab stop, bounded arrows/Home/End, explicit pressed state, Enter/Space toggle, and visible guidance");
     console.log("- Note-grid keyboard: one Tab stop per Bass/Synth grid, exhaustive spatial arrows/Home/End, pressed state, guarded Enter/Space, and guidance");
+    console.log("- Live Overdub: Keyboard Capture exposes a direct Pattern-playhead recording mode alongside Next and Replace");
     console.log("- Closed disclosures: 24-panel inventory shares one non-summary containment rule; only the project launchpad starts open");
     console.log(
       "- Beginner path: Guide Quick Start, Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"

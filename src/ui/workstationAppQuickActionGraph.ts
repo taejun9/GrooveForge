@@ -1906,7 +1906,7 @@ export function createQuickActions({
   onSwitchMode: (mode: ProjectState["mode"]) => void;
   onUsePatternInSelectedBlock: (pattern: PatternSlot) => void;
   onSetKeyboardCaptureEnabled: (enabled: boolean) => void;
-  onSetKeyboardCaptureStepMode: (mode: KeyboardCaptureStepMode) => void;
+  onSetKeyboardCaptureStepMode: (mode: KeyboardCaptureStepMode) => void | "canceled";
   onSetKeyboardCaptureTarget: (target: NoteTrack) => void;
   onUpdateKeyboardCaptureDefaults: (update: Partial<KeyboardCaptureDefaults>) => void;
   onSetMidiCaptureArmed: (armed: boolean) => void;
@@ -3673,7 +3673,9 @@ export function createQuickActions({
       ? `will replace ${selectedNoteLabel}`
       : keyboardCaptureStepMode === "replace-selected"
         ? `needs selected ${keyboardCaptureTargetLabel} step`
-        : `fills next empty ${keyboardCaptureTargetLabel} step`;
+        : keyboardCaptureStepMode === "playhead"
+          ? `writes ${keyboardCaptureTargetLabel} to the current Pattern playhead`
+          : `fills next empty ${keyboardCaptureTargetLabel} step`;
   const captureStepModeReadoutAction: QuickAction = {
     id: "capture-step-mode-readout-action",
     title: `Review Capture Step Mode: ${quickActionCaptureStepModeLabel(keyboardCaptureStepMode)}`,
@@ -3684,7 +3686,7 @@ export function createQuickActions({
       activeCaptureDefaults
     )} / Pattern ${project.selectedPattern}`,
     group: "Create",
-    keywords: `capture step mode readout review placement input posture next empty replace selected selected step note ${keyboardCaptureStepMode} ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} ${captureStepPlacementLabel} ${captureStepSelectedLabel} ${keyboardCaptureDefaultDetail} midi ${midiCaptureStatus} pattern ${project.selectedPattern} beginner producer direct composition sample free`,
+    keywords: `capture step mode readout review placement input posture next empty replace selected live overdub record playhead quantize selected step note ${keyboardCaptureStepMode} ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} ${captureStepPlacementLabel} ${captureStepSelectedLabel} ${keyboardCaptureDefaultDetail} midi ${midiCaptureStatus} pattern ${project.selectedPattern} beginner producer direct composition sample free`,
     run: onFocusCaptureStepModeReadout
   };
   const midiInputReadoutAction: QuickAction = {
@@ -7571,7 +7573,7 @@ export function keyboardCapturePitchMapSummary(
   return lanes.length === 1 ? lanes[0] : `${lanes[0]}-${lanes[lanes.length - 1]}`;
 }
 export function quickActionCaptureStepModeLabel(mode: KeyboardCaptureStepMode): string {
-  return mode === "next-free" ? "Next empty" : "Replace selected";
+  return mode === "next-free" ? "Next empty" : mode === "replace-selected" ? "Replace selected" : "Live Overdub";
 }
 export function quickActionSoundDesignPosture(sound: SoundDesign): string {
   return [
