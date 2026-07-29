@@ -1331,7 +1331,7 @@ function installBrowserMocks() {
   });
 }
 
-function validateFirstRunRenderer(html) {
+function validateFirstRunRenderer(html, supportedStyleCount) {
   check(html.length > 250000, `first-run renderer output should be substantial, got ${html.length} characters`);
   const quickStartIndex = html.indexOf('data-testid="guide-quick-start"');
   const guidanceCenterIndex = html.indexOf('data-testid="guidance-center"');
@@ -2224,7 +2224,7 @@ function validateFirstRunRenderer(html) {
       "A minor",
       'data-testid="style-select"',
       'data-testid="style-starting-point"',
-      "Starting point · 14 editable styles",
+      `Starting point · ${supportedStyleCount} editable styles`,
       "Lo-fi",
       "8 bars song loop"
     ],
@@ -3783,8 +3783,9 @@ const server = await createServer({
 
 try {
   const { App } = await server.ssrLoadModule("/src/ui/App.tsx");
+  const workstation = await server.ssrLoadModule("/src/domain/workstation.ts");
   validateProjectFileLoadErrorStatus(await server.ssrLoadModule("/src/ui/workstationUiModel.ts"));
-  validateMasterCeilingDraftLifecycle(await server.ssrLoadModule("/src/domain/workstation.ts"));
+  validateMasterCeilingDraftLifecycle(workstation);
   validateProjectCloseGuard(await server.ssrLoadModule("/src/ui/projectCloseGuard.ts"));
   validateProjectReplacementGuard(await server.ssrLoadModule("/src/ui/projectReplacementGuard.ts"));
   validateStyleChangeSafety({
@@ -3795,7 +3796,7 @@ try {
   validateProjectSaveCompletion(await server.ssrLoadModule("/src/ui/projectSaveCompletion.ts"));
   validateSqliteProjectStorage();
   const html = renderToStaticMarkup(React.createElement(App));
-  validateFirstRunRenderer(html);
+  validateFirstRunRenderer(html, workstation.styleProfiles.length);
   check(
     html.includes('data-testid="keyboard-capture-step-mode-playhead"') &&
       html.includes("<span>Overdub</span>") &&
@@ -3804,7 +3805,7 @@ try {
   );
   validateLiveOverdub(
     await server.ssrLoadModule("/src/ui/workstationPatternTools.ts"),
-    await server.ssrLoadModule("/src/domain/workstation.ts"),
+    workstation,
     await server.ssrLoadModule("/src/audio/midi.ts"),
     await server.ssrLoadModule("/src/audio/render.ts"),
     await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx")
@@ -3902,7 +3903,9 @@ try {
     console.log("GrooveForge renderer smoke passed.");
     console.log("- Scope: first-run React workstation server render without browser, Electron window, network, imported audio, or sampling scope");
     console.log(`- Markup: ${html.length} characters from App first render`);
-    console.log("- Starter: Untitled Beat, Guided 82 BPM A minor Lo-fi, 8 bars, Starter Sketch, 14 editable styles visible");
+    console.log(
+      `- Starter: Untitled Beat, Guided 82 BPM A minor Lo-fi, 8 bars, Starter Sketch, ${workstation.styleProfiles.length} editable styles visible`
+    );
     console.log("- Project ownership: Editable 8-bar foundation, editable now, local only, explicit Save-to-keep guidance");
     console.log("- Starter landing: beginner opens the focused drum grid; producer opens the focused Review Queue; sticky navigation stays clear");
     console.log("- Deep editor commands: conditional fixed dock reuses Play, Actions, Undo, Redo, and Save after the full transport leaves view");

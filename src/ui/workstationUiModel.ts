@@ -3442,6 +3442,32 @@ export type ComposerStyleActionProfile = {
 };
 
 export const composerStyleActionProfiles: Record<StyleId, ComposerStyleActionProfile> = {
+  ballad: {
+    focus: "harmony and vocal space",
+    priorities: { harmony: 1, melody: 2, arrange: 3, bass: 4, drums: 5, finish: 6 },
+    goals: { drumHits: 6, bassNotes: 3, chordEvents: 4, melodyNotes: 4, arrangementBars: 16 },
+    cues: {
+      drums: "restrained pulse",
+      bass: "gentle root motion",
+      harmony: "open piano chords",
+      melody: "answer phrase",
+      arrange: "vocal arc",
+      finish: "vocal headroom"
+    }
+  },
+  hiphop: {
+    focus: "drum and rap pocket",
+    priorities: { drums: 1, bass: 2, melody: 3, harmony: 4, arrange: 5, finish: 6 },
+    goals: { drumHits: 14, bassNotes: 4, chordEvents: 3, melodyNotes: 4, arrangementBars: 8 },
+    cues: {
+      drums: "head-nod pocket",
+      bass: "walking anchor",
+      harmony: "open loop",
+      melody: "hook response",
+      arrange: "verse and hook contrast",
+      finish: "rap headroom"
+    }
+  },
   trap: {
     focus: "808 pocket first",
     priorities: { bass: 1, drums: 2, melody: 3, arrange: 4, harmony: 5, finish: 6 },
@@ -3627,6 +3653,8 @@ export const composerStyleActionProfiles: Record<StyleId, ComposerStyleActionPro
 };
 
 const suggestedBlueprintIdsByStyle: Record<StyleId, BeatBlueprintId> = {
+  ballad: "ballad_canvas",
+  hiphop: "hiphop_pocket",
   trap: "trap_bounce",
   drill: "dark_808",
   boom_bap: "boom_bap_knock",
@@ -3658,6 +3686,8 @@ export function composerDrumFoundation(project: Pick<ProjectState, "styleId">): 
     case "experimental":
       return "half";
     case "trap":
+    case "ballad":
+    case "hiphop":
     case "boom_bap":
     case "lofi":
     case "rnb":
@@ -3683,6 +3713,8 @@ export function composerBasslinePad(project: Pick<ProjectState, "styleId">): Bas
     case "phonk":
       return "slide";
     case "boom_bap":
+    case "ballad":
+    case "hiphop":
     case "lofi":
     case "rnb":
     case "k_hiphop_rnb":
@@ -3705,6 +3737,8 @@ export function composerChordPreset(project: Pick<ProjectState, "styleId">): Cho
     case "reggaeton":
       return "lift";
     case "boom_bap":
+    case "ballad":
+    case "hiphop":
     case "lofi":
       return "sparse";
     case "trap":
@@ -3723,6 +3757,8 @@ export function composerMelodyMotif(project: Pick<ProjectState, "styleId">): Mel
     case "garage":
       return "rise";
     case "boom_bap":
+    case "ballad":
+    case "hiphop":
     case "lofi":
       return "answer";
     case "rnb":

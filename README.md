@@ -29,7 +29,7 @@ BPM/키/스타일 → 패턴 프로그래밍 → 드럼 → 808/베이스 → �
 - Delivery Target과 Session Brief
 - 프로젝트 JSON, WAV, 스템, MIDI, Handoff Sheet와 Delivery Bundle ZIP
 
-장르 지원은 고정된 한 장르가 아니라 편집 가능한 스타일 프로필과 생성 규칙에서 나옵니다. Lo-fi, House, Trap, Drill, Boom Bap, R&B, K-hip-hop/R&B, Afrobeats, Amapiano, Reggaeton, Jersey Club, Phonk, Garage, Experimental 등 14개 시작점을 제공하며, 모든 결과는 다시 편집할 수 있습니다.
+장르 지원은 고정된 한 장르가 아니라 편집 가능한 스타일 프로필과 생성 규칙에서 나옵니다. Ballad, Hip-Hop, Lo-fi, House, Trap, Drill, Boom Bap, R&B, K-hip-hop/R&B, Afrobeats, Amapiano, Reggaeton, Jersey Club, Phonk, Garage, Experimental 등 16개 시작점을 제공하며, 모든 결과는 다시 편집할 수 있습니다.
 
 샘플링은 이후 추가할 수 있는 선택형 음원 모듈입니다. 오디오 가져오기, 자르기, 슬라이스, 타임 스트레치나 샘플러가 없어도 완전한 비트를 만들 수 있어야 하며, MVP·첫 화면·기본 내비게이션은 계속 직접 작곡을 우선합니다.
 
@@ -160,6 +160,12 @@ npm run workflow:smoke
 npm run sample-audio:qa
 ```
 
+전체 장르를 번갈아 렌더하고 발라드·힙합·R&B 전체 전달 ZIP과 SoundCloud private-first 자료를 만드는 검증:
+
+```sh
+npm run genre-rotation:delivery
+```
+
 전체 검증은 실제 Electron 실행, 로컬 패키지, 프로젝트 재열기와 릴리스 증거 생성을 포함하므로 시간이 오래 걸릴 수 있습니다.
 
 ```sh
@@ -173,7 +179,7 @@ npm run verify
 `npm run sample-audio:qa`는 내장 이벤트로 실제 오디오 파일을 생성하고 다음 항목을 검사합니다.
 
 - Guided Lo-fi와 Studio House 전체 믹스 및 네 개 스템
-- 지원하는 14개 스타일 프로필의 전체 믹스
+- 지원하는 16개 스타일 프로필의 전체 믹스
 - 44.1 kHz / 24-bit stereo signed PCM 디코딩과 실제 하위 바이트 신호
 - 템포에 맞는 길이와 export tail
 - 렌더 경계 뒤의 잔향과 마지막 digital zero
@@ -186,6 +192,8 @@ npm run verify
 - Delivery Bundle의 SoundCloud 업로드 시트와 Private-first 권리 체크
 
 생성 파일은 `build/desktop/` 아래에 있으며 Git에 포함되지 않습니다. 자동 수치 검증은 사람의 최종 청취 판단을 대신하지 않습니다.
+
+`npm run genre-rotation:delivery`는 현재 16개 스타일을 정확히 한 번씩 순환하고 각 장르의 프로젝트·full-mix WAV·SoundCloud 업로드 시트를 만듭니다. 발라드·힙합·R&B에는 11개 artifact Delivery Bundle ZIP도 포함하며, 최상위 `manifest.json`과 `checksums.sha256`로 결과를 재검증할 수 있습니다.
 
 ## 데스크톱과 배포 범위
 

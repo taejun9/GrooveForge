@@ -271,9 +271,9 @@ Primary arrangement structure controls must carry their direction in both visibl
 
 ## Genre Rule
 
-Genre is data, not a product silo. Trap, drill, boom bap, lofi, house, jersey, phonk, R&B, garage, and experimental behavior should live in `StyleProfile` presets and editable generation rules.
+Genre is data, not a product silo. Ballad, hip-hop, trap, drill, boom bap, lofi, house, R&B, K-hip-hop/R&B, Afrobeats, Amapiano, Reggaeton, jersey, phonk, garage, and experimental behavior should live in `StyleProfile` presets and editable generation rules.
 
-The default project is an 8-bar local composition foundation, not a genre-branded long demo: it uses the existing Lo-fi profile at 82 BPM in A minor, generates matching editable Pattern A/B/C events through the same style-rule system, targets Starter Sketch with Clean Demo master posture, and labels Style as a changeable starting point across all 14 profiles. Full-song and professional producer projects remain explicit starter/template choices.
+The default project is an 8-bar local composition foundation, not a genre-branded long demo: it uses the existing Lo-fi profile at 82 BPM in A minor, generates matching editable Pattern A/B/C events through the same style-rule system, targets Starter Sketch with Clean Demo master posture, and labels Style as a changeable starting point across every current profile. Full-song and professional producer projects remain explicit starter/template choices.
 
 ## Scheduling Rule
 

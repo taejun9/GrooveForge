@@ -564,22 +564,7 @@ async function reopenPersonaDeliveryPackage({ workstation, render, packageRow })
 }
 
 function validateAllGenreCoverage(workstation) {
-  const requiredStyleIds = [
-    "trap",
-    "drill",
-    "boom_bap",
-    "lofi",
-    "house",
-    "rnb",
-    "k_hiphop_rnb",
-    "afrobeats",
-    "amapiano",
-    "reggaeton",
-    "jersey",
-    "phonk",
-    "garage",
-    "experimental"
-  ];
+  const requiredStyleIds = workstation.styleProfiles.map((profile) => profile.id);
   const styleRows = requiredStyleIds.map((styleId) => {
     const profile = styleProfile(workstation, styleId);
     const patterns = workstation.createStylePatternSet(styleId, "F minor");
@@ -1222,7 +1207,10 @@ check(personaReadinessReport.deliveryPackageReopenRows.every((row) => row.verifi
 check(personaReadinessReport.deliveryPackageReopenRows.every((row) => row.projectReopened === true && row.hashesReady === true && row.wavHeadersReady === true && row.midiHeaderReady === true && row.handoffReady === true), "persona readiness delivery package reopen rows should verify project, hashes, WAV, MIDI, and Handoff");
 check(personaReadinessReport.deliveryPackageReopenRows.every((row) => row.valueRecorded === false), "persona readiness delivery package reopen rows should not record values");
 check(personaReadinessReport.workflowRows.length === 2, "persona readiness report should include two persona workflow rows");
-check(personaReadinessReport.styleCoverage.readyStyleCount === 14, "persona readiness report should include 14 ready style rows");
+check(
+  personaReadinessReport.styleCoverage.readyStyleCount === workstation.styleProfiles.length,
+  "persona readiness report should include one ready row for every supported style"
+);
 check(markdown.includes("Persona Readiness"), "persona readiness Markdown should include title");
 check(markdown.includes("Audience Readiness"), "persona readiness Markdown should include audience readiness");
 check(markdown.includes("Audience Acceptance Matrix"), "persona readiness Markdown should include audience acceptance matrix");

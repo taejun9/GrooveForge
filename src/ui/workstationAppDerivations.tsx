@@ -2676,6 +2676,20 @@ const patternContrastSectionRoleExpectations: Record<ArrangementSection, Pattern
 };
 
 const patternContrastStyleSectionRoleExpectations: Record<StyleId, Record<ArrangementSection, PatternContrastRole[]>> = {
+  ballad: {
+    Intro: ["anchor", "break"],
+    Verse: ["anchor"],
+    Hook: ["lift"],
+    Bridge: ["break", "switchup"],
+    Outro: ["break", "anchor"]
+  },
+  hiphop: {
+    Intro: ["anchor", "break"],
+    Verse: ["anchor", "lift"],
+    Hook: ["lift", "switchup"],
+    Bridge: ["break", "switchup"],
+    Outro: ["anchor", "break"]
+  },
   trap: patternContrastSectionRoleExpectations,
   drill: {
     Intro: ["break", "anchor"],
@@ -2771,6 +2785,20 @@ const patternContrastStyleSectionRoleExpectations: Record<StyleId, Record<Arrang
 };
 
 const patternContrastStyleSectionReasonLabels: Record<StyleId, Record<ArrangementSection, string>> = {
+  ballad: {
+    Intro: "Open with harmony and room for the first line",
+    Verse: "Keep the accompaniment steady under the vocal",
+    Hook: "Lift harmony and dynamics for the refrain",
+    Bridge: "Thin or reharmonize before the final return",
+    Outro: "Resolve gently on the anchor or a soft break"
+  },
+  hiphop: {
+    Intro: "Establish the pocket before the verse lands",
+    Verse: "Keep the drums and bass open for the rap",
+    Hook: "Lift or switch the motif for payoff",
+    Bridge: "Break the loop before the hook returns",
+    Outro: "Resolve on the anchor or a short tag"
+  },
   trap: {
     Intro: "Set a sparse bounce before the pocket lands",
     Verse: "Hold the main 808 pocket steady",

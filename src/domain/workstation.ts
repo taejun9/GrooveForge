@@ -5,6 +5,8 @@ export type TrackType = "drum_rack" | "bass_808" | "synth" | "chord" | "fx_retur
 export type DrumLane = "kick" | "clap" | "hat" | "perc";
 
 export type StyleId =
+  | "ballad"
+  | "hiphop"
   | "trap"
   | "drill"
   | "boom_bap"
@@ -207,6 +209,8 @@ export type ProjectState = ProjectCoreState & {
 };
 
 export const beatBlueprintIds = [
+  "ballad_canvas",
+  "hiphop_pocket",
   "trap_bounce",
   "dark_808",
   "boom_bap_knock",
@@ -452,6 +456,42 @@ export const soundPresetLabels: Record<SoundPresetId, string> = {
 };
 
 export const beatBlueprints: BeatBlueprint[] = [
+  {
+    id: "ballad_canvas",
+    name: "Ballad Canvas",
+    focus: "open piano harmony, restrained drums, and vocal-first low end",
+    styleId: "ballad",
+    key: "C major",
+    bpm: 72,
+    arrangementTemplate: "full",
+    soundPreset: "air_space",
+    masterPreset: "Headroom for Vocal",
+    mixer: {
+      drum_rack: { volumeDb: -6, lowCut: 0.14, air: 0.18, drive: 0.04, glue: 0.14, send: 0.24 },
+      bass_808: { volumeDb: -7, lowCut: 0.02, air: 0.04, drive: 0.08, glue: 0.14, send: 0.12 },
+      synth: { volumeDb: -8.5, pan: -18, lowCut: 0.28, air: 0.34, drive: 0.02, glue: 0.08, send: 0.48 },
+      chord: { volumeDb: -4.5, pan: 16, lowCut: 0.12, air: 0.26, drive: 0.03, glue: 0.16, send: 0.42 },
+      master: { volumeDb: -1.8 }
+    }
+  },
+  {
+    id: "hiphop_pocket",
+    name: "Hip-Hop Pocket",
+    focus: "head-nod drums, melodic bass movement, and an open rap pocket",
+    styleId: "hiphop",
+    key: "E minor",
+    bpm: 90,
+    arrangementTemplate: "hook_first",
+    soundPreset: "warm_tape",
+    masterPreset: "Headroom for Vocal",
+    mixer: {
+      drum_rack: { volumeDb: -4.2, lowCut: 0.1, air: 0.16, drive: 0.22, glue: 0.34, send: 0.15 },
+      bass_808: { volumeDb: -6.8, lowCut: 0.02, air: 0.05, drive: 0.18, glue: 0.22, send: 0.06 },
+      synth: { volumeDb: -10.4, pan: -15, lowCut: 0.3, air: 0.22, drive: 0.08, glue: 0.14, send: 0.34 },
+      chord: { volumeDb: -9.2, pan: 15, lowCut: 0.18, air: 0.18, drive: 0.08, glue: 0.2, send: 0.3 },
+      master: { volumeDb: -2.1 }
+    }
+  },
   {
     id: "trap_bounce",
     name: "Trap Bounce",
@@ -799,6 +839,26 @@ const chordIntervals: Record<ChordQuality, number[]> = {
 };
 
 export const styleProfiles: StyleProfile[] = [
+  {
+    id: "ballad",
+    name: "Ballad",
+    bpmRange: [60, 86],
+    defaultBpm: 72,
+    defaultSwing: 0.04,
+    bassStyle: "minimal",
+    melodyStyle: "chordal",
+    color: "#f6b7d2"
+  },
+  {
+    id: "hiphop",
+    name: "Hip-Hop",
+    bpmRange: [76, 106],
+    defaultBpm: 90,
+    defaultSwing: 0.14,
+    bassStyle: "walking",
+    melodyStyle: "riff",
+    color: "#f5a65b"
+  },
   {
     id: "trap",
     name: "Trap",
@@ -2150,6 +2210,16 @@ function defaultHatRepeats(hatSteps: boolean[], repeatOverrides: Partial<Record<
 }
 
 const stylePatternBlueprints: Record<StyleId, [PatternBlueprint, PatternBlueprint, PatternBlueprint]> = {
+  ballad: [
+    blueprint([0, 10], [4, 12], [0, 8], [14], [0, 4, 5], [0, 2, 4, 5], [0, 4, 5, 3]),
+    blueprint([0, 7, 14], [4, 12], [0, 6, 10, 14], [11], [0, 3, 5, 4], [4, 5, 2, 0], [0, 5, 3, 4]),
+    blueprint([0, 12], [4, 12], [0, 8, 12], [], [0, 5], [5, 4, 2], [5, 3, 0, 4])
+  ],
+  hiphop: [
+    blueprint([0, 3, 7, 10, 14], [4, 12], [0, 2, 4, 6, 8, 10, 12, 14], [5, 11, 15], [0, 3, 7, 5], [0, 2, 4, 3], [0, 3, 4, 2]),
+    blueprint([0, 2, 6, 9, 13, 15], [4, 12], [0, 2, 4, 5, 8, 10, 12, 13, 15], [3, 7, 11], [0, 2, 5, 7, 4], [4, 2, 0, 5], [0, 4, 3, 5]),
+    blueprint([0, 7, 10, 14], [4, 12], [0, 4, 6, 8, 12, 14], [2, 11], [0, 7, 12], [2, 4, 0], [3, 0, 5])
+  ],
   trap: [
     blueprint([0, 6, 12], [4, 12], [0, 2, 4, 7, 8, 10, 12, 14, 15], [3, 9, 14], [0, 6, 10, 12], [0, 3, 6, 10, 12], [0, 3, 5, 4]),
     blueprint([0, 5, 8, 12, 14], [4, 12], [0, 1, 2, 4, 6, 7, 8, 9, 10, 12, 14, 15], [2, 7, 10, 13], [0, 5, 8, 12, 14], [4, 5, 7, 3, 4], [0, 4, 3, 5]),
@@ -2256,8 +2326,11 @@ export function styleSoundPreset(styleId: StyleId): (typeof soundPresetIds)[numb
     case "reggaeton":
       return "club_punch";
     case "boom_bap":
+    case "hiphop":
     case "lofi":
       return "warm_tape";
+    case "ballad":
+      return "air_space";
     case "rnb":
     case "k_hiphop_rnb":
     case "afrobeats":
