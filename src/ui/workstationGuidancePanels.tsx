@@ -10,7 +10,7 @@ import {
   SlidersHorizontal,
   Target
 } from "lucide-react";
-import { useEffect, useState, type ReactElement, type Ref } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement, type Ref } from "react";
 import type { AudienceStarterProjectId, ProjectState } from "../domain/workstation";
 import type {
   BeatReadinessCheck,
@@ -3799,18 +3799,56 @@ function SessionPassFocusResultStrip({ result }: { result: SessionPassFocusResul
 }
 
 export function WorkflowNavigator({
+  activeZone,
   items,
   onJump,
   result,
   sectionRef
 }: {
+  activeZone: WorkflowZoneId;
   items: WorkflowNavigatorItem[];
   result: WorkflowNavigatorJumpResult | null;
   sectionRef?: Ref<HTMLElement>;
   onJump: (item: WorkflowNavigatorItem) => void;
 }): ReactElement {
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const spotlight = createWorkflowSpotlightSummary(items);
   const spotlightItem = spotlight.zoneId ? items.find((item) => item.id === spotlight.zoneId) ?? null : null;
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, currentIndex: number): void {
+    if (event.key === " " || event.key === "Enter") {
+      event.stopPropagation();
+      return;
+    }
+
+    let nextIndex: number;
+    switch (event.key) {
+      case "ArrowLeft":
+        nextIndex = (currentIndex - 1 + items.length) % items.length;
+        break;
+      case "ArrowRight":
+        nextIndex = (currentIndex + 1) % items.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = items.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    const nextItem = items[nextIndex];
+    if (!nextItem) {
+      return;
+    }
+
+    tabRefs.current[nextIndex]?.focus();
+    onJump(nextItem);
+  }
 
   return (
     <nav className="workflow-navigator" data-testid="workflow-navigator" aria-label="Workflow navigator" ref={sectionRef}>
@@ -3867,13 +3905,32 @@ export function WorkflowNavigator({
         <small data-testid="workflow-spotlight-detail">{spotlight.detailLabel}</small>
         <small data-testid="workflow-spotlight-count">{spotlight.countLabel}</small>
       </button>
-      <div className="workflow-navigator-grid">
-        {items.map((item) => (
+      <div
+        aria-label="Workstation function tabs"
+        aria-orientation="horizontal"
+        className="workflow-navigator-grid"
+        role="tablist"
+      >
+        {items.map((item, index) => (
           <button
+            aria-controls={`workspace-panel-${item.id}`}
+            aria-selected={item.id === activeZone}
             className={`workflow-navigator-card ${item.tone}`}
             data-testid={`workflow-jump-${item.id}`}
+            id={`workspace-tab-${item.id}`}
             key={item.id}
             onClick={() => onJump(item)}
+            onKeyDown={(event) => handleTabKeyDown(event, index)}
+            onKeyUp={(event) => {
+              if (event.key === " " || event.key === "Enter") {
+                event.stopPropagation();
+              }
+            }}
+            ref={(node) => {
+              tabRefs.current[index] = node;
+            }}
+            role="tab"
+            tabIndex={item.id === activeZone ? 0 : -1}
             title={`Jump to ${item.label}`}
             type="button"
           >

@@ -210,6 +210,7 @@ function checkPackageScripts() {
 }
 
 function checkDesktopGuiLaunchGuardContract() {
+  const electronMainSource = readText("electron/main.ts");
   const guardSource = readText("harness/scripts/desktop_gui_launch_guard.mjs");
   const bundleDependencyGuardSource = readText("harness/scripts/desktop_bundle_dependency_guard.mjs");
   const desktopAppSource = readText("harness/scripts/run_desktop_app.mjs");
@@ -224,6 +225,21 @@ function checkDesktopGuiLaunchGuardContract() {
   const pkgPayloadProjectIoSmokeSource = readText("harness/scripts/run_desktop_pkg_payload_project_io_smoke.mjs");
   const installSmokeSource = readText("harness/scripts/run_desktop_install_smoke.mjs");
   const installedProjectIoSmokeSource = readText("harness/scripts/run_desktop_installed_project_io_smoke.mjs");
+
+  const projectIoWatchdogMs = Number(/const projectIoSmokeTimeoutMs = (\d+);/.exec(electronMainSource)?.[1] ?? Number.NaN);
+  const projectIoParentTimeouts = [
+    projectIoSmokeSource,
+    packagedProjectIoSmokeSource,
+    pkgPayloadProjectIoSmokeSource,
+    installedProjectIoSmokeSource
+  ].map((source) => Number(/const timeoutMs = (\d+);/.exec(source)?.[1] ?? Number.NaN));
+  checkIncludes(electronMainSource, "grooveforge-project-io-smoke-${process.pid}", "electron/main.ts project IO session partition");
+  checkIncludes(electronMainSource, "runProjectIoSmokeRendererStep", "electron/main.ts project IO staged renderer checks");
+  check(
+    Number.isFinite(projectIoWatchdogMs) &&
+      projectIoParentTimeouts.every((timeout) => Number.isFinite(timeout) && timeout > projectIoWatchdogMs),
+    "project IO parent harness timeouts should exceed the in-app project IO watchdog"
+  );
 
   checkIncludes(guardSource, "CODEX_SANDBOX", "desktop GUI launch guard");
   checkIncludes(guardSource, "isMacAppKitAbort", "desktop GUI launch guard");
@@ -407,6 +423,24 @@ function checkElectronMainContract() {
   const updateFeedConfigBuilt = readText("dist-electron/updateFeedConfig.js");
   const built = readText("dist-electron/main.js");
   const label = "electron/main.ts";
+  const functionalTabsCollector = textBetween(
+    source,
+    "async function collectLaunchSmokeFunctionalTabsEvidence(",
+    "async function collectLaunchSmokeClosedDetailsEvidence",
+    label
+  );
+  const projectIoCollector = textBetween(
+    source,
+    "async function collectProjectIoSmokeEvidence(",
+    "function projectIoSmokeFailures(",
+    label
+  );
+  const projectIoNativeOpen = textBetween(
+    source,
+    "async function clickProjectIoSmokeNativeOpen(",
+    "async function collectProjectIoSmokeEvidence(",
+    label
+  );
 
   checkIncludes(source, "const isDev = process.env.VITE_DEV_SERVER_URL !== undefined", label);
   checkIncludes(source, 'preload: path.join(__dirname, "preload.cjs")', label);
@@ -451,6 +485,29 @@ function checkElectronMainContract() {
   checkIncludes(source, 'label: "GrooveForge Local Workstation"', label);
   checkIncludes(source, 'filters: projectFilters', label);
   checkIncludes(source, 'properties: ["openFile"]', label);
+  check(
+    !functionalTabsCollector.includes("rmSync(evidenceDirectory"),
+    "electron/main.ts functional-tab evidence collector should never recursively delete a configured evidence directory"
+  );
+  checkIncludes(functionalTabsCollector, "await mkdir(evidenceDirectory, { recursive: true", `${label} functional-tab evidence collector`);
+  checkIncludes(functionalTabsCollector, 'activateNativeMenuCommandForSmoke(win, "delete-selected-event")', `${label} functional-tab native menu guard`);
+  checkIncludes(functionalTabsCollector, 'activateNativeMenuCommandForSmoke(win, "quick-actions")', `${label} functional-tab Quick Actions reveal`);
+  checkIncludes(functionalTabsCollector, '"quick-action-finish-checklist-route-readout-action"', `${label} functional-tab Finish Checklist route`);
+  checkIncludes(functionalTabsCollector, 'await sendLaunchSmokeFunctionalTabNativeKey(win, "K", commandModifier)', `${label} functional-tab native Quick Actions shortcut`);
+  checkIncludes(functionalTabsCollector, 'await win.webContents.insertText("beat passport route")', `${label} functional-tab Guide route native search`);
+  checkIncludes(functionalTabsCollector, '"quick-action-beat-passport-route-readout-action"', `${label} functional-tab Guide route target`);
+  checkIncludes(functionalTabsCollector, "guidanceBeatPassportQuickActionEvidence", `${label} functional-tab Guide route evidence`);
+  checkIncludes(source, "Menu.getApplicationMenu()?.getMenuItemById", `${label} native menu smoke activation`);
+  checkIncludes(source, "menuItem.click({}, win, win.webContents)", `${label} native menu smoke activation`);
+  checkIncludes(source, "480000", `${label} functional-tab screen timeout`);
+  checkIncludes(projectIoCollector, 'clickProjectIoSmokeNativeOpen(win)', `${label} project IO collector`);
+  check(!projectIoCollector.includes("button?.click()"), "electron/main.ts project IO collector should not DOM-click the visible Open button");
+  checkIncludes(projectIoCollector, "sourceUiFingerprint", `${label} project IO collector`);
+  checkIncludes(projectIoCollector, "renderedUiFingerprint", `${label} project IO collector`);
+  checkIncludes(projectIoNativeOpen, "document.elementFromPoint", `${label} native project Open activation`);
+  checkIncludes(projectIoNativeOpen, 'type: "mouseDown"', `${label} native project Open activation`);
+  checkIncludes(projectIoNativeOpen, 'type: "mouseUp"', `${label} native project Open activation`);
+  checkIncludes(source, "project Open UI should render the source title, BPM, key, style, mode, and selected Pattern fingerprint", label);
   for (const command of expectedNativeMenuCommands) {
     checkIncludes(source, `"${command}"`, label);
   }

@@ -17,6 +17,7 @@ const projectWorkspaceSource = readFileSync(new URL("../../electron/projectWorks
 const composePanelsSource = readFileSync(new URL("../../src/ui/workstationComposePanels.tsx", import.meta.url), "utf8");
 const graphSource = readFileSync(new URL("../../src/ui/workstationAppQuickActionGraph.ts", import.meta.url), "utf8");
 const quickActionSource = readFileSync(new URL("../../src/ui/workstationAppQuickActions.tsx", import.meta.url), "utf8");
+const desktopLaunchSmokeSource = readFileSync(new URL("./run_desktop_launch_smoke.mjs", import.meta.url), "utf8");
 const shellSource = readFileSync(new URL("../../src/ui/workstationShellPanels.tsx", import.meta.url), "utf8");
 const styleChangeDialogSource = readFileSync(new URL("../../src/ui/StyleChangeDialog.tsx", import.meta.url), "utf8");
 const styleChangePreviewSource = readFileSync(new URL("../../src/ui/styleChangePreview.ts", import.meta.url), "utf8");
@@ -1331,27 +1332,151 @@ function installBrowserMocks() {
   });
 }
 
-function validateFirstRunRenderer(html, supportedStyleCount) {
-  check(html.length > 250000, `first-run renderer output should be substantial, got ${html.length} characters`);
+function validateWorkspaceFunctionTabs(html) {
+  const zones = ["compose", "arrange", "mix", "deliver"];
+  const openingTagById = (tagName, id) => {
+    const idIndex = html.indexOf(`id="${id}"`);
+    const tagStart = idIndex >= 0 ? html.lastIndexOf(`<${tagName}`, idIndex) : -1;
+    const tagEnd = tagStart >= 0 ? html.indexOf(">", idIndex) : -1;
+    return tagStart >= 0 && tagEnd >= idIndex ? html.slice(tagStart, tagEnd + 1) : "";
+  };
+  const cssRuleBody = (selector) => {
+    const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+    return styles.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`, "u"))?.[1] ?? "";
+  };
+
+  const modeRowIndex = html.indexOf('<section class="mode-row"');
+  const modeRowCloseIndex = modeRowIndex >= 0 ? html.indexOf("</section>", modeRowIndex) : -1;
+  const workflowNavigatorIndex = html.indexOf('data-testid="workflow-navigator"');
+  const workflowNavigatorTagIndex =
+    workflowNavigatorIndex >= 0 ? html.lastIndexOf("<nav", workflowNavigatorIndex) : -1;
   const quickStartIndex = html.indexOf('data-testid="guide-quick-start"');
   const guidanceCenterIndex = html.indexOf('data-testid="guidance-center"');
   const feedbackAnchorIndex = html.indexOf('data-testid="workspace-feedback-anchor"');
-  const workflowNavigatorIndex = html.indexOf('data-testid="workflow-navigator"');
-  const workspaceIndex = html.indexOf('class="workspace-grid"');
+  const workspaceTabpanelsIndex = html.indexOf('class="workspace-tabpanels"');
   check(
-    quickStartIndex >= 0 &&
+    modeRowIndex >= 0 &&
+      modeRowCloseIndex > modeRowIndex &&
+      workflowNavigatorTagIndex === modeRowCloseIndex + "</section>".length &&
+      quickStartIndex > workflowNavigatorIndex &&
       guidanceCenterIndex > quickStartIndex &&
       feedbackAnchorIndex > guidanceCenterIndex &&
-      workflowNavigatorIndex > feedbackAnchorIndex &&
-      workspaceIndex > workflowNavigatorIndex,
-    "first-run hierarchy should keep Guide Quick Start, on-demand guidance, global feedback, visible workflow navigation, and core workspace in order"
+      workspaceTabpanelsIndex > feedbackAnchorIndex,
+    "first-run hierarchy should place Workflow Navigator immediately after Mode, then Guide Quick Start, Guidance Center, feedback, and core workspace"
   );
   check(
-    ['compose', 'arrange', 'mix', 'deliver'].every((zone) =>
-      html.includes(`data-testid="workflow-jump-${zone}"`)
-    ),
-    "Workflow Navigator should expose Compose, Arrange, Mix, and Deliver stage actions"
+    appSource.includes("activeZone={activeWorkspaceZone}") &&
+      appSource.includes('className="workspace-tabpanels" data-active-workspace-zone={activeWorkspaceZone}'),
+    "App should share one active workspace zone between Workflow Navigator and the tabpanel container"
   );
+
+  const tablistLabelIndex = html.indexOf('aria-label="Workstation function tabs"');
+  const tablistTagStart = tablistLabelIndex >= 0 ? html.lastIndexOf("<div", tablistLabelIndex) : -1;
+  const tablistTagEnd = tablistLabelIndex >= 0 ? html.indexOf(">", tablistLabelIndex) : -1;
+  const tablistTag =
+    tablistTagStart >= 0 && tablistTagEnd >= tablistLabelIndex
+      ? html.slice(tablistTagStart, tablistTagEnd + 1)
+      : "";
+  check(
+    tablistTag.includes('role="tablist"') &&
+      tablistTag.includes('aria-orientation="horizontal"') &&
+      tablistTag.includes('class="workflow-navigator-grid"'),
+    "Workflow Navigator should expose a labelled horizontal workstation function tablist"
+  );
+
+  const tabTags = Object.fromEntries(
+    zones.map((zone) => [zone, openingTagById("button", `workspace-tab-${zone}`)])
+  );
+  const panelTags = Object.fromEntries(
+    zones.map((zone) => [zone, openingTagById("section", `workspace-panel-${zone}`)])
+  );
+  check(
+    zones.every(
+      (zone) =>
+        tabTags[zone].includes('role="tab"') &&
+        tabTags[zone].includes(`aria-controls="workspace-panel-${zone}"`) &&
+        tabTags[zone].includes(`data-testid="workflow-jump-${zone}"`)
+    ),
+    "Compose, Arrange, Mix, and Deliver controls should preserve workflow jump test ids and own their matching tabpanels"
+  );
+  check(
+    tabTags.compose.includes('aria-selected="true"') &&
+      tabTags.compose.includes('tabindex="0"') &&
+      zones
+        .filter((zone) => zone !== "compose")
+        .every(
+          (zone) =>
+            tabTags[zone].includes('aria-selected="false"') &&
+            tabTags[zone].includes('tabindex="-1"')
+        ),
+    "Compose should be the default selected and roving-tab-stop function tab"
+  );
+  check(
+    zones.every(
+      (zone) =>
+        panelTags[zone].includes('role="tabpanel"') &&
+        panelTags[zone].includes(`aria-labelledby="workspace-tab-${zone}"`) &&
+        panelTags[zone].includes(`data-workspace-zone="${zone}"`)
+    ),
+    "every workspace function panel should be a labelled tabpanel with a stable zone identity"
+  );
+  check(
+    html.includes('class="workspace-tabpanels" data-active-workspace-zone="compose"') &&
+      panelTags.compose.includes('tabindex="0"') &&
+      !panelTags.compose.includes(" hidden") &&
+      zones
+        .filter((zone) => zone !== "compose")
+        .every((zone) => panelTags[zone].includes('hidden=""') && panelTags[zone].includes('tabindex="-1"')),
+    "first render should expose only the Compose tabpanel and keep Arrange, Mix, and Deliver hidden and untabbable"
+  );
+  check(
+    [
+      "workflow-target-compose",
+      "workflow-target-arrange",
+      "workflow-target-mix",
+      "workflow-target-master",
+      "review-queue",
+      "handoff-pack"
+    ].every((testId) => html.includes(`data-testid="${testId}"`)),
+    "functional tab grouping should preserve existing workspace landing and review/export test ids"
+  );
+
+  const hiddenRule = cssRuleBody('.workspace-zone-panel[hidden]');
+  const selectedRule = cssRuleBody('.workflow-navigator-card[aria-selected="true"]');
+  const workspaceGridRule = cssRuleBody(".workspace-grid");
+  const arrangeRule = cssRuleBody(".workspace-arrange-panel");
+  const mixRule = cssRuleBody(".workspace-mix-panel");
+  const mixMixerRule = cssRuleBody(".workspace-mix-panel > .mixer-panel");
+  const mixMasterRule = cssRuleBody(".workspace-mix-panel > .master-panel");
+  const deliverRule = cssRuleBody(".workspace-deliver-panel");
+  const desktopDeliverHandoffRule = cssRuleBody(".workspace-deliver-panel .handoff-pack");
+  check(
+    hiddenRule.includes("display: none !important;") &&
+      selectedRule.includes("border-block-end-width: 3px;") &&
+      selectedRule.includes("background:") &&
+      selectedRule.includes("box-shadow:"),
+    "inactive workspace panels should stay forcibly hidden while the selected function tab has a persistent visual state"
+  );
+  check(
+    panelTags.compose.includes("workspace-grid workspace-zone-panel workspace-compose-panel") &&
+      workspaceGridRule.includes("grid-template-columns: 1.3fr 1.2fr 0.92fr;") &&
+      panelTags.arrange.includes("workspace-grid workspace-zone-panel workspace-arrange-panel") &&
+      arrangeRule.includes("grid-template-columns: minmax(0, 1fr);") &&
+      panelTags.mix.includes("workspace-grid workspace-zone-panel workspace-mix-panel") &&
+      mixRule.includes("grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.85fr);") &&
+      mixMixerRule.includes("grid-column: 1;") &&
+      mixMasterRule.includes("grid-column: 2;") &&
+      panelTags.deliver.includes("workspace-zone-panel workspace-deliver-panel") &&
+      deliverRule.includes("display: grid;") &&
+      desktopDeliverHandoffRule.includes("grid-template-columns: 250px minmax(0, 1fr);"),
+    "Compose, Arrange, Mix, and Deliver should retain purpose-built zone layouts and a readable desktop Handoff summary after tab grouping"
+  );
+}
+
+function validateFirstRunRenderer(html, supportedStyleCount) {
+  check(html.length > 250000, `first-run renderer output should be substantial, got ${html.length} characters`);
+  validateWorkspaceFunctionTabs(html);
+  const workspaceIndex = html.indexOf('class="workspace-grid"');
   check(
     !html.includes('<details class="guidance-center" data-testid="guidance-center" open="">'),
     "Guide & Review Center should be collapsed by default so the core workspace remains close to first-run controls"
@@ -1417,8 +1542,26 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
   );
   const audienceStarterLandingSource = printNamedFunction(appSource, "App.tsx", "focusAudienceStarterLanding");
   const createAudienceStarterSource = printNamedFunction(appSource, "App.tsx", "createAudienceStarter");
+  const workspaceZoneSource = printNamedFunction(appSource, "App.tsx", "workspaceZoneForTarget");
+  const workspaceActivationSource = printNamedFunction(appSource, "App.tsx", "activateWorkspaceZone");
   const workspaceScrollSource = printNamedFunction(appSource, "App.tsx", "scrollWorkspaceTargetIntoView");
+  const guidanceScrollSource = printNamedFunction(appSource, "App.tsx", "scrollGuidanceTargetIntoView");
+  const beatPassportRouteSource = printNamedFunction(appSource, "App.tsx", "focusBeatPassportRouteReadout");
+  const runQuickActionSource = printNamedFunction(appSource, "App.tsx", "runQuickAction");
   const workflowJumpSource = printNamedFunction(appSource, "App.tsx", "jumpToWorkflowZone");
+  const desktopShortcutSource = printNamedFunction(appSource, "App.tsx", "handleDesktopShortcut");
+  const nativeMenuSource = printNamedFunction(appSource, "App.tsx", "handleNativeMenuCommand");
+  const midiCaptureSource = printNamedFunction(appSource, "App.tsx", "captureMidiNoteEvent");
+  const finishChecklistRouteSource = printNamedFunction(
+    appSource,
+    "App.tsx",
+    "focusFinishChecklistRouteReadout"
+  );
+  const reviewQueueRouteSource = printNamedFunction(
+    appSource,
+    "App.tsx",
+    "focusReviewQueueRouteReadout"
+  );
   check(
     html.includes("Guided · opens the drum grid") &&
       html.includes("Studio · opens Review Queue") &&
@@ -1426,21 +1569,250 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       html.includes('data-testid="review-queue" aria-label="Review queue" tabindex="-1"'),
     "first-run choices should name their direct destinations and keep both landing regions programmatically focusable"
   );
+  const zoneResolutionIndex = workspaceScrollSource.indexOf("workspaceZoneForTarget(target)");
+  const zoneActivationIndex = workspaceScrollSource.indexOf("activateWorkspaceZone(zone)");
+  const focusTransferIndex = workspaceScrollSource.indexOf("if (shouldTransferFocus)");
+  const targetFocusIndex = workspaceScrollSource.indexOf("target.focus({ preventScroll: true })");
+  const panelFocusFallbackIndex = workspaceScrollSource.indexOf(
+    "document.getElementById(`workspace-panel-${zone}`)?.focus({ preventScroll: true })"
+  );
+  const targetScrollIndex = workspaceScrollSource.indexOf("target.scrollIntoView");
+  const mixTabpanelIndex = html.indexOf('id="workspace-panel-mix"');
+  const reviewQueueIndex = html.indexOf('data-testid="review-queue"');
+  const deliverTabpanelIndex = html.indexOf('id="workspace-panel-deliver"');
   check(
     audienceStarterLandingSource.includes('starterId === "producer"') &&
       audienceStarterLandingSource.includes("setMasterReviewOpen(true)") &&
       audienceStarterLandingSource.includes("setMasterReviewQueueOpen(true)") &&
-      audienceStarterLandingSource.includes("composePanelRef.current") &&
-      audienceStarterLandingSource.includes("reviewQueuePanelRef.current") &&
+      audienceStarterLandingSource.includes(
+        'starterId === "beginner" ? composePanelRef.current : reviewQueuePanelRef.current'
+      ) &&
       audienceStarterLandingSource.includes("scrollWorkspaceTargetIntoView(target)") &&
       audienceStarterLandingSource.includes("focus({ preventScroll: true })") &&
       createAudienceStarterSource.includes("focusAudienceStarterLanding(starterId)") &&
-      workspaceScrollSource.includes('scrollIntoView({ block: "start", behavior: "auto" })') &&
-      workspaceScrollSource.includes("window.innerWidth < 1221") &&
+      workspaceZoneSource.includes('[data-workspace-zone]') &&
+      ['compose', 'arrange', 'mix', 'deliver'].every((zone) => workspaceZoneSource.includes(`zone === "${zone}"`)) &&
+      workspaceActivationSource.includes("activeWorkspaceZoneRef.current === zone") &&
+      workspaceActivationSource.includes("flushSync") &&
+      workspaceActivationSource.includes("activeWorkspaceZoneRef.current = zone") &&
+      workspaceActivationSource.includes("setActiveWorkspaceZone(zone)") &&
+      zoneResolutionIndex >= 0 &&
+      zoneActivationIndex > zoneResolutionIndex &&
+      targetScrollIndex > zoneActivationIndex &&
+      workspaceScrollSource.includes('target.scrollIntoView({ block, behavior: "auto" })') &&
+      workspaceScrollSource.includes('getComputedStyle(navigator).position !== "sticky"') &&
+      !workspaceScrollSource.includes("window.innerWidth < 1221") &&
       workspaceScrollSource.includes("navigator.getBoundingClientRect().bottom + 12") &&
       workspaceScrollSource.includes('window.scrollBy({ top: targetTop - desiredTop, behavior: "auto" })') &&
-      workflowJumpSource.includes("scrollWorkspaceTargetIntoView(targetRefs[zone])"),
-    "both visible and Quick Actions starter creation should reuse one deterministic Compose or Review Queue landing route"
+      workflowJumpSource.includes("scrollWorkspaceTargetIntoView(targetRefs[zone])") &&
+      mixTabpanelIndex >= 0 &&
+      reviewQueueIndex > mixTabpanelIndex &&
+      reviewQueueIndex < deliverTabpanelIndex,
+    "central workspace reveal should activate the target tab before scrolling, including beginner Compose and producer Review Queue in Mix"
+  );
+  const guidanceRevealIndex = guidanceScrollSource.indexOf("flushSync(() => setGuidanceCenterOpen(true))");
+  const guidanceFocusIndex = guidanceScrollSource.indexOf("target.focus({ preventScroll: true })");
+  const guidanceScrollIndex = guidanceScrollSource.indexOf('target.scrollIntoView({ block, behavior: "auto" })');
+  check(
+    appSource.includes("const guidanceCenterRef = useRef<HTMLDetailsElement | null>(null);") &&
+      appSource.includes("ref={guidanceCenterRef}") &&
+      guidanceScrollSource.includes("guidanceCenter?.contains(target)") &&
+      guidanceScrollSource.includes("activeElement === document.body") &&
+      guidanceScrollSource.includes("activeElement?.closest('[role=\"dialog\"], [data-testid=\"quick-actions\"]')") &&
+      guidanceRevealIndex >= 0 &&
+      guidanceScrollSource.includes("!target.matches('a[href], button, input, select, textarea, [tabindex]')") &&
+      guidanceScrollSource.includes("target.tabIndex = -1") &&
+      guidanceFocusIndex > guidanceRevealIndex &&
+      guidanceScrollIndex > guidanceFocusIndex &&
+      guidanceScrollSource.includes("getComputedStyle(navigator).position !== \"sticky\"") &&
+      guidanceScrollSource.includes("navigator.getBoundingClientRect().bottom + 12") &&
+      beatPassportRouteSource.includes('scrollGuidanceTargetIntoView(beatPassportPanelRef.current, "start")') &&
+      html.includes('data-testid="beat-passport" tabindex="-1"') &&
+      runQuickActionSource.includes('action.group === "Project" || action.group === "Export"') &&
+      runQuickActionSource.includes("flushSync(() => setGuidanceCenterOpen(true))"),
+    "central guidance reveal should open its target before scroll, make non-control routes programmatically focusable after modal dismissal, clear the sticky navigator, and preserve synchronous Project/Export Guide disclosure"
+  );
+  check(
+    appSource.includes("const activeWorkspaceZoneRef = useRef<WorkflowZoneId>(activeWorkspaceZone);") &&
+      appSource.includes("activeWorkspaceZoneRef.current = activeWorkspaceZone;") &&
+      desktopShortcutSource.includes(
+        'activeWorkspaceZoneRef.current === "compose" && keyboardCaptureEnabled && isKeyboardCaptureKey(key)'
+      ) &&
+      desktopShortcutSource.includes('activeWorkspaceZoneRef.current === "compose" && nextPattern') &&
+      desktopShortcutSource.includes(
+        'activeWorkspaceZoneRef.current === "compose" && (key === "backspace" || key === "delete")'
+      ),
+    "desktop capture, Pattern, and delete shortcuts should read the current functional tab ref and stay Compose-only"
+  );
+  check(
+    /case "delete-selected-event":\s*if \(activeWorkspaceZoneRef\.current !== "compose"\) \{\s*setProjectStatus\("Delete Selected Event is available in Compose"\);\s*return;\s*\}\s*deleteSelectedEvent\(\);/u.test(
+      nativeMenuSource
+    ),
+    "native Delete Selected Event should return before mutation whenever the current functional tab is not Compose"
+  );
+  check(
+    electronMainSource.includes('for (const keyCode of ["1", "2", "3", "Delete", "A"] as const)') &&
+      electronMainSource.includes("keyResults[keyCode] =") &&
+      electronMainSource.includes(
+        "afterKey.composeDataFingerprint === preparedCompose.composeDataFingerprint"
+      ) &&
+      electronMainSource.includes("afterKey.selectedPattern === preparedCompose.selectedPattern") &&
+      electronMainSource.includes("hiddenComposeGuards[zone] = keyResults") &&
+      desktopLaunchSmokeSource.includes('["1", "2", "3", "Delete", "A"].every('),
+    "Electron hidden Compose guards should compare project fingerprint and selected Pattern after every native key so mutations cannot cancel each other"
+  );
+  check(
+    midiCaptureSource.includes('activeWorkspaceZoneRef.current !== "compose" || !event.data') &&
+      midiCaptureSource.indexOf('activeWorkspaceZoneRef.current !== "compose" || !event.data') <
+        midiCaptureSource.indexOf("midiNoteOnFromMessage(event.data)"),
+    "MIDI note capture should reject events outside Compose before decoding or mutating a note"
+  );
+  check(
+    workspaceScrollSource.includes(
+      "const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;"
+    ) &&
+      workspaceScrollSource.includes("const activeElementZone = workspaceZoneForTarget(activeElement);") &&
+      workspaceScrollSource.includes(
+        "const dismissedModalFocus ="
+      ) &&
+      workspaceScrollSource.includes("activeElement === document.body") &&
+      workspaceScrollSource.includes(
+        "activeElement?.closest('[role=\"dialog\"], [data-testid=\"quick-actions\"]')"
+      ) &&
+      workspaceScrollSource.includes(
+        "dismissedModalFocus || (zone !== null && activeElementZone !== null && activeElementZone !== zone)"
+      ) &&
+      workspaceScrollSource.includes(
+        "dismissedModalFocus && !target.matches('a[href], button, input, select, textarea, [tabindex]')"
+      ) &&
+      workspaceScrollSource.includes("target.tabIndex = -1") &&
+      workspaceScrollSource.includes("if (zone && document.activeElement !== target)") &&
+      !workspaceScrollSource.includes("zone !== null &&\n      (dismissedModalFocus") &&
+      zoneActivationIndex >= 0 &&
+      focusTransferIndex > zoneActivationIndex &&
+      targetFocusIndex > focusTransferIndex &&
+      panelFocusFallbackIndex > targetFocusIndex &&
+      targetScrollIndex > panelFocusFallbackIndex,
+    "workspace reveal should activate functional zones, focus a visible target after modal dismissal even outside tabs, use panel fallback only for zones, then scroll"
+  );
+  check(
+    finishChecklistRouteSource.includes("flushSync(() => setMasterReviewOpen(true))") &&
+      finishChecklistRouteSource.includes('scrollWorkspaceTargetIntoView(finishChecklistPanelRef.current, "start")') &&
+      !finishChecklistRouteSource.includes("finishChecklistPanelRef.current?.scrollIntoView"),
+    "Finish Checklist route readout should synchronously reveal its disclosure and use the central Mix-tab reveal path"
+  );
+  const reviewQueueOuterRevealIndex = reviewQueueRouteSource.indexOf("setMasterReviewOpen(true)");
+  const reviewQueueInnerRevealIndex = reviewQueueRouteSource.indexOf("setMasterReviewQueueOpen(true)");
+  const reviewQueueScrollIndex = reviewQueueRouteSource.indexOf(
+    'scrollWorkspaceTargetIntoView(reviewQueuePanelRef.current, "start")'
+  );
+  check(
+    reviewQueueRouteSource.includes("flushSync(() => {") &&
+      reviewQueueOuterRevealIndex >= 0 &&
+      reviewQueueInnerRevealIndex > reviewQueueOuterRevealIndex &&
+      reviewQueueScrollIndex > reviewQueueInnerRevealIndex &&
+      !appSource.includes("flushSync(() => focusReviewQueueRouteReadout())"),
+    "Review Queue route readout should synchronously reveal both disclosures inside the production handler before central same-Mix scrolling, without an audit-only outer flush"
+  );
+  check(
+    electronMainSource.includes(
+      'onStep("closing both Mix Review Queue disclosures before native Quick Actions routing")'
+    ) &&
+      electronMainSource.includes('await sendLaunchSmokeFunctionalTabNativeKey(win, "K", commandModifier)') &&
+      electronMainSource.includes('await win.webContents.insertText("review queue route")') &&
+      electronMainSource.includes('await sendLaunchSmokeFunctionalTabNativeKey(win, "Enter")') &&
+      desktopLaunchSmokeSource.includes(
+        'finishChecklistQuickActionReveal?.activeElementTestId === "finish-checklist"'
+      ) &&
+      desktopLaunchSmokeSource.includes("finishChecklistQuickActionReveal?.activeElementVisible === true") &&
+      desktopLaunchSmokeSource.includes(
+        "finishChecklistQuickActionReveal?.activeElementWithinActivePanel === true"
+      ) &&
+      electronMainSource.includes("activeElementInViewport: Boolean(") &&
+      desktopLaunchSmokeSource.includes("crossTabFocusTransfer?.activeElementInViewport === true") &&
+      electronMainSource.includes("finishChecklistClearOfNavigator") &&
+      electronMainSource.includes("finishChecklistInViewport") &&
+      desktopLaunchSmokeSource.includes(
+        "finishChecklistQuickActionReveal?.finishChecklistClearOfNavigator === true"
+      ) &&
+      desktopLaunchSmokeSource.includes("finishChecklistQuickActionReveal?.finishChecklistWidth > 0") &&
+      desktopLaunchSmokeSource.includes("finishChecklistQuickActionReveal?.finishChecklistHeight > 0") &&
+      desktopLaunchSmokeSource.includes(
+        "finishChecklistQuickActionReveal?.finishChecklistInViewport === true"
+      ) &&
+      desktopLaunchSmokeSource.includes("finishChecklistQuickActionReveal?.visibleHeight > 0") &&
+      electronMainSource.includes("reviewQueueClearOfNavigator") &&
+      electronMainSource.includes("disclosurePostureRestored") &&
+      desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.sourceZone === \"mix\"") &&
+      desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.destinationZone === \"mix\"") &&
+      desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.activeElementTestId === \"review-queue\"") &&
+      desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.activeElementVisible === true") &&
+      desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.activeElementWithinActivePanel === true") &&
+      desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.reviewQueueWidth > 0") &&
+      desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.reviewQueueHeight > 0") &&
+      desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.reviewQueueInViewport === true") &&
+      desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.reviewQueueClearOfNavigator === true") &&
+      desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.disclosurePostureRestored === true"),
+    "Electron and its external runner should contract native Finish and same-Mix Review Queue shortcut viewport, sticky-clearance, preservation, and restoration evidence"
+  );
+  check(
+    electronMainSource.includes(
+      'onStep("preparing closed Guide and Compose for native Beat Passport Quick Actions routing")'
+    ) &&
+      electronMainSource.includes('await win.webContents.insertText("beat passport route")') &&
+      electronMainSource.includes('guidanceBeatPassportSelectedActionId !== "beat-passport-route-readout-action"') &&
+      electronMainSource.includes('document.activeElement === passport') &&
+      electronMainSource.includes("passportClearOfNavigator") &&
+      electronMainSource.includes("guidancePostureRestored") &&
+      electronMainSource.includes("480000") &&
+      desktopLaunchSmokeSource.includes('guidanceBeatPassportQuickActionReveal?.sourceZone === "compose"') &&
+      desktopLaunchSmokeSource.includes('guidanceBeatPassportQuickActionReveal?.destinationZone === "compose"') &&
+      desktopLaunchSmokeSource.includes('guidanceBeatPassportQuickActionReveal?.activeElementTestId === "beat-passport"') &&
+      desktopLaunchSmokeSource.includes("guidanceBeatPassportQuickActionReveal?.activeElementVisible === true") &&
+      desktopLaunchSmokeSource.includes("guidanceBeatPassportQuickActionReveal?.guidanceCenterInitiallyClosed === true") &&
+      desktopLaunchSmokeSource.includes(
+        'guidanceBeatPassportQuickActionReveal?.selectedActionId ===\n        "beat-passport-route-readout-action"'
+      ) &&
+      desktopLaunchSmokeSource.includes("guidanceBeatPassportQuickActionReveal?.passportWithinGuidance === true") &&
+      desktopLaunchSmokeSource.includes("guidanceBeatPassportQuickActionReveal?.passportInViewport === true") &&
+      desktopLaunchSmokeSource.includes("guidanceBeatPassportQuickActionReveal?.passportClearOfNavigator === true") &&
+      desktopLaunchSmokeSource.includes("guidanceBeatPassportQuickActionReveal?.projectFingerprintPreserved === true") &&
+      desktopLaunchSmokeSource.includes("guidanceBeatPassportQuickActionReveal?.guidancePostureRestored === true"),
+    "Electron and its external runner should contract the native closed-Guide Beat Passport shortcut, exact keyboard target, focus, viewport, sticky-clearance, preservation, posture restoration, and bounded timeout evidence"
+  );
+  check(
+    electronMainSource.includes(
+      'onStep("running native First Beat Path Setup Quick Action from Compose to Transport")'
+    ) &&
+      electronMainSource.includes('await win.webContents.insertText("first beat path setup")') &&
+      electronMainSource.includes(
+        'firstBeatPathTransportSelectedActionId !== "first-beat-path-step-setup"'
+      ) &&
+      electronMainSource.includes("document.activeElement === transport") &&
+      electronMainSource.includes("firstBeatPathTransportQuickActionReveal") &&
+      electronMainSource.includes("480000") &&
+      desktopLaunchSmokeSource.includes(
+        'firstBeatPathTransportQuickActionReveal?.sourceZone === "compose"'
+      ) &&
+      desktopLaunchSmokeSource.includes(
+        'firstBeatPathTransportQuickActionReveal?.destinationZone === "compose"'
+      ) &&
+      desktopLaunchSmokeSource.includes(
+        'firstBeatPathTransportQuickActionReveal?.activeElementTestId ===\n        "workflow-target-transport"'
+      ) &&
+      desktopLaunchSmokeSource.includes(
+        'firstBeatPathTransportQuickActionReveal?.selectedActionId ===\n        "first-beat-path-step-setup"'
+      ) &&
+      desktopLaunchSmokeSource.includes(
+        "firstBeatPathTransportQuickActionReveal?.transportInViewport === true"
+      ) &&
+      desktopLaunchSmokeSource.includes(
+        "firstBeatPathTransportQuickActionReveal?.projectFingerprintPreserved === true"
+      ) &&
+      desktopLaunchSmokeSource.includes(
+        "firstBeatPathTransportQuickActionReveal?.guidancePostureRestored === true"
+      ),
+    "Electron and its external runner should contract native First Beat Path Setup routing to focus visible Transport outside tabs while Compose, project data, modal closure, Guide restoration, and timeout stay bounded"
   );
   check(
     styles.includes(".workspace-grid > .panel,") &&
@@ -1705,6 +2077,20 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       styles.includes(".command-strip .transport-export-tools {") &&
       styles.includes("grid-column: 3 / 5;"),
     "the reachable minimum desktop width should use an intermediate transport layout without hiding setup, audience, command, or disclosure surfaces"
+  );
+  check(
+    styles.includes("clamp(118px, 13vw, 150px)") &&
+      styles.includes("clamp(138px, 15vw, 180px)") &&
+      styles.includes("clamp(150px, 16vw, 190px)") &&
+      styles.includes(".app-shell > .workflow-navigator {\n    position: sticky;\n    top: 8px;") &&
+      styles.includes(
+        ".workspace-zone-panel,\n  .workspace-grid > .panel,\n  .guidance-center-content > *,\n  .review-queue,\n  .handoff-pack {\n    scroll-margin-top: 116px;"
+      ) &&
+      electronMainSource.includes("stickyNavigatorAfterDeepScroll") &&
+      electronMainSource.includes('navigatorPosition !== "sticky"') &&
+      electronMainSource.includes("!sticky.tabListFullyVisible") &&
+      electronMainSource.includes("!sticky.activeTabFullyVisible"),
+    "the 901-1220 desktop layout should keep a compact sticky functional tablist visible after deep Arrange, Mix, and Deliver scrolling"
   );
   const loopScopeSegments = [
     "playback-mode-arrangement",

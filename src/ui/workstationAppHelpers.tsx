@@ -3847,6 +3847,7 @@ export function BeatPassport({
       className={["beat-passport", summary.tone, result ? "has-result" : ""].filter(Boolean).join(" ")}
       data-testid="beat-passport"
       ref={sectionRef}
+      tabIndex={-1}
     >
       <div className="beat-passport-heading">
         <div>
@@ -4636,6 +4637,7 @@ export function FinishChecklist({
       data-testid="finish-checklist"
       aria-label="Finish checklist"
       ref={sectionRef}
+      tabIndex={-1}
     >
       <div className="finish-checklist-heading">
         <div>

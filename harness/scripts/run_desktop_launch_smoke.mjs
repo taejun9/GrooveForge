@@ -12,8 +12,10 @@ const require = createRequire(import.meta.url);
 const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const progressPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_PROGRESS ";
 const smokeWorkspaceRoot = path.join(root, "build", "desktop", "GrooveForge-launch-smoke-workspace");
+const functionalTabsEvidenceRoot = path.join(root, "build", "desktop", "functional-tabs-launch-smoke");
 const timeoutMs = 1820000;
 const failures = [];
+const functionalTabZones = ["compose", "arrange", "mix", "deliver"];
 const expectedLiveTestIds = [
   "workflow-target-transport",
   "workflow-target-compose",
@@ -176,6 +178,228 @@ function checkResult(result) {
   check(evidence?.hasSaveProject === true, "live desktop preload bridge should expose saveProject");
   check(evidence?.hasOpenProject === true, "live desktop preload bridge should expose openProject");
   check(evidence?.rootChildCount > 0, "live desktop renderer should mount React under #root");
+  const functionalTabs = evidence?.functionalTabs;
+  check(functionalTabs && typeof functionalTabs === "object", "live desktop should include functional tab screen evidence");
+  check(
+    functionalTabs?.initial?.activeZone === "compose" &&
+      functionalTabs?.initial?.selectedTabCount === 1 &&
+      functionalTabs?.initial?.tabStopCount === 1 &&
+      functionalTabs?.initial?.visiblePanelCount === 1,
+    "live desktop functional tabs should initially select, expose, and make tabbable only Compose"
+  );
+  check(
+    Array.isArray(functionalTabs?.traversal) &&
+      functionalTabs.traversal.map(({ input, zone }) => `${input}:${zone}`).join("|") ===
+        "initial:compose|native-click:arrange|ArrowRight:mix|End:deliver|Home:compose|ArrowLeft:deliver|ArrowRight:compose",
+    "live desktop functional tabs should traverse all four surfaces with native click plus Arrow/Home/End input"
+  );
+  for (const zone of functionalTabZones) {
+    const state = functionalTabs?.states?.[zone];
+    check(
+      state?.activeZone === zone &&
+        state?.tabCount === 4 &&
+        state?.tabPanelCount === 4 &&
+        state?.selectedTabCount === 1 &&
+        state?.tabStopCount === 1 &&
+        state?.visiblePanelCount === 1 &&
+        state?.ariaConnectionsReady === true &&
+        state?.inactiveHiddenPanelCount === 3 &&
+        state?.inactiveZeroRectPanelCount === 3 &&
+        state?.inactiveFocusableControlCount === 0,
+      `live desktop ${zone} tab should have one ARIA-connected active panel and three hidden, zero-rect, unreachable panels`
+    );
+  }
+  check(
+    functionalTabs?.states?.mix?.mixMixerVisible === true && functionalTabs?.states?.mix?.mixMasterVisible === true,
+    "live desktop Mix tab should visibly contain Mixer and Master"
+  );
+  check(
+    functionalTabs?.states?.deliver?.deliverHandoffVisible === true,
+    "live desktop Deliver tab should visibly contain Handoff Pack"
+  );
+  check(
+    functionalTabs?.composeRoundTrip?.editFingerprintPreserved === true &&
+      functionalTabs?.composeRoundTrip?.selectedPatternPreserved === true &&
+      functionalTabs?.composeRoundTrip?.disclosurePosturePreserved === true &&
+      functionalTabs?.composeRoundTrip?.undoRedoPosturePreserved === true &&
+      functionalTabs?.composeRoundTrip?.dirtyPosturePreserved === true &&
+      functionalTabs?.composeRoundTrip?.playbackPosturePreserved === true &&
+      functionalTabs?.composeRoundTrip?.keyboardCapturePosturePreserved === true,
+    "live desktop tab round trip should preserve Compose edit, Pattern, disclosure, Undo/Redo, dirty, playback, and capture posture"
+  );
+  check(
+    ["arrange", "mix", "deliver"].every((zone) =>
+      ["1", "2", "3", "Delete", "A"].every(
+        (key) => functionalTabs?.hiddenComposeGuards?.[zone]?.[key] === true
+      )
+    ),
+    "each live desktop 1/2/3/Delete and keyboard capture key outside Compose should immediately preserve the hidden Pattern and Compose data"
+  );
+  check(
+    functionalTabs?.nativeMenuDeleteGuards?.mix === true &&
+      functionalTabs?.nativeMenuDeleteGuards?.deliver === true,
+    "live desktop native Delete Selected Event menu activation should not mutate hidden Compose data from Mix or Deliver"
+  );
+  check(
+    functionalTabs?.crossTabFocusTransfer?.sourceZone === "mix" &&
+      functionalTabs?.crossTabFocusTransfer?.destinationZone === "compose" &&
+      String(functionalTabs?.crossTabFocusTransfer?.triggerTestId ?? "").startsWith(
+        "finish-checklist-focus-"
+      ) &&
+      ["workflow-target-compose", "workspace-panel-compose"].includes(
+        functionalTabs?.crossTabFocusTransfer?.activeElementTestId
+      ) &&
+      functionalTabs?.crossTabFocusTransfer?.activeElementInViewport === true &&
+      functionalTabs?.crossTabFocusTransfer?.activeElementVisible === true &&
+      functionalTabs?.crossTabFocusTransfer?.activeElementWithinActivePanel === true &&
+      functionalTabs?.crossTabFocusTransfer?.sourcePanelHidden === true,
+    "live desktop Mix Focus action should activate Compose and transfer focus from the hidden source to a visible destination"
+  );
+  check(
+    functionalTabs?.finishChecklistQuickActionReveal?.sourceZone === "deliver" &&
+      functionalTabs?.finishChecklistQuickActionReveal?.destinationZone === "mix" &&
+      functionalTabs?.finishChecklistQuickActionReveal?.activeElementTestId === "finish-checklist" &&
+      functionalTabs?.finishChecklistQuickActionReveal?.activeElementVisible === true &&
+      functionalTabs?.finishChecklistQuickActionReveal?.activeElementWithinActivePanel === true &&
+      functionalTabs?.finishChecklistQuickActionReveal?.actionVisible === true &&
+      functionalTabs?.finishChecklistQuickActionReveal?.modalClosed === true &&
+      functionalTabs?.finishChecklistQuickActionReveal?.masterReviewOpen === true &&
+      functionalTabs?.finishChecklistQuickActionReveal?.finishChecklistClearOfNavigator === true &&
+      functionalTabs?.finishChecklistQuickActionReveal?.finishChecklistWidth > 0 &&
+      functionalTabs?.finishChecklistQuickActionReveal?.finishChecklistHeight > 0 &&
+      functionalTabs?.finishChecklistQuickActionReveal?.finishChecklistInViewport === true &&
+      functionalTabs?.finishChecklistQuickActionReveal?.finishChecklistVisible === true &&
+      functionalTabs?.finishChecklistQuickActionReveal?.visibleHeight > 0 &&
+      functionalTabs?.finishChecklistQuickActionReveal?.viewportHeight >= 760 &&
+      functionalTabs?.finishChecklistQuickActionReveal?.projectFingerprintPreserved === true,
+    "live desktop Finish Checklist Route Quick Action should reveal the visible Mix checklist below the sticky navigator from Deliver without editing Compose"
+  );
+  check(
+    functionalTabs?.guidanceBeatPassportQuickActionReveal?.sourceZone === "compose" &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.destinationZone === "compose" &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.activeElementTestId === "beat-passport" &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.activeElementVisible === true &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.originalGuidanceCenterOpen === false &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.guidanceCenterInitiallyClosed === true &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.nativeShortcutOpened === true &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.actionVisible === true &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.selectedActionId ===
+        "beat-passport-route-readout-action" &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.modalClosed === true &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.guidanceCenterOpen === true &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.passportWithinGuidance === true &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.passportVisible === true &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.passportWidth > 0 &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.passportHeight > 0 &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.passportInViewport === true &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.passportClearOfNavigator === true &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.visibleHeight > 0 &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.viewportHeight >= 760 &&
+      String(functionalTabs?.guidanceBeatPassportQuickActionReveal?.statusText ?? "").startsWith(
+        "Beat Passport Route Readout Pattern "
+      ) &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.projectFingerprintPreserved === true &&
+      functionalTabs?.guidanceBeatPassportQuickActionReveal?.guidancePostureRestored === true,
+    `live desktop native Quick Actions Beat Passport route should reveal and focus the closed Guide target in the Compose viewport, clear the sticky navigator, preserve Compose, and restore Guide posture (${JSON.stringify(functionalTabs?.guidanceBeatPassportQuickActionReveal ?? null)})`
+  );
+  check(
+    functionalTabs?.firstBeatPathTransportQuickActionReveal?.sourceZone === "compose" &&
+      functionalTabs?.firstBeatPathTransportQuickActionReveal?.destinationZone === "compose" &&
+      functionalTabs?.firstBeatPathTransportQuickActionReveal?.activeElementTestId ===
+        "workflow-target-transport" &&
+      functionalTabs?.firstBeatPathTransportQuickActionReveal?.activeElementVisible === true &&
+      functionalTabs?.firstBeatPathTransportQuickActionReveal?.nativeShortcutOpened === true &&
+      functionalTabs?.firstBeatPathTransportQuickActionReveal?.actionVisible === true &&
+      functionalTabs?.firstBeatPathTransportQuickActionReveal?.selectedActionId ===
+        "first-beat-path-step-setup" &&
+      functionalTabs?.firstBeatPathTransportQuickActionReveal?.modalClosed === true &&
+      functionalTabs?.firstBeatPathTransportQuickActionReveal?.transportVisible === true &&
+      functionalTabs?.firstBeatPathTransportQuickActionReveal?.transportWidth > 0 &&
+      functionalTabs?.firstBeatPathTransportQuickActionReveal?.transportHeight > 0 &&
+      functionalTabs?.firstBeatPathTransportQuickActionReveal?.transportInViewport === true &&
+      functionalTabs?.firstBeatPathTransportQuickActionReveal?.visibleHeight > 0 &&
+      functionalTabs?.firstBeatPathTransportQuickActionReveal?.viewportHeight >= 760 &&
+      String(functionalTabs?.firstBeatPathTransportQuickActionReveal?.statusText ?? "").startsWith(
+        "First Beat Path Setup:"
+      ) &&
+      functionalTabs?.firstBeatPathTransportQuickActionReveal?.projectFingerprintPreserved === true &&
+      functionalTabs?.firstBeatPathTransportQuickActionReveal?.guidancePostureRestored === true,
+    `live desktop native Quick Actions First Beat Path Setup route should focus visible Transport outside functional tabs, keep Compose active, preserve project data, close the modal, and restore Guide posture (${JSON.stringify(functionalTabs?.firstBeatPathTransportQuickActionReveal ?? null)})`
+  );
+  check(
+    functionalTabs?.reviewQueueQuickActionReveal?.sourceZone === "mix" &&
+      functionalTabs?.reviewQueueQuickActionReveal?.destinationZone === "mix" &&
+      functionalTabs?.reviewQueueQuickActionReveal?.activeElementTestId === "review-queue" &&
+      functionalTabs?.reviewQueueQuickActionReveal?.activeElementVisible === true &&
+      functionalTabs?.reviewQueueQuickActionReveal?.activeElementWithinActivePanel === true &&
+      functionalTabs?.reviewQueueQuickActionReveal?.masterReviewInitiallyClosed === true &&
+      functionalTabs?.reviewQueueQuickActionReveal?.masterReviewQueueInitiallyClosed === true &&
+      functionalTabs?.reviewQueueQuickActionReveal?.nativeShortcutOpened === true &&
+      functionalTabs?.reviewQueueQuickActionReveal?.actionVisible === true &&
+      functionalTabs?.reviewQueueQuickActionReveal?.selectedActionId === "review-queue-route-readout-action" &&
+      functionalTabs?.reviewQueueQuickActionReveal?.modalClosed === true &&
+      functionalTabs?.reviewQueueQuickActionReveal?.masterReviewOpen === true &&
+      functionalTabs?.reviewQueueQuickActionReveal?.masterReviewQueueOpen === true &&
+      functionalTabs?.reviewQueueQuickActionReveal?.reviewQueueVisible === true &&
+      functionalTabs?.reviewQueueQuickActionReveal?.reviewQueueWidth > 0 &&
+      functionalTabs?.reviewQueueQuickActionReveal?.reviewQueueHeight > 0 &&
+      functionalTabs?.reviewQueueQuickActionReveal?.reviewQueueInViewport === true &&
+      functionalTabs?.reviewQueueQuickActionReveal?.reviewQueueClearOfNavigator === true &&
+      functionalTabs?.reviewQueueQuickActionReveal?.visibleHeight > 0 &&
+      functionalTabs?.reviewQueueQuickActionReveal?.viewportHeight >= 760 &&
+      String(functionalTabs?.reviewQueueQuickActionReveal?.statusText ?? "").startsWith(
+        "Review Queue Route Readout Pattern "
+      ) &&
+      functionalTabs?.reviewQueueQuickActionReveal?.projectFingerprintPreserved === true &&
+      functionalTabs?.reviewQueueQuickActionReveal?.disclosurePostureRestored === true,
+    `live desktop native Quick Actions Review Queue route should reveal both closed disclosures in the same Mix viewport, clear the sticky navigator, preserve Compose, and restore disclosure posture (${JSON.stringify(functionalTabs?.reviewQueueQuickActionReveal ?? null)})`
+  );
+  check(
+    functionalTabs?.minimumWindow?.viewportWidth >= 1000 &&
+      functionalTabs?.minimumWindow?.viewportWidth <= 1180 &&
+      functionalTabs?.minimumWindow?.maximumDocumentHorizontalOverflow === 0 &&
+      functionalTabs?.minimumWindow?.maximumTabListHorizontalOverflow === 0 &&
+      functionalTabs?.minimumWindow?.maximumActivePanelHorizontalOverflow === 0,
+    `live desktop functional tabs should have zero horizontal overflow at the 1180 minimum window (${JSON.stringify(functionalTabs?.minimumWindow ?? null)})`
+  );
+  for (const zone of ["arrange", "mix", "deliver"]) {
+    const sticky = functionalTabs?.stickyNavigatorAfterDeepScroll?.[zone];
+    check(
+      sticky?.activeZone === zone &&
+        sticky?.viewportWidth >= 1000 &&
+        sticky?.viewportWidth <= 1180 &&
+        sticky?.documentScrollable === true &&
+        sticky?.maximumScrollY >= 240 &&
+        sticky?.scrollY >= 240 &&
+        sticky?.deepScrollReached === true &&
+        sticky?.navigatorPosition === "sticky" &&
+        sticky?.configuredTop === 8 &&
+        sticky?.stickyTopAligned === true &&
+        sticky?.navigatorFullyVisible === true &&
+        sticky?.tabListFullyVisible === true &&
+        sticky?.activeTabFullyVisible === true,
+      `live desktop ${zone} deep-work screen should keep the compact functional navigator, tablist, and active tab fully visible at 1180px (${JSON.stringify(sticky ?? null)})`
+    );
+  }
+  const functionalTabPixelDigests = new Set();
+  for (const zone of functionalTabZones) {
+    const capture = functionalTabs?.captures?.[zone];
+    const expectedArtifact = `build/desktop/functional-tabs-launch-smoke/${zone}.png`;
+    check(
+      capture?.artifact === expectedArtifact &&
+        capture?.pngBytes >= 20000 &&
+        capture?.bitmapBytes >= capture?.width * capture?.height * 4 &&
+        capture?.sampledPixels >= 1000 &&
+        capture?.nonBackgroundSamples >= 100 &&
+        /^[a-f0-9]{64}$/u.test(capture?.pixelDigest ?? "") &&
+        /^[a-f0-9]{64}$/u.test(capture?.pngDigest ?? "") &&
+        existsSync(path.join(root, expectedArtifact)),
+      `live desktop ${zone} tab should persist a substantial non-empty PNG with pixel and PNG digests`
+    );
+    functionalTabPixelDigests.add(capture?.pixelDigest);
+  }
+  check(functionalTabPixelDigests.size === 4, "live desktop functional tab screenshots should have four distinct pixel digests");
+  check(functionalTabs?.restoredCompose === true, "live desktop functional tab evidence should restore Compose posture");
   check(
     evidence?.modalFocus?.closedDetails?.totalCount === 24 &&
       evidence?.modalFocus?.closedDetails?.initiallyOpenCount === 1 &&
@@ -1294,10 +1518,12 @@ if (blockDetails) {
 }
 
 rmSync(smokeWorkspaceRoot, { recursive: true, force: true });
+rmSync(functionalTabsEvidenceRoot, { recursive: true, force: true });
 mkdirSync(smokeWorkspaceRoot, { recursive: true, mode: 0o700 });
 const env = {
   ...process.env,
   GROOVEFORGE_DESKTOP_LAUNCH_SMOKE: "1",
+  GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_EVIDENCE_DIR: functionalTabsEvidenceRoot,
   GROOVEFORGE_DESKTOP_WORKSPACE_ROOT: smokeWorkspaceRoot,
   NO_COLOR: "1"
 };
@@ -1399,6 +1625,14 @@ child.on("exit", (code, signal) => {
     `- Workspace navigation: outside Guide ${result.evidence.layout.workflowNavigatorOutsideGuidance ? "yes" : "no"}, before workstation ${result.evidence.layout.workflowNavigatorBeforeWorkspace ? "yes" : "no"}, sticky ${result.evidence.layout.workflowNavigatorSticky ? "yes" : "no"}, Compose/Deliver jumps ${result.evidence.layout.workflowNavigatorComposeJumpReady && result.evidence.layout.workflowNavigatorDeliverJumpReady ? "yes" : "no"}, stages ${result.evidence.layout.workflowNavigatorStageCount}`
   );
   console.log(
+    `- Functional tabs: Compose initial, native click + Arrow/Home/End traversal, one visible/selected/Tab-stop panel, keyboard/native-menu hidden mutation guards, visible cross-tab focus transfer, and ${result.evidence.functionalTabs.minimumWindow.viewportWidth}px zero-overflow posture ready`
+  );
+  console.log(
+    `- Functional tab screens: ${functionalTabZones
+      .map((zone) => `${zone} ${result.evidence.functionalTabs.captures[zone].pngBytes}B/${result.evidence.functionalTabs.captures[zone].pixelDigest.slice(0, 12)}`)
+      .join(", ")} in build/desktop/functional-tabs-launch-smoke/`
+  );
+  console.log(
     `- Transport essentials: Play direct ${result.evidence.layout.transportPlayDirectVisible ? "yes" : "no"}, Save direct ${result.evidence.layout.transportSaveDirectVisible ? "yes" : "no"}, Guided helpers ${result.evidence.layout.transportSessionOpen || result.evidence.layout.transportExportsOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.transportTools.studioSessionOpen && result.evidence.palette.transportTools.studioExportsOpen ? "yes" : "no"}`
   );
   console.log(
@@ -1422,6 +1656,15 @@ child.on("exit", (code, signal) => {
   );
   console.log(
     `- Quick Actions keyboard selection: arrows/Home/End retained search focus; Enter ran ${result.evidence.modalFocus.quickKeyboardSelectedTitle}`
+  );
+  console.log(
+    `- Review Queue route: native shortcut/search/Enter revealed both closed disclosures in the same Mix viewport with ${Math.round(result.evidence.functionalTabs.reviewQueueQuickActionReveal.visibleHeight)}px visible below the sticky navigator, then restored disclosure posture`
+  );
+  console.log(
+    `- Guide route: native shortcut/search/Enter opened the closed Guide and focused Beat Passport in Compose with ${Math.round(result.evidence.functionalTabs.guidanceBeatPassportQuickActionReveal.visibleHeight)}px visible below the sticky navigator, then restored Guide posture`
+  );
+  console.log(
+    `- Transport route: native shortcut/search/Enter focused First Beat Path Setup on Transport outside the functional tabs while Compose and project data stayed unchanged, then restored Guide posture`
   );
   console.log("- Drum grid keyboard: 64 pressed-state buttons, one roving Tab stop, bounded navigation, Enter/Space toggles, playback guard, and Undo ready");
   console.log("- Closed disclosures: 24 panels, zero closed content/Tab leaks, native Enter reopen/reclose, and unchanged project posture ready");
