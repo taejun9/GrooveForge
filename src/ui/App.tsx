@@ -1212,6 +1212,7 @@ export function App(): ReactElement {
   const [commandReferenceOpen, setCommandReferenceOpen] = useState(false);
   const modalReturnFocusRef = useRef<HTMLElement | null>(null);
   const [guidanceCenterOpen, setGuidanceCenterOpen] = useState(false);
+  const [activeWorkspaceZone, setActiveWorkspaceZone] = useState<WorkflowZoneId>("compose");
   const [launchpadOpen, setLaunchpadOpen] = useState(true);
   const [styleChangePreview, setStyleChangePreview] = useState<StyleChangePreview | null>(null);
   const [workspaceCommandDockVisible, setWorkspaceCommandDockVisible] = useState(false);
@@ -1359,6 +1360,7 @@ export function App(): ReactElement {
   const localDraftReadyRef = useRef(false);
   const localDraftSkipNextWriteRef = useRef(false);
   const selectedEventDeleteSelectionGuardRef = useRef(false);
+  const activeWorkspaceZoneRef = useRef<WorkflowZoneId>(activeWorkspaceZone);
   const controllerRef = useRef<PlaybackController | null>(null);
   const playbackSessionRef = useRef(0);
   const activePlaybackModeRef = useRef<PlaybackMode | null>(null);
@@ -1370,6 +1372,7 @@ export function App(): ReactElement {
   const styleSelectRef = useRef<HTMLSelectElement | null>(null);
   const styleChangeReturnFocusRef = useRef<HTMLElement | null>(null);
   const styleChangeRequestResolveRef = useRef<((outcome: QuickActionRunOutcome) => void) | null>(null);
+  const guidanceCenterRef = useRef<HTMLDetailsElement | null>(null);
   const styleInspectorRef = useRef<HTMLElement | null>(null);
   const beatPassportPanelRef = useRef<HTMLElement | null>(null);
   const productionSnapshotPanelRef = useRef<HTMLElement | null>(null);
@@ -1401,6 +1404,7 @@ export function App(): ReactElement {
   const sessionBriefVibeRef = useRef<HTMLInputElement | null>(null);
   const sessionBriefReferenceRef = useRef<HTMLInputElement | null>(null);
   const sessionBriefNotesRef = useRef<HTMLTextAreaElement | null>(null);
+  activeWorkspaceZoneRef.current = activeWorkspaceZone;
   const style = getStyle(project);
   const deliveryTarget = activeDeliveryTarget(project);
   const currentPattern = activePattern(project);
@@ -2434,10 +2438,15 @@ export function App(): ReactElement {
     };
 
     for (const input of inputs) {
-      input.onmidimessage = midiCaptureArmed && midiInputMatchesSelection(input, midiSelectedInputId) ? handleMidiMessage : null;
+      input.onmidimessage =
+        activeWorkspaceZone === "compose" && midiCaptureArmed && midiInputMatchesSelection(input, midiSelectedInputId)
+          ? handleMidiMessage
+          : null;
     }
 
-    setMidiCaptureStatus(midiCaptureArmed && listeningInputs.length > 0 ? "listening" : "ready");
+    setMidiCaptureStatus(
+      activeWorkspaceZone === "compose" && midiCaptureArmed && listeningInputs.length > 0 ? "listening" : "ready"
+    );
 
     return () => {
       for (const input of inputs) {
@@ -2451,6 +2460,7 @@ export function App(): ReactElement {
     midiPortRevision,
     midiCaptureArmed,
     midiSelectedInputId,
+    activeWorkspaceZone,
     keyboardCaptureTarget,
     keyboardCaptureDefaults,
     keyboardCaptureStepMode,
@@ -2508,7 +2518,8 @@ export function App(): ReactElement {
     keyboardCaptureEnabled,
     keyboardCaptureTarget,
     keyboardCaptureDefaults,
-    keyboardCaptureStepMode
+    keyboardCaptureStepMode,
+    activeWorkspaceZone
   ]);
 
   useEffect(() => {
@@ -2623,7 +2634,14 @@ export function App(): ReactElement {
       return;
     }
 
+    const focusedInteractiveControl =
+      event.target instanceof HTMLElement
+        ? event.target.closest('button, summary, a[href], [role="button"], [role="tab"]')
+        : null;
     if (event.code === "Space") {
+      if (focusedInteractiveControl) {
+        return;
+      }
       event.preventDefault();
       if (!event.repeat) {
         togglePlayback();
@@ -2631,7 +2649,7 @@ export function App(): ReactElement {
       return;
     }
 
-    if (keyboardCaptureEnabled && isKeyboardCaptureKey(key)) {
+    if (activeWorkspaceZoneRef.current === "compose" && keyboardCaptureEnabled && isKeyboardCaptureKey(key)) {
       event.preventDefault();
       if (!event.repeat) {
         captureKeyboardNote(key);
@@ -2641,13 +2659,13 @@ export function App(): ReactElement {
 
     const patternShortcut: Record<string, PatternSlot> = { "1": "A", "2": "B", "3": "C" };
     const nextPattern = patternShortcut[key];
-    if (nextPattern) {
+    if (activeWorkspaceZoneRef.current === "compose" && nextPattern) {
       event.preventDefault();
       selectPattern(nextPattern);
       return;
     }
 
-    if (key === "backspace" || key === "delete") {
+    if (activeWorkspaceZoneRef.current === "compose" && (key === "backspace" || key === "delete")) {
       event.preventDefault();
       if (!event.repeat) {
         deleteSelectedEvent();
@@ -2692,6 +2710,10 @@ export function App(): ReactElement {
         togglePlayback();
         return;
       case "delete-selected-event":
+        if (activeWorkspaceZoneRef.current !== "compose") {
+          setProjectStatus("Delete Selected Event is available in Compose");
+          return;
+        }
         deleteSelectedEvent();
         return;
     }
@@ -3591,7 +3613,7 @@ export function App(): ReactElement {
   }
 
   function captureMidiNoteEvent(event: MIDIMessageEvent): void {
-    if (!event.data) {
+    if (activeWorkspaceZoneRef.current !== "compose" || !event.data) {
       return;
     }
 
@@ -7915,12 +7937,10 @@ export function App(): ReactElement {
       productionSnapshotSummary,
       sessionPassSummary
     });
-    if (typeof document !== "undefined") {
-      document.querySelector<HTMLElement>('[data-testid="audience-route-bridge"]')?.scrollIntoView({
-        block: "start",
-        behavior: "auto"
-      });
-    }
+    scrollGuidanceTargetIntoView(
+      document.querySelector<HTMLElement>('[data-testid="audience-route-bridge"]'),
+      "start"
+    );
     setProjectStatus(
       `Audience Route Bridge Readout Pattern ${project.selectedPattern}: ${summary.activeAudienceLabel} / ${summary.detailLabel} / ${summary.readinessLane.laneLabel} / ${summary.completionLane.laneLabel} / direct bridge actions unchanged`
     );
@@ -7929,12 +7949,10 @@ export function App(): ReactElement {
   function focusAudienceDeliveryProofBridgeReadout(): void {
     const beginner = audienceSessionReadoutSummary.rows.find((row) => row.id === "beginner");
     const producer = audienceSessionReadoutSummary.rows.find((row) => row.id === "producer");
-    if (typeof document !== "undefined") {
-      document.querySelector<HTMLElement>('[data-testid="audience-delivery-proof-bridge"]')?.scrollIntoView({
-        block: "start",
-        behavior: "auto"
-      });
-    }
+    scrollGuidanceTargetIntoView(
+      document.querySelector<HTMLElement>('[data-testid="audience-delivery-proof-bridge"]'),
+      "start"
+    );
     setProjectStatus(
       `Audience Delivery Proof Bridge Readout Pattern ${project.selectedPattern}: ${
         beginner?.label ?? "First-time composer"
@@ -7947,12 +7965,10 @@ export function App(): ReactElement {
   function focusAudienceSessionAcceptanceReadout(): void {
     const beginner = audienceSessionReadoutSummary.rows.find((row) => row.id === "beginner");
     const producer = audienceSessionReadoutSummary.rows.find((row) => row.id === "producer");
-    if (typeof document !== "undefined") {
-      document.querySelector<HTMLElement>('[data-testid="audience-session-acceptance"]')?.scrollIntoView({
-        block: "start",
-        behavior: "auto"
-      });
-    }
+    scrollGuidanceTargetIntoView(
+      document.querySelector<HTMLElement>('[data-testid="audience-session-acceptance"]'),
+      "start"
+    );
     setProjectStatus(
       `Audience Session Acceptance Pattern ${project.selectedPattern}: ${
         beginner?.label ?? "First-time composer"
@@ -7965,12 +7981,10 @@ export function App(): ReactElement {
   function focusAudienceSessionProofHandoffReadout(): void {
     const beginner = audienceSessionReadoutSummary.rows.find((row) => row.id === "beginner");
     const producer = audienceSessionReadoutSummary.rows.find((row) => row.id === "producer");
-    if (typeof document !== "undefined") {
-      document.querySelector<HTMLElement>('[data-testid="audience-session-proof-handoff"]')?.scrollIntoView({
-        block: "start",
-        behavior: "auto"
-      });
-    }
+    scrollGuidanceTargetIntoView(
+      document.querySelector<HTMLElement>('[data-testid="audience-session-proof-handoff"]'),
+      "start"
+    );
     setProjectStatus(
       `Audience Session Proof Handoff Pattern ${project.selectedPattern}: ${
         beginner?.label ?? "First-time composer"
@@ -7990,12 +8004,10 @@ export function App(): ReactElement {
     });
     const readyLaneCount = rows.filter((row) => row.tone === "good").length;
     const priorityRow = rows.find((row) => row.tone === "danger") ?? rows.find((row) => row.tone === "warn") ?? rows[0];
-    if (typeof document !== "undefined") {
-      document.querySelector<HTMLElement>('[data-testid="dual-audience-readiness"]')?.scrollIntoView({
-        block: "start",
-        behavior: "auto"
-      });
-    }
+    scrollGuidanceTargetIntoView(
+      document.querySelector<HTMLElement>('[data-testid="dual-audience-readiness"]'),
+      "start"
+    );
     setProjectStatus(
       `Dual Audience Readiness Route Readout Pattern ${project.selectedPattern}: ${readyLaneCount}/${rows.length} lanes ready / ${
         priorityRow?.laneLabel ?? "Dual Audience Readiness"
@@ -8014,12 +8026,10 @@ export function App(): ReactElement {
     });
     const readyLaneCount = rows.filter((row) => row.tone === "good").length;
     const priorityRow = rows.find((row) => row.tone === "danger") ?? rows.find((row) => row.tone === "warn") ?? rows[0];
-    if (typeof document !== "undefined") {
-      document.querySelector<HTMLElement>('[data-testid="audience-completion-route"]')?.scrollIntoView({
-        block: "start",
-        behavior: "auto"
-      });
-    }
+    scrollGuidanceTargetIntoView(
+      document.querySelector<HTMLElement>('[data-testid="audience-completion-route"]'),
+      "start"
+    );
     setProjectStatus(
       `Audience Completion Route Readout Pattern ${project.selectedPattern}: ${readyLaneCount}/${rows.length} lanes send-ready / ${
         priorityRow?.laneLabel ?? "Audience Completion Route"
@@ -8139,7 +8149,7 @@ export function App(): ReactElement {
   }
 
   function focusBeatBlueprintsPanel(): void {
-    beatBlueprintPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(beatBlueprintPanelRef.current, "start");
   }
 
   function applyQuickActionBeatBlueprint(blueprintId: BeatBlueprintId): void {
@@ -8152,14 +8162,106 @@ export function App(): ReactElement {
     focusBeatBlueprintsPanel();
   }
 
-  function scrollWorkspaceTargetIntoView(target: HTMLElement | null): void {
+  function workspaceZoneForTarget(target: HTMLElement | null): WorkflowZoneId | null {
+    const zone = target?.closest<HTMLElement>("[data-workspace-zone]")?.dataset.workspaceZone;
+    return zone === "compose" || zone === "arrange" || zone === "mix" || zone === "deliver" ? zone : null;
+  }
+
+  function activateWorkspaceZone(zone: WorkflowZoneId): void {
+    if (activeWorkspaceZoneRef.current === zone) {
+      return;
+    }
+
+    flushSync(() => {
+      activeWorkspaceZoneRef.current = zone;
+      setActiveWorkspaceZone(zone);
+    });
+  }
+
+  function scrollWorkspaceTargetIntoView(
+    target: HTMLElement | null,
+    block: ScrollLogicalPosition = "start"
+  ): void {
     if (!target) {
       return;
     }
 
-    target.scrollIntoView({ block: "start", behavior: "auto" });
+    const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const activeElementZone = workspaceZoneForTarget(activeElement);
+    const zone = workspaceZoneForTarget(target);
+    const dismissedModalFocus =
+      activeElement === document.body ||
+      Boolean(activeElement?.closest('[role="dialog"], [data-testid="quick-actions"]'));
+    const shouldTransferFocus =
+      dismissedModalFocus || (zone !== null && activeElementZone !== null && activeElementZone !== zone);
+    if (zone) {
+      activateWorkspaceZone(zone);
+    }
+
+    if (shouldTransferFocus) {
+      if (dismissedModalFocus && !target.matches('a[href], button, input, select, textarea, [tabindex]')) {
+        target.tabIndex = -1;
+      }
+      target.focus({ preventScroll: true });
+      if (zone && document.activeElement !== target) {
+        document.getElementById(`workspace-panel-${zone}`)?.focus({ preventScroll: true });
+      }
+    }
+
+    target.scrollIntoView({ block, behavior: "auto" });
+    if (!zone || block !== "start") {
+      return;
+    }
+
     const navigator = workflowNavigatorPanelRef.current;
-    if (!navigator || window.innerWidth < 1221) {
+    if (!navigator || getComputedStyle(navigator).position !== "sticky") {
+      return;
+    }
+
+    const targetTop = target.getBoundingClientRect().top;
+    const desiredTop = navigator.getBoundingClientRect().bottom + 12;
+    if (targetTop < desiredTop) {
+      window.scrollBy({ top: targetTop - desiredTop, behavior: "auto" });
+    }
+  }
+
+  function scrollGuidanceTargetIntoView(
+    target: HTMLElement | null,
+    block: ScrollLogicalPosition = "start"
+  ): void {
+    if (!target) {
+      return;
+    }
+
+    const guidanceCenter = guidanceCenterRef.current;
+    const targetInsideGuidance = Boolean(guidanceCenter?.contains(target));
+    const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dismissedModalFocus =
+      activeElement === document.body ||
+      Boolean(activeElement?.closest('[role="dialog"], [data-testid="quick-actions"]'));
+    if (targetInsideGuidance && guidanceCenter && !guidanceCenter.open) {
+      flushSync(() => setGuidanceCenterOpen(true));
+    }
+
+    if (dismissedModalFocus) {
+      if (!target.matches('a[href], button, input, select, textarea, [tabindex]')) {
+        target.tabIndex = -1;
+      }
+      target.focus({ preventScroll: true });
+      if (document.activeElement !== target) {
+        guidanceCenter?.querySelector<HTMLElement>('[data-testid="guidance-center-toggle"]')?.focus({
+          preventScroll: true
+        });
+      }
+    }
+
+    target.scrollIntoView({ block, behavior: "auto" });
+    if (!targetInsideGuidance || block !== "start") {
+      return;
+    }
+
+    const navigator = workflowNavigatorPanelRef.current;
+    if (!navigator || getComputedStyle(navigator).position !== "sticky") {
       return;
     }
 
@@ -8413,10 +8515,10 @@ export function App(): ReactElement {
     setSessionBriefCompassFocusId(card.id);
     setSessionBriefCompassResult(createSessionBriefCompassFocusResult(card, sessionBriefCompassSummary, projectRef.current.sessionBrief));
     if (target === "deliver") {
-      deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+      scrollWorkspaceTargetIntoView(deliverPanelRef.current, "start");
     } else {
       const field = fieldRefs[target];
-      field?.scrollIntoView({ block: "center", behavior: "auto" });
+      scrollGuidanceTargetIntoView(field, "center");
       field?.focus({ preventScroll: true });
     }
     setProjectStatus(`Brief ${card.label}: ${card.value}`);
@@ -8437,10 +8539,10 @@ export function App(): ReactElement {
 
     setReferenceAlignmentFocusId(card.id);
     if (card.focusTarget === "arrange" || card.focusTarget === "master" || card.focusTarget === "deliver") {
-      panelRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+      scrollWorkspaceTargetIntoView(panelRefs[card.focusTarget], "start");
     } else {
       const field = fieldRefs[card.focusTarget];
-      field?.scrollIntoView({ block: "center", behavior: "auto" });
+      scrollGuidanceTargetIntoView(field, "center");
       field?.focus({ preventScroll: true });
     }
     setReferenceAlignmentResult(createReferenceAlignmentFocusResult(card, referenceAlignmentSummary));
@@ -8449,7 +8551,7 @@ export function App(): ReactElement {
 
   function focusReferenceAlignmentRouteReadout(): void {
     const card = activeReferenceAlignmentQuickActionCard(referenceAlignmentSummary);
-    referenceAlignmentPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(referenceAlignmentPanelRef.current, "start");
     setProjectStatus(
       `Reference Alignment Route Readout Pattern ${project.selectedPattern}: ${referenceAlignmentRouteLabel(
         card,
@@ -8465,7 +8567,7 @@ export function App(): ReactElement {
     const currentCheck = currentChecks.find((candidate) => candidate.id === check.id) ?? check;
     setMixCoachFocusId(check.id);
     setMixCoachResult(createMixCoachFocusResult(currentCheck, currentChecks));
-    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(masterPanelRef.current, "center");
     setProjectStatus(`Review ${currentCheck.label}: ${currentCheck.status}`);
   }
 
@@ -8478,14 +8580,14 @@ export function App(): ReactElement {
     } else {
       setMixCoachFocusId(null);
       setMixCoachResult(null);
-      masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+      scrollWorkspaceTargetIntoView(masterPanelRef.current, "center");
     }
     return check;
   }
 
   function focusStemAuditionReadout(): void {
     setMixReviewOpen(true);
-    mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(mixPanelRef.current, "start");
     setProjectStatus(
       `Stem Audition ${stemAuditionReadout.statusLabel}: ${stemAuditionReadout.roleLabel} / ${stemAuditionReadout.detailLabel} / Decision ${stemAuditionDecision.targetLabel}`
     );
@@ -8498,7 +8600,7 @@ export function App(): ReactElement {
       : null;
     const routeLabel = pad ? stemAuditionRouteLabel(pad) : "No Stem Audition route available";
     const directCommand = pad ? `stem-audition-${pad.id}` : "stem-audition";
-    mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(mixPanelRef.current, "start");
     setProjectStatus(
       `Stem Audition Route Readout Pattern ${project.selectedPattern}: ${routeLabel} / ${stemAuditionReadout.roleLabel} / Decision ${stemAuditionDecision.targetLabel} / direct ${directCommand} unchanged`
     );
@@ -8506,7 +8608,7 @@ export function App(): ReactElement {
 
   function focusMixSnapshotReadout(): void {
     setMixReviewOpen(true);
-    mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(mixPanelRef.current, "start");
     setProjectStatus(
       `Mix Snapshot A/B ${mixSnapshotComparison.statusLabel}: ${mixSnapshotComparison.winnerLabel} / Decision ${mixSnapshotComparison.decisionActionLabel}`
     );
@@ -8515,7 +8617,7 @@ export function App(): ReactElement {
   function focusMixSnapshotRouteReadout(): void {
     setMixReviewOpen(true);
     const directCommand = `mix-snapshot-${mixSnapshotComparison.decisionActionId}`;
-    mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(mixPanelRef.current, "start");
     setProjectStatus(
       `Mix Snapshot Route Readout Pattern ${project.selectedPattern}: ${mixSnapshotRouteLabel(
         mixSnapshotComparison.decisionActionId
@@ -8525,7 +8627,7 @@ export function App(): ReactElement {
 
   function focusMixBalanceReadout(): void {
     setMixMovesOpen(true);
-    mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(mixPanelRef.current, "start");
     setProjectStatus(
       `Mix Balance ${mixBalancePreviewSummary.statusLabel}: ${mixBalancePreviewSummary.padLabel} / ${mixBalancePreviewSummary.channelLabel}`
     );
@@ -8540,7 +8642,7 @@ export function App(): ReactElement {
     const routeLabel = pad
       ? mixBalanceRouteLabel(project.mixer, applyMixBalancePadToMixer(project.mixer, pad))
       : "No Mix Balance route needed";
-    mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(mixPanelRef.current, "start");
     setProjectStatus(
       `Mix Balance Route Readout Pattern ${project.selectedPattern}: ${routeLabel} / ${mixBalancePreviewSummary.padLabel} / ${mixBalancePreviewSummary.channelLabel} / direct Mix Balance unchanged`
     );
@@ -8548,7 +8650,7 @@ export function App(): ReactElement {
 
   function focusSpaceFxReadout(): void {
     setMixMovesOpen(true);
-    mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(mixPanelRef.current, "start");
     setProjectStatus(
       `Space FX ${spaceFxPreviewSummary.statusLabel}: ${spaceFxPreviewSummary.padLabel} / ${spaceFxPreviewSummary.sendLabel}`
     );
@@ -8563,14 +8665,14 @@ export function App(): ReactElement {
     const routeLabel = pad
       ? spaceFxRouteLabel(project.mixer, applySpaceFxPadToMixer(project.mixer, pad))
       : "No Space FX route needed";
-    mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(mixPanelRef.current, "start");
     setProjectStatus(
       `Space FX Route Readout Pattern ${project.selectedPattern}: ${routeLabel} / ${spaceFxPreviewSummary.padLabel} / ${spaceFxPreviewSummary.sendLabel} / direct Space FX unchanged`
     );
   }
 
   function focusPatternChainReadout(): void {
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setProjectStatus(
       `Pattern Chain ${patternChainPreviewSummary.statusLabel}: ${patternChainPreviewSummary.actionLabel} / ${patternChainPreviewSummary.sequenceLabel}`
     );
@@ -8578,7 +8680,7 @@ export function App(): ReactElement {
 
   function focusChainExpandReadout(): void {
     const outline = expandPatternChainArrangement(projectRef.current.arrangement);
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setProjectStatus(
       `Chain Expand ${patternChainPreviewSummary.statusLabel}: ${patternChainReadout(outline)} / ${barCountLabel(
         arrangementTotalBars({ ...projectRef.current, arrangement: outline })
@@ -8588,21 +8690,21 @@ export function App(): ReactElement {
 
   function focusArrangementTemplateReadout(): void {
     const summary = createArrangementTemplatePreviewSummary(projectRef.current.arrangement);
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setProjectStatus(
       `Arrangement Template ${summary.statusLabel}: ${summary.templateLabel} / ${summary.sectionLabel} / ${summary.patternLabel}`
     );
   }
 
   function focusArrangementArcReadout(): void {
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setProjectStatus(
       `Arrangement Arc ${arrangementArcPreviewSummary.statusLabel}: ${arrangementArcPreviewSummary.padLabel} / ${arrangementArcPreviewSummary.energyLabel} / ${arrangementArcPreviewSummary.muteLabel}`
     );
   }
 
   function focusArrangementFocusReadout(): void {
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setProjectStatus(
       arrangementFocusPreviewSummary
         ? `Arrangement Focus ${arrangementFocusPreviewSummary.statusLabel}: ${arrangementFocusPreviewSummary.presetLabel} / ${arrangementFocusPreviewSummary.blockLabel} / ${arrangementFocusPreviewSummary.sectionLabel}`
@@ -8611,7 +8713,7 @@ export function App(): ReactElement {
   }
 
   function focusArrangementMoveReadout(): void {
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setProjectStatus(
       arrangementMovePrioritySummary.presetId !== "none"
         ? `Arrangement Move ${arrangementMovePrioritySummary.statusLabel}: ${arrangementMovePrioritySummary.presetLabel} / ${arrangementMovePrioritySummary.scopeLabel} / ${arrangementMovePrioritySummary.impactLabel}`
@@ -8621,7 +8723,7 @@ export function App(): ReactElement {
 
   function focusSectionLocatorReadout(): void {
     const summary = createSectionLocatorCueDecisionSummary(sectionLocatorPads, isPlaying);
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setProjectStatus(
       summary.section
         ? `Section Locator ${summary.statusLabel}: ${summary.sectionLabel} / ${summary.metricLabel} / ${summary.detailLabel}`
@@ -8631,7 +8733,7 @@ export function App(): ReactElement {
 
   function focusSongFormOverviewReadout(): void {
     const priority = createSongFormPrioritySummary(songFormOverviewSummary);
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setProjectStatus(
       priority.targetIndex === null
         ? `Song Form Overview ${priority.statusLabel}: ${priority.reasonLabel}`
@@ -8641,12 +8743,12 @@ export function App(): ReactElement {
 
   function focusMasterOutputRole(): void {
     const summary = createMasterOutputRoleSummary(projectRef.current, analyzeExport(projectRef.current));
-    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(masterPanelRef.current, "center");
     setProjectStatus(`Master Output Role: ${summary.roleLabel} / ${summary.detailLabel}`);
   }
 
   function focusMasterFinishReadout(): void {
-    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(masterPanelRef.current, "center");
     setProjectStatus(
       `Master Finish ${masterFinishPreviewSummary.statusLabel}: ${masterFinishPreviewSummary.padLabel} / ${masterFinishPreviewSummary.outputLabel}`
     );
@@ -8654,7 +8756,7 @@ export function App(): ReactElement {
 
   function focusMasterFinishRouteReadout(): void {
     const directCommand = `master-finish-${masterFinishPreviewSummary.padId}`;
-    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(masterPanelRef.current, "center");
     setProjectStatus(
       `Master Finish Route Readout Pattern ${project.selectedPattern}: ${masterFinishRouteLabel(
         masterFinishPreviewSummary.padId
@@ -8663,7 +8765,7 @@ export function App(): ReactElement {
   }
 
   function focusMasterAutomationReadout(): void {
-    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(masterPanelRef.current, "center");
     setProjectStatus(
       `Master Automation ${masterAutomationPreviewSummary.statusLabel}: ${masterAutomationPreviewSummary.padLabel} / ${masterAutomationPreviewSummary.rangeLabel}`
     );
@@ -8671,7 +8773,7 @@ export function App(): ReactElement {
 
   function focusMasterAutomationRouteReadout(): void {
     const directCommand = `master-automation-${masterAutomationPreviewSummary.padId}`;
-    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(masterPanelRef.current, "center");
     setProjectStatus(
       `Master Automation Route Readout Pattern ${project.selectedPattern}: ${masterAutomationRouteLabel(
         masterAutomationPreviewSummary.padId
@@ -8683,7 +8785,7 @@ export function App(): ReactElement {
     setMasterReviewOpen(true);
     const currentProject = projectRef.current;
     const analysis = analyzeExport(currentProject);
-    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(masterPanelRef.current, "center");
     setProjectStatus(`Export Meter: ${analysis.status} / ${formatDb(analysis.headroomDb)} headroom`);
   }
 
@@ -8781,7 +8883,7 @@ export function App(): ReactElement {
   function focusWorkflowNavigatorRouteReadout(): void {
     const spotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
     const item = spotlight.zoneId ? workflowNavigatorItems.find((candidate) => candidate.id === spotlight.zoneId) ?? null : null;
-    workflowNavigatorPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(workflowNavigatorPanelRef.current, "start");
     setProjectStatus(
       item
         ? `Workflow Navigator Route Readout Pattern ${project.selectedPattern}: ${workflowNavigatorRouteLabel(
@@ -8795,7 +8897,7 @@ export function App(): ReactElement {
   function focusWorkflowSpotlightRouteReadout(): void {
     const spotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
     const item = spotlight.zoneId ? workflowNavigatorItems.find((candidate) => candidate.id === spotlight.zoneId) ?? null : null;
-    workflowNavigatorPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(workflowNavigatorPanelRef.current, "start");
     setProjectStatus(
       item
         ? `Workflow Spotlight Route Readout Pattern ${project.selectedPattern}: ${workflowSpotlightRouteLabel(
@@ -8813,7 +8915,7 @@ export function App(): ReactElement {
       ? beatMapStageForNextMoveAction(beatMapSummary, action)
       : (beatMapSummary.stages.find((candidate) => candidate.tone !== "good") ??
         beatMapSummary.stages[beatMapSummary.stages.length - 1]);
-    beatMapPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(beatMapPanelRef.current, "start");
     setProjectStatus(
       action
         ? `Beat Map Route Readout Pattern ${project.selectedPattern}: ${stage.label} / ${stage.status} / ${beatMapRouteLabel(
@@ -8828,7 +8930,7 @@ export function App(): ReactElement {
     const signal = action
       ? structureLensSignalForNextMoveAction(structureLensSummary, action)
       : (structureLensSummary.signals.find((candidate) => candidate.tone !== "good") ?? structureLensSummary.signals[0]);
-    structureLensPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(structureLensPanelRef.current, "start");
     setProjectStatus(
       action
         ? `Structure Lens Route Readout Pattern ${project.selectedPattern}: ${signal.label} / ${signal.value} / ${structureLensRouteLabel(
@@ -8842,7 +8944,7 @@ export function App(): ReactElement {
     const action = nextMoveActions[0] ?? null;
     const posture = action ? nextMoveActionPostureMetricSnapshot(projectRef.current, action) : null;
     const followup = action ? nextMoveResultFollowup(action, projectRef.current) : null;
-    nextMovePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(nextMovePanelRef.current, "start");
     setProjectStatus(
       action && posture && followup
         ? `Next Move Route Readout Pattern ${project.selectedPattern}: ${action.buttonLabel} / ${posture.label}: ${
@@ -8863,14 +8965,14 @@ export function App(): ReactElement {
     };
 
     setBeatReadinessFocusId(check.id);
-    targetRefs[check.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[check.focusTarget], "start");
     setBeatReadinessResult(createBeatReadinessFocusResult(check, beatReadinessChecks));
     setProjectStatus(`Beat Readiness ${check.label}: ${check.status}`);
   }
 
   function focusBeatReadinessRouteReadout(): void {
     const check = activeBeatReadinessQuickActionCheck(beatReadinessChecks);
-    beatReadinessPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(beatReadinessPanelRef.current, "start");
     setProjectStatus(
       check
         ? `Beat Readiness Route Readout Pattern ${project.selectedPattern}: ${beatReadinessRouteLabel(
@@ -8882,7 +8984,7 @@ export function App(): ReactElement {
 
   function jumpToFirstBeatPathTarget(target: FirstBeatPathTarget): void {
     if (target === "transport") {
-      transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+      scrollWorkspaceTargetIntoView(transportPanelRef.current, "start");
       return;
     }
 
@@ -8909,7 +9011,7 @@ export function App(): ReactElement {
     if (card.target === "sound") {
       setSoundDesignOpen(true);
     }
-    targetRefs[card.target]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[card.target], "start");
     setBeatSpineJumpResult(createBeatSpineJumpResult(card, beatSpineSummary));
     setBeatSpineResult(null);
     setProjectStatus(`Beat Spine ${card.label}: ${card.value}`);
@@ -8956,14 +9058,14 @@ export function App(): ReactElement {
     };
 
     setBeatPassportFocusId(metric.focusId);
-    targetRefs[metric.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[metric.focusTarget], "start");
     setBeatPassportResult(createBeatPassportFocusResult(metric, beatPassportSummary));
     setProjectStatus(`Passport ${metric.label}: ${metric.value}`);
   }
 
   function focusBeatPassportRouteReadout(): void {
     const metric = activeBeatPassportQuickActionMetric(beatPassportSummary);
-    beatPassportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(beatPassportPanelRef.current, "start");
     setProjectStatus(
       metric
         ? `Beat Passport Route Readout Pattern ${project.selectedPattern}: ${beatPassportRouteLabel(
@@ -8982,14 +9084,14 @@ export function App(): ReactElement {
     };
 
     setProductionSnapshotFocusId(metric.focusId);
-    targetRefs[metric.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[metric.focusTarget], "start");
     setProductionSnapshotResult(createProductionSnapshotFocusResult(metric, productionSnapshotSummary));
     setProjectStatus(`Snapshot ${metric.label}: ${metric.value}`);
   }
 
   function focusProductionSnapshotRouteReadout(): void {
     const metric = activeProductionSnapshotQuickActionMetric(productionSnapshotSummary);
-    productionSnapshotPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(productionSnapshotPanelRef.current, "start");
     setProjectStatus(
       metric
         ? `Production Snapshot Route Readout Pattern ${project.selectedPattern}: ${productionSnapshotRouteLabel(metric)} / ${metric.value} / direct production-snapshot-metric-${metric.id} unchanged / ${metric.focusLabel} panel`
@@ -9007,7 +9109,7 @@ export function App(): ReactElement {
     };
 
     setSnapshotCompareFocusId(item.focusId);
-    targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[item.focusTarget], "start");
     setSnapshotCompareResult(createSnapshotCompareFocusResult(item, snapshotCompareSummary));
     setProjectStatus(`Snapshot Compare ${item.cardName} ${item.label}: ${item.value}`);
   }
@@ -9022,14 +9124,14 @@ export function App(): ReactElement {
     };
 
     setHookReadinessFocusId(card.focusId);
-    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[card.focusTarget], "start");
     setHookReadinessResult(createHookReadinessFocusResult(card, hookReadinessSummary));
     setProjectStatus(`Hook ${card.label}: ${card.value}`);
   }
 
   function focusHookReadinessRouteReadout(): void {
     const card = activeHookReadinessQuickActionCard(hookReadinessSummary);
-    hookReadinessPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(hookReadinessPanelRef.current, "start");
     setProjectStatus(
       card
         ? `Hook Readiness Route Readout Pattern ${project.selectedPattern}: ${hookReadinessRouteLabel(
@@ -9050,14 +9152,14 @@ export function App(): ReactElement {
     };
 
     setToplineSpaceFocusId(card.focusId);
-    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[card.focusTarget], "start");
     setToplineSpaceResult(createToplineSpaceFocusResult(card, toplineSpaceSummary));
     setProjectStatus(`Topline ${card.label}: ${card.value}`);
   }
 
   function focusToplineSpaceRouteReadout(): void {
     const card = activeToplineSpaceQuickActionCard(toplineSpaceSummary);
-    toplineSpacePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(toplineSpacePanelRef.current, "start");
     setProjectStatus(
       card
         ? `Topline Space Route Readout Pattern ${project.selectedPattern}: ${toplineSpaceRouteLabel(
@@ -9071,7 +9173,7 @@ export function App(): ReactElement {
   function focusArrangementMuteMapLane(lane: ArrangementMuteMapLane): void {
     setArrangementToolsOpen(true);
     setArrangementMuteMapFocusId(lane.id);
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setArrangementMuteMapResult(createArrangementMuteMapFocusResult(lane, arrangementMuteMapSummary));
     setProjectStatus(`Mute Map ${lane.label}: ${lane.value}`);
   }
@@ -9079,7 +9181,7 @@ export function App(): ReactElement {
   function focusArrangementMuteMapReadout(): void {
     setArrangementToolsOpen(true);
     const lane = activeArrangementMuteMapQuickActionLane(arrangementMuteMapSummary);
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setProjectStatus(
       lane
         ? `Arrangement Mute Map ${lane.status}: ${lane.label} / ${lane.value} / ${lane.detail}`
@@ -9090,7 +9192,7 @@ export function App(): ReactElement {
   function focusArrangementTransitionMapTransition(transition: ArrangementTransitionMapTransition): void {
     setArrangementToolsOpen(true);
     setArrangementTransitionMapFocusId(transition.id);
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setArrangementTransitionMapResult(createArrangementTransitionMapFocusResult(transition, arrangementTransitionMapSummary));
     setProjectStatus(`Transition ${transition.fromIndex + 1}->${transition.toIndex + 1}: ${transition.status}`);
   }
@@ -9098,7 +9200,7 @@ export function App(): ReactElement {
   function focusArrangementTransitionMapReadout(): void {
     setArrangementToolsOpen(true);
     const transition = activeArrangementTransitionMapQuickActionTransition(arrangementTransitionMapSummary);
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setProjectStatus(
       transition
         ? `Arrangement Transition Map ${transition.status}: ${transition.value} / ${transition.energyLabel} / ${transition.patternLabel}`
@@ -9115,7 +9217,7 @@ export function App(): ReactElement {
       deliver: deliverPanelRef.current
     };
 
-    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[card.focusTarget], "start");
     setModeFocusResult(createModeFocusJumpResult(card, modeFocusSummary));
     setProjectStatus(`Mode ${card.label}: ${card.value}`);
   }
@@ -9130,7 +9232,7 @@ export function App(): ReactElement {
       deliver: deliverPanelRef.current
     };
 
-    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[card.focusTarget], "start");
     setSessionPassResult(createSessionPassFocusResult(card, sessionPassSummary));
     setProjectStatus(`Session Pass ${card.label}: ${card.value}`);
   }
@@ -9138,7 +9240,7 @@ export function App(): ReactElement {
   function focusSessionPassRouteReadout(): void {
     const card = activeSessionPassQuickActionCard(sessionPassSummary);
     const routeLabel = sessionPassRouteLabel(card, sessionPassSummary);
-    sessionPassPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(sessionPassPanelRef.current, "start");
     setProjectStatus(
       `Session Pass Route Readout Pattern ${project.selectedPattern}: ${routeLabel} / ${card.value} / direct session-pass-card-${card.id} unchanged / ${card.focusLabel} panel`
     );
@@ -9154,14 +9256,14 @@ export function App(): ReactElement {
     };
 
     setComposerGuideFocusId(card.id);
-    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[card.focusTarget], "start");
     setComposerGuideResult(createComposerGuideFocusResult(card, composerGuideSummary));
     setProjectStatus(`Guide ${card.label}: ${card.status}`);
   }
 
   function focusComposerGuideRouteReadout(): void {
     const card = activeComposerGuideQuickActionCard(composerGuideSummary);
-    composerGuidePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(composerGuidePanelRef.current, "start");
 
     setProjectStatus(
       card
@@ -9175,7 +9277,7 @@ export function App(): ReactElement {
 
   function focusComposerActionsReadout(): void {
     const action = composerActionsSummary.actions[0] ?? null;
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       action
         ? `Composer Actions Readout ${action.label}: ${quickActionComposerActionAreaLabel(action.area)} / ${quickActionComposerActionRouteLabel(
@@ -9192,14 +9294,14 @@ export function App(): ReactElement {
     };
 
     setKeyCompassFocusId(item.focusId);
-    targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[item.focusTarget], "start");
     setKeyCompassResult(createKeyCompassFocusResult(item, keyCompassSummary));
     setProjectStatus(`Key ${item.label}: ${item.value}`);
   }
 
   function focusKeyCompassRouteReadout(): void {
     const item = activeKeyCompassQuickActionItem(keyCompassSummary);
-    keyCompassPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(keyCompassPanelRef.current, "start");
 
     setProjectStatus(
       item
@@ -9217,14 +9319,14 @@ export function App(): ReactElement {
     };
 
     setGrooveCompassFocusId(item.focusId);
-    targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[item.focusTarget], "start");
     setGrooveCompassResult(createGrooveCompassFocusResult(item, grooveCompassSummary));
     setProjectStatus(`Groove ${item.label}: ${item.value}`);
   }
 
   function focusGrooveCompassRouteReadout(): void {
     const item = activeGrooveCompassQuickActionItem(grooveCompassSummary);
-    grooveCompassPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(grooveCompassPanelRef.current, "start");
 
     setProjectStatus(
       item
@@ -9243,7 +9345,7 @@ export function App(): ReactElement {
     };
 
     setPatternDnaFocusId(card.id);
-    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[card.focusTarget], "start");
     setPatternDnaResult(createPatternDnaFocusResult(card, patternDnaSummary));
     setProjectStatus(`Pattern DNA ${card.label}: ${card.value}`);
   }
@@ -9258,14 +9360,14 @@ export function App(): ReactElement {
     };
 
     setListeningPassFocusId(item.id);
-    targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[item.focusTarget], "start");
     setListeningPassResult(createListeningPassFocusResult(item, listeningPassSummary));
     setProjectStatus(`Listening ${item.label}: ${item.status}`);
   }
 
   function focusListeningPassRouteReadout(): void {
     const item = activeListeningPassQuickActionItem(listeningPassSummary);
-    listeningPassPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(listeningPassPanelRef.current, "start");
     setProjectStatus(
       item
         ? `Listening Pass Route Readout Pattern ${project.selectedPattern}: ${listeningPassRouteLabel(
@@ -9287,13 +9389,13 @@ export function App(): ReactElement {
       setSoundDesignOpen(true);
     }
     setStyleInspectorFocusId(item.focusId);
-    targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[item.focusTarget], "start");
     setStyleInspectorResult(createStyleInspectorFocusResult(item, styleInspectorSummary));
     setProjectStatus(`Style ${item.label}: ${item.value}`);
   }
 
   function focusStyleDirectionReadout(): void {
-    styleInspectorRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollGuidanceTargetIntoView(styleInspectorRef.current, "start");
     setProjectStatus(
       `Style Direction ${style.name}: ${styleDirectionCurrentSummary(project)} / ${styleDirectionTargetSummary(project.styleId)}`
     );
@@ -9301,13 +9403,13 @@ export function App(): ReactElement {
 
   function focusTimbreCheck(): void {
     setSoundDesignOpen(true);
-    soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(soundPanelRef.current, "start");
     setProjectStatus(`Timbre Check ${soundTimbreCheckSummary.statusLabel}: ${soundTimbreCheckSummary.balanceLabel}`);
   }
 
   function focusSoundPresetReadout(): void {
     setSoundDesignOpen(true);
-    soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(soundPanelRef.current, "start");
     setProjectStatus(
       `Sound Preset ${soundPresetPreviewSummary.statusLabel}: ${soundPresetPreviewSummary.presetLabel} / ${soundPresetPreviewSummary.toneLabel}`
     );
@@ -9316,7 +9418,7 @@ export function App(): ReactElement {
   function focusSoundPresetRouteReadout(): void {
     setSoundDesignOpen(true);
     const routeLabel = soundPresetRouteLabel(project.sound, soundPresetDesign(soundPresetPreviewSummary.presetId));
-    soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(soundPanelRef.current, "start");
     setProjectStatus(
       `Sound Preset Route Readout Pattern ${project.selectedPattern}: ${routeLabel} / ${soundPresetPreviewSummary.presetLabel} / ${soundPresetPreviewSummary.toneLabel} / direct Sound Preset unchanged`
     );
@@ -9324,7 +9426,7 @@ export function App(): ReactElement {
 
   function focusDrumKitReadout(): void {
     setSoundDesignOpen(true);
-    soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(soundPanelRef.current, "start");
     setProjectStatus(
       `Drum Kit ${drumKitPreviewSummary.statusLabel}: ${drumKitPreviewSummary.kitLabel} / ${drumKitPreviewSummary.rackLabel}`
     );
@@ -9337,7 +9439,7 @@ export function App(): ReactElement {
       drumKitPadOptions[0] ??
       null;
     const routeLabel = pad ? drumKitRouteLabel(pad) : "No kit route needed";
-    soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(soundPanelRef.current, "start");
     setProjectStatus(
       `Drum Kit Route Readout Pattern ${project.selectedPattern}: ${routeLabel} / ${drumKitPreviewSummary.kitLabel} / ${drumKitPreviewSummary.rackLabel} / direct Drum Kit unchanged`
     );
@@ -9345,7 +9447,7 @@ export function App(): ReactElement {
 
   function focusSoundFocusReadout(): void {
     setSoundDesignOpen(true);
-    soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(soundPanelRef.current, "start");
     setProjectStatus(
       `Sound Focus ${soundFocusPreviewSummary.statusLabel}: ${soundFocusPreviewSummary.padLabel} / ${soundFocusPreviewSummary.parameterLabel}`
     );
@@ -9358,7 +9460,7 @@ export function App(): ReactElement {
       soundFocusPadOptions[0] ??
       null;
     const routeLabel = pad ? soundFocusRouteLabel(soundFocusChangedParameters(project.sound, pad)) : "No tone route needed";
-    soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(soundPanelRef.current, "start");
     setProjectStatus(
       `Sound Focus Route Readout Pattern ${project.selectedPattern}: ${routeLabel} / ${soundFocusPreviewSummary.padLabel} / ${soundFocusPreviewSummary.parameterLabel} / direct Sound Focus unchanged`
     );
@@ -9366,7 +9468,7 @@ export function App(): ReactElement {
 
   function focusSoundSnapshotReadout(): void {
     setSoundDesignOpen(true);
-    soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(soundPanelRef.current, "start");
     setProjectStatus(
       `Sound Snapshot A/B ${soundSnapshotComparison.statusLabel}: ${soundSnapshotComparison.actionLabel} / ${soundSnapshotComparison.winnerLabel}`
     );
@@ -9383,15 +9485,15 @@ export function App(): ReactElement {
     };
 
     setFinishChecklistFocusId(card.id);
-    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[card.focusTarget], "start");
     setFinishChecklistResult(createFinishChecklistFocusResult(card, finishChecklistSummary));
     setProjectStatus(`Finish ${card.label}: ${card.status}`);
   }
 
   function focusFinishChecklistRouteReadout(): void {
-    setMasterReviewOpen(true);
+    flushSync(() => setMasterReviewOpen(true));
     const card = activeFinishChecklistQuickActionCard(finishChecklistSummary);
-    finishChecklistPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(finishChecklistPanelRef.current, "start");
     setProjectStatus(
       card
         ? `Finish Checklist Route Readout Pattern ${project.selectedPattern}: ${finishChecklistRouteLabel(card)} / ${card.status} / direct finish-checklist-card-${card.id} unchanged / ${card.focusLabel} panel`
@@ -9409,14 +9511,14 @@ export function App(): ReactElement {
     };
 
     setExportPreflightFocusId(card.focusId);
-    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[card.focusTarget], "start");
     setExportPreflightResult(createExportPreflightFocusResult(card, exportPreflightSummary));
     setProjectStatus(`Preflight ${card.label}: ${card.value}`);
   }
 
   function focusExportPreflightRouteReadout(): void {
     const card = activeExportPreflightQuickActionCard(exportPreflightSummary);
-    deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(deliverPanelRef.current, "start");
     setProjectStatus(
       card
         ? `Export Preflight Route Readout Pattern ${project.selectedPattern}: ${exportPreflightRouteLabel(
@@ -9449,7 +9551,7 @@ export function App(): ReactElement {
       currentSendOrder
     );
 
-    deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(deliverPanelRef.current, "start");
     setProjectStatus(
       `Handoff Pack ${currentRoute.statusLabel}: ${currentRoute.detailLabel} / ${currentAudit.statusLabel} / ${currentSendOrder.nextLabel}`
     );
@@ -9469,7 +9571,7 @@ export function App(): ReactElement {
     const currentSendOrder = createHandoffPackSendOrderSummary(project, currentItems);
     const readyCount = currentItems.filter((item) => item.tone === "good").length;
 
-    deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(deliverPanelRef.current, "start");
     setProjectStatus(
       `Direct Exports Readout: ${readyCount}/${currentItems.length} ready / ${currentSendOrder.nextLabel} / ${currentReceipt.statusLabel}`
     );
@@ -9493,7 +9595,7 @@ export function App(): ReactElement {
       : null;
     const nextLabel = nextItem ? `${nextItem.label} ${nextItem.value}` : "Send order clear";
 
-    deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(deliverPanelRef.current, "start");
     setProjectStatus(
       `Handoff Next Export Readout: ${currentSendOrder.nextLabel} / ${nextLabel} / ${currentReceipt.statusLabel}`
     );
@@ -9502,7 +9604,7 @@ export function App(): ReactElement {
   function focusHandoffPackageCheckCard(card: HandoffPackageCheckCard): void {
     setDeliveryAuditOpen(true);
     setHandoffPackageCheckFocusId(card.focusId);
-    deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(deliverPanelRef.current, "start");
     setHandoffPackageCheckResult(createHandoffPackageCheckFocusResult(card, handoffPackageCheckSummary));
     setProjectStatus(`Package ${card.label}: ${card.value}`);
   }
@@ -9523,7 +9625,7 @@ export function App(): ReactElement {
     const currentManifest = createHandoffFileManifest(project, stemAnalyses, currentItems);
     const currentAudit = createHandoffManifestAudit(project, currentItems, currentManifest, currentReceipt, currentSendOrder);
 
-    deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(deliverPanelRef.current, "start");
     setProjectStatus(`Manifest ${currentAudit.statusLabel}: ${currentAudit.detailLabel}`);
   }
 
@@ -9541,7 +9643,7 @@ export function App(): ReactElement {
     const currentSummary = createHandoffExportFormatSummary(project, exportAnalysis, stemAnalyses, currentItems);
     const currentMetric = currentSummary.metrics.find((candidate) => candidate.id === metric.id) ?? metric;
     setHandoffExportFormatFocusId(currentMetric.id);
-    deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(deliverPanelRef.current, "start");
     setHandoffExportFormatResult(createHandoffExportFormatFocusResult(currentMetric, currentSummary));
     setProjectStatus(`Format ${currentMetric.label}: ${currentMetric.value}`);
   }
@@ -9562,16 +9664,18 @@ export function App(): ReactElement {
     if (mixCheckId) {
       setMixCoachFocusId(mixCheckId);
     }
-    targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(targetRefs[item.focusTarget], "start");
     setReviewQueueResult(createReviewQueueFocusResult(item, reviewQueueSummary));
     setProjectStatus(`Review ${item.area}: ${item.status}`);
   }
 
   function focusReviewQueueRouteReadout(): void {
-    setMasterReviewOpen(true);
-    setMasterReviewQueueOpen(true);
+    flushSync(() => {
+      setMasterReviewOpen(true);
+      setMasterReviewQueueOpen(true);
+    });
     const item = reviewQueueSummary.items[0] ?? null;
-    reviewQueuePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(reviewQueuePanelRef.current, "start");
     setProjectStatus(
       item
         ? `Review Queue Route Readout Pattern ${project.selectedPattern}: ${reviewQueueRouteLabel(item)} / ${item.status} / direct review-queue-item-${item.id} unchanged / review-fix unchanged / ${item.focusLabel} panel`
@@ -9799,7 +9903,7 @@ export function App(): ReactElement {
       return;
     }
     if (action.group === "Project" || action.group === "Export") {
-      setGuidanceCenterOpen(true);
+      flushSync(() => setGuidanceCenterOpen(true));
     }
     const beforeProject = projectRef.current;
     const inputSetupResult = createQuickActionInputSetupResultState(action, {
@@ -9959,14 +10063,14 @@ export function App(): ReactElement {
   }
 
   function focusPatternPlaybackReadout(): void {
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       `Pattern Playback ${patternPlaybackReadout.statusLabel}: ${patternPlaybackReadout.roleLabel} / ${patternPlaybackReadout.detailLabel}`
     );
   }
 
   function focusPatternCueReadout(): void {
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       selectedArrangementBlock
         ? `Pattern Cue Readout Pattern ${patternCueReadoutTarget}: ${transportLoopLabel(
@@ -9981,7 +10085,7 @@ export function App(): ReactElement {
   }
 
   function focusPatternSwitchReadout(): void {
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       selectedArrangementBlock
         ? `Pattern Switch Readout Pattern ${patternSwitchReadoutTarget}: edit Pattern ${project.selectedPattern} / Block ${
@@ -9994,21 +10098,21 @@ export function App(): ReactElement {
   }
 
   function focusPatternContrastReadout(): void {
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       `Pattern Contrast ${patternContrastSummary.statusLabel}: ${patternContrastSummary.contrastLabel} / ${patternContrastSummary.metricLabel} / ${patternContrastSummary.detailLabel}`
     );
   }
 
   function focusPatternContrastRoleMapReadout(): void {
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       `Pattern Contrast Role Map ${patternContrastRoleMapSummary.statusLabel}: ${patternContrastRoleMapSummary.metricLabel} / ${patternContrastRoleMapSummary.detailLabel}`
     );
   }
 
   function focusPatternContrastSectionFitReadout(): void {
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       `Pattern Contrast Section Fit ${patternContrastSectionFitSummary.statusLabel}: ${patternContrastSectionFitSummary.metricLabel} / ${patternContrastSectionFitSummary.detailLabel}`
     );
@@ -10016,7 +10120,7 @@ export function App(): ReactElement {
 
   function focusPatternCopyClearReadout(): void {
     const copyTargets = patternSlots.filter((pattern) => pattern !== project.selectedPattern).join(", ");
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       `Pattern Copy/Clear Readout Pattern ${project.selectedPattern}: ${patternEventCount(
         activePattern(project)
@@ -10025,28 +10129,28 @@ export function App(): ReactElement {
   }
 
   function focusPatternCloneReadout(): void {
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       `Pattern Clone Readout ${patternCloneSuggestionSummary.routeLabel}: ${patternCloneSuggestionSummary.presetLabel} suggestion / ${patternCloneSuggestionSummary.detailLabel} / ${patternCloneSuggestionSummary.moveLabel} / direct clone unchanged`
     );
   }
 
   function focusPatternVariationReadout(): void {
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       `Pattern Variation Readout ${patternVariationSuggestionSummary.patternLabel}: ${patternVariationSuggestionSummary.presetLabel} suggestion / preview ${patternVariationPreviewSummary.presetLabel} / ${patternVariationPreviewSummary.moveLabel} / direct variation unchanged`
     );
   }
 
   function focusPatternFillReadout(): void {
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       `Pattern Fill Readout ${patternFillSuggestionSummary.patternLabel}: ${patternFillSuggestionSummary.presetLabel} suggestion / preview ${patternFillPreviewSummary.presetLabel} / ${patternFillPreviewSummary.moveLabel} / direct fill unchanged`
     );
   }
 
   function focusPatternStackReadout(): void {
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       `Pattern Stack Readout Pattern ${project.selectedPattern}: ${patternStackPreviewSummary.statusLabel} / preview ${patternStackPreviewSummary.stackLabel} / ${patternStackPreviewSummary.moveLabel} / direct stack unchanged`
     );
@@ -10061,7 +10165,7 @@ export function App(): ReactElement {
           ? "Groove Feel route"
           : "Drum Accent route"
       : "no drum route";
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       target
         ? `Drum Move Route Readout Pattern ${project.selectedPattern}: route ${routeLabel} / target ${target.label} ${target.kind} / direct command drum-move / ${drumMovePreviewSummary.moveLabel} / direct drum move unchanged`
@@ -10078,7 +10182,7 @@ export function App(): ReactElement {
           ? "Bass Glide route"
           : "Bass Contour route"
       : "no Bass route";
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       target
         ? `Bass Move Route Readout Pattern ${project.selectedPattern}: route ${routeLabel} / target ${target.label} ${target.kind} / direct command 808-move / ${bassMovePreviewSummary.moveLabel} / direct Bass move unchanged`
@@ -10095,7 +10199,7 @@ export function App(): ReactElement {
           ? "Melody Accent route"
           : "Melody Contour route"
       : "no melody route";
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       target
         ? `Melody Move Route Readout Pattern ${project.selectedPattern}: route ${routeLabel} / target ${target.label} ${target.kind} / direct command melody-move / ${melodyMovePreviewSummary.moveLabel} / direct melody move unchanged`
@@ -10112,7 +10216,7 @@ export function App(): ReactElement {
           ? "Chord Rhythm route"
           : "Chord Voicing route"
       : "no chord route";
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       target
         ? `Chord Move Route Readout Pattern ${project.selectedPattern}: route ${routeLabel} / target ${target.label} ${target.kind} / direct command chord-move / ${chordMovePreviewSummary.moveLabel} / direct chord move unchanged`
@@ -10122,7 +10226,7 @@ export function App(): ReactElement {
 
   function focusLayerStarterReadout(): void {
     const priorityLayer = layerStarterOptions.find((option) => option.tone !== "good") ?? layerStarterOptions[0] ?? null;
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       priorityLayer
         ? `Layer Starter Readout Pattern ${project.selectedPattern}: ${priorityLayer.status} / priority ${priorityLayer.label} / ${priorityLayer.detail} / direct starter unchanged`
@@ -10131,7 +10235,7 @@ export function App(): ReactElement {
   }
 
   function focusPatternUseReadout(): void {
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setProjectStatus(
       selectedArrangementBlock
         ? `Pattern Use Readout Pattern ${patternUseReadoutTarget}: Block ${selectedArrangementIndex + 1} ${
@@ -10142,14 +10246,14 @@ export function App(): ReactElement {
   }
 
   function focusArrangementPlaybackReadout(): void {
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setProjectStatus(
       `Arrangement Playback ${arrangementPlaybackReadout.statusLabel}: ${arrangementPlaybackReadout.roleLabel} / ${arrangementPlaybackReadout.detailLabel}`
     );
   }
 
   function focusSelectedArrangementBlockReadout(): void {
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setProjectStatus(
       selectedArrangementBlock && selectedArrangementBlockRole
         ? `Selected Arrangement Block Readout Block ${selectedArrangementIndex + 1}: ${
@@ -10162,14 +10266,14 @@ export function App(): ReactElement {
   }
 
   function focusAudibleArrangementFollowReadout(): void {
-    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(arrangePanelRef.current, "start");
     setProjectStatus(
       `Audible Arrangement Follow Readout ${arrangementPlaybackReadout.statusLabel}: ${arrangementPlaybackReadout.roleLabel} / ${arrangementPlaybackReadout.detailLabel}`
     );
   }
 
   function focusTransportPositionReadout(): void {
-    transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(transportPanelRef.current, "start");
     setProjectStatus(
       `Transport Position ${transportPositionReadout.statusLabel}: ${transportPositionReadout.roleLabel} / ${transportPositionReadout.detailLabel}`
     );
@@ -10183,7 +10287,7 @@ export function App(): ReactElement {
       arrangementTransitionLoopTarget
     );
 
-    transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(transportPanelRef.current, "start");
     setProjectStatus(`Loop Scope ${transportLoopLabel(transportLoopScope)}: ${currentLoopStatus}`);
   }
 
@@ -10195,38 +10299,38 @@ export function App(): ReactElement {
       arrangementTransitionLoopTarget
     );
 
-    transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(transportPanelRef.current, "start");
     setProjectStatus(
       `Metronome ${project.metronomeEnabled ? "on" : "off"}: ${project.bpm} BPM / ${currentLoopStatus}`
     );
   }
 
   function focusTapTempoReadout(): void {
-    transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(transportPanelRef.current, "start");
     setProjectStatus(
       `Tap Tempo ${tapTempoReadout.statusLabel}: ${tapTempoReadout.roleLabel} / ${tapTempoReadout.detailLabel}`
     );
   }
 
   function focusTempoNudgeReadout(): void {
-    transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(transportPanelRef.current, "start");
     setProjectStatus(`Tempo Nudge ${project.bpm} BPM: ${tempoNudgeRouteSummary(project.bpm)}`);
   }
 
   function focusSwingFeelReadout(): void {
-    transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(transportPanelRef.current, "start");
     setProjectStatus(
       `Swing Feel ${percentLabel(normalizeSwingFeelValue(project.swing))}: ${swingFeelRouteSummary(project)}`
     );
   }
 
   function focusKeyRetargetReadout(): void {
-    transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(transportPanelRef.current, "start");
     setProjectStatus(`Key Retarget ${project.key}: ${keyRetargetPatternSummary(project)}`);
   }
 
   function focusKeyboardCaptureReadout(): void {
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       `Keyboard Capture ${keyboardCaptureEnabled ? "Armed" : "Off"}: ${
         keyboardCaptureTarget === "bass" ? "808" : "Synth"
@@ -10242,7 +10346,7 @@ export function App(): ReactElement {
     const selectedLabel = selectedNote
       ? `${selectedCaptureNoteLabel}${selectedCaptureNoteActive ? "" : " inactive"}`
       : "No selected note";
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       `Capture Step Mode ${quickActionCaptureStepModeLabel(
         keyboardCaptureStepMode
@@ -10251,7 +10355,7 @@ export function App(): ReactElement {
   }
 
   function focusMidiInputReadout(): void {
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       `MIDI Input ${midiCaptureSummary.statusLabel}: ${midiCaptureArmed ? "Armed" : "Disarmed"} / ${
         keyboardCaptureTarget === "bass" ? "808" : "Synth"
@@ -10260,7 +10364,7 @@ export function App(): ReactElement {
   }
 
   function focusEditorAuditionReadout(): void {
-    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    scrollWorkspaceTargetIntoView(composePanelRef.current, "start");
     setProjectStatus(
       `Editor Audition ${editorAuditionReadout.statusLabel}: ${editorAuditionReadout.targetLabel} / ${editorAuditionReadout.metricLabel} ${editorAuditionReadout.metricValue}`
     );
@@ -12338,7 +12442,7 @@ export function App(): ReactElement {
           studioMixReviewOpen,
           studioProcessingOpen
         };
-        flushSync(() => focusReviewQueueRouteReadout());
+        focusReviewQueueRouteReadout();
         const routedMasterReviewQueueOpen = document.querySelector<HTMLDetailsElement>('[data-testid="master-review-queue-tools"]')?.open ?? false;
         flushSync(() => {
           setMasterReviewQueueOpen(false);
@@ -13216,6 +13320,14 @@ export function App(): ReactElement {
         {localDraftRecoveryResult && <LocalDraftRecoveryResultStrip result={localDraftRecoveryResult} />}
       </section>
 
+      <WorkflowNavigator
+        activeZone={activeWorkspaceZone}
+        items={workflowNavigatorItems}
+        result={workflowNavigatorResult}
+        sectionRef={workflowNavigatorPanelRef}
+        onJump={jumpToWorkflowNavigatorItem}
+      />
+
       <GuideQuickStart
         firstBeatPathSummary={firstBeatPathSummary}
         sessionPassSummary={sessionPassSummary}
@@ -13231,6 +13343,7 @@ export function App(): ReactElement {
         data-testid="guidance-center"
         open={guidanceCenterOpen}
         onToggle={(event) => setGuidanceCenterOpen(event.currentTarget.open)}
+        ref={guidanceCenterRef}
       >
         <summary className="guidance-center-summary" data-testid="guidance-center-toggle">
           <span className="guidance-center-icon" aria-hidden="true">
@@ -13531,14 +13644,16 @@ export function App(): ReactElement {
         {quickActionResult && <QuickActionResultStrip result={quickActionResult} />}
       </div>
 
-      <WorkflowNavigator
-        items={workflowNavigatorItems}
-        result={workflowNavigatorResult}
-        sectionRef={workflowNavigatorPanelRef}
-        onJump={jumpToWorkflowNavigatorItem}
-      />
-
-      <section className="workspace-grid">
+      <div className="workspace-tabpanels" data-active-workspace-zone={activeWorkspaceZone}>
+      <section
+        aria-labelledby="workspace-tab-compose"
+        className="workspace-grid workspace-zone-panel workspace-compose-panel"
+        data-workspace-zone="compose"
+        hidden={activeWorkspaceZone !== "compose"}
+        id="workspace-panel-compose"
+        role="tabpanel"
+        tabIndex={activeWorkspaceZone === "compose" ? 0 : -1}
+      >
         <section
           className="panel pattern-panel"
           data-testid="workflow-target-compose"
@@ -14187,6 +14302,16 @@ export function App(): ReactElement {
           </details>
         </section>
 
+      </section>
+      <section
+        aria-labelledby="workspace-tab-arrange"
+        className="workspace-grid workspace-zone-panel workspace-arrange-panel"
+        data-workspace-zone="arrange"
+        hidden={activeWorkspaceZone !== "arrange"}
+        id="workspace-panel-arrange"
+        role="tabpanel"
+        tabIndex={activeWorkspaceZone === "arrange" ? 0 : -1}
+      >
         <section className="panel arrangement-panel" data-testid="workflow-target-arrange" aria-label="Arrangement" ref={arrangePanelRef}>
           <PanelTitle icon={<Music2 size={18} />} title="Arrangement" meta={`${project.arrangement.length} blocks / ${barCountLabel(arrangementTotalBars(project))}`} />
           <div
@@ -14688,6 +14813,16 @@ export function App(): ReactElement {
           </details>
         </section>
 
+      </section>
+      <section
+        aria-labelledby="workspace-tab-mix"
+        className="workspace-grid workspace-zone-panel workspace-mix-panel"
+        data-workspace-zone="mix"
+        hidden={activeWorkspaceZone !== "mix"}
+        id="workspace-panel-mix"
+        role="tabpanel"
+        tabIndex={activeWorkspaceZone === "mix" ? 0 : -1}
+      >
         <section className="panel mixer-panel" data-testid="workflow-target-mix" aria-label="Mixer" ref={mixPanelRef}>
           <PanelTitle icon={<SlidersHorizontal size={18} />} title="Mixer" meta={`${activeChannels} audible`} />
           <div className="mixer-strips" data-testid="mixer-channel-strips">
@@ -15259,6 +15394,15 @@ export function App(): ReactElement {
         </section>
       </section>
 
+      <section
+        aria-labelledby="workspace-tab-deliver"
+        className="workspace-zone-panel workspace-deliver-panel"
+        data-workspace-zone="deliver"
+        hidden={activeWorkspaceZone !== "deliver"}
+        id="workspace-panel-deliver"
+        role="tabpanel"
+        tabIndex={activeWorkspaceZone === "deliver" ? 0 : -1}
+      >
       <HandoffPack
         analysis={exportAnalysis}
         auditOpen={deliveryAuditOpen}
@@ -15284,6 +15428,8 @@ export function App(): ReactElement {
         onToggleAudit={() => setDeliveryAuditOpen((open) => !open)}
         onToggleStatus={() => setDeliveryStatusOpen((open) => !open)}
       />
+      </section>
+      </div>
     </main>
   );
 }

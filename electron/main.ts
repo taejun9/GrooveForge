@@ -2,7 +2,7 @@ import { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, shell } from "e
 import type { MenuItemConstructorOptions, OpenDialogOptions, SaveDialogOptions } from "electron";
 import { createHash } from "node:crypto";
 import { rmSync } from "node:fs";
-import { readFile, stat } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ProjectLibrary } from "./projectLibrary.js";
@@ -38,12 +38,19 @@ const launchSmokeProgressPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_PROGRESS ";
 const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
 const closeFlowSmokeResultPrefix = "GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE_RESULT ";
 const launchSmokeTimeoutMs = 1800000;
-const projectIoSmokeTimeoutMs = 640000;
+const projectIoSmokeTimeoutMs = 180000;
 const closeFlowSmokeTimeoutMs = 240000;
 const closeFlowSmokeExpectedTitle = "Close Flow Smoke Beat";
 // Mirrors the renderer/domain 1,500,000-character contract at the native IPC boundary.
 const maxNativeProjectFileCharacters = 1_500_000;
 const maxNativeProjectFileBytes = maxNativeProjectFileCharacters * 4;
+
+function functionalTabsLaunchSmokeEvidenceDirectory(): string {
+  const configuredDirectory = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_EVIDENCE_DIR;
+  return configuredDirectory
+    ? path.resolve(configuredDirectory)
+    : path.join(app.getPath("temp"), `GrooveForge-${process.pid}-functional-tabs-launch-smoke`);
+}
 
 type NativeMenuCommand =
   | "open-project"
@@ -65,6 +72,7 @@ type LaunchSmokeEvidence = {
   appKind: unknown;
   bodyTextLength: number;
   commandReference: LaunchSmokeCommandReferenceEvidence;
+  functionalTabs?: LaunchSmokeFunctionalTabsEvidence;
   hasOpenProject: boolean;
   hasPreloadBridge: boolean;
   hasRoot: boolean;
@@ -84,6 +92,196 @@ type LaunchSmokeEvidence = {
     height: number;
     width: number;
   };
+};
+
+type LaunchSmokeFunctionalTabZone = "compose" | "arrange" | "mix" | "deliver";
+
+type LaunchSmokeFunctionalTabStateEvidence = {
+  activePanelHorizontalOverflow: number;
+  activeZone: string;
+  ariaConnectionsReady: boolean;
+  documentHorizontalOverflow: number;
+  inactiveFocusableControlCount: number;
+  inactiveHiddenPanelCount: number;
+  inactiveZeroRectPanelCount: number;
+  mixMasterVisible: boolean;
+  mixMixerVisible: boolean;
+  selectedTabCount: number;
+  tabCount: number;
+  tabListHorizontalOverflow: number;
+  tabPanelCount: number;
+  tabStopCount: number;
+  visiblePanelCount: number;
+  deliverHandoffVisible: boolean;
+};
+
+type LaunchSmokeFunctionalTabCaptureEvidence = {
+  artifact: string;
+  bitmapBytes: number;
+  height: number;
+  nonBackgroundSamples: number;
+  pixelDigest: string;
+  pngBytes: number;
+  pngDigest: string;
+  sampledPixels: number;
+  width: number;
+};
+
+type LaunchSmokeStickyNavigatorEvidence = {
+  activeTabFullyVisible: boolean;
+  activeZone: string;
+  configuredTop: number;
+  deepScrollReached: boolean;
+  documentScrollable: boolean;
+  maximumScrollY: number;
+  navigatorFullyVisible: boolean;
+  navigatorPosition: string;
+  navigatorTop: number;
+  scrollY: number;
+  stickyTopAligned: boolean;
+  tabListFullyVisible: boolean;
+  viewportHeight: number;
+  viewportWidth: number;
+};
+
+type LaunchSmokeFunctionalTabsEvidence = {
+  captures: Record<LaunchSmokeFunctionalTabZone, LaunchSmokeFunctionalTabCaptureEvidence>;
+  composeRoundTrip: {
+    dirtyPosturePreserved: boolean;
+    disclosurePosturePreserved: boolean;
+    editFingerprintPreserved: boolean;
+    keyboardCapturePosturePreserved: boolean;
+    playbackPosturePreserved: boolean;
+    selectedPatternPreserved: boolean;
+    undoRedoPosturePreserved: boolean;
+  };
+  crossTabFocusTransfer: {
+    activeElementInViewport: boolean;
+    activeElementTestId: string;
+    activeElementVisible: boolean;
+    activeElementWithinActivePanel: boolean;
+    destinationZone: string;
+    sourcePanelHidden: boolean;
+    sourceZone: string;
+    triggerTestId: string;
+  };
+  finishChecklistQuickActionReveal: {
+    activeElementTestId: string;
+    activeElementVisible: boolean;
+    activeElementWithinActivePanel: boolean;
+    actionVisible: boolean;
+    destinationZone: string;
+    finishChecklistClearOfNavigator: boolean;
+    finishChecklistHeight: number;
+    finishChecklistInViewport: boolean;
+    finishChecklistVisible: boolean;
+    finishChecklistWidth: number;
+    masterReviewOpen: boolean;
+    modalClosed: boolean;
+    projectFingerprintPreserved: boolean;
+    sourceZone: string;
+    viewportHeight: number;
+    visibleHeight: number;
+  };
+  guidanceBeatPassportQuickActionReveal: {
+    activeElementTestId: string;
+    activeElementVisible: boolean;
+    actionVisible: boolean;
+    destinationZone: string;
+    guidanceCenterInitiallyClosed: boolean;
+    guidanceCenterOpen: boolean;
+    guidancePostureRestored: boolean;
+    modalClosed: boolean;
+    nativeShortcutOpened: boolean;
+    originalGuidanceCenterOpen: boolean;
+    passportClearOfNavigator: boolean;
+    passportHeight: number;
+    passportInViewport: boolean;
+    passportVisible: boolean;
+    passportWidth: number;
+    passportWithinGuidance: boolean;
+    projectFingerprintPreserved: boolean;
+    selectedActionId: string;
+    sourceZone: string;
+    statusText: string;
+    viewportHeight: number;
+    visibleHeight: number;
+  };
+  firstBeatPathTransportQuickActionReveal: {
+    activeElementTestId: string;
+    activeElementVisible: boolean;
+    actionVisible: boolean;
+    destinationZone: string;
+    guidanceCenterOpenAfterRoute: boolean;
+    guidancePostureRestored: boolean;
+    modalClosed: boolean;
+    nativeShortcutOpened: boolean;
+    originalGuidanceCenterOpen: boolean;
+    projectFingerprintPreserved: boolean;
+    selectedActionId: string;
+    sourceZone: string;
+    statusText: string;
+    transportHeight: number;
+    transportInViewport: boolean;
+    transportVisible: boolean;
+    transportWidth: number;
+    viewportHeight: number;
+    visibleHeight: number;
+  };
+  reviewQueueQuickActionReveal: {
+    activeElementTestId: string;
+    activeElementVisible: boolean;
+    activeElementWithinActivePanel: boolean;
+    actionVisible: boolean;
+    destinationZone: string;
+    disclosurePostureRestored: boolean;
+    masterReviewInitiallyClosed: boolean;
+    masterReviewOpen: boolean;
+    masterReviewQueueInitiallyClosed: boolean;
+    masterReviewQueueOpen: boolean;
+    modalClosed: boolean;
+    nativeShortcutOpened: boolean;
+    projectFingerprintPreserved: boolean;
+    reviewQueueClearOfNavigator: boolean;
+    reviewQueueHeight: number;
+    reviewQueueInViewport: boolean;
+    reviewQueueVisible: boolean;
+    reviewQueueWidth: number;
+    selectedActionId: string;
+    sourceZone: string;
+    statusText: string;
+    viewportHeight: number;
+    visibleHeight: number;
+  };
+  hiddenComposeGuards: Record<
+    Exclude<LaunchSmokeFunctionalTabZone, "compose">,
+    Record<"1" | "2" | "3" | "Delete" | "A", boolean>
+  >;
+  nativeMenuDeleteGuards: Record<"mix" | "deliver", boolean>;
+  initial: LaunchSmokeFunctionalTabStateEvidence;
+  minimumWindow: {
+    maximumActivePanelHorizontalOverflow: number;
+    maximumDocumentHorizontalOverflow: number;
+    maximumTabListHorizontalOverflow: number;
+    viewportWidth: number;
+  };
+  restoredCompose: boolean;
+  states: Record<LaunchSmokeFunctionalTabZone, LaunchSmokeFunctionalTabStateEvidence>;
+  stickyNavigatorAfterDeepScroll: Record<
+    Exclude<LaunchSmokeFunctionalTabZone, "compose">,
+    LaunchSmokeStickyNavigatorEvidence
+  >;
+  traversal: Array<{ input: string; zone: string }>;
+};
+
+type LaunchSmokeFunctionalTabInternalSnapshot = LaunchSmokeFunctionalTabStateEvidence & {
+  composeDataFingerprint: string;
+  dirtyPosture: string;
+  disclosurePosture: string;
+  keyboardCapturePosture: string;
+  playbackPosture: string;
+  selectedPattern: string;
+  undoRedoPosture: string;
 };
 
 type LaunchSmokeLayoutEvidence = {
@@ -637,6 +835,8 @@ type ProjectIoSmokeEvidence = {
     contentsMatched?: boolean;
     filePath?: string;
   };
+  nativeOpenActivation: ProjectIoSmokeNativeOpenActivationEvidence;
+  preOpenRecoveryPresent: boolean;
   readyState: string;
   recoveryResult: {
     cleared: boolean;
@@ -645,6 +845,7 @@ type ProjectIoSmokeEvidence = {
     narrowSaveResponse: boolean;
     savedAtReady: boolean;
   };
+  replacementConfirmCallCount: number;
   projectOpenButtonPresent: boolean;
   samplingTextPresent: boolean;
   saveResult: {
@@ -655,6 +856,30 @@ type ProjectIoSmokeEvidence = {
   sourceLength: number;
   targetPath: string;
   title: string;
+  uiFingerprint: {
+    matched: boolean;
+    rendered: ProjectIoSmokeUiFingerprint;
+    renderedDigest: string;
+    source: ProjectIoSmokeUiFingerprint;
+    sourceDigest: string;
+  };
+};
+
+type ProjectIoSmokeUiFingerprint = {
+  bpm: number;
+  key: string;
+  mode: string;
+  selectedPattern: string;
+  styleId: string;
+  title: string;
+};
+
+type ProjectIoSmokeNativeOpenActivationEvidence = {
+  hitTestMatched: boolean;
+  point: { x: number; y: number } | null;
+  targetPresent: boolean;
+  targetVisible: boolean;
+  testId: "project-open";
 };
 
 type CloseFlowSmokeLiveEditEvidence = {
@@ -890,12 +1115,23 @@ function checkForUpdates(): void {
 
 function createRendererCommandMenuItem(label: string, accelerator: string, command: NativeMenuCommand): MenuItemConstructorOptions {
   return {
+    id: `renderer-command-${command}`,
     label,
     accelerator,
     // Renderer keydown handling owns focused-input guards; Electron only displays the shortcut here.
     registerAccelerator: false,
     click: () => sendMenuCommand(command)
   };
+}
+
+function activateNativeMenuCommandForSmoke(win: BrowserWindow, command: NativeMenuCommand): void {
+  const menuItem = Menu.getApplicationMenu()?.getMenuItemById(`renderer-command-${command}`);
+  if (!menuItem) {
+    throw new Error(`Could not locate native menu item for ${command}.`);
+  }
+  win.show();
+  win.focus();
+  menuItem.click({}, win, win.webContents);
 }
 
 function createNativeCommandMenu(): Menu {
@@ -1624,6 +1860,248 @@ function launchSmokeModalFocusFailures(evidence: LaunchSmokeModalFocusEvidence):
   return failures;
 }
 
+function launchSmokeFunctionalTabsFailures(evidence: LaunchSmokeFunctionalTabsEvidence): string[] {
+  const failures: string[] = [];
+  const zones: LaunchSmokeFunctionalTabZone[] = ["compose", "arrange", "mix", "deliver"];
+  const expectedTraversal = [
+    "initial:compose",
+    "native-click:arrange",
+    "ArrowRight:mix",
+    "End:deliver",
+    "Home:compose",
+    "ArrowLeft:deliver",
+    "ArrowRight:compose"
+  ];
+  const actualTraversal = evidence.traversal.map((entry) => `${entry.input}:${entry.zone}`);
+
+  if (
+    evidence.initial.activeZone !== "compose" ||
+    evidence.initial.selectedTabCount !== 1 ||
+    evidence.initial.tabStopCount !== 1 ||
+    evidence.initial.visiblePanelCount !== 1
+  ) {
+    failures.push("functional tabs should launch with only Compose selected, tabbable, and visible");
+  }
+  if (actualTraversal.join("|") !== expectedTraversal.join("|")) {
+    failures.push(`functional tabs should follow native click and Arrow/Home/End traversal, got ${actualTraversal.join(", ")}`);
+  }
+  for (const zone of zones) {
+    const state = evidence.states[zone];
+    if (
+      state.activeZone !== zone ||
+      state.tabCount !== 4 ||
+      state.tabPanelCount !== 4 ||
+      state.selectedTabCount !== 1 ||
+      state.tabStopCount !== 1 ||
+      state.visiblePanelCount !== 1 ||
+      !state.ariaConnectionsReady ||
+      state.inactiveHiddenPanelCount !== 3 ||
+      state.inactiveZeroRectPanelCount !== 3 ||
+      state.inactiveFocusableControlCount !== 0
+    ) {
+      failures.push(`functional tab ${zone} should expose one ARIA-connected active surface and fully contain three inactive panels`);
+    }
+  }
+  if (!evidence.states.mix.mixMixerVisible || !evidence.states.mix.mixMasterVisible) {
+    failures.push("Mix functional tab should visibly contain both Mixer and Master");
+  }
+  if (!evidence.states.deliver.deliverHandoffVisible) {
+    failures.push("Deliver functional tab should visibly contain Handoff Pack");
+  }
+  if (
+    !evidence.composeRoundTrip.editFingerprintPreserved ||
+    !evidence.composeRoundTrip.selectedPatternPreserved ||
+    !evidence.composeRoundTrip.disclosurePosturePreserved ||
+    !evidence.composeRoundTrip.undoRedoPosturePreserved ||
+    !evidence.composeRoundTrip.dirtyPosturePreserved ||
+    !evidence.composeRoundTrip.playbackPosturePreserved ||
+    !evidence.composeRoundTrip.keyboardCapturePosturePreserved
+  ) {
+    failures.push("Compose edit, Pattern, disclosure, history, dirty, playback, and keyboard-capture posture should survive a tab round trip");
+  }
+  const hiddenComposeGuardKeys = ["1", "2", "3", "Delete", "A"] as const;
+  if (
+    !(["arrange", "mix", "deliver"] as const).every((zone) =>
+      hiddenComposeGuardKeys.every((key) => evidence.hiddenComposeGuards[zone][key])
+    )
+  ) {
+    failures.push("each 1/2/3/Delete and keyboard-capture key outside Compose should immediately leave the hidden Pattern and Compose data unchanged");
+  }
+  if (!evidence.nativeMenuDeleteGuards.mix || !evidence.nativeMenuDeleteGuards.deliver) {
+    failures.push("native Delete Selected Event menu activation should leave hidden Compose data unchanged from Mix and Deliver");
+  }
+  if (
+    evidence.crossTabFocusTransfer.sourceZone !== "mix" ||
+    evidence.crossTabFocusTransfer.destinationZone !== "compose" ||
+    !evidence.crossTabFocusTransfer.triggerTestId.startsWith("finish-checklist-focus-") ||
+    !["workflow-target-compose", "workspace-panel-compose"].includes(
+      evidence.crossTabFocusTransfer.activeElementTestId
+    ) ||
+    !evidence.crossTabFocusTransfer.activeElementInViewport ||
+    !evidence.crossTabFocusTransfer.activeElementVisible ||
+    !evidence.crossTabFocusTransfer.activeElementWithinActivePanel ||
+    !evidence.crossTabFocusTransfer.sourcePanelHidden
+  ) {
+    failures.push("a visible Mix Focus action should activate Compose and transfer focus out of the hidden source panel");
+  }
+  if (
+    evidence.finishChecklistQuickActionReveal.sourceZone !== "deliver" ||
+    evidence.finishChecklistQuickActionReveal.destinationZone !== "mix" ||
+    evidence.finishChecklistQuickActionReveal.activeElementTestId !== "finish-checklist" ||
+    !evidence.finishChecklistQuickActionReveal.activeElementVisible ||
+    !evidence.finishChecklistQuickActionReveal.activeElementWithinActivePanel ||
+    !evidence.finishChecklistQuickActionReveal.actionVisible ||
+    !evidence.finishChecklistQuickActionReveal.modalClosed ||
+    !evidence.finishChecklistQuickActionReveal.masterReviewOpen ||
+    !evidence.finishChecklistQuickActionReveal.finishChecklistClearOfNavigator ||
+    evidence.finishChecklistQuickActionReveal.finishChecklistWidth <= 0 ||
+    evidence.finishChecklistQuickActionReveal.finishChecklistHeight <= 0 ||
+    !evidence.finishChecklistQuickActionReveal.finishChecklistInViewport ||
+    !evidence.finishChecklistQuickActionReveal.finishChecklistVisible ||
+    evidence.finishChecklistQuickActionReveal.visibleHeight <= 0 ||
+    evidence.finishChecklistQuickActionReveal.viewportHeight < 760 ||
+    !evidence.finishChecklistQuickActionReveal.projectFingerprintPreserved
+  ) {
+    failures.push("the live Finish Checklist Route Quick Action should reveal the visible Mix checklist below the sticky navigator from Deliver without editing Compose");
+  }
+  if (
+    evidence.guidanceBeatPassportQuickActionReveal.sourceZone !== "compose" ||
+    evidence.guidanceBeatPassportQuickActionReveal.destinationZone !== "compose" ||
+    evidence.guidanceBeatPassportQuickActionReveal.activeElementTestId !== "beat-passport" ||
+    !evidence.guidanceBeatPassportQuickActionReveal.activeElementVisible ||
+    evidence.guidanceBeatPassportQuickActionReveal.originalGuidanceCenterOpen ||
+    !evidence.guidanceBeatPassportQuickActionReveal.guidanceCenterInitiallyClosed ||
+    !evidence.guidanceBeatPassportQuickActionReveal.nativeShortcutOpened ||
+    !evidence.guidanceBeatPassportQuickActionReveal.actionVisible ||
+    evidence.guidanceBeatPassportQuickActionReveal.selectedActionId !== "beat-passport-route-readout-action" ||
+    !evidence.guidanceBeatPassportQuickActionReveal.modalClosed ||
+    !evidence.guidanceBeatPassportQuickActionReveal.guidanceCenterOpen ||
+    !evidence.guidanceBeatPassportQuickActionReveal.passportWithinGuidance ||
+    !evidence.guidanceBeatPassportQuickActionReveal.passportVisible ||
+    evidence.guidanceBeatPassportQuickActionReveal.passportWidth <= 0 ||
+    evidence.guidanceBeatPassportQuickActionReveal.passportHeight <= 0 ||
+    !evidence.guidanceBeatPassportQuickActionReveal.passportInViewport ||
+    !evidence.guidanceBeatPassportQuickActionReveal.passportClearOfNavigator ||
+    evidence.guidanceBeatPassportQuickActionReveal.visibleHeight <= 0 ||
+    evidence.guidanceBeatPassportQuickActionReveal.viewportHeight < 760 ||
+    !evidence.guidanceBeatPassportQuickActionReveal.statusText.startsWith("Beat Passport Route Readout Pattern ") ||
+    !evidence.guidanceBeatPassportQuickActionReveal.projectFingerprintPreserved ||
+    !evidence.guidanceBeatPassportQuickActionReveal.guidancePostureRestored
+  ) {
+    failures.push(
+      `the native Quick Actions Beat Passport route should reveal and focus the Guide target in the Compose viewport, clear the sticky navigator, preserve Compose, and restore Guide posture, got ${JSON.stringify(evidence.guidanceBeatPassportQuickActionReveal)}`
+    );
+  }
+  if (
+    evidence.firstBeatPathTransportQuickActionReveal.sourceZone !== "compose" ||
+    evidence.firstBeatPathTransportQuickActionReveal.destinationZone !== "compose" ||
+    evidence.firstBeatPathTransportQuickActionReveal.activeElementTestId !== "workflow-target-transport" ||
+    !evidence.firstBeatPathTransportQuickActionReveal.activeElementVisible ||
+    !evidence.firstBeatPathTransportQuickActionReveal.nativeShortcutOpened ||
+    !evidence.firstBeatPathTransportQuickActionReveal.actionVisible ||
+    evidence.firstBeatPathTransportQuickActionReveal.selectedActionId !== "first-beat-path-step-setup" ||
+    !evidence.firstBeatPathTransportQuickActionReveal.modalClosed ||
+    !evidence.firstBeatPathTransportQuickActionReveal.transportVisible ||
+    evidence.firstBeatPathTransportQuickActionReveal.transportWidth <= 0 ||
+    evidence.firstBeatPathTransportQuickActionReveal.transportHeight <= 0 ||
+    !evidence.firstBeatPathTransportQuickActionReveal.transportInViewport ||
+    evidence.firstBeatPathTransportQuickActionReveal.visibleHeight <= 0 ||
+    evidence.firstBeatPathTransportQuickActionReveal.viewportHeight < 760 ||
+    !evidence.firstBeatPathTransportQuickActionReveal.statusText.startsWith("First Beat Path Setup:") ||
+    !evidence.firstBeatPathTransportQuickActionReveal.projectFingerprintPreserved ||
+    !evidence.firstBeatPathTransportQuickActionReveal.guidancePostureRestored
+  ) {
+    failures.push(
+      `the native Quick Actions First Beat Path Setup route should focus the visible Transport outside functional tabs, preserve active Compose and project data, close the modal, and restore Guide posture, got ${JSON.stringify(evidence.firstBeatPathTransportQuickActionReveal)}`
+    );
+  }
+  if (
+    evidence.reviewQueueQuickActionReveal.sourceZone !== "mix" ||
+    evidence.reviewQueueQuickActionReveal.destinationZone !== "mix" ||
+    evidence.reviewQueueQuickActionReveal.activeElementTestId !== "review-queue" ||
+    !evidence.reviewQueueQuickActionReveal.activeElementVisible ||
+    !evidence.reviewQueueQuickActionReveal.activeElementWithinActivePanel ||
+    !evidence.reviewQueueQuickActionReveal.masterReviewInitiallyClosed ||
+    !evidence.reviewQueueQuickActionReveal.masterReviewQueueInitiallyClosed ||
+    !evidence.reviewQueueQuickActionReveal.nativeShortcutOpened ||
+    !evidence.reviewQueueQuickActionReveal.actionVisible ||
+    evidence.reviewQueueQuickActionReveal.selectedActionId !== "review-queue-route-readout-action" ||
+    !evidence.reviewQueueQuickActionReveal.modalClosed ||
+    !evidence.reviewQueueQuickActionReveal.masterReviewOpen ||
+    !evidence.reviewQueueQuickActionReveal.masterReviewQueueOpen ||
+    !evidence.reviewQueueQuickActionReveal.reviewQueueVisible ||
+    evidence.reviewQueueQuickActionReveal.reviewQueueWidth <= 0 ||
+    evidence.reviewQueueQuickActionReveal.reviewQueueHeight <= 0 ||
+    !evidence.reviewQueueQuickActionReveal.reviewQueueInViewport ||
+    !evidence.reviewQueueQuickActionReveal.reviewQueueClearOfNavigator ||
+    evidence.reviewQueueQuickActionReveal.visibleHeight <= 0 ||
+    evidence.reviewQueueQuickActionReveal.viewportHeight < 760 ||
+    !evidence.reviewQueueQuickActionReveal.statusText.startsWith("Review Queue Route Readout Pattern ") ||
+    !evidence.reviewQueueQuickActionReveal.projectFingerprintPreserved ||
+    !evidence.reviewQueueQuickActionReveal.disclosurePostureRestored
+  ) {
+    failures.push(
+      `the native Quick Actions Review Queue route should synchronously reveal both closed disclosures in the same Mix viewport, clear the sticky navigator, preserve Compose, and restore disclosure posture, got ${JSON.stringify(evidence.reviewQueueQuickActionReveal)}`
+    );
+  }
+  if (
+    evidence.minimumWindow.viewportWidth > 1180 ||
+    evidence.minimumWindow.viewportWidth < 1000 ||
+    evidence.minimumWindow.maximumDocumentHorizontalOverflow !== 0 ||
+    evidence.minimumWindow.maximumTabListHorizontalOverflow !== 0 ||
+    evidence.minimumWindow.maximumActivePanelHorizontalOverflow !== 0
+  ) {
+    failures.push(
+      `functional tabs should remain horizontally contained at the 1180 minimum window, got viewport ${evidence.minimumWindow.viewportWidth} and overflow ${evidence.minimumWindow.maximumDocumentHorizontalOverflow}/${evidence.minimumWindow.maximumTabListHorizontalOverflow}/${evidence.minimumWindow.maximumActivePanelHorizontalOverflow}`
+    );
+  }
+  for (const zone of ["arrange", "mix", "deliver"] as const) {
+    const sticky = evidence.stickyNavigatorAfterDeepScroll[zone];
+    if (
+      sticky.activeZone !== zone ||
+      sticky.viewportWidth < 1000 ||
+      sticky.viewportWidth > 1180 ||
+      !sticky.documentScrollable ||
+      sticky.maximumScrollY < 240 ||
+      sticky.scrollY < 240 ||
+      !sticky.deepScrollReached ||
+      sticky.navigatorPosition !== "sticky" ||
+      sticky.configuredTop !== 8 ||
+      !sticky.stickyTopAligned ||
+      !sticky.navigatorFullyVisible ||
+      !sticky.tabListFullyVisible ||
+      !sticky.activeTabFullyVisible
+    ) {
+      failures.push(
+        `functional tab ${zone} should keep the sticky navigator and active tab fully visible after a deep 1180px-window scroll, got ${JSON.stringify(sticky)}`
+      );
+    }
+  }
+  const captureDigests = new Set<string>();
+  for (const zone of zones) {
+    const capture = evidence.captures[zone];
+    if (
+      capture.pngBytes < 20000 ||
+      capture.bitmapBytes < capture.width * capture.height * 4 ||
+      capture.sampledPixels < 1000 ||
+      capture.nonBackgroundSamples < 100 ||
+      !/^[a-f0-9]{64}$/u.test(capture.pixelDigest) ||
+      !/^[a-f0-9]{64}$/u.test(capture.pngDigest) ||
+      capture.artifact !== `build/desktop/functional-tabs-launch-smoke/${zone}.png`
+    ) {
+      failures.push(`functional tab ${zone} should return a substantial persisted PNG and non-empty pixel digest`);
+    }
+    captureDigests.add(capture.pixelDigest);
+  }
+  if (captureDigests.size !== zones.length) {
+    failures.push("each functional tab screenshot should have a distinct pixel digest");
+  }
+  if (!evidence.restoredCompose) {
+    failures.push("functional tab smoke should restore Compose and its original local interaction posture");
+  }
+  return failures;
+}
+
 function launchSmokeVisualFailures(evidence: LaunchSmokeVisualEvidence): string[] {
   const failures: string[] = [];
   const opaqueRatio = evidence.sampledPixels > 0 ? evidence.opaqueSamples / evidence.sampledPixels : 0;
@@ -1733,6 +2211,1282 @@ function collectLaunchSmokeVisualEvidenceWithTimeout(win: BrowserWindow): Promis
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("Timed out collecting live screenshot visual evidence.")), 30000);
     void collectLaunchSmokeVisualEvidence(win)
+      .then((evidence) => {
+        clearTimeout(timeout);
+        resolve(evidence);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+}
+
+function publicFunctionalTabState(
+  snapshot: LaunchSmokeFunctionalTabInternalSnapshot
+): LaunchSmokeFunctionalTabStateEvidence {
+  return {
+    activePanelHorizontalOverflow: snapshot.activePanelHorizontalOverflow,
+    activeZone: snapshot.activeZone,
+    ariaConnectionsReady: snapshot.ariaConnectionsReady,
+    deliverHandoffVisible: snapshot.deliverHandoffVisible,
+    documentHorizontalOverflow: snapshot.documentHorizontalOverflow,
+    inactiveFocusableControlCount: snapshot.inactiveFocusableControlCount,
+    inactiveHiddenPanelCount: snapshot.inactiveHiddenPanelCount,
+    inactiveZeroRectPanelCount: snapshot.inactiveZeroRectPanelCount,
+    mixMasterVisible: snapshot.mixMasterVisible,
+    mixMixerVisible: snapshot.mixMixerVisible,
+    selectedTabCount: snapshot.selectedTabCount,
+    tabCount: snapshot.tabCount,
+    tabListHorizontalOverflow: snapshot.tabListHorizontalOverflow,
+    tabPanelCount: snapshot.tabPanelCount,
+    tabStopCount: snapshot.tabStopCount,
+    visiblePanelCount: snapshot.visiblePanelCount
+  };
+}
+
+async function readLaunchSmokeFunctionalTabState(win: BrowserWindow): Promise<LaunchSmokeFunctionalTabInternalSnapshot> {
+  return (await win.webContents.executeJavaScript(`
+    (() => {
+      const tabList = document.querySelector('[role="tablist"][aria-label="Workstation function tabs"]');
+      const tabs = tabList ? Array.from(tabList.querySelectorAll('[role="tab"]')) : [];
+      const panels = ["compose", "arrange", "mix", "deliver"]
+        .map((zone) => document.getElementById("workspace-panel-" + zone))
+        .filter(Boolean);
+      const selectedTabs = tabs.filter((tab) => tab.getAttribute("aria-selected") === "true");
+      const tabStops = tabs.filter((tab) => tab.tabIndex === 0);
+      const activeTab = selectedTabs[0] ?? null;
+      const activeZone = activeTab?.id?.replace("workspace-tab-", "") ?? "";
+      const activePanel = activeTab ? document.getElementById(activeTab.getAttribute("aria-controls") ?? "") : null;
+      const rendered = (element) => {
+        if (!(element instanceof HTMLElement)) return false;
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      };
+      const visiblePanels = panels.filter((panel) => !panel.hidden && rendered(panel));
+      const inactivePanels = panels.filter((panel) => panel !== activePanel);
+      const focusableSelector = 'a[href], button, input, select, textarea, [tabindex]';
+      const inactiveFocusableControlCount = inactivePanels.reduce(
+        (count, panel) =>
+          count +
+          Array.from(panel.querySelectorAll(focusableSelector)).filter(
+            (control) => !control.disabled && control.tabIndex >= 0 && rendered(control)
+          ).length,
+        0
+      );
+      const ariaConnectionsReady =
+        tabs.length === 4 &&
+        panels.length === 4 &&
+        tabs.every((tab) => {
+          const controlled = document.getElementById(tab.getAttribute("aria-controls") ?? "");
+          return Boolean(
+            controlled &&
+            controlled.getAttribute("role") === "tabpanel" &&
+            controlled.getAttribute("aria-labelledby") === tab.id
+          );
+        });
+      const activePressedIds = (selector) =>
+        Array.from(document.querySelectorAll(selector))
+          .filter((control) => control.getAttribute("aria-pressed") === "true")
+          .map((control) => control.getAttribute("data-testid") ?? "")
+          .sort();
+      const selectedPattern =
+        document.querySelector('[data-testid^="pattern-tab-"][aria-selected="true"]')?.getAttribute("data-testid")?.replace("pattern-tab-", "") ?? "";
+      const composeDataFingerprint = JSON.stringify({
+        selectedPattern,
+        title: document.querySelector('[data-testid="project-title-input"]')?.value ?? "",
+        bpm: document.querySelector('[data-testid="project-bpm-input"]')?.value ?? "",
+        key: document.querySelector('[data-testid="project-key-select"]')?.value ?? "",
+        style: document.querySelector('[data-testid="style-select"]')?.value ?? "",
+        drums: activePressedIds('button[data-testid^="drum-step-"]'),
+        bass: activePressedIds('button[data-testid^="note-step-bass-"]'),
+        melody: activePressedIds('button[data-testid^="note-step-melody-"]'),
+        chords: Array.from(document.querySelectorAll('[data-testid^="chord-slot-"]')).map((card) => ({
+          open: card.getAttribute("data-editor-open") ?? "",
+          text: card.textContent?.trim().replace(/\\s+/g, " ") ?? ""
+        }))
+      });
+      const disclosurePosture = JSON.stringify(
+        ["pattern-lab", "capture-ideas", "harmony-moves", "sound-design-tools"].map((testId) => ({
+          open: document.querySelector('[data-testid="' + testId + '"]')?.open === true,
+          testId
+        }))
+      );
+      const undoRedoPosture = JSON.stringify({
+        redoDisabled: document.querySelector('[data-testid="redo-button"]')?.disabled === true,
+        redoTitle: document.querySelector('[data-testid="redo-button"]')?.getAttribute("title") ?? "",
+        undoDisabled: document.querySelector('[data-testid="undo-button"]')?.disabled === true,
+        undoTitle: document.querySelector('[data-testid="undo-button"]')?.getAttribute("title") ?? ""
+      });
+      const dirtyPosture = JSON.stringify({
+        detail: document.querySelector('[data-testid="project-safety-detail"]')?.textContent?.trim() ?? "",
+        label: document.querySelector('[data-testid="project-safety-label"]')?.textContent?.trim() ?? "",
+        localDraft: document.querySelector('[data-testid="local-draft-status"]')?.textContent?.trim() ?? "",
+        status: document.querySelector('[data-testid="project-safety-status"]')?.textContent?.trim() ?? ""
+      });
+      const keyboardCapturePosture = JSON.stringify({
+        pressed: document.querySelector('[data-testid="keyboard-capture-toggle"]')?.getAttribute("aria-pressed") ?? "missing",
+        status: document.querySelector('[data-testid="keyboard-capture-posture-status"]')?.textContent?.trim() ?? ""
+      });
+      const playbackPosture = JSON.stringify({
+        pressed: document.querySelector('[data-testid="transport-play"]')?.getAttribute("aria-pressed") ?? "missing",
+        title: document.querySelector('[data-testid="transport-play"]')?.getAttribute("title") ?? ""
+      });
+      const mixer = document.querySelector('[data-testid="workflow-target-mix"]');
+      const master = document.querySelector('[data-testid="workflow-target-master"]');
+      const handoff = document.querySelector('[data-testid="handoff-pack"]');
+      return {
+        activePanelHorizontalOverflow: activePanel
+          ? Math.max(0, activePanel.scrollWidth - activePanel.clientWidth)
+          : -1,
+        activeZone,
+        ariaConnectionsReady,
+        composeDataFingerprint,
+        deliverHandoffVisible: activeZone === "deliver" && rendered(handoff),
+        dirtyPosture,
+        disclosurePosture,
+        documentHorizontalOverflow: Math.max(
+          0,
+          document.documentElement.scrollWidth - document.documentElement.clientWidth
+        ),
+        inactiveFocusableControlCount,
+        inactiveHiddenPanelCount: inactivePanels.filter((panel) => panel.hidden).length,
+        inactiveZeroRectPanelCount: inactivePanels.filter((panel) => {
+          const rect = panel.getBoundingClientRect();
+          return rect.width === 0 && rect.height === 0 && panel.getClientRects().length === 0;
+        }).length,
+        keyboardCapturePosture,
+        mixMasterVisible: activeZone === "mix" && rendered(master),
+        mixMixerVisible: activeZone === "mix" && rendered(mixer),
+        playbackPosture,
+        selectedPattern,
+        selectedTabCount: selectedTabs.length,
+        tabCount: tabs.length,
+        tabListHorizontalOverflow: tabList ? Math.max(0, tabList.scrollWidth - tabList.clientWidth) : -1,
+        tabPanelCount: panels.length,
+        tabStopCount: tabStops.length,
+        undoRedoPosture,
+        visiblePanelCount: visiblePanels.length
+      };
+    })();
+  `)) as LaunchSmokeFunctionalTabInternalSnapshot;
+}
+
+async function sendLaunchSmokeFunctionalTabNativeKey(
+  win: BrowserWindow,
+  keyCode: string,
+  modifiers: Electron.InputEvent["modifiers"] = []
+): Promise<void> {
+  win.webContents.focus();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  win.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
+  win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+}
+
+async function clickLaunchSmokeFunctionalTabNativeTarget(win: BrowserWindow, testId: string): Promise<void> {
+  const point = (await win.webContents.executeJavaScript(`
+    (() => {
+      const testId = ${JSON.stringify(testId)};
+      const target = document.querySelector('[data-testid="' + testId + '"]');
+      if (!(target instanceof HTMLElement)) return null;
+      target.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
+      const rect = target.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return null;
+      return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
+    })();
+  `)) as { x: number; y: number } | null;
+  if (!point) {
+    throw new Error(`Could not locate native functional-tab target ${testId}.`);
+  }
+  win.webContents.focus();
+  win.webContents.sendInputEvent({ type: "mouseMove", x: point.x, y: point.y });
+  win.webContents.sendInputEvent({ type: "mouseDown", x: point.x, y: point.y, button: "left", clickCount: 1 });
+  win.webContents.sendInputEvent({ type: "mouseUp", x: point.x, y: point.y, button: "left", clickCount: 1 });
+  await new Promise((resolve) => setTimeout(resolve, 140));
+}
+
+async function collectLaunchSmokeStickyNavigatorAfterDeepScroll(
+  win: BrowserWindow,
+  zone: Exclude<LaunchSmokeFunctionalTabZone, "compose">
+): Promise<LaunchSmokeStickyNavigatorEvidence> {
+  await win.webContents.executeJavaScript(`
+    (() => {
+      const scrollingElement = document.scrollingElement ?? document.documentElement;
+      const maximumScrollY = Math.max(0, scrollingElement.scrollHeight - window.innerHeight);
+      window.scrollTo({ behavior: "auto", left: 0, top: maximumScrollY });
+    })();
+  `);
+  await new Promise((resolve) => setTimeout(resolve, 180));
+  return (await win.webContents.executeJavaScript(`
+    (() => {
+      const expectedZone = ${JSON.stringify(zone)};
+      const navigator = document.querySelector('[data-testid="workflow-navigator"]');
+      const tabList = navigator?.querySelector('[role="tablist"]') ?? null;
+      const activeTab = navigator?.querySelector('[role="tab"][aria-selected="true"]') ?? null;
+      const scrollingElement = document.scrollingElement ?? document.documentElement;
+      const maximumScrollY = Math.max(0, scrollingElement.scrollHeight - window.innerHeight);
+      const navigatorRect = navigator?.getBoundingClientRect() ?? null;
+      const tabListRect = tabList?.getBoundingClientRect() ?? null;
+      const activeTabRect = activeTab?.getBoundingClientRect() ?? null;
+      const navigatorStyle = navigator ? getComputedStyle(navigator) : null;
+      const configuredTop = Number.parseFloat(navigatorStyle?.top ?? "NaN");
+      const fullyVisible = (rect) => Boolean(
+        rect &&
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.top >= 0 &&
+        rect.left >= 0 &&
+        rect.bottom <= window.innerHeight + 1 &&
+        rect.right <= window.innerWidth + 1
+      );
+      return {
+        activeTabFullyVisible: fullyVisible(activeTabRect),
+        activeZone: activeTab?.id?.replace("workspace-tab-", "") ?? "",
+        configuredTop,
+        deepScrollReached: maximumScrollY >= 240 && window.scrollY >= maximumScrollY - 1,
+        documentScrollable: maximumScrollY > 0,
+        maximumScrollY,
+        navigatorFullyVisible: fullyVisible(navigatorRect),
+        navigatorPosition: navigatorStyle?.position ?? "",
+        navigatorTop: navigatorRect?.top ?? -1,
+        scrollY: window.scrollY,
+        stickyTopAligned: Boolean(
+          navigatorRect &&
+          Number.isFinite(configuredTop) &&
+          Math.abs(navigatorRect.top - configuredTop) <= 1.5
+        ),
+        tabListFullyVisible: fullyVisible(tabListRect),
+        viewportHeight: window.innerHeight,
+        viewportWidth: window.innerWidth
+      };
+    })();
+  `)) as LaunchSmokeStickyNavigatorEvidence;
+}
+
+async function captureLaunchSmokeFunctionalTab(
+  win: BrowserWindow,
+  zone: LaunchSmokeFunctionalTabZone,
+  evidenceDirectory: string
+): Promise<LaunchSmokeFunctionalTabCaptureEvidence> {
+  await waitForLaunchSmokePaint();
+  const screenshot = await win.webContents.capturePage();
+  const png = screenshot.toPNG();
+  const bitmap = screenshot.toBitmap();
+  const { height, width } = screenshot.getSize();
+  const totalPixels = Math.floor(bitmap.byteLength / 4);
+  const stride = Math.max(1, Math.floor(totalPixels / Math.max(1, Math.min(12000, totalPixels))));
+  const base0 = bitmap[0] ?? 0;
+  const base1 = bitmap[1] ?? 0;
+  const base2 = bitmap[2] ?? 0;
+  let nonBackgroundSamples = 0;
+  let sampledPixels = 0;
+  for (let pixel = 0; pixel < totalPixels; pixel += stride) {
+    const offset = pixel * 4;
+    const delta =
+      Math.abs((bitmap[offset] ?? 0) - base0) +
+      Math.abs((bitmap[offset + 1] ?? 0) - base1) +
+      Math.abs((bitmap[offset + 2] ?? 0) - base2);
+    sampledPixels += 1;
+    if (delta > 24) {
+      nonBackgroundSamples += 1;
+    }
+  }
+  const artifact = `build/desktop/functional-tabs-launch-smoke/${zone}.png`;
+  await writeFile(path.join(evidenceDirectory, `${zone}.png`), png, { mode: 0o600 });
+  return {
+    artifact,
+    bitmapBytes: bitmap.byteLength,
+    height,
+    nonBackgroundSamples,
+    pixelDigest: createHash("sha256").update(bitmap).digest("hex"),
+    pngBytes: png.byteLength,
+    pngDigest: createHash("sha256").update(png).digest("hex"),
+    sampledPixels,
+    width
+  };
+}
+
+async function restoreLaunchSmokeFunctionalTabPosture(
+  win: BrowserWindow,
+  initial: LaunchSmokeFunctionalTabInternalSnapshot
+): Promise<void> {
+  await win.webContents.executeJavaScript(`
+    (() => {
+      document.querySelector('[data-testid="workflow-jump-compose"]')?.click();
+      const selectedPattern = ${JSON.stringify(initial.selectedPattern)};
+      document.querySelector('[data-testid="pattern-tab-' + selectedPattern + '"]')?.click();
+      const keyboardCapture = JSON.parse(${JSON.stringify(initial.keyboardCapturePosture)});
+      const captureToggle = document.querySelector('[data-testid="keyboard-capture-toggle"]');
+      if (captureToggle && captureToggle.getAttribute("aria-pressed") !== keyboardCapture.pressed) {
+        captureToggle.click();
+      }
+      const disclosurePosture = JSON.parse(${JSON.stringify(initial.disclosurePosture)});
+      for (const expected of disclosurePosture) {
+        const details = document.querySelector('[data-testid="' + expected.testId + '"]');
+        if (details instanceof HTMLDetailsElement && details.open !== expected.open) {
+          details.querySelector(':scope > summary')?.click();
+        }
+      }
+      document.querySelector('[data-testid="workflow-jump-compose"]')?.focus();
+    })();
+  `);
+  await new Promise((resolve) => setTimeout(resolve, 140));
+}
+
+async function collectLaunchSmokeFunctionalTabsEvidence(
+  win: BrowserWindow,
+  onStep: (step: string) => void = () => {}
+): Promise<LaunchSmokeFunctionalTabsEvidence> {
+  const originalSize = win.getSize();
+  const evidenceDirectory = functionalTabsLaunchSmokeEvidenceDirectory();
+  let initial: LaunchSmokeFunctionalTabInternalSnapshot | null = null;
+  let cleanupComplete = false;
+  win.setSize(1180, 800);
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  try {
+    onStep("reading initial Compose tab contract");
+    initial = await readLaunchSmokeFunctionalTabState(win);
+    if (initial.activeZone !== "compose") {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-compose");
+    }
+    const originalGuidanceCenterOpen = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="guidance-center"]')?.open === true`
+    )) as boolean;
+    await mkdir(evidenceDirectory, { recursive: true, mode: 0o700 });
+
+    onStep("preparing Compose Pattern and disclosure posture");
+    const preservedPattern = initial.selectedPattern === "B" ? "C" : "B";
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, `pattern-tab-${preservedPattern}`);
+    const patternLabOpen = await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="pattern-lab"]')?.open === true`
+    );
+    if (!patternLabOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "pattern-lab-toggle");
+    }
+    const captureIdeasOpen = await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="capture-ideas"]')?.open === true`
+    );
+    if (!captureIdeasOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "capture-ideas-toggle");
+    }
+    const keyboardCaptureEnabled = await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="keyboard-capture-toggle"]')?.getAttribute('aria-pressed') === 'true'`
+    );
+    if (!keyboardCaptureEnabled) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "keyboard-capture-toggle");
+    }
+    onStep("selecting an existing Compose drum without mutating it");
+    const selectedDrumPreparation = (await win.webContents.executeJavaScript(`
+      (() => {
+        const target = Array.from(document.querySelectorAll('button[data-testid^="drum-step-"]'))
+          .find((button) => button.getAttribute("aria-pressed") === "true");
+        if (!(target instanceof HTMLButtonElement)) return null;
+        const match = target.getAttribute("data-testid")?.match(/^drum-step-(kick|snare|hat|perc)-(\\d+)$/);
+        if (!match) return null;
+        const targetStep = Number(match[2]);
+        const sourceStep = targetStep === 0 ? 1 : targetStep - 1;
+        const source = document.querySelector('[data-testid="drum-step-' + match[1] + '-' + sourceStep + '"]');
+        if (!(source instanceof HTMLButtonElement)) return null;
+        source.focus({ preventScroll: true });
+        return {
+          keyCode: targetStep === 0 ? "Left" : "Right",
+          targetId: target.getAttribute("data-testid") ?? ""
+        };
+      })();
+    `)) as { keyCode: string; targetId: string } | null;
+    if (!selectedDrumPreparation) {
+      throw new Error("Could not prepare an existing Compose drum selection for native-menu guarding.");
+    }
+    await sendLaunchSmokeFunctionalTabNativeKey(win, selectedDrumPreparation.keyCode);
+    const selectedDrumReady = (await win.webContents.executeJavaScript(`
+      document.activeElement?.getAttribute("data-testid") === ${JSON.stringify(selectedDrumPreparation.targetId)}
+    `)) as boolean;
+    if (!selectedDrumReady) {
+      throw new Error(`Could not select ${selectedDrumPreparation.targetId} without mutating it.`);
+    }
+    const preparedCompose = await readLaunchSmokeFunctionalTabState(win);
+    const states = {} as Record<LaunchSmokeFunctionalTabZone, LaunchSmokeFunctionalTabStateEvidence>;
+    const captures = {} as Record<LaunchSmokeFunctionalTabZone, LaunchSmokeFunctionalTabCaptureEvidence>;
+    const hiddenComposeGuards = {} as LaunchSmokeFunctionalTabsEvidence["hiddenComposeGuards"];
+    const nativeMenuDeleteGuards = {} as Record<"mix" | "deliver", boolean>;
+    const stickyNavigatorAfterDeepScroll = {} as Record<
+      Exclude<LaunchSmokeFunctionalTabZone, "compose">,
+      LaunchSmokeStickyNavigatorEvidence
+    >;
+    const traversal: Array<{ input: string; zone: string }> = [{ input: "initial", zone: initial.activeZone }];
+    states.compose = publicFunctionalTabState(preparedCompose);
+    captures.compose = await captureLaunchSmokeFunctionalTab(win, "compose", evidenceDirectory);
+
+    const sendHiddenComposeGuardKeys = async (zone: Exclude<LaunchSmokeFunctionalTabZone, "compose">): Promise<void> => {
+      const keyResults = {} as LaunchSmokeFunctionalTabsEvidence["hiddenComposeGuards"][typeof zone];
+      for (const keyCode of ["1", "2", "3", "Delete", "A"] as const) {
+        await sendLaunchSmokeFunctionalTabNativeKey(win, keyCode);
+        const afterKey = await readLaunchSmokeFunctionalTabState(win);
+        keyResults[keyCode] =
+          afterKey.composeDataFingerprint === preparedCompose.composeDataFingerprint &&
+          afterKey.selectedPattern === preparedCompose.selectedPattern;
+      }
+      const afterKeys = await readLaunchSmokeFunctionalTabState(win);
+      hiddenComposeGuards[zone] = keyResults;
+      states[zone] = publicFunctionalTabState(afterKeys);
+    };
+
+    onStep("native clicking Arrange and guarding hidden Compose shortcuts");
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-arrange");
+    let current = await readLaunchSmokeFunctionalTabState(win);
+    traversal.push({ input: "native-click", zone: current.activeZone });
+    await sendHiddenComposeGuardKeys("arrange");
+    onStep("deep scrolling Arrange while keeping the functional tablist visible");
+    stickyNavigatorAfterDeepScroll.arrange = await collectLaunchSmokeStickyNavigatorAfterDeepScroll(win, "arrange");
+    captures.arrange = await captureLaunchSmokeFunctionalTab(win, "arrange", evidenceDirectory);
+
+    onStep("using ArrowRight for Mix and guarding hidden Compose shortcuts");
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Right");
+    current = await readLaunchSmokeFunctionalTabState(win);
+    traversal.push({ input: "ArrowRight", zone: current.activeZone });
+    await sendHiddenComposeGuardKeys("mix");
+    onStep("activating native Delete Selected Event menu command from Mix");
+    activateNativeMenuCommandForSmoke(win, "delete-selected-event");
+    await new Promise((resolve) => setTimeout(resolve, 140));
+    nativeMenuDeleteGuards.mix =
+      (await readLaunchSmokeFunctionalTabState(win)).composeDataFingerprint === preparedCompose.composeDataFingerprint;
+    onStep("deep scrolling Mix while keeping the functional tablist visible");
+    stickyNavigatorAfterDeepScroll.mix = await collectLaunchSmokeStickyNavigatorAfterDeepScroll(win, "mix");
+    captures.mix = await captureLaunchSmokeFunctionalTab(win, "mix", evidenceDirectory);
+
+    onStep("using End for Deliver and guarding hidden Compose shortcuts");
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "End");
+    current = await readLaunchSmokeFunctionalTabState(win);
+    traversal.push({ input: "End", zone: current.activeZone });
+    await sendHiddenComposeGuardKeys("deliver");
+    onStep("activating native Delete Selected Event menu command from Deliver");
+    activateNativeMenuCommandForSmoke(win, "delete-selected-event");
+    await new Promise((resolve) => setTimeout(resolve, 140));
+    nativeMenuDeleteGuards.deliver =
+      (await readLaunchSmokeFunctionalTabState(win)).composeDataFingerprint === preparedCompose.composeDataFingerprint;
+    onStep("deep scrolling Deliver while keeping the functional tablist visible");
+    stickyNavigatorAfterDeepScroll.deliver = await collectLaunchSmokeStickyNavigatorAfterDeepScroll(win, "deliver");
+    captures.deliver = await captureLaunchSmokeFunctionalTab(win, "deliver", evidenceDirectory);
+
+    onStep("using Home and wrapped arrows to return to Compose");
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Home");
+    current = await readLaunchSmokeFunctionalTabState(win);
+    traversal.push({ input: "Home", zone: current.activeZone });
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Left");
+    current = await readLaunchSmokeFunctionalTabState(win);
+    traversal.push({ input: "ArrowLeft", zone: current.activeZone });
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Right");
+    const returnedCompose = await readLaunchSmokeFunctionalTabState(win);
+    traversal.push({ input: "ArrowRight", zone: returnedCompose.activeZone });
+
+    onStep("transferring visible focus from a Mix Finish Checklist action to Compose");
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-mix");
+    const masterReviewWasOpen = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="master-review-tools"]')?.open === true`
+    )) as boolean;
+    const masterReviewQueueWasOpen = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="master-review-queue-tools"]')?.open === true`
+    )) as boolean;
+    if (!masterReviewWasOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "master-review-toggle");
+    }
+    const focusTriggerTestId = "finish-checklist-focus-compose";
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, focusTriggerTestId);
+    const crossTabFocusTransfer = (await win.webContents.executeJavaScript(`
+      (() => {
+        const activeTab = document.querySelector('[role="tab"][aria-selected="true"]');
+        const activePanel = activeTab
+          ? document.getElementById(activeTab.getAttribute("aria-controls") ?? "")
+          : null;
+        const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const activeRect = activeElement?.getBoundingClientRect();
+        const activeStyle = activeElement ? getComputedStyle(activeElement) : null;
+        return {
+          activeElementInViewport: Boolean(
+            activeRect &&
+              activeRect.left < window.innerWidth &&
+              activeRect.right > 0 &&
+              activeRect.top < window.innerHeight &&
+              activeRect.bottom > 0
+          ),
+          activeElementTestId: activeElement?.getAttribute("data-testid") ?? activeElement?.id ?? "",
+          activeElementVisible: Boolean(
+            activeRect &&
+              activeRect.width > 0 &&
+              activeRect.height > 0 &&
+              activeStyle?.display !== "none" &&
+              activeStyle?.visibility !== "hidden"
+          ),
+          activeElementWithinActivePanel: Boolean(activeElement && activePanel?.contains(activeElement)),
+          destinationZone: activeTab?.id?.replace("workspace-tab-", "") ?? "",
+          sourcePanelHidden: document.getElementById("workspace-panel-mix")?.hidden === true,
+          sourceZone: "mix",
+          triggerTestId: ${JSON.stringify(focusTriggerTestId)}
+        };
+      })();
+    `)) as LaunchSmokeFunctionalTabsEvidence["crossTabFocusTransfer"];
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-mix");
+    if (!masterReviewWasOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "master-review-toggle");
+    }
+
+    onStep("running Finish Checklist Route Quick Action from Deliver");
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-deliver");
+    activateNativeMenuCommandForSmoke(win, "quick-actions");
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    await win.webContents.executeJavaScript(`
+      (() => {
+        const input = document.querySelector('[data-testid="quick-actions-search"]');
+        const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+        valueSetter?.call(input, "review finish checklist route");
+        input?.dispatchEvent(new Event("input", { bubbles: true }));
+      })();
+    `);
+    let finishChecklistActionVisible = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      finishChecklistActionVisible = (await win.webContents.executeJavaScript(`
+        (() => {
+          const target = document.querySelector('[data-testid="quick-action-finish-checklist-route-readout-action"]');
+          return Boolean(target);
+        })();
+      `)) as boolean;
+      if (finishChecklistActionVisible) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!finishChecklistActionVisible) {
+      throw new Error("Finish Checklist Route Quick Action did not become visible from Deliver.");
+    }
+    const finishChecklistSearchFocused = (await win.webContents.executeJavaScript(`
+      (() => {
+        const input = document.querySelector('[data-testid="quick-actions-search"]');
+        input?.focus();
+        return document.activeElement === input;
+      })();
+    `)) as boolean;
+    if (!finishChecklistSearchFocused) {
+      throw new Error("Could not focus the live Quick Actions search before native Enter.");
+    }
+    const finishChecklistTargetIndex = (await win.webContents.executeJavaScript(`
+      (() => {
+        const ids = Array.from(document.querySelectorAll('.quick-action-row'))
+          .filter((row) => {
+            const button = row.querySelector('.quick-action-run');
+            return button instanceof HTMLButtonElement && !button.disabled;
+          })
+          .map((row) => row.id.replace('quick-action-option-', ''));
+        return ids.indexOf('finish-checklist-route-readout-action');
+      })();
+    `)) as number;
+    if (finishChecklistTargetIndex < 0) {
+      throw new Error("Finish Checklist Route Quick Action was not in the runnable keyboard result list.");
+    }
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Home");
+    for (let index = 0; index < finishChecklistTargetIndex; index += 1) {
+      await sendLaunchSmokeFunctionalTabNativeKey(win, "Down");
+    }
+    const finishChecklistActionSelected = (await win.webContents.executeJavaScript(`
+      document.querySelector('[data-testid="quick-actions-keyboard-selection"]')?.getAttribute("data-keyboard-action") ===
+        "finish-checklist-route-readout-action"
+    `)) as boolean;
+    if (!finishChecklistActionSelected) {
+      throw new Error("Native Home/ArrowDown did not select the Finish Checklist Route Quick Action.");
+    }
+    win.webContents.sendInputEvent({ type: "keyDown", keyCode: "Enter" });
+    win.webContents.sendInputEvent({ type: "keyUp", keyCode: "Enter" });
+    await new Promise((resolve) => setTimeout(resolve, 140));
+    let finishChecklistQuickActionSettled = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      finishChecklistQuickActionSettled = (await win.webContents.executeJavaScript(`
+        (() => {
+          const activeTab = document.querySelector('[role="tab"][aria-selected="true"]');
+          return (
+            document.querySelector('[data-testid="quick-actions"]') === null &&
+            activeTab?.id === "workspace-tab-mix" &&
+            document.querySelector('[data-testid="master-review-tools"]')?.open === true
+          );
+        })();
+      `)) as boolean;
+      if (finishChecklistQuickActionSettled) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!finishChecklistQuickActionSettled) {
+      throw new Error("Native Enter did not settle the Finish Checklist Route Quick Action on the Mix checklist.");
+    }
+    const finishChecklistQuickActionReveal = (await win.webContents.executeJavaScript(`
+      (() => {
+        const activeTab = document.querySelector('[role="tab"][aria-selected="true"]');
+        const activePanel = activeTab ? document.getElementById(activeTab.getAttribute('aria-controls') ?? '') : null;
+        const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const activeElementRect = activeElement?.getBoundingClientRect() ?? null;
+        const activeElementStyle = activeElement ? getComputedStyle(activeElement) : null;
+        const navigator = document.querySelector('[data-testid="workflow-navigator"]');
+        const checklist = document.querySelector('[data-testid="finish-checklist"]');
+        const navigatorRect = navigator?.getBoundingClientRect() ?? null;
+        const rect = checklist?.getBoundingClientRect();
+        const style = checklist instanceof HTMLElement ? getComputedStyle(checklist) : null;
+        const visibleHeight = rect
+          ? Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0))
+          : 0;
+        return {
+          activeElementTestId: activeElement?.getAttribute('data-testid') ?? activeElement?.id ?? '',
+          activeElementVisible: Boolean(
+            activeElementRect &&
+              activeElementRect.width > 0 &&
+              activeElementRect.height > 0 &&
+              activeElementStyle?.display !== 'none' &&
+              activeElementStyle?.visibility !== 'hidden'
+          ),
+          activeElementWithinActivePanel: Boolean(activeElement && activePanel?.contains(activeElement)),
+          actionVisible: ${JSON.stringify(true)},
+          destinationZone: activeTab?.id?.replace("workspace-tab-", "") ?? "",
+          finishChecklistClearOfNavigator: Boolean(rect && navigatorRect && rect.top >= navigatorRect.bottom - 1),
+          finishChecklistHeight: rect?.height ?? 0,
+          finishChecklistInViewport: Boolean(rect && rect.top >= 0 && rect.top < window.innerHeight && rect.bottom > 0),
+          finishChecklistVisible: Boolean(
+            rect &&
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style?.display !== "none" &&
+              style?.visibility !== "hidden"
+          ),
+          finishChecklistWidth: rect?.width ?? 0,
+          masterReviewOpen: document.querySelector('[data-testid="master-review-tools"]')?.open === true,
+          modalClosed: document.querySelector('[data-testid="quick-actions"]') === null,
+          sourceZone: "deliver",
+          viewportHeight: window.innerHeight,
+          visibleHeight
+        };
+      })();
+    `)) as Omit<LaunchSmokeFunctionalTabsEvidence["finishChecklistQuickActionReveal"], "projectFingerprintPreserved">;
+    const afterFinishChecklistQuickAction = await readLaunchSmokeFunctionalTabState(win);
+    const finishChecklistQuickActionEvidence: LaunchSmokeFunctionalTabsEvidence["finishChecklistQuickActionReveal"] = {
+      ...finishChecklistQuickActionReveal,
+      projectFingerprintPreserved:
+        afterFinishChecklistQuickAction.composeDataFingerprint === preparedCompose.composeDataFingerprint
+    };
+
+    onStep("closing both Mix Review Queue disclosures before native Quick Actions routing");
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-mix");
+    const reviewQueueWasOpenBeforeClose = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="master-review-queue-tools"]')?.open === true`
+    )) as boolean;
+    if (reviewQueueWasOpenBeforeClose) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "master-review-queue-toggle");
+    }
+    const reviewWasOpenBeforeClose = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="master-review-tools"]')?.open === true`
+    )) as boolean;
+    if (reviewWasOpenBeforeClose) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "master-review-toggle");
+    }
+    const reviewQueueClosedPosture = (await win.webContents.executeJavaScript(`
+      (() => ({
+        activeZone: document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace('workspace-tab-', '') ?? '',
+        masterReviewClosed: document.querySelector('[data-testid="master-review-tools"]')?.open === false,
+        masterReviewQueueClosed: document.querySelector('[data-testid="master-review-queue-tools"]')?.open === false
+      }))();
+    `)) as { activeZone: string; masterReviewClosed: boolean; masterReviewQueueClosed: boolean };
+    if (
+      reviewQueueClosedPosture.activeZone !== "mix" ||
+      !reviewQueueClosedPosture.masterReviewClosed ||
+      !reviewQueueClosedPosture.masterReviewQueueClosed
+    ) {
+      throw new Error(
+        `Could not prepare the closed same-Mix Review Queue route posture (${JSON.stringify(reviewQueueClosedPosture)}).`
+      );
+    }
+
+    onStep("opening Quick Actions with the native shortcut from closed same-Mix Review Queue disclosures");
+    const commandModifier: Electron.InputEvent["modifiers"] = process.platform === "darwin" ? ["meta"] : ["control"];
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "K", commandModifier);
+    let reviewQueueNativeShortcutOpened = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      reviewQueueNativeShortcutOpened = (await win.webContents.executeJavaScript(`
+        document.querySelector('[data-testid="quick-actions"]') !== null &&
+          document.activeElement?.getAttribute('data-testid') === 'quick-actions-search'
+      `)) as boolean;
+      if (reviewQueueNativeShortcutOpened) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!reviewQueueNativeShortcutOpened) {
+      throw new Error("Native Quick Actions shortcut did not focus the search from the closed same-Mix route posture.");
+    }
+
+    await win.webContents.insertText("review queue route");
+    let reviewQueueActionVisible = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      reviewQueueActionVisible = (await win.webContents.executeJavaScript(`
+        document.querySelector('[data-testid="quick-actions-search"]')?.value === 'review queue route' &&
+          document.querySelector('[data-testid="quick-action-review-queue-route-readout-action"]') !== null
+      `)) as boolean;
+      if (reviewQueueActionVisible) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!reviewQueueActionVisible) {
+      throw new Error("Review Queue Route Quick Action did not become visible after native text entry.");
+    }
+
+    const reviewQueueTargetIndex = (await win.webContents.executeJavaScript(`
+      (() => {
+        const ids = Array.from(document.querySelectorAll('.quick-action-row'))
+          .filter((row) => {
+            const button = row.querySelector('.quick-action-run');
+            return button instanceof HTMLButtonElement && !button.disabled;
+          })
+          .map((row) => row.id.replace('quick-action-option-', ''));
+        return ids.indexOf('review-queue-route-readout-action');
+      })();
+    `)) as number;
+    if (reviewQueueTargetIndex < 0) {
+      throw new Error("Review Queue Route Quick Action was not in the runnable keyboard result list.");
+    }
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Home");
+    for (let index = 0; index < reviewQueueTargetIndex; index += 1) {
+      await sendLaunchSmokeFunctionalTabNativeKey(win, "Down");
+    }
+    const reviewQueueSelectedActionId = (await win.webContents.executeJavaScript(`
+      document.querySelector('[data-testid="quick-actions-keyboard-selection"]')?.getAttribute('data-keyboard-action') ?? ''
+    `)) as string;
+    if (reviewQueueSelectedActionId !== "review-queue-route-readout-action") {
+      throw new Error(
+        `Native Home/ArrowDown selected ${reviewQueueSelectedActionId || "no action"} instead of Review Queue Route.`
+      );
+    }
+
+    onStep("running the selected Review Queue Route action with native Enter");
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Enter");
+    let reviewQueueQuickActionSettled = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      reviewQueueQuickActionSettled = (await win.webContents.executeJavaScript(`
+        (() => {
+          const queue = document.querySelector('[data-testid="review-queue"]');
+          const rect = queue?.getBoundingClientRect();
+          return (
+            document.querySelector('[data-testid="quick-actions"]') === null &&
+            document.querySelector('[role="tab"][aria-selected="true"]')?.id === 'workspace-tab-mix' &&
+            document.querySelector('[data-testid="master-review-tools"]')?.open === true &&
+            document.querySelector('[data-testid="master-review-queue-tools"]')?.open === true &&
+            Boolean(rect && rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight && rect.bottom > 0)
+          );
+        })();
+      `)) as boolean;
+      if (reviewQueueQuickActionSettled) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!reviewQueueQuickActionSettled) {
+      throw new Error("Native Enter did not reveal the closed Review Queue disclosures in the active Mix viewport.");
+    }
+
+    const reviewQueueQuickActionReveal = (await win.webContents.executeJavaScript(`
+      (() => {
+        const activeTab = document.querySelector('[role="tab"][aria-selected="true"]');
+        const activePanel = activeTab ? document.getElementById(activeTab.getAttribute('aria-controls') ?? '') : null;
+        const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const activeElementRect = activeElement?.getBoundingClientRect() ?? null;
+        const activeElementStyle = activeElement ? getComputedStyle(activeElement) : null;
+        const navigator = document.querySelector('[data-testid="workflow-navigator"]');
+        const queue = document.querySelector('[data-testid="review-queue"]');
+        const navigatorRect = navigator?.getBoundingClientRect() ?? null;
+        const rect = queue?.getBoundingClientRect() ?? null;
+        const style = queue instanceof HTMLElement ? getComputedStyle(queue) : null;
+        const visibleHeight = rect
+          ? Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0))
+          : 0;
+        return {
+          activeElementTestId: activeElement?.getAttribute('data-testid') ?? activeElement?.id ?? '',
+          activeElementVisible: Boolean(
+            activeElementRect &&
+              activeElementRect.width > 0 &&
+              activeElementRect.height > 0 &&
+              activeElementStyle?.display !== 'none' &&
+              activeElementStyle?.visibility !== 'hidden'
+          ),
+          activeElementWithinActivePanel: Boolean(activeElement && activePanel?.contains(activeElement)),
+          actionVisible: ${JSON.stringify(true)},
+          destinationZone: activeTab?.id?.replace('workspace-tab-', '') ?? '',
+          masterReviewInitiallyClosed: ${JSON.stringify(reviewQueueClosedPosture.masterReviewClosed)},
+          masterReviewOpen: document.querySelector('[data-testid="master-review-tools"]')?.open === true,
+          masterReviewQueueInitiallyClosed: ${JSON.stringify(reviewQueueClosedPosture.masterReviewQueueClosed)},
+          masterReviewQueueOpen: document.querySelector('[data-testid="master-review-queue-tools"]')?.open === true,
+          modalClosed: document.querySelector('[data-testid="quick-actions"]') === null,
+          nativeShortcutOpened: ${JSON.stringify(reviewQueueNativeShortcutOpened)},
+          reviewQueueClearOfNavigator: Boolean(rect && navigatorRect && rect.top >= navigatorRect.bottom - 1),
+          reviewQueueHeight: rect?.height ?? 0,
+          reviewQueueInViewport: Boolean(rect && rect.top >= 0 && rect.top < window.innerHeight && rect.bottom > 0),
+          reviewQueueVisible: Boolean(
+            queue &&
+              activePanel?.contains(queue) &&
+              rect &&
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style?.display !== 'none' &&
+              style?.visibility !== 'hidden'
+          ),
+          reviewQueueWidth: rect?.width ?? 0,
+          selectedActionId: ${JSON.stringify(reviewQueueSelectedActionId)},
+          sourceZone: 'mix',
+          statusText: document.querySelector('[data-testid="project-status"]')?.textContent?.trim() ?? '',
+          viewportHeight: window.innerHeight,
+          visibleHeight
+        };
+      })();
+    `)) as Omit<
+      LaunchSmokeFunctionalTabsEvidence["reviewQueueQuickActionReveal"],
+      "disclosurePostureRestored" | "projectFingerprintPreserved"
+    >;
+    const afterReviewQueueQuickAction = await readLaunchSmokeFunctionalTabState(win);
+    const reviewQueueQuickActionEvidence: LaunchSmokeFunctionalTabsEvidence["reviewQueueQuickActionReveal"] = {
+      ...reviewQueueQuickActionReveal,
+      disclosurePostureRestored: false,
+      projectFingerprintPreserved:
+        afterReviewQueueQuickAction.composeDataFingerprint === preparedCompose.composeDataFingerprint
+    };
+
+    await win.webContents.executeJavaScript(`
+      (() => {
+        const guidance = document.querySelector('[data-testid="guidance-center"]');
+        if (guidance instanceof HTMLDetailsElement && guidance.open) {
+          guidance.querySelector(':scope > summary')?.click();
+        }
+      })();
+    `);
+    await new Promise((resolve) => setTimeout(resolve, 140));
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-mix");
+    const masterReviewQueueIsOpen = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="master-review-queue-tools"]')?.open === true`
+    )) as boolean;
+    if (masterReviewQueueIsOpen !== masterReviewQueueWasOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "master-review-queue-toggle");
+    }
+    const masterReviewIsOpen = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="master-review-tools"]')?.open === true`
+    )) as boolean;
+    if (masterReviewIsOpen !== masterReviewWasOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "master-review-toggle");
+    }
+    reviewQueueQuickActionEvidence.disclosurePostureRestored = (await win.webContents.executeJavaScript(`
+      document.querySelector('[data-testid="master-review-tools"]')?.open === ${JSON.stringify(masterReviewWasOpen)} &&
+        document.querySelector('[data-testid="master-review-queue-tools"]')?.open === ${JSON.stringify(masterReviewQueueWasOpen)}
+    `)) as boolean;
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-compose");
+
+    onStep("preparing closed Guide and Compose for native Beat Passport Quick Actions routing");
+    const guidanceCenterOpenBeforePreparation = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="guidance-center"]')?.open === true`
+    )) as boolean;
+    if (guidanceCenterOpenBeforePreparation) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle");
+    }
+    const guidanceBeatPassportClosedPosture = (await win.webContents.executeJavaScript(`
+      (() => ({
+        activeZone: document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace('workspace-tab-', '') ?? '',
+        guidanceCenterClosed: document.querySelector('[data-testid="guidance-center"]')?.open === false
+      }))();
+    `)) as { activeZone: string; guidanceCenterClosed: boolean };
+    if (
+      guidanceBeatPassportClosedPosture.activeZone !== "compose" ||
+      !guidanceBeatPassportClosedPosture.guidanceCenterClosed
+    ) {
+      throw new Error(
+        `Could not prepare the closed Guide Beat Passport route posture (${JSON.stringify(guidanceBeatPassportClosedPosture)}).`
+      );
+    }
+
+    onStep("opening Quick Actions with the native shortcut from closed Guide on Compose");
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "K", commandModifier);
+    let guidanceBeatPassportNativeShortcutOpened = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      guidanceBeatPassportNativeShortcutOpened = (await win.webContents.executeJavaScript(`
+        document.querySelector('[data-testid="quick-actions"]') !== null &&
+          document.activeElement?.getAttribute('data-testid') === 'quick-actions-search'
+      `)) as boolean;
+      if (guidanceBeatPassportNativeShortcutOpened) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!guidanceBeatPassportNativeShortcutOpened) {
+      throw new Error("Native Quick Actions shortcut did not focus search from the closed Guide Compose posture.");
+    }
+
+    await win.webContents.insertText("beat passport route");
+    let guidanceBeatPassportActionVisible = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      guidanceBeatPassportActionVisible = (await win.webContents.executeJavaScript(`
+        document.querySelector('[data-testid="quick-actions-search"]')?.value === 'beat passport route' &&
+          document.querySelector('[data-testid="quick-action-beat-passport-route-readout-action"]') !== null
+      `)) as boolean;
+      if (guidanceBeatPassportActionVisible) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!guidanceBeatPassportActionVisible) {
+      throw new Error("Beat Passport Route Quick Action did not become visible after native text entry.");
+    }
+
+    const guidanceBeatPassportTargetIndex = (await win.webContents.executeJavaScript(`
+      (() => {
+        const ids = Array.from(document.querySelectorAll('.quick-action-row'))
+          .filter((row) => {
+            const button = row.querySelector('.quick-action-run');
+            return button instanceof HTMLButtonElement && !button.disabled;
+          })
+          .map((row) => row.id.replace('quick-action-option-', ''));
+        return ids.indexOf('beat-passport-route-readout-action');
+      })();
+    `)) as number;
+    if (guidanceBeatPassportTargetIndex < 0) {
+      throw new Error("Beat Passport Route Quick Action was not in the runnable keyboard result list.");
+    }
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Home");
+    for (let index = 0; index < guidanceBeatPassportTargetIndex; index += 1) {
+      await sendLaunchSmokeFunctionalTabNativeKey(win, "Down");
+    }
+    const guidanceBeatPassportSelectedActionId = (await win.webContents.executeJavaScript(`
+      document.querySelector('[data-testid="quick-actions-keyboard-selection"]')?.getAttribute('data-keyboard-action') ?? ''
+    `)) as string;
+    if (guidanceBeatPassportSelectedActionId !== "beat-passport-route-readout-action") {
+      throw new Error(
+        `Native Home/ArrowDown selected ${guidanceBeatPassportSelectedActionId || "no action"} instead of Beat Passport Route.`
+      );
+    }
+
+    onStep("running the selected Beat Passport Route action with native Enter");
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Enter");
+    let guidanceBeatPassportQuickActionSettled = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      guidanceBeatPassportQuickActionSettled = (await win.webContents.executeJavaScript(`
+        (() => {
+          const passport = document.querySelector('[data-testid="beat-passport"]');
+          const rect = passport?.getBoundingClientRect();
+          return (
+            document.querySelector('[data-testid="quick-actions"]') === null &&
+            document.querySelector('[role="tab"][aria-selected="true"]')?.id === 'workspace-tab-compose' &&
+            document.querySelector('[data-testid="guidance-center"]')?.open === true &&
+            document.activeElement === passport &&
+            Boolean(rect && rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight && rect.bottom > 0)
+          );
+        })();
+      `)) as boolean;
+      if (guidanceBeatPassportQuickActionSettled) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!guidanceBeatPassportQuickActionSettled) {
+      throw new Error("Native Enter did not reveal and focus Beat Passport inside the Guide on Compose.");
+    }
+
+    const guidanceBeatPassportQuickActionReveal = (await win.webContents.executeJavaScript(`
+      (() => {
+        const activeTab = document.querySelector('[role="tab"][aria-selected="true"]');
+        const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const activeElementRect = activeElement?.getBoundingClientRect() ?? null;
+        const activeElementStyle = activeElement ? getComputedStyle(activeElement) : null;
+        const guidance = document.querySelector('[data-testid="guidance-center"]');
+        const navigator = document.querySelector('[data-testid="workflow-navigator"]');
+        const passport = document.querySelector('[data-testid="beat-passport"]');
+        const navigatorRect = navigator?.getBoundingClientRect() ?? null;
+        const rect = passport?.getBoundingClientRect() ?? null;
+        const style = passport instanceof HTMLElement ? getComputedStyle(passport) : null;
+        const visibleHeight = rect
+          ? Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0))
+          : 0;
+        return {
+          activeElementTestId: activeElement?.getAttribute('data-testid') ?? activeElement?.id ?? '',
+          activeElementVisible: Boolean(
+            activeElementRect &&
+              activeElementRect.width > 0 &&
+              activeElementRect.height > 0 &&
+              activeElementStyle?.display !== 'none' &&
+              activeElementStyle?.visibility !== 'hidden'
+          ),
+          actionVisible: ${JSON.stringify(true)},
+          destinationZone: activeTab?.id?.replace('workspace-tab-', '') ?? '',
+          guidanceCenterInitiallyClosed: ${JSON.stringify(guidanceBeatPassportClosedPosture.guidanceCenterClosed)},
+          guidanceCenterOpen: guidance?.open === true,
+          modalClosed: document.querySelector('[data-testid="quick-actions"]') === null,
+          nativeShortcutOpened: ${JSON.stringify(guidanceBeatPassportNativeShortcutOpened)},
+          originalGuidanceCenterOpen: ${JSON.stringify(originalGuidanceCenterOpen)},
+          passportClearOfNavigator: Boolean(rect && navigatorRect && rect.top >= navigatorRect.bottom - 1),
+          passportHeight: rect?.height ?? 0,
+          passportInViewport: Boolean(rect && rect.top >= 0 && rect.top < window.innerHeight && rect.bottom > 0),
+          passportVisible: Boolean(
+            passport &&
+              rect &&
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style?.display !== 'none' &&
+              style?.visibility !== 'hidden'
+          ),
+          passportWidth: rect?.width ?? 0,
+          passportWithinGuidance: Boolean(passport && guidance?.contains(passport)),
+          selectedActionId: ${JSON.stringify(guidanceBeatPassportSelectedActionId)},
+          sourceZone: 'compose',
+          statusText: document.querySelector('[data-testid="project-status"]')?.textContent?.trim() ?? '',
+          viewportHeight: window.innerHeight,
+          visibleHeight
+        };
+      })();
+    `)) as Omit<
+      LaunchSmokeFunctionalTabsEvidence["guidanceBeatPassportQuickActionReveal"],
+      "guidancePostureRestored" | "projectFingerprintPreserved"
+    >;
+    const afterGuidanceBeatPassportQuickAction = await readLaunchSmokeFunctionalTabState(win);
+    const guidanceBeatPassportQuickActionEvidence: LaunchSmokeFunctionalTabsEvidence["guidanceBeatPassportQuickActionReveal"] = {
+      ...guidanceBeatPassportQuickActionReveal,
+      guidancePostureRestored: false,
+      projectFingerprintPreserved:
+        afterGuidanceBeatPassportQuickAction.composeDataFingerprint === preparedCompose.composeDataFingerprint
+    };
+
+    const guidanceCenterOpenAfterRoute = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="guidance-center"]')?.open === true`
+    )) as boolean;
+    if (guidanceCenterOpenAfterRoute !== originalGuidanceCenterOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle");
+    }
+    guidanceBeatPassportQuickActionEvidence.guidancePostureRestored = (await win.webContents.executeJavaScript(`
+      document.querySelector('[data-testid="guidance-center"]')?.open === ${JSON.stringify(originalGuidanceCenterOpen)}
+    `)) as boolean;
+
+    onStep("running native First Beat Path Setup Quick Action from Compose to Transport");
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "K", commandModifier);
+    let firstBeatPathTransportNativeShortcutOpened = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      firstBeatPathTransportNativeShortcutOpened = (await win.webContents.executeJavaScript(`
+        document.querySelector('[data-testid="quick-actions"]') !== null &&
+          document.activeElement?.getAttribute('data-testid') === 'quick-actions-search'
+      `)) as boolean;
+      if (firstBeatPathTransportNativeShortcutOpened) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!firstBeatPathTransportNativeShortcutOpened) {
+      throw new Error("Native Quick Actions shortcut did not focus search before First Beat Path Setup routing.");
+    }
+
+    await win.webContents.insertText("first beat path setup");
+    let firstBeatPathTransportActionVisible = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      firstBeatPathTransportActionVisible = (await win.webContents.executeJavaScript(`
+        document.querySelector('[data-testid="quick-actions-search"]')?.value === 'first beat path setup' &&
+          document.querySelector('[data-testid="quick-action-first-beat-path-step-setup"]') !== null
+      `)) as boolean;
+      if (firstBeatPathTransportActionVisible) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!firstBeatPathTransportActionVisible) {
+      throw new Error("First Beat Path Setup Quick Action did not become visible after native text entry.");
+    }
+
+    const firstBeatPathTransportTargetIndex = (await win.webContents.executeJavaScript(`
+      (() => {
+        const ids = Array.from(document.querySelectorAll('.quick-action-row'))
+          .filter((row) => {
+            const button = row.querySelector('.quick-action-run');
+            return button instanceof HTMLButtonElement && !button.disabled;
+          })
+          .map((row) => row.id.replace('quick-action-option-', ''));
+        return ids.indexOf('first-beat-path-step-setup');
+      })();
+    `)) as number;
+    if (firstBeatPathTransportTargetIndex < 0) {
+      throw new Error("First Beat Path Setup Quick Action was not in the runnable keyboard result list.");
+    }
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Home");
+    for (let index = 0; index < firstBeatPathTransportTargetIndex; index += 1) {
+      await sendLaunchSmokeFunctionalTabNativeKey(win, "Down");
+    }
+    const firstBeatPathTransportSelectedActionId = (await win.webContents.executeJavaScript(`
+      document.querySelector('[data-testid="quick-actions-keyboard-selection"]')?.getAttribute('data-keyboard-action') ?? ''
+    `)) as string;
+    if (firstBeatPathTransportSelectedActionId !== "first-beat-path-step-setup") {
+      throw new Error(
+        `Native Home/ArrowDown selected ${firstBeatPathTransportSelectedActionId || "no action"} instead of First Beat Path Setup.`
+      );
+    }
+
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Enter");
+    let firstBeatPathTransportQuickActionSettled = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      firstBeatPathTransportQuickActionSettled = (await win.webContents.executeJavaScript(`
+        (() => {
+          const transport = document.querySelector('[data-testid="workflow-target-transport"]');
+          const rect = transport?.getBoundingClientRect();
+          return (
+            document.querySelector('[data-testid="quick-actions"]') === null &&
+            document.querySelector('[role="tab"][aria-selected="true"]')?.id === 'workspace-tab-compose' &&
+            document.activeElement === transport &&
+            Boolean(rect && rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight && rect.bottom > 0)
+          );
+        })();
+      `)) as boolean;
+      if (firstBeatPathTransportQuickActionSettled) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!firstBeatPathTransportQuickActionSettled) {
+      throw new Error("Native Enter did not focus visible Transport from the active Compose tab.");
+    }
+
+    const firstBeatPathTransportQuickActionReveal = (await win.webContents.executeJavaScript(`
+      (() => {
+        const activeTab = document.querySelector('[role="tab"][aria-selected="true"]');
+        const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const activeElementRect = activeElement?.getBoundingClientRect() ?? null;
+        const activeElementStyle = activeElement ? getComputedStyle(activeElement) : null;
+        const guidance = document.querySelector('[data-testid="guidance-center"]');
+        const transport = document.querySelector('[data-testid="workflow-target-transport"]');
+        const rect = transport?.getBoundingClientRect() ?? null;
+        const style = transport instanceof HTMLElement ? getComputedStyle(transport) : null;
+        const visibleHeight = rect
+          ? Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0))
+          : 0;
+        return {
+          activeElementTestId: activeElement?.getAttribute('data-testid') ?? activeElement?.id ?? '',
+          activeElementVisible: Boolean(
+            activeElementRect &&
+              activeElementRect.width > 0 &&
+              activeElementRect.height > 0 &&
+              activeElementStyle?.display !== 'none' &&
+              activeElementStyle?.visibility !== 'hidden'
+          ),
+          actionVisible: ${JSON.stringify(true)},
+          destinationZone: activeTab?.id?.replace('workspace-tab-', '') ?? '',
+          guidanceCenterOpenAfterRoute: guidance?.open === true,
+          modalClosed: document.querySelector('[data-testid="quick-actions"]') === null,
+          nativeShortcutOpened: ${JSON.stringify(firstBeatPathTransportNativeShortcutOpened)},
+          originalGuidanceCenterOpen: ${JSON.stringify(originalGuidanceCenterOpen)},
+          selectedActionId: ${JSON.stringify(firstBeatPathTransportSelectedActionId)},
+          sourceZone: 'compose',
+          statusText: document.querySelector('[data-testid="project-status"]')?.textContent?.trim() ?? '',
+          transportHeight: rect?.height ?? 0,
+          transportInViewport: Boolean(rect && rect.top >= 0 && rect.top < window.innerHeight && rect.bottom > 0),
+          transportVisible: Boolean(
+            transport &&
+              rect &&
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style?.display !== 'none' &&
+              style?.visibility !== 'hidden'
+          ),
+          transportWidth: rect?.width ?? 0,
+          viewportHeight: window.innerHeight,
+          visibleHeight
+        };
+      })();
+    `)) as Omit<
+      LaunchSmokeFunctionalTabsEvidence["firstBeatPathTransportQuickActionReveal"],
+      "guidancePostureRestored" | "projectFingerprintPreserved"
+    >;
+    const afterFirstBeatPathTransportQuickAction = await readLaunchSmokeFunctionalTabState(win);
+    const firstBeatPathTransportQuickActionEvidence: LaunchSmokeFunctionalTabsEvidence["firstBeatPathTransportQuickActionReveal"] = {
+      ...firstBeatPathTransportQuickActionReveal,
+      guidancePostureRestored: false,
+      projectFingerprintPreserved:
+        afterFirstBeatPathTransportQuickAction.composeDataFingerprint === preparedCompose.composeDataFingerprint
+    };
+    const guidanceCenterOpenAfterTransportRoute = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="guidance-center"]')?.open === true`
+    )) as boolean;
+    if (guidanceCenterOpenAfterTransportRoute !== originalGuidanceCenterOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle");
+    }
+    firstBeatPathTransportQuickActionEvidence.guidancePostureRestored = (await win.webContents.executeJavaScript(`
+      document.querySelector('[data-testid="guidance-center"]')?.open === ${JSON.stringify(originalGuidanceCenterOpen)}
+    `)) as boolean;
+
+    const viewportWidth = (await win.webContents.executeJavaScript(`window.innerWidth`)) as number;
+    const stateValues = Object.values(states);
+    const evidence: LaunchSmokeFunctionalTabsEvidence = {
+      captures,
+      composeRoundTrip: {
+        dirtyPosturePreserved: returnedCompose.dirtyPosture === preparedCompose.dirtyPosture,
+        disclosurePosturePreserved: returnedCompose.disclosurePosture === preparedCompose.disclosurePosture,
+        editFingerprintPreserved: returnedCompose.composeDataFingerprint === preparedCompose.composeDataFingerprint,
+        keyboardCapturePosturePreserved:
+          returnedCompose.keyboardCapturePosture === preparedCompose.keyboardCapturePosture,
+        playbackPosturePreserved: returnedCompose.playbackPosture === preparedCompose.playbackPosture,
+        selectedPatternPreserved: returnedCompose.selectedPattern === preparedCompose.selectedPattern,
+        undoRedoPosturePreserved: returnedCompose.undoRedoPosture === preparedCompose.undoRedoPosture
+      },
+      crossTabFocusTransfer,
+      firstBeatPathTransportQuickActionReveal: firstBeatPathTransportQuickActionEvidence,
+      finishChecklistQuickActionReveal: finishChecklistQuickActionEvidence,
+      guidanceBeatPassportQuickActionReveal: guidanceBeatPassportQuickActionEvidence,
+      reviewQueueQuickActionReveal: reviewQueueQuickActionEvidence,
+      hiddenComposeGuards,
+      initial: publicFunctionalTabState(initial),
+      minimumWindow: {
+        maximumActivePanelHorizontalOverflow: Math.max(
+          0,
+          ...stateValues.map((state) => state.activePanelHorizontalOverflow)
+        ),
+        maximumDocumentHorizontalOverflow: Math.max(0, ...stateValues.map((state) => state.documentHorizontalOverflow)),
+        maximumTabListHorizontalOverflow: Math.max(0, ...stateValues.map((state) => state.tabListHorizontalOverflow)),
+        viewportWidth
+      },
+      nativeMenuDeleteGuards,
+      restoredCompose: false,
+      states,
+      stickyNavigatorAfterDeepScroll,
+      traversal
+    };
+
+    onStep("restoring Compose local posture");
+    await restoreLaunchSmokeFunctionalTabPosture(win, initial);
+    const restored = await readLaunchSmokeFunctionalTabState(win);
+    cleanupComplete = true;
+    evidence.restoredCompose =
+      restored.activeZone === "compose" &&
+      restored.selectedPattern === initial.selectedPattern &&
+      restored.disclosurePosture === initial.disclosurePosture &&
+      restored.keyboardCapturePosture === initial.keyboardCapturePosture &&
+      restored.undoRedoPosture === initial.undoRedoPosture &&
+      restored.dirtyPosture === initial.dirtyPosture &&
+      restored.playbackPosture === initial.playbackPosture;
+    return evidence;
+  } finally {
+    if (initial && !cleanupComplete) {
+      await restoreLaunchSmokeFunctionalTabPosture(win, initial).catch(() => undefined);
+    }
+    win.setSize(originalSize[0], originalSize[1]);
+    await new Promise((resolve) => setTimeout(resolve, 160));
+  }
+}
+
+function collectLaunchSmokeFunctionalTabsEvidenceWithTimeout(
+  win: BrowserWindow,
+  onStep: (step: string) => void = () => {}
+): Promise<LaunchSmokeFunctionalTabsEvidence> {
+  return new Promise((resolve, reject) => {
+    let step = "starting";
+    const timeout = setTimeout(
+      () => reject(new Error(`Timed out collecting functional tab screen evidence at ${step}.`)),
+      480000
+    );
+    void collectLaunchSmokeFunctionalTabsEvidence(win, (nextStep) => {
+      step = nextStep;
+      onStep(nextStep);
+    })
       .then((evidence) => {
         clearTimeout(timeout);
         resolve(evidence);
@@ -2316,17 +4070,47 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         targetText: ""
       };
       const workflowNavigatorJumpEvidence = (() => {
+        const arrangeButton = document.querySelector('[data-testid="workflow-jump-arrange"]');
+        const mixButton = document.querySelector('[data-testid="workflow-jump-mix"]');
         const deliverButton = document.querySelector('[data-testid="workflow-jump-deliver"]');
         const deliverTarget = document.querySelector('[data-testid="handoff-pack"]');
         const composeButton = document.querySelector('[data-testid="workflow-jump-compose"]');
         const composeTarget = document.querySelector('[data-testid="workflow-target-compose"]');
         const workflowNavigator = document.querySelector('[data-testid="workflow-navigator"]');
+        const visible = (element) => Boolean(
+          element &&
+          element.getBoundingClientRect().width > 0 &&
+          element.getBoundingClientRect().height > 0 &&
+          element.closest('[hidden]') === null
+        );
+        arrangeButton?.click();
+        const arrangeVisibility = {
+          arrangementPatternControlsVisible: visible(arrangementPatternControls),
+          arrangementShapeControlsVisible: visible(arrangementShapeControls),
+          arrangementToolsToggleVisible: visible(arrangementToolsToggle),
+          arrangementTrackStateControlsVisible: visible(arrangementTrackStateControls),
+          blockMovesToggleVisible: visible(blockMovesToggle)
+        };
+        mixButton?.click();
+        const mixVisibility = {
+          masterPolishToggleVisible: visible(masterPolishToggle),
+          masterReviewToggleVisible: visible(masterReviewToggle),
+          mixerProcessingToggleVisible: visible(mixerProcessingToggle),
+          mixMovesToggleVisible: visible(mixMovesToggle),
+          mixReviewToggleVisible: visible(mixReviewToggle)
+        };
         deliverButton?.click();
         const deliverRect = deliverTarget?.getBoundingClientRect() ?? null;
+        const deliverVisibility = {
+          deliveryAuditToggleVisible: visible(deliveryAuditToggle),
+          deliveryDirectVisible: visible(deliveryDirect) && deliveryDirect?.closest('details:not([open])') === null,
+          deliveryStatusToggleVisible: visible(deliveryStatusToggle)
+        };
         composeButton?.click();
         const composeRect = composeTarget?.getBoundingClientRect() ?? null;
         const workflowNavigatorRect = workflowNavigator?.getBoundingClientRect() ?? null;
         return {
+          ...arrangeVisibility,
           composeReady: Boolean(
             composeRect &&
             workflowNavigatorRect &&
@@ -2334,7 +4118,9 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
             composeRect.top < window.innerHeight &&
             composeRect.bottom > 0
           ),
-          deliverReady: Boolean(deliverRect && deliverRect.top < window.innerHeight && deliverRect.bottom > 0)
+          deliverReady: Boolean(deliverRect && deliverRect.top < window.innerHeight && deliverRect.bottom > 0),
+          ...deliverVisibility,
+          ...mixVisibility
         };
       })();
       const bridge = window.grooveforge;
@@ -2351,19 +4137,13 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           arrangementEssentialBeforeBlockMoves: follows(arrangementBars, blockMoves),
           arrangementPlaybackBeforeTimeline: follows(arrangementPlayback, arrangementTimeline),
           arrangementPlaybackPresent: Boolean(arrangementPlayback),
-          arrangementPatternControlsVisible: Boolean(
-            arrangementPatternControls && arrangementPatternControls.getBoundingClientRect().height > 0
-          ),
-          arrangementShapeControlsVisible: Boolean(
-            arrangementShapeControls && arrangementShapeControls.getBoundingClientRect().height > 0
-          ),
-          arrangementTrackStateControlsVisible: Boolean(
-            arrangementTrackStateControls && arrangementTrackStateControls.getBoundingClientRect().height > 0
-          ),
+          arrangementPatternControlsVisible: workflowNavigatorJumpEvidence.arrangementPatternControlsVisible,
+          arrangementShapeControlsVisible: workflowNavigatorJumpEvidence.arrangementShapeControlsVisible,
+          arrangementTrackStateControlsVisible: workflowNavigatorJumpEvidence.arrangementTrackStateControlsVisible,
           arrangementTimelineBeforeEditor: follows(arrangementTimeline, selectedBlockEditor),
           arrangementTimelinePresent: Boolean(arrangementTimeline),
           arrangementToolsOpen: Boolean(arrangementTools?.open),
-          arrangementToolsToggleVisible: Boolean(arrangementToolsToggle && arrangementToolsToggle.getBoundingClientRect().height > 0),
+          arrangementToolsToggleVisible: workflowNavigatorJumpEvidence.arrangementToolsToggleVisible,
           audienceSessionActionsDirectVisible,
           audienceSessionProofContentHidden: audienceSessionProofInitiallyHidden && audienceSessionProofHiddenAgain,
           audienceSessionProofInteractionReady:
@@ -2376,7 +4156,7 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           audienceSessionProofToggleVisible,
           blockMovesBeforeArrangementTools: follows(blockMoves, arrangementTools),
           blockMovesOpen: Boolean(blockMoves?.open),
-          blockMovesToggleVisible: Boolean(blockMovesToggle && blockMovesToggle.getBoundingClientRect().height > 0),
+          blockMovesToggleVisible: workflowNavigatorJumpEvidence.blockMovesToggleVisible,
           chordCardCount: chordCards.length,
           chordCompactCardCount: compactChordCards.length,
           chordCompactEditorsHidden: chordEditors
@@ -2391,18 +4171,14 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           captureIdeasOpen: Boolean(captureIdeas?.open),
           captureIdeasToggleVisible: Boolean(captureIdeasToggle && captureIdeasToggle.getBoundingClientRect().height > 0),
           deliveryAuditOpen: Boolean(deliveryAudit?.open),
-          deliveryAuditToggleVisible: Boolean(deliveryAuditToggle && deliveryAuditToggle.getBoundingClientRect().height > 0),
+          deliveryAuditToggleVisible: workflowNavigatorJumpEvidence.deliveryAuditToggleVisible,
           deliveryDirectBeforeStatus: follows(deliveryDirect, deliveryStatus),
-          deliveryDirectVisible: Boolean(
-            deliveryDirect &&
-            deliveryDirect.getBoundingClientRect().height > 0 &&
-            deliveryDirect.closest('details:not([open])') === null
-          ),
+          deliveryDirectVisible: workflowNavigatorJumpEvidence.deliveryDirectVisible,
           deliveryDirectPresent: Boolean(deliveryDirect),
           deliveryOutsideGuidance: Boolean(deliveryDirect && guidanceCenter && !guidanceCenter.contains(deliveryDirect)),
           deliveryStatusBeforeAudit: follows(deliveryStatus, deliveryAudit),
           deliveryStatusOpen: Boolean(deliveryStatus?.open),
-          deliveryStatusToggleVisible: Boolean(deliveryStatusToggle && deliveryStatusToggle.getBoundingClientRect().height > 0),
+          deliveryStatusToggleVisible: workflowNavigatorJumpEvidence.deliveryStatusToggleVisible,
           deliveryRouteBeforeDirect: follows(deliveryRoute, deliveryDirect),
           feedbackAfterGuidance: follows(guidanceCenter, feedbackAnchor),
           feedbackOutsideGuidance: Boolean(guidanceCenter && feedbackAnchor && !guidanceCenter.contains(feedbackAnchor)),
@@ -2466,14 +4242,14 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           ),
           mixerBasicBalanceBeforeProcessing: follows(mixerVolume, mixerProcessing),
           mixerProcessingOpen: Boolean(mixerProcessing?.open),
-          mixerProcessingToggleVisible: Boolean(mixerProcessingToggle && mixerProcessingToggle.getBoundingClientRect().height > 0),
+          mixerProcessingToggleVisible: workflowNavigatorJumpEvidence.mixerProcessingToggleVisible,
           mixerStripsBeforeMixMoves: follows(mixerStrips, mixMoves),
           mixerStripsPresent: Boolean(mixerStrips),
           mixMovesBeforeReview: follows(mixMoves, mixReview),
           mixMovesOpen: Boolean(mixMoves?.open),
-          mixMovesToggleVisible: Boolean(mixMovesToggle && mixMovesToggle.getBoundingClientRect().height > 0),
+          mixMovesToggleVisible: workflowNavigatorJumpEvidence.mixMovesToggleVisible,
           mixReviewOpen: Boolean(mixReview?.open),
-          mixReviewToggleVisible: Boolean(mixReviewToggle && mixReviewToggle.getBoundingClientRect().height > 0),
+          mixReviewToggleVisible: workflowNavigatorJumpEvidence.mixReviewToggleVisible,
           masterCeilingBoundsReady: Boolean(
             masterCeilingInput &&
             masterCeilingInput.getAttribute("type") === "number" &&
@@ -2485,13 +4261,13 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           masterOutputControlsPresent: Boolean(masterOutputControls),
           masterPolishBeforeReview: follows(masterPolish, masterReview),
           masterPolishOpen: Boolean(masterPolish?.open),
-          masterPolishToggleVisible: Boolean(masterPolishToggle && masterPolishToggle.getBoundingClientRect().height > 0),
+          masterPolishToggleVisible: workflowNavigatorJumpEvidence.masterPolishToggleVisible,
           masterMixCoachPresent: Boolean(masterMixCoach),
           masterMixCoachOpen: Boolean(masterMixCoach?.open),
           masterReviewOpen: Boolean(masterReview?.open),
           masterReviewQueuePresent: Boolean(masterReviewQueue),
           masterReviewQueueOpen: Boolean(masterReviewQueue?.open),
-          masterReviewToggleVisible: Boolean(masterReviewToggle && masterReviewToggle.getBoundingClientRect().height > 0),
+          masterReviewToggleVisible: workflowNavigatorJumpEvidence.masterReviewToggleVisible,
           masterRoleBeforeControls: follows(masterRole, masterOutputControls),
           patternLabOpen: Boolean(patternLab?.open),
           patternLabToggleVisible: Boolean(patternLabToggle && patternLabToggle.getBoundingClientRect().height > 0),
@@ -2797,7 +4573,153 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
   if (!result || result.ready !== true || !result.evidence) {
     throw new Error("Launch smoke Audience Starter landing hook was not ready.");
   }
-  return result.evidence as LaunchSmokeStarterLandingEvidence;
+  const zoneMeasurements = await win.webContents.executeJavaScript(`
+    (() => {
+      const activeZone =
+        document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "compose";
+      const activate = (zone) => document.querySelector('[data-testid="workflow-jump-' + zone + '"]')?.click();
+      activate("arrange");
+      const arrangementMoveGroup = document.querySelector(".arrangement-actions");
+      const arrangementMoveButtons = Array.from(
+        document.querySelectorAll('[data-testid="arrangement-move-left"], [data-testid="arrangement-move-right"]')
+      );
+      const arrangementMoveAccessibleNames = arrangementMoveButtons
+        .map((button) => button.getAttribute("aria-label")?.trim() ?? "")
+        .filter((label) => label.length > 0);
+      const arrangementMoveReadableLabels = arrangementMoveButtons.filter((button) => {
+        const label = button.querySelector("span");
+        return Boolean(label && label.clientWidth > 0 && label.scrollWidth <= label.clientWidth + 1);
+      });
+      const arrangementMoveContainedButtons = arrangementMoveButtons.filter((button) => {
+        const groupRect = arrangementMoveGroup?.getBoundingClientRect() ?? null;
+        const buttonRect = button.getBoundingClientRect();
+        return Boolean(
+          groupRect && buttonRect.left >= groupRect.left - 1 && buttonRect.right <= groupRect.right + 1
+        );
+      });
+      const arrangement = {
+        arrangementMoveContainedCount: arrangementMoveContainedButtons.length,
+        arrangementMoveControlCount: arrangementMoveButtons.length,
+        arrangementMoveInternalOverflow: arrangementMoveGroup
+          ? Math.max(0, arrangementMoveGroup.scrollWidth - arrangementMoveGroup.clientWidth)
+          : 0,
+        arrangementMoveReadableLabelCount: arrangementMoveReadableLabels.length,
+        arrangementMoveUniqueAccessibleNameCount: new Set(arrangementMoveAccessibleNames).size
+      };
+
+      activate("mix");
+      const mixerToggleButtons = Array.from(
+        document.querySelectorAll('[data-testid^="mixer-mute-"], [data-testid^="mixer-solo-"]')
+      );
+      const mixerToggleAccessibleNames = mixerToggleButtons
+        .map((button) => button.getAttribute("aria-label")?.trim() ?? "")
+        .filter((label) => label.length > 0);
+      const mixerToggleReadableLabels = mixerToggleButtons.filter((button) => {
+        const label = button.querySelector("span");
+        return Boolean(label && label.clientWidth > 0 && label.scrollWidth <= label.clientWidth + 1);
+      });
+      const mixerToggleContainedButtons = mixerToggleButtons.filter((button) => {
+        const strip = button.closest('[data-testid^="mixer-strip-"]');
+        const stripRect = strip?.getBoundingClientRect() ?? null;
+        const buttonRect = button.getBoundingClientRect();
+        return Boolean(
+          stripRect &&
+          buttonRect.width >= 48 &&
+          buttonRect.left >= stripRect.left - 1 &&
+          buttonRect.right <= stripRect.right + 1
+        );
+      });
+      const mixerStrips = Array.from(document.querySelectorAll('[data-testid^="mixer-strip-"]'));
+      const mixerNarrowStrips = mixerStrips.filter((strip) => {
+        const stripTop = strip.querySelector(".strip-top");
+        const trackName = stripTop?.querySelector(":scope > span");
+        const toggles = stripTop?.querySelector(".strip-toggles");
+        const trackRect = trackName?.getBoundingClientRect() ?? null;
+        const togglesRect = toggles?.getBoundingClientRect() ?? null;
+        return Boolean(
+          stripTop &&
+          trackRect &&
+          togglesRect &&
+          getComputedStyle(stripTop).gridTemplateColumns.trim().split(/\\s+/).length === 1 &&
+          togglesRect.top >= trackRect.bottom
+        );
+      });
+      const mixer = {
+        mixerNarrowStripCount: mixerNarrowStrips.length,
+        mixerToggleContainedCount: mixerToggleContainedButtons.length,
+        mixerToggleCount: mixerToggleButtons.length,
+        mixerToggleInternalOverflow: mixerStrips.reduce(
+          (maximum, strip) => Math.max(maximum, strip.scrollWidth - strip.clientWidth),
+          0
+        ),
+        mixerTogglePressedStateCount: mixerToggleButtons.filter((button) => button.hasAttribute("aria-pressed")).length,
+        mixerToggleReadableLabelCount: mixerToggleReadableLabels.length,
+        mixerToggleTitleCount: mixerToggleButtons.filter(
+          (button) => (button.getAttribute("title")?.trim().length ?? 0) > 0
+        ).length,
+        mixerToggleUniqueAccessibleNameCount: new Set(mixerToggleAccessibleNames).size
+      };
+
+      activate("compose");
+      const noteToolGroup = document.querySelector(".note-action-row");
+      const noteToolButtons = noteToolGroup ? Array.from(noteToolGroup.querySelectorAll("button")) : [];
+      const noteToolGroupRect = noteToolGroup?.getBoundingClientRect() ?? null;
+      const noteToolAccessibleNames = noteToolButtons
+        .map((button) => button.getAttribute("aria-label")?.trim() ?? "")
+        .filter((label) => label.length > 0);
+      const noteToolReadableLabels = noteToolButtons.filter((button) => {
+        const label = button.querySelector("span");
+        const labelStyle = label ? getComputedStyle(label) : null;
+        return Boolean(
+          label &&
+          labelStyle &&
+          label.clientWidth > 0 &&
+          label.clientHeight > 0 &&
+          label.scrollWidth <= label.clientWidth + 1 &&
+          label.scrollHeight <= label.clientHeight + 1 &&
+          labelStyle.whiteSpace !== "nowrap" &&
+          labelStyle.textOverflow === "clip"
+        );
+      });
+      const noteToolContainedButtons = noteToolButtons.filter((button) => {
+        const buttonRect = button.getBoundingClientRect();
+        return Boolean(
+          noteToolGroupRect &&
+          buttonRect.height >= 48 &&
+          buttonRect.left >= noteToolGroupRect.left - 1 &&
+          buttonRect.right <= noteToolGroupRect.right + 1
+        );
+      });
+      const noteTools = {
+        noteToolColumnCount: noteToolGroup
+          ? getComputedStyle(noteToolGroup).gridTemplateColumns.trim().split(/\\s+/).length
+          : 0,
+        noteToolContainedCount: noteToolContainedButtons.length,
+        noteToolControlCount: noteToolButtons.length,
+        noteToolInternalOverflow: noteToolGroup
+          ? Math.max(0, noteToolGroup.scrollWidth - noteToolGroup.clientWidth)
+          : 0,
+        noteToolReadableLabelCount: noteToolReadableLabels.length,
+        noteToolRowCount: new Set(noteToolButtons.map((button) => Math.round(button.getBoundingClientRect().top))).size,
+        noteToolUniqueAccessibleNameCount: new Set(noteToolAccessibleNames).size
+      };
+      activate(activeZone);
+      return { arrangement, mixer, noteTools };
+    })();
+  `);
+  const evidence = result.evidence as LaunchSmokeStarterLandingEvidence;
+  return {
+    ...evidence,
+    beginner: {
+      ...evidence.beginner,
+      ...zoneMeasurements.arrangement,
+      ...zoneMeasurements.mixer
+    },
+    producer: {
+      ...evidence.producer,
+      ...zoneMeasurements.noteTools
+    }
+  };
 }
 
 function collectLaunchSmokeStarterLandingEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeStarterLandingEvidence> {
@@ -2977,6 +4899,20 @@ async function collectLaunchSmokeClosedDetailsEvidence(
       })();
     `)) as DisclosureSnapshot;
 
+  const activateWorkspaceZone = async (zone: LaunchSmokeFunctionalTabZone): Promise<void> => {
+    const activated = (await win.webContents.executeJavaScript(`
+      (() => {
+        document.querySelector('[data-testid="workflow-jump-${zone}"]')?.click();
+        const panel = document.getElementById("workspace-panel-${zone}");
+        return Boolean(panel && !panel.hidden && panel.getBoundingClientRect().height > 0);
+      })();
+    `)) as boolean;
+    if (!activated) {
+      throw new Error(`Could not activate ${zone} before disclosure evidence.`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  };
+
   const toggleWithNativeEnter = async (targetTestId: string, expectedOpen: boolean): Promise<DisclosureSnapshot> => {
     const focused = (await win.webContents.executeJavaScript(`
       (() => {
@@ -3013,11 +4949,14 @@ async function collectLaunchSmokeClosedDetailsEvidence(
   const guideOpen = await toggleWithNativeEnter("guidance-center", true);
   const guideClosed = await toggleWithNativeEnter("guidance-center", false);
   onStep("opening and closing Pattern Lab");
+  await activateWorkspaceZone("compose");
   const patternOpen = await toggleWithNativeEnter("pattern-lab", true);
   const patternClosed = await toggleWithNativeEnter("pattern-lab", false);
   onStep("opening and closing nested mixer processing");
+  await activateWorkspaceZone("mix");
   const mixerOpen = await toggleWithNativeEnter("mixer-processing-drum_rack", true);
   const mixerClosed = await toggleWithNativeEnter("mixer-processing-drum_rack", false);
+  await activateWorkspaceZone("compose");
   const snapshots = [initial, guideOpen, guideClosed, patternOpen, patternClosed, mixerOpen, mixerClosed];
   const reclosedSnapshots = [guideClosed, patternClosed, mixerClosed];
 
@@ -4185,6 +6124,159 @@ function collectLaunchSmokeCommandReferenceEvidenceWithTimeout(win: BrowserWindo
   });
 }
 
+function runProjectIoSmokeRendererStep<T>(
+  win: BrowserWindow,
+  label: string,
+  script: string,
+  timeoutMs = 30000
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`Timed out during project IO smoke ${label}.`)), timeoutMs);
+    void win.webContents
+      .executeJavaScript(script)
+      .then((result: T) => {
+        clearTimeout(timeout);
+        resolve(result);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+}
+
+function projectIoSmokeUiFingerprintFromSource(sourceContents: string): ProjectIoSmokeUiFingerprint {
+  const parsed: unknown = JSON.parse(sourceContents);
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error("Project IO smoke source should contain a JSON object.");
+  }
+  const wrapper = parsed as Record<string, unknown>;
+  const candidate = wrapper.app === "GrooveForge" ? wrapper.project : wrapper;
+  if (typeof candidate !== "object" || candidate === null) {
+    throw new Error("Project IO smoke source should contain a GrooveForge project object.");
+  }
+  const project = candidate as Record<string, unknown>;
+  if (
+    typeof project.title !== "string" ||
+    typeof project.bpm !== "number" ||
+    !Number.isFinite(project.bpm) ||
+    typeof project.key !== "string" ||
+    typeof project.styleId !== "string" ||
+    typeof project.mode !== "string" ||
+    typeof project.selectedPattern !== "string"
+  ) {
+    throw new Error("Project IO smoke source is missing the title, BPM, key, style, mode, or selected Pattern UI fingerprint.");
+  }
+  return {
+    bpm: project.bpm,
+    key: project.key,
+    mode: project.mode,
+    selectedPattern: project.selectedPattern,
+    styleId: project.styleId,
+    title: project.title
+  };
+}
+
+function projectIoSmokeUiFingerprintDigest(fingerprint: ProjectIoSmokeUiFingerprint): string {
+  return createHash("sha256").update(JSON.stringify(fingerprint)).digest("hex");
+}
+
+async function readProjectIoSmokeUiFingerprint(win: BrowserWindow): Promise<ProjectIoSmokeUiFingerprint> {
+  return runProjectIoSmokeRendererStep<ProjectIoSmokeUiFingerprint>(
+    win,
+    "rendered project fingerprint",
+    `(() => {
+      const titleInput = document.querySelector('[data-testid="project-title-input"]');
+      const bpmInput = document.querySelector('[data-testid="project-bpm-input"]');
+      const keySelect = document.querySelector('[data-testid="project-key-select"]');
+      const styleSelect = document.querySelector('[data-testid="style-select"]');
+      const selectedMode = ["guided", "studio"].find((mode) =>
+        document.querySelector('[data-testid="mode-' + mode + '"]')?.classList.contains("selected")
+      ) ?? "";
+      const selectedPattern =
+        document.querySelector('[data-testid^="pattern-tab-"][aria-selected="true"]')
+          ?.getAttribute("data-testid")
+          ?.replace("pattern-tab-", "") ?? "";
+      return {
+        bpm: bpmInput instanceof HTMLInputElement && bpmInput.value !== "" ? Number(bpmInput.value) : -1,
+        key: keySelect instanceof HTMLSelectElement ? keySelect.value : "",
+        mode: selectedMode,
+        selectedPattern,
+        styleId: styleSelect instanceof HTMLSelectElement ? styleSelect.value : "",
+        title: titleInput instanceof HTMLInputElement ? titleInput.value : ""
+      };
+    })()`
+  );
+}
+
+function projectIoSmokeUiFingerprintsMatch(
+  source: ProjectIoSmokeUiFingerprint,
+  rendered: ProjectIoSmokeUiFingerprint
+): boolean {
+  return projectIoSmokeUiFingerprintDigest(source) === projectIoSmokeUiFingerprintDigest(rendered);
+}
+
+async function clickProjectIoSmokeNativeOpen(win: BrowserWindow): Promise<ProjectIoSmokeNativeOpenActivationEvidence> {
+  const activation = await runProjectIoSmokeRendererStep<ProjectIoSmokeNativeOpenActivationEvidence>(
+    win,
+    "native Open hit test",
+    `(() => {
+      const testId = "project-open";
+      const target = document.querySelector('[data-testid="' + testId + '"]');
+      if (!(target instanceof HTMLElement)) {
+        return { hitTestMatched: false, point: null, targetPresent: false, targetVisible: false, testId };
+      }
+      target.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
+      const rect = target.getBoundingClientRect();
+      const style = getComputedStyle(target);
+      const targetVisible =
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== "none" &&
+        style.visibility !== "hidden";
+      if (!targetVisible) {
+        return { hitTestMatched: false, point: null, targetPresent: true, targetVisible, testId };
+      }
+      const point = {
+        x: Math.round(rect.left + rect.width / 2),
+        y: Math.round(rect.top + rect.height / 2)
+      };
+      const hit = document.elementFromPoint(point.x, point.y);
+      return {
+        hitTestMatched: hit === target || (hit instanceof Node && target.contains(hit)),
+        point,
+        targetPresent: true,
+        targetVisible,
+        testId
+      };
+    })()`
+  );
+  if (!activation.targetPresent || !activation.targetVisible || !activation.hitTestMatched || !activation.point) {
+    throw new Error("Could not hit-test the visible project Open button for native pointer activation.");
+  }
+
+  win.show();
+  win.focus();
+  win.webContents.focus();
+  win.webContents.sendInputEvent({ type: "mouseMove", x: activation.point.x, y: activation.point.y });
+  win.webContents.sendInputEvent({
+    type: "mouseDown",
+    x: activation.point.x,
+    y: activation.point.y,
+    button: "left",
+    clickCount: 1
+  });
+  win.webContents.sendInputEvent({
+    type: "mouseUp",
+    x: activation.point.x,
+    y: activation.point.y,
+    button: "left",
+    clickCount: 1
+  });
+  await new Promise((resolve) => setTimeout(resolve, 140));
+  return activation;
+}
+
 async function collectProjectIoSmokeEvidence(win: BrowserWindow): Promise<ProjectIoSmokeEvidence> {
   const sourcePath = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SOURCE_PATH;
   const targetPath = projectIoSmokePath();
@@ -4193,26 +6285,29 @@ async function collectProjectIoSmokeEvidence(win: BrowserWindow): Promise<Projec
   }
 
   const sourceContents = await readFile(sourcePath, "utf8");
+  const sourceUiFingerprint = projectIoSmokeUiFingerprintFromSource(sourceContents);
   const defaultName = path.basename(targetPath);
-  const evidence = await win.webContents.executeJavaScript(`
-    (async () => {
-      const sourceContents = ${JSON.stringify(sourceContents)};
-      const defaultName = ${JSON.stringify(defaultName)};
-      const targetPath = ${JSON.stringify(targetPath)};
+  const metadata = await runProjectIoSmokeRendererStep<
+    Pick<
+      ProjectIoSmokeEvidence,
+      | "appKind"
+      | "hasOpenProject"
+      | "hasPreloadBridge"
+      | "hasRecoveryBridge"
+      | "hasSaveProject"
+      | "location"
+      | "readyState"
+      | "samplingTextPresent"
+      | "title"
+    >
+  >(
+    win,
+    "bridge readiness",
+    `(() => {
       const bridge = window.grooveforge;
       const bodyText = document.body?.textContent ?? "";
-      const saveResult = await bridge?.saveProject?.(sourceContents, defaultName);
-      const openResult = await bridge?.openProject?.();
-      const recoverySaveResult = await bridge?.saveProjectRecovery?.(sourceContents);
-      const recoveryLoadResult = await bridge?.loadProjectRecovery?.();
-      const recoveryClearResult = await bridge?.clearProjectRecovery?.();
-      const recoveryAfterClear = await bridge?.loadProjectRecovery?.();
-      const projectOpenButton = document.querySelector('[data-testid="project-open"]');
-      projectOpenButton?.click();
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       return {
         appKind: bridge?.appKind ?? null,
-        defaultName,
         hasOpenProject: typeof bridge?.openProject === "function",
         hasPreloadBridge: Boolean(bridge),
         hasRecoveryBridge:
@@ -4221,41 +6316,163 @@ async function collectProjectIoSmokeEvidence(win: BrowserWindow): Promise<Projec
           typeof bridge?.clearProjectRecovery === "function",
         hasSaveProject: typeof bridge?.saveProject === "function",
         location: window.location.href,
-        launchpadCollapsedAfterUiOpen:
-          document.querySelector('[data-testid="first-run-launchpad"]')?.open === false,
-        openResult: {
-          canceled: openResult?.canceled === true,
-          contentsLength: typeof openResult?.contents === "string" ? openResult.contents.length : undefined,
-          contentsMatched: openResult?.contents === sourceContents,
-          filePath: openResult?.filePath
-        },
         readyState: document.readyState,
-        recoveryResult: {
-          cleared: recoveryClearResult?.cleared === true,
-          contentsMatched: recoveryLoadResult?.contents === sourceContents,
-          emptyAfterClear: recoveryAfterClear === null,
-          narrowSaveResponse:
-            recoverySaveResult !== null &&
-            typeof recoverySaveResult === "object" &&
-            !("contents" in recoverySaveResult),
-          savedAtReady:
-            typeof recoverySaveResult?.savedAt === "string" &&
-            recoverySaveResult.savedAt === recoveryLoadResult?.savedAt
-        },
-        projectOpenButtonPresent: projectOpenButton !== null,
         samplingTextPresent: /AudioClipEvent|sample import|sample browser|chop pads|sampler track|audio clip/i.test(bodyText),
-        saveResult: {
-          canceled: saveResult?.canceled === true,
-          databaseStored: saveResult?.databaseStored,
-          filePath: saveResult?.filePath
-        },
-        sourceLength: sourceContents.length,
-        targetPath,
         title: document.title
       };
-    })();
-  `);
-  return evidence as ProjectIoSmokeEvidence;
+    })()`
+  );
+  const saveResult = await runProjectIoSmokeRendererStep<{
+    canceled?: boolean;
+    databaseStored?: boolean;
+    filePath?: string;
+  }>(
+    win,
+    "native save",
+    `(async () => window.grooveforge?.saveProject?.(${JSON.stringify(sourceContents)}, ${JSON.stringify(defaultName)}))()`
+  );
+  const openResult = await runProjectIoSmokeRendererStep<{
+    canceled?: boolean;
+    contents?: string;
+    filePath?: string;
+  }>(win, "native open", `(async () => window.grooveforge?.openProject?.())()`);
+  const preOpenState = await runProjectIoSmokeRendererStep<{
+    projectOpenButtonPresent: boolean;
+    recoveryPresent: boolean;
+  }>(
+    win,
+    "Open button preparation",
+    `(() => {
+      const button = document.querySelector('[data-testid="project-open"]');
+      window.__grooveforgeProjectIoSmokeOriginalConfirm = window.confirm;
+      window.__grooveforgeProjectIoSmokeConfirmMessages = [];
+      window.confirm = (message) => {
+        window.__grooveforgeProjectIoSmokeConfirmMessages.push(String(message));
+        return true;
+      };
+      return {
+        projectOpenButtonPresent: button !== null,
+        recoveryPresent: document.querySelector('[data-testid="local-draft-recovery"]') !== null
+      };
+    })()`
+  );
+  const nativeOpenActivation = await clickProjectIoSmokeNativeOpen(win);
+
+  let launchpadCollapsedAfterUiOpen = false;
+  let renderedUiFingerprint = await readProjectIoSmokeUiFingerprint(win);
+  let uiFingerprintMatched = projectIoSmokeUiFingerprintsMatch(sourceUiFingerprint, renderedUiFingerprint);
+  const uiOpenDeadline = Date.now() + 15000;
+  while ((!launchpadCollapsedAfterUiOpen || !uiFingerprintMatched) && Date.now() < uiOpenDeadline) {
+    const uiOpenState = await runProjectIoSmokeRendererStep<{
+      fingerprint: ProjectIoSmokeUiFingerprint;
+      launchpadCollapsed: boolean;
+    }>(
+      win,
+      "Open button result",
+      `(() => {
+        const titleInput = document.querySelector('[data-testid="project-title-input"]');
+        const bpmInput = document.querySelector('[data-testid="project-bpm-input"]');
+        const keySelect = document.querySelector('[data-testid="project-key-select"]');
+        const styleSelect = document.querySelector('[data-testid="style-select"]');
+        return {
+          fingerprint: {
+            bpm: bpmInput instanceof HTMLInputElement && bpmInput.value !== "" ? Number(bpmInput.value) : -1,
+            key: keySelect instanceof HTMLSelectElement ? keySelect.value : "",
+            mode: ["guided", "studio"].find((mode) =>
+              document.querySelector('[data-testid="mode-' + mode + '"]')?.classList.contains("selected")
+            ) ?? "",
+            selectedPattern:
+              document.querySelector('[data-testid^="pattern-tab-"][aria-selected="true"]')
+                ?.getAttribute("data-testid")
+                ?.replace("pattern-tab-", "") ?? "",
+            styleId: styleSelect instanceof HTMLSelectElement ? styleSelect.value : "",
+            title: titleInput instanceof HTMLInputElement ? titleInput.value : ""
+          },
+          launchpadCollapsed: document.querySelector('[data-testid="first-run-launchpad"]')?.open === false
+        };
+      })()`,
+      60000
+    );
+    launchpadCollapsedAfterUiOpen = uiOpenState.launchpadCollapsed;
+    renderedUiFingerprint = uiOpenState.fingerprint;
+    uiFingerprintMatched = projectIoSmokeUiFingerprintsMatch(sourceUiFingerprint, renderedUiFingerprint);
+    if (!launchpadCollapsedAfterUiOpen || !uiFingerprintMatched) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+  const replacementConfirmCallCount = await runProjectIoSmokeRendererStep<number>(
+    win,
+    "replacement confirmation cleanup",
+    `(() => {
+      const messages = window.__grooveforgeProjectIoSmokeConfirmMessages ?? [];
+      window.confirm = window.__grooveforgeProjectIoSmokeOriginalConfirm;
+      delete window.__grooveforgeProjectIoSmokeOriginalConfirm;
+      delete window.__grooveforgeProjectIoSmokeConfirmMessages;
+      return messages.length;
+    })()`
+  );
+  const recoverySaveResult = await runProjectIoSmokeRendererStep<{ savedAt?: string }>(
+    win,
+    "recovery save",
+    `(async () => window.grooveforge?.saveProjectRecovery?.(${JSON.stringify(sourceContents)}))()`
+  );
+  const recoveryLoadResult = await runProjectIoSmokeRendererStep<{ contents?: string; savedAt?: string } | null>(
+    win,
+    "recovery load",
+    `(async () => window.grooveforge?.loadProjectRecovery?.())()`
+  );
+  const recoveryClearResult = await runProjectIoSmokeRendererStep<{ cleared?: boolean }>(
+    win,
+    "recovery clear",
+    `(async () => window.grooveforge?.clearProjectRecovery?.())()`
+  );
+  const recoveryAfterClear = await runProjectIoSmokeRendererStep<unknown>(
+    win,
+    "recovery verification",
+    `(async () => window.grooveforge?.loadProjectRecovery?.())()`
+  );
+
+  return {
+    ...metadata,
+    defaultName,
+    launchpadCollapsedAfterUiOpen,
+    nativeOpenActivation,
+    openResult: {
+      canceled: openResult?.canceled === true,
+      contentsLength: typeof openResult?.contents === "string" ? openResult.contents.length : undefined,
+      contentsMatched: openResult?.contents === sourceContents,
+      filePath: openResult?.filePath
+    },
+    preOpenRecoveryPresent: preOpenState.recoveryPresent,
+    projectOpenButtonPresent: preOpenState.projectOpenButtonPresent,
+    recoveryResult: {
+      cleared: recoveryClearResult?.cleared === true,
+      contentsMatched: recoveryLoadResult?.contents === sourceContents,
+      emptyAfterClear: recoveryAfterClear === null,
+      narrowSaveResponse:
+        recoverySaveResult !== null &&
+        typeof recoverySaveResult === "object" &&
+        !("contents" in recoverySaveResult),
+      savedAtReady:
+        typeof recoverySaveResult?.savedAt === "string" &&
+        recoverySaveResult.savedAt === recoveryLoadResult?.savedAt
+    },
+    saveResult: {
+      canceled: saveResult?.canceled === true,
+      databaseStored: saveResult?.databaseStored,
+      filePath: saveResult?.filePath
+    },
+    replacementConfirmCallCount,
+    sourceLength: sourceContents.length,
+    targetPath,
+    uiFingerprint: {
+      matched: uiFingerprintMatched,
+      rendered: renderedUiFingerprint,
+      renderedDigest: projectIoSmokeUiFingerprintDigest(renderedUiFingerprint),
+      source: sourceUiFingerprint,
+      sourceDigest: projectIoSmokeUiFingerprintDigest(sourceUiFingerprint)
+    }
+  };
 }
 
 function projectIoSmokeFailures(evidence: ProjectIoSmokeEvidence): string[] {
@@ -4277,6 +6494,25 @@ function projectIoSmokeFailures(evidence: ProjectIoSmokeEvidence): string[] {
   }
   if (!evidence.projectOpenButtonPresent || !evidence.launchpadCollapsedAfterUiOpen) {
     failures.push("project Open UI should load the configured project and collapse the first-run launchpad");
+  }
+  if (
+    !evidence.nativeOpenActivation.targetPresent ||
+    !evidence.nativeOpenActivation.targetVisible ||
+    !evidence.nativeOpenActivation.hitTestMatched ||
+    evidence.nativeOpenActivation.point === null
+  ) {
+    failures.push("project Open UI should be visibly hit-tested and activated through native pointer input");
+  }
+  if (
+    !evidence.uiFingerprint.matched ||
+    evidence.uiFingerprint.sourceDigest !== evidence.uiFingerprint.renderedDigest
+  ) {
+    failures.push(
+      `project Open UI should render the source title, BPM, key, style, mode, and selected Pattern fingerprint; expected ${JSON.stringify(evidence.uiFingerprint.source)}, got ${JSON.stringify(evidence.uiFingerprint.rendered)}`
+    );
+  }
+  if (evidence.preOpenRecoveryPresent || evidence.replacementConfirmCallCount !== 0) {
+    failures.push("isolated project IO smoke should open without a recovery banner or replacement confirmation");
   }
   if (evidence.saveResult.canceled) {
     failures.push("native saveProject should not be canceled in project IO smoke");
@@ -4315,6 +6551,7 @@ function installLaunchSmoke(win: BrowserWindow): void {
   let finished = false;
   let closedDetailsEvidence: LaunchSmokeClosedDetailsEvidence | null = null;
   let drumGridKeyboardEvidence: LaunchSmokeDrumGridKeyboardEvidence | null = null;
+  let functionalTabsEvidence: LaunchSmokeFunctionalTabsEvidence | null = null;
   let noteGridKeyboardEvidence: LaunchSmokeNoteGridKeyboardEvidence | null = null;
   let minimumWindowEvidence: LaunchSmokeMinimumWindowEvidence | null = null;
   let lastProgress: Record<string, unknown> = { phase: "waiting-ready-to-show" };
@@ -4369,6 +6606,9 @@ function installLaunchSmoke(win: BrowserWindow): void {
             }
           };
         }
+        if (functionalTabsEvidence) {
+          evidence = { ...evidence, functionalTabs: functionalTabsEvidence };
+        }
         if (finished) {
           return;
         }
@@ -4376,6 +6616,37 @@ function installLaunchSmoke(win: BrowserWindow): void {
         const failures = launchSmokeFailures(evidence);
         updateProgress({ phase: "dom-collected", evidence, failures });
         if (failures.length === 0) {
+          if (!functionalTabsEvidence) {
+            updateProgress({ phase: "collecting-functional-tabs", evidence });
+            return collectLaunchSmokeFunctionalTabsEvidenceWithTimeout(win, (step) => {
+              updateProgress({ phase: "collecting-functional-tabs", step, evidence });
+            })
+              .then((collectedEvidence) => {
+                if (finished) {
+                  return;
+                }
+                const functionalTabFailures = launchSmokeFunctionalTabsFailures(collectedEvidence);
+                functionalTabsEvidence = collectedEvidence;
+                updateProgress({
+                  phase: "functional-tabs-collected",
+                  evidence: { ...evidence, functionalTabs: collectedEvidence },
+                  failures: functionalTabFailures
+                });
+                if (functionalTabFailures.length > 0) {
+                  fail("Production desktop functional tab screen smoke failed.", {
+                    evidence: collectedEvidence,
+                    failures: functionalTabFailures
+                  });
+                  return;
+                }
+                setTimeout(() => poll(deadline), 100);
+              })
+              .catch((error: unknown) => {
+                fail("Production desktop functional tab screen evidence failed.", {
+                  error: error instanceof Error ? error.message : String(error)
+                });
+              });
+          }
           if (!closedDetailsEvidence) {
             updateProgress({ phase: "collecting-closed-details", evidence });
             return collectLaunchSmokeClosedDetailsEvidenceWithTimeout(win)
@@ -4913,7 +7184,7 @@ function createWindow(): void {
     title: "GrooveForge",
     backgroundColor: "#0f1115",
     paintWhenInitiallyHidden: true,
-    show: false,
+    show: isProjectIoSmoke,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       nodeIntegration: false,
@@ -4921,6 +7192,8 @@ function createWindow(): void {
       sandbox: true,
       partition: isLaunchSmoke
         ? `grooveforge-launch-smoke-${process.pid}`
+        : isProjectIoSmoke
+          ? `grooveforge-project-io-smoke-${process.pid}`
         : isCloseFlowSmoke
           ? `grooveforge-close-flow-smoke-${process.pid}`
           : undefined,
