@@ -33,7 +33,8 @@ import {
   X
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode, Ref } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
+import type { ProjectAudioAnalysisStatus } from "./useProjectAudioAnalysis";
 import { deliveryBundleZipFileName } from "../audio/deliveryBundle";
 import { exportMidi, midiFileName } from "../audio/midi";
 import {
@@ -192,6 +193,10 @@ import {
   steps,
   styleProfiles
 } from "../domain/workstation";
+import {
+  workflowNavigatorAnalysisPosture,
+  type WorkflowNavigatorAnalysisStatus
+} from "./workflowNavigatorAnalysisPosture";
 
 import type {
   KeyboardCaptureKey,
@@ -3189,6 +3194,42 @@ export function SectionLocatorCueDecision({
   );
 }
 
+export function ProjectAudioAnalysisGate({
+  onRetry,
+  status,
+  surface
+}: {
+  onRetry: () => void;
+  status: ProjectAudioAnalysisStatus;
+  surface: "Guide" | "Mix" | "Master" | "Deliver";
+}): ReactElement {
+  const pending = status === "pending";
+  const title = pending ? "Analyzing" : "Meters unavailable";
+  const detail = pending
+    ? `Exact ${surface} meters are updating for the current project.`
+    : `Exact ${surface} meters could not be calculated for the current project.`;
+
+  return (
+    <div
+      aria-live="polite"
+      className={`project-audio-analysis-gate ${status}`}
+      data-analysis-status={status}
+      data-analysis-surface={surface.toLowerCase()}
+      data-testid={`audio-analysis-gate-${surface.toLowerCase()}`}
+      role="status"
+    >
+      <strong>{title}</strong>
+      <span>{detail}</span>
+      <small>Meter values, readiness claims, and delivery actions stay hidden until analysis is exact.</small>
+      {!pending && (
+        <button data-testid={`audio-analysis-gate-retry-${surface.toLowerCase()}`} onClick={onRetry} type="button">
+          Retry meters
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function DeliveryTargets({
   onApply,
   onCustomChange,
@@ -3435,6 +3476,8 @@ export function DeliveryTargetAlignmentResultStrip({ result }: { result: Deliver
 }
 
 export function SessionBriefPanel({
+  analysisStatus,
+  authoritativeRevision,
   brief,
   compass,
   compassResult,
@@ -3450,8 +3493,11 @@ export function SessionBriefPanel({
   onChange,
   onClear,
   onFocusCompass,
-  onFocusReferenceAlignment
+  onFocusReferenceAlignment,
+  onRetryMeters
 }: {
+  analysisStatus: ProjectAudioAnalysisStatus;
+  authoritativeRevision: number;
   brief: SessionBrief;
   compass: SessionBriefCompassSummary;
   compassResult: SessionBriefCompassFocusResult | null;
@@ -3468,6 +3514,7 @@ export function SessionBriefPanel({
   onClear: () => void;
   onFocusCompass: (card: SessionBriefCompassCard) => void;
   onFocusReferenceAlignment: (card: ReferenceAlignmentCard) => void;
+  onRetryMeters: () => void;
 }): ReactElement {
   const filledFields = sessionBriefFilledFields(brief);
   const roleSummary = createSessionBriefRoleSummary(brief);
@@ -3493,6 +3540,8 @@ export function SessionBriefPanel({
         </div>
       </div>
       <div className="session-brief-body">
+        {analysisStatus === "ready" ? (
+          <>
         <div
           aria-label={`${compass.headline}: ${compass.detail}`}
           className={`session-brief-compass ${compass.tone}`}
@@ -3543,6 +3592,10 @@ export function SessionBriefPanel({
           result={referenceAlignmentResult}
           summary={referenceAlignment}
         />
+          </>
+        ) : (
+          <ProjectAudioAnalysisGate onRetry={onRetryMeters} status={analysisStatus} surface="Guide" />
+        )}
         <div className="session-brief-starters" aria-label="Session Brief Starter Pads">
           {starterPads.map((pad) => (
             <button
@@ -3560,56 +3613,12 @@ export function SessionBriefPanel({
           ))}
         </div>
         {result && <SessionBriefStarterResultStrip result={result} />}
-        <div className="session-brief-fields">
-          <label className="session-brief-field">
-            <span>Artist</span>
-            <input
-              data-testid="session-brief-artist"
-              maxLength={maxSessionBriefFieldLength}
-              onChange={(event) => onChange("artist", event.target.value)}
-              placeholder="Artist or client"
-              ref={fieldRefs.artist}
-              type="text"
-              value={brief.artist}
-            />
-          </label>
-          <label className="session-brief-field">
-            <span>Vibe</span>
-            <input
-              data-testid="session-brief-vibe"
-              maxLength={maxSessionBriefFieldLength}
-              onChange={(event) => onChange("vibe", event.target.value)}
-              placeholder="Mood or energy"
-              ref={fieldRefs.vibe}
-              type="text"
-              value={brief.vibe}
-            />
-          </label>
-          <label className="session-brief-field">
-            <span>Reference</span>
-            <input
-              data-testid="session-brief-reference"
-              maxLength={maxSessionBriefFieldLength}
-              onChange={(event) => onChange("reference", event.target.value)}
-              placeholder="Track or scene"
-              ref={fieldRefs.reference}
-              type="text"
-              value={brief.reference}
-            />
-          </label>
-          <label className="session-brief-field notes">
-            <span>Notes</span>
-            <textarea
-              data-testid="session-brief-notes"
-              maxLength={maxSessionBriefNotesLength}
-              onChange={(event) => onChange("notes", event.target.value)}
-              placeholder="Handoff notes"
-              ref={fieldRefs.notes}
-              rows={2}
-              value={brief.notes}
-            />
-          </label>
-        </div>
+        <SessionBriefFields
+          authoritativeRevision={authoritativeRevision}
+          brief={brief}
+          fieldRefs={fieldRefs}
+          onChange={onChange}
+        />
       </div>
       <button
         className="session-brief-clear"
@@ -3632,6 +3641,125 @@ export type SessionBriefFieldRefs = {
   reference: Ref<HTMLInputElement>;
   notes: Ref<HTMLTextAreaElement>;
 };
+
+/** Keep urgent typing work isolated from the diagnostic-heavy brief panel. */
+function SessionBriefFields({
+  authoritativeRevision,
+  brief,
+  fieldRefs,
+  onChange
+}: {
+  authoritativeRevision: number;
+  brief: SessionBrief;
+  fieldRefs: SessionBriefFieldRefs;
+  onChange: (field: keyof SessionBrief, value: string) => void;
+}): ReactElement {
+  const [draft, setDraft] = useState(brief);
+  const activeFieldRef = useRef<keyof SessionBrief | null>(null);
+
+  useEffect(() => {
+    activeFieldRef.current = null;
+    setDraft(brief);
+  }, [authoritativeRevision, brief]);
+
+  const updateDraft = (field: keyof SessionBrief, value: string): void => {
+    setDraft((current) => (current[field] === value ? current : { ...current, [field]: value }));
+  };
+
+  const commitDraft = (field: keyof SessionBrief, value: string, keepFocus = false): void => {
+    activeFieldRef.current = keepFocus ? field : null;
+    startTransition(() => onChange(field, value));
+  };
+
+  return (
+    <div className="session-brief-fields">
+      <label className="session-brief-field">
+        <span>Artist</span>
+        <input
+          data-testid="session-brief-artist"
+          maxLength={maxSessionBriefFieldLength}
+          onChange={(event) => updateDraft("artist", event.target.value)}
+          onFocus={() => {
+            activeFieldRef.current = "artist";
+          }}
+          onBlur={(event) => commitDraft("artist", event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+              commitDraft("artist", event.currentTarget.value, true);
+            }
+          }}
+          placeholder="Artist or client"
+          ref={fieldRefs.artist}
+          type="text"
+          value={draft.artist}
+        />
+      </label>
+      <label className="session-brief-field">
+        <span>Vibe</span>
+        <input
+          data-testid="session-brief-vibe"
+          maxLength={maxSessionBriefFieldLength}
+          onChange={(event) => updateDraft("vibe", event.target.value)}
+          onFocus={() => {
+            activeFieldRef.current = "vibe";
+          }}
+          onBlur={(event) => commitDraft("vibe", event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+              commitDraft("vibe", event.currentTarget.value, true);
+            }
+          }}
+          placeholder="Mood or energy"
+          ref={fieldRefs.vibe}
+          type="text"
+          value={draft.vibe}
+        />
+      </label>
+      <label className="session-brief-field">
+        <span>Reference</span>
+        <input
+          data-testid="session-brief-reference"
+          maxLength={maxSessionBriefFieldLength}
+          onChange={(event) => updateDraft("reference", event.target.value)}
+          onFocus={() => {
+            activeFieldRef.current = "reference";
+          }}
+          onBlur={(event) => commitDraft("reference", event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+              commitDraft("reference", event.currentTarget.value, true);
+            }
+          }}
+          placeholder="Track or scene"
+          ref={fieldRefs.reference}
+          type="text"
+          value={draft.reference}
+        />
+      </label>
+      <label className="session-brief-field notes">
+        <span>Notes</span>
+        <textarea
+          data-testid="session-brief-notes"
+          maxLength={maxSessionBriefNotesLength}
+          onChange={(event) => updateDraft("notes", event.target.value)}
+          onFocus={() => {
+            activeFieldRef.current = "notes";
+          }}
+          onBlur={(event) => commitDraft("notes", event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+              commitDraft("notes", event.currentTarget.value, true);
+            }
+          }}
+          placeholder="Handoff notes"
+          ref={fieldRefs.notes}
+          rows={2}
+          value={draft.notes}
+        />
+      </label>
+    </div>
+  );
+}
 
 export function SessionBriefCompassFocusResultStrip({ result }: { result: SessionBriefCompassFocusResult }): ReactElement {
   return (
@@ -4799,6 +4927,8 @@ export function FinishChecklistFocusResultStrip({ result }: { result: FinishChec
 }
 
 export function ReviewQueue({
+  analysis,
+  analysisPending,
   summary,
   fixResult,
   focusedItemId,
@@ -4808,6 +4938,8 @@ export function ReviewQueue({
   onFix,
   onFocus
 }: {
+  analysis: ExportAnalysis;
+  analysisPending: boolean;
   summary: ReviewQueueSummary;
   fixResult: ReviewFixResult | null;
   focusedItemId: string | null;
@@ -4821,7 +4953,7 @@ export function ReviewQueue({
   const priority = createReviewQueuePriority(summary);
   const priorityItem = summary.items.find((item) => item.id === priority.itemId) ?? null;
   const priorityActionDisabled = priorityItem === null;
-  const fixPreview = createReviewFixPreview(summary, focusedItemId, project, analyzeExport(project));
+  const fixPreview = createReviewFixPreview(summary, focusedItemId, project, analysis);
 
   return (
     <section
@@ -4880,8 +5012,8 @@ export function ReviewQueue({
       <div className="review-queue-list" data-testid="review-queue-list">
         {summary.items.map((item) => {
           const focused = focusedItemId !== null && item.id === focusedItemId;
-          const fix = createReviewFixOption(item, project, analyzeExport(project));
-          const fixDisabled = item.tone === "good" || fix === null;
+          const fix = createReviewFixOption(item, project, analysis);
+          const fixDisabled = analysisPending || item.tone === "good" || fix === null;
           return (
             <div
               className={["review-queue-item", item.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
@@ -4908,7 +5040,13 @@ export function ReviewQueue({
                   data-testid={`review-queue-fix-${item.id}`}
                   disabled={fixDisabled}
                   onClick={() => onFix(item)}
-                  title={fix ? `Apply ${fix.label}: ${fix.detail}` : "No Review Fix for this item"}
+                  title={
+                    analysisPending
+                      ? "Audio meters updating; Review Fix will be available when exact meters are ready"
+                      : fix
+                        ? `Apply ${fix.label}: ${fix.detail}`
+                        : "No Review Fix for this item"
+                  }
                   type="button"
                 >
                   <SlidersHorizontal size={13} aria-hidden="true" />
@@ -10940,12 +11078,14 @@ export function beatPassportFocusResultNextCheck(metric: BeatPassportFocusItem):
   }
 }
 
-export function createSnapshotCompareProjectProfile(project: ProjectState): SnapshotCompareProjectProfile {
+export function createSnapshotCompareProjectProfileFromAnalysis(
+  project: ProjectState,
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): SnapshotCompareProjectProfile {
   const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
   const target = activeDeliveryTarget(project);
   const bars = arrangementTotalBars(project);
-  const analysis = analyzeExport(project);
-  const stemAnalyses = analyzeStemExports(project);
   const checks = createBeatReadinessChecks(project, analysis);
   const readyCount = checks.filter((check) => check.tone === "good").length;
   const readinessTone = weakestTone(checks.map((check) => check.tone));
@@ -10972,6 +11112,48 @@ export function createSnapshotCompareProjectProfile(project: ProjectState): Snap
     master: project.masterPreset,
     masterDetail: `${formatDb(project.masterCeilingDb)} ceiling / ${formatDb(masterChannelVolumeDb(project.mixer))} output`
   };
+}
+
+export function createSnapshotCompareDeferredProjectProfile(
+  project: ProjectState,
+  status: "pending" | "error"
+): SnapshotCompareProjectProfile {
+  const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const pending = status === "pending";
+
+  return {
+    setup: `${styleName} / ${project.key} / ${project.bpm} BPM`,
+    targetName: target.name,
+    bars,
+    length: barCountLabel(bars),
+    readyCount: 0,
+    readiness: pending ? "Analyzing" : "Unavailable",
+    readinessTone: "warn",
+    exportStatus: pending ? "Analyzing" : "Unavailable",
+    exportDetail: pending ? "exact local meters pending" : "exact local meters unavailable",
+    exportTone: "warn",
+    stemCount: 0,
+    stemGoal: target.stemGoal,
+    stems: pending ? "Analyzing" : "Unavailable",
+    stemTone: "warn",
+    master: project.masterPreset,
+    masterDetail: `${formatDb(project.masterCeilingDb)} ceiling / ${formatDb(masterChannelVolumeDb(project.mixer))} output`
+  };
+}
+
+/**
+ * Exact fallback for saved snapshot profiles and non-interactive callers.
+ * App render paths inject the worker-owned exact analysis above so React
+ * reconciliation never performs a multi-bar PCM render on the main thread.
+ */
+export function createSnapshotCompareProjectProfile(project: ProjectState): SnapshotCompareProjectProfile {
+  return createSnapshotCompareProjectProfileFromAnalysis(
+    project,
+    analyzeExport(project),
+    analyzeStemExports(project)
+  );
 }
 
 export function createFinishChecklistSummary(
@@ -11265,12 +11447,15 @@ export function createWorkflowNavigatorItems(
   project: ProjectState,
   beatMap: BeatMapSummary,
   exportPreflight: ExportPreflightSummary,
-  analysis: ExportAnalysis
+  analysis: ExportAnalysis,
+  analysisStatus: WorkflowNavigatorAnalysisStatus = "ready"
 ): WorkflowNavigatorItem[] {
   const composeStage = beatMap.stages.find((stage) => stage.id === "compose") ?? beatMap.stages[1];
   const arrangeStage = beatMap.stages.find((stage) => stage.id === "arrange") ?? beatMap.stages[2];
   const polishStage = beatMap.stages.find((stage) => stage.id === "polish") ?? beatMap.stages[3];
   const deliverStage = beatMap.stages.find((stage) => stage.id === "deliver") ?? beatMap.stages[4];
+  const mixAnalysisPosture = workflowNavigatorAnalysisPosture("mix", analysisStatus);
+  const deliverAnalysisPosture = workflowNavigatorAnalysisPosture("deliver", analysisStatus);
 
   return [
     {
@@ -11290,16 +11475,16 @@ export function createWorkflowNavigatorItems(
     {
       id: "mix",
       label: "Mix",
-      value: analysis.status,
-      detail: `${polishStage.status} / ${polishStage.detail}`,
-      tone: polishStage.tone
+      value: mixAnalysisPosture?.value ?? analysis.status,
+      detail: mixAnalysisPosture?.detail ?? `${polishStage.status} / ${polishStage.detail}`,
+      tone: mixAnalysisPosture ? "warn" : polishStage.tone
     },
     {
       id: "deliver",
       label: "Deliver",
-      value: exportPreflight.headline,
-      detail: `${deliverStage.status} / ${exportPreflight.detail}`,
-      tone: weakestTone([deliverStage.tone, exportPreflight.tone])
+      value: deliverAnalysisPosture?.value ?? exportPreflight.headline,
+      detail: deliverAnalysisPosture?.detail ?? `${deliverStage.status} / ${exportPreflight.detail}`,
+      tone: deliverAnalysisPosture ? "warn" : weakestTone([deliverStage.tone, exportPreflight.tone])
     }
   ];
 }

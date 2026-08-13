@@ -16,8 +16,49 @@ const workstation = await import("../../src/domain/workstation.ts");
 const render = await import("../../src/audio/render.ts");
 const midi = await import("../../src/audio/midi.ts");
 const handoff = await import("../../src/audio/handoff.ts");
+const projectExportCompletion = await import("../../src/ui/projectExportCompletion.ts");
 
 const forbiddenSamplingText = /AudioClipEvent|sampler|sample import|sample browser|chop pads|audio clip/i;
+
+const exportSourceProject = { id: "source" };
+const exportReplacementProject = { id: "replacement" };
+check(
+  projectExportCompletion.shouldCommitProjectExportResult(8, 8, exportSourceProject, exportSourceProject) === true,
+  "latest export request should commit for the exact source project"
+);
+check(
+  projectExportCompletion.shouldCommitProjectExportResult(7, 8, exportSourceProject, exportSourceProject) === false,
+  "older export request should not commit after a newer export begins"
+);
+check(
+  projectExportCompletion.shouldCommitProjectExportResult(8, 8, exportSourceProject, exportReplacementProject) === false,
+  "export request should not commit after full project replacement"
+);
+const sourceReceipt = { status: "Exported WAV" };
+const sourceReceiptBinding = projectExportCompletion.bindProjectExportReceipt(exportSourceProject, sourceReceipt);
+check(
+  projectExportCompletion.currentProjectExportReceipt(sourceReceiptBinding, exportSourceProject) === sourceReceipt,
+  "an export receipt should remain current for its exact immutable project reference"
+);
+for (const [label, mutatedProject] of [
+  ["title", { ...exportSourceProject, title: "Renamed" }],
+  ["tempo", { ...exportSourceProject, bpm: 111 }],
+  ["mixer", { ...exportSourceProject, mixer: [{ id: "master", volumeDb: -2 }] }]
+]) {
+  check(
+    projectExportCompletion.currentProjectExportReceipt(sourceReceiptBinding, mutatedProject) === null,
+    `${label} mutation should stale the previous export receipt`
+  );
+}
+const reexportedProject = { ...exportSourceProject, title: "Renamed" };
+const reexportedReceipt = { status: "Exported bundle" };
+check(
+  projectExportCompletion.currentProjectExportReceipt(
+    projectExportCompletion.bindProjectExportReceipt(reexportedProject, reexportedReceipt),
+    reexportedProject
+  ) === reexportedReceipt,
+  "a new export should restore the receipt for the current project reference"
+);
 
 function cloneProject(project) {
   return workstation.parseProjectFile(workstation.serializeProjectFile(project));
@@ -180,6 +221,7 @@ if (failures.length > 0) {
 
 console.log("GrooveForge workflow smoke passed.");
 console.log("- Scope: first-session beginner and producer workflows from starter project through setup, composition, arrangement, mix/master, save/load, export analysis, MIDI, and Handoff without media artifacts");
+console.log("- Project export isolation: latest-request and exact-project identity gates reject stale async delivery results");
 for (const summary of summaries) {
   console.log(
     `- ${summary.label}: ${summary.mode}, ${summary.bpm} BPM ${summary.key} ${summary.styleId}, ${summary.bars} bars, ${summary.deliveryTarget}, ${summary.masterPreset}, ${summary.status}, ${summary.projectBytes} project bytes, ${summary.midiBytes} MIDI bytes, events ${summary.counts.drums}/${summary.counts.bass}/${summary.counts.melody}/${summary.counts.chords}`

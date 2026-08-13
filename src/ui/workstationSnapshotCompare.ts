@@ -36,10 +36,9 @@ type CreateSnapshotCompareProjectProfile = (project: ProjectState) => SnapshotCo
 
 export function createSnapshotCompareSummary(
   project: ProjectState,
+  current: SnapshotCompareProjectProfile,
   createProjectProfile: CreateSnapshotCompareProjectProfile
 ): SnapshotCompareSummary {
-  const current = createProjectProfile(project);
-
   if (project.snapshots.length === 0) {
     return {
       headline: "No saved takes yet",

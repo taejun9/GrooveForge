@@ -684,6 +684,14 @@ Build and open the desktop app:
 npm run desktop
 ```
 
+Run a visible, isolated QA app without touching the normal user project database or recovery draft:
+
+```sh
+npm run desktop:manual-qa
+```
+
+This command requires built artifacts, creates a starter fixture and separate Open/Save targets under ignored `build/desktop/plan-1525-manual-qa/`, uses a non-persistent Electron partition and dedicated SQLite workspace, and routes WAV/MIDI/text/ZIP downloads into that workspace.
+
 Validation:
 
 ```sh

@@ -3812,8 +3812,32 @@ export function WorkflowNavigator({
   onJump: (item: WorkflowNavigatorItem) => void;
 }): ReactElement {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const tablistRef = useRef<HTMLDivElement | null>(null);
   const spotlight = createWorkflowSpotlightSummary(items);
   const spotlightItem = spotlight.zoneId ? items.find((item) => item.id === spotlight.zoneId) ?? null : null;
+
+  useEffect(() => {
+    const activeIndex = items.findIndex((item) => item.id === activeZone);
+    const activeTab = activeIndex >= 0 ? tabRefs.current[activeIndex] : null;
+    const tablist = tablistRef.current;
+    if (!activeTab || !tablist || tablist.scrollWidth <= tablist.clientWidth + 1) {
+      return;
+    }
+
+    const tablistRect = tablist.getBoundingClientRect();
+    const activeTabRect = activeTab.getBoundingClientRect();
+    if (activeTabRect.left < tablistRect.left || activeTabRect.right > tablistRect.right) {
+      const nearestScrollLeft =
+        tablist.scrollLeft +
+        (activeTabRect.left < tablistRect.left
+          ? activeTabRect.left - tablistRect.left
+          : activeTabRect.right - tablistRect.right);
+      tablist.scrollTo({
+        behavior: "auto",
+        left: Math.max(0, Math.min(nearestScrollLeft, tablist.scrollWidth - tablist.clientWidth))
+      });
+    }
+  }, [activeZone, items]);
 
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, currentIndex: number): void {
     if (event.key === " " || event.key === "Enter") {
@@ -3852,95 +3876,119 @@ export function WorkflowNavigator({
 
   return (
     <nav className="workflow-navigator" data-testid="workflow-navigator" aria-label="Workflow navigator" ref={sectionRef}>
-      <div className="workflow-navigator-heading">
-        <div>
-          <ArrowRight size={16} aria-hidden="true" />
-          <span>Workflow</span>
-        </div>
-        <strong>Compose to deliver</strong>
-        <small>Jump across the workstation</small>
-      </div>
-      <div
-        className={`workflow-spotlight-decision ${spotlight.tone}`}
-        data-workflow-spotlight-decision={spotlight.zoneId ?? "none"}
-        data-testid="workflow-spotlight-decision"
-        title={spotlight.decisionTitle}
+      <section
+        className="workspace-tabs-surface"
+        data-active-workspace-tab={activeZone}
+        data-testid="workspace-tabs-surface"
+        aria-labelledby="workspace-tabs-title"
       >
-        <span data-testid="workflow-spotlight-decision-status">{spotlight.decisionStatus}</span>
-        <strong data-testid="workflow-spotlight-decision-label">{spotlight.decisionLabel}</strong>
-        <small data-testid="workflow-spotlight-decision-detail">{spotlight.decisionDetail}</small>
+        <header className="workspace-tabs-heading">
+          <div className="workspace-tabs-kicker">
+            <SlidersHorizontal size={17} aria-hidden="true" />
+            <span>WORKSPACE TABS</span>
+          </div>
+          <strong id="workspace-tabs-title">Choose a production stage</strong>
+          <small>Compose · Arrange · Mix · Deliver</small>
+        </header>
+        <div
+          aria-label="Workstation function tabs"
+          aria-orientation="horizontal"
+          className="workflow-navigator-grid"
+          ref={tablistRef}
+          role="tablist"
+        >
+          {items.map((item, index) => {
+            const selected = item.id === activeZone;
+            return (
+              <button
+                aria-controls={`workspace-panel-${item.id}`}
+                aria-selected={selected}
+                className={`workflow-navigator-card ${item.tone}`}
+                data-testid={`workflow-jump-${item.id}`}
+                id={`workspace-tab-${item.id}`}
+                key={item.id}
+                onClick={() => onJump(item)}
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
+                onKeyUp={(event) => {
+                  if (event.key === " " || event.key === "Enter") {
+                    event.stopPropagation();
+                  }
+                }}
+                ref={(node) => {
+                  tabRefs.current[index] = node;
+                }}
+                role="tab"
+                tabIndex={selected ? 0 : -1}
+                title={`Jump to ${item.label}`}
+                type="button"
+              >
+                {workflowNavigatorIcon(item.id)}
+                <span className="workflow-tab-label">{item.label}</span>
+                <span className="workflow-tab-status" aria-hidden="true">
+                  {selected ? "ACTIVE" : String(index + 1).padStart(2, "0")}
+                </span>
+                <strong>{item.value}</strong>
+                <small>{item.detail}</small>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+      <section className="workflow-review-surface" aria-label="Workflow review">
+        <div className="workflow-navigator-heading">
+          <div>
+            <ArrowRight size={16} aria-hidden="true" />
+            <span>Workflow review</span>
+          </div>
+          <strong>Next production check</strong>
+          <small>Readiness guidance, separate from tabs</small>
+        </div>
+        <div
+          className={`workflow-spotlight-decision ${spotlight.tone}`}
+          data-workflow-spotlight-decision={spotlight.zoneId ?? "none"}
+          data-testid="workflow-spotlight-decision"
+          title={spotlight.decisionTitle}
+        >
+          <span data-testid="workflow-spotlight-decision-status">{spotlight.decisionStatus}</span>
+          <strong data-testid="workflow-spotlight-decision-label">{spotlight.decisionLabel}</strong>
+          <small data-testid="workflow-spotlight-decision-detail">{spotlight.decisionDetail}</small>
+          <button
+            className="workflow-spotlight-decision-action"
+            data-workflow-spotlight-decision-action={spotlightItem?.id ?? "none"}
+            data-testid="workflow-spotlight-decision-run"
+            disabled={!spotlightItem}
+            onClick={() => {
+              if (spotlightItem) {
+                onJump(spotlightItem);
+              }
+            }}
+            title={spotlightItem ? `Jump to ${spotlightItem.label}: ${spotlightItem.detail}` : spotlight.detailTitle}
+            type="button"
+          >
+            <ArrowRight size={13} aria-hidden="true" />
+            <span>{spotlight.decisionLabel}</span>
+          </button>
+        </div>
         <button
-          className="workflow-spotlight-decision-action"
-          data-workflow-spotlight-decision-action={spotlightItem?.id ?? "none"}
-          data-testid="workflow-spotlight-decision-run"
+          aria-label={spotlight.detailTitle}
+          className={`workflow-spotlight ${spotlight.tone}`}
+          data-spotlight-zone={spotlight.zoneId ?? "none"}
+          data-testid="workflow-spotlight"
           disabled={!spotlightItem}
           onClick={() => {
             if (spotlightItem) {
               onJump(spotlightItem);
             }
           }}
-          title={spotlightItem ? `Jump to ${spotlightItem.label}: ${spotlightItem.detail}` : spotlight.detailTitle}
+          title={spotlight.zoneId ? `Jump to ${spotlight.zoneLabel}` : spotlight.detailTitle}
           type="button"
         >
-          <ArrowRight size={13} aria-hidden="true" />
-          <span>{spotlight.decisionLabel}</span>
+          <span data-testid="workflow-spotlight-status">{spotlight.statusLabel}</span>
+          <strong data-testid="workflow-spotlight-zone">{spotlight.zoneLabel}</strong>
+          <small data-testid="workflow-spotlight-detail">{spotlight.detailLabel}</small>
+          <small data-testid="workflow-spotlight-count">{spotlight.countLabel}</small>
         </button>
-      </div>
-      <button
-        aria-label={spotlight.detailTitle}
-        className={`workflow-spotlight ${spotlight.tone}`}
-        data-spotlight-zone={spotlight.zoneId ?? "none"}
-        data-testid="workflow-spotlight"
-        disabled={!spotlightItem}
-        onClick={() => {
-          if (spotlightItem) {
-            onJump(spotlightItem);
-          }
-        }}
-        title={spotlight.zoneId ? `Jump to ${spotlight.zoneLabel}` : spotlight.detailTitle}
-        type="button"
-      >
-        <span data-testid="workflow-spotlight-status">{spotlight.statusLabel}</span>
-        <strong data-testid="workflow-spotlight-zone">{spotlight.zoneLabel}</strong>
-        <small data-testid="workflow-spotlight-detail">{spotlight.detailLabel}</small>
-        <small data-testid="workflow-spotlight-count">{spotlight.countLabel}</small>
-      </button>
-      <div
-        aria-label="Workstation function tabs"
-        aria-orientation="horizontal"
-        className="workflow-navigator-grid"
-        role="tablist"
-      >
-        {items.map((item, index) => (
-          <button
-            aria-controls={`workspace-panel-${item.id}`}
-            aria-selected={item.id === activeZone}
-            className={`workflow-navigator-card ${item.tone}`}
-            data-testid={`workflow-jump-${item.id}`}
-            id={`workspace-tab-${item.id}`}
-            key={item.id}
-            onClick={() => onJump(item)}
-            onKeyDown={(event) => handleTabKeyDown(event, index)}
-            onKeyUp={(event) => {
-              if (event.key === " " || event.key === "Enter") {
-                event.stopPropagation();
-              }
-            }}
-            ref={(node) => {
-              tabRefs.current[index] = node;
-            }}
-            role="tab"
-            tabIndex={item.id === activeZone ? 0 : -1}
-            title={`Jump to ${item.label}`}
-            type="button"
-          >
-            {workflowNavigatorIcon(item.id)}
-            <span>{item.label}</span>
-            <strong>{item.value}</strong>
-            <small>{item.detail}</small>
-          </button>
-        ))}
-      </div>
+      </section>
       {result && <WorkflowNavigatorJumpResultStrip result={result} />}
     </nav>
   );

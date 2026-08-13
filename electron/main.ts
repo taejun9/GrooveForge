@@ -1,7 +1,8 @@
 import { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
-import type { MenuItemConstructorOptions, OpenDialogOptions, SaveDialogOptions } from "electron";
+import type { DownloadItem, MenuItemConstructorOptions, OpenDialogOptions, SaveDialogOptions, Session } from "electron";
 import { createHash } from "node:crypto";
-import { rmSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,13 +21,20 @@ import {
 import { resolveUpdateFeedConfig } from "./updateFeedConfig.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(__dirname, "..");
 const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
 const menuCommandChannel = "grooveforge:menu-command";
 const closeWindowChannel = "grooveforge:close-window";
 const isLaunchSmoke = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1";
 const isProjectIoSmoke = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE === "1";
 const isCloseFlowSmoke = process.env.GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE === "1";
-const isDesktopSmoke = isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke;
+const isManualQa = process.env.GROOVEFORGE_DESKTOP_MANUAL_QA === "1";
+const isManualQaAutoSong =
+  isManualQa &&
+  (process.env.GROOVEFORGE_DESKTOP_MANUAL_QA_AUTO_SONG === "1" || process.argv.includes("--auto-song-qa"));
+const isManualQaAutoExit =
+  isManualQa && (process.env.GROOVEFORGE_DESKTOP_MANUAL_QA_AUTO_EXIT === "1" || isManualQaAutoSong);
+const isDesktopSmoke = isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke || isManualQa;
 const ownsSingleInstanceLock = isDesktopSmoke || app.requestSingleInstanceLock();
 if (!ownsSingleInstanceLock) {
   app.quit();
@@ -37,13 +45,711 @@ const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const launchSmokeProgressPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_PROGRESS ";
 const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
 const closeFlowSmokeResultPrefix = "GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE_RESULT ";
+const manualQaResultPrefix = "GROOVEFORGE_DESKTOP_MANUAL_QA_RESULT ";
 const launchSmokeTimeoutMs = 1800000;
+const launchSmokePaletteUiSettleTimeoutMs = 10_000;
+// Sequential upper bound after skipping the hook's duplicate starter routes:
+// mode-tool settles 250 s, two native starter analysis/result/follow-up paths
+// 270 s, chord/palette settles 40 s, and hook/IPC/native-click margin 140 s.
+// Keep the parent strictly above 700 s and below the global 30 minute budget.
+const launchSmokePaletteBoundedChildBudgetMs = 700_000;
+const launchSmokePaletteTimeoutMs = 900_000;
 const projectIoSmokeTimeoutMs = 180000;
 const closeFlowSmokeTimeoutMs = 240000;
 const closeFlowSmokeExpectedTitle = "Close Flow Smoke Beat";
 // Mirrors the renderer/domain 1,500,000-character contract at the native IPC boundary.
 const maxNativeProjectFileCharacters = 1_500_000;
 const maxNativeProjectFileBytes = maxNativeProjectFileCharacters * 4;
+const manualQaSentinelName = ".grooveforge-manual-qa-owned.json";
+const manualQaSentinelOwner = "GrooveForge desktop manual QA";
+const manualQaProvenanceMarker = "grooveforge-manual-qa-provenance-v2";
+const manualQaProvenanceSourceEntries = [
+  "electron",
+  "harness/scripts/run_desktop_manual_qa.mjs",
+  "src",
+  "index.html",
+  "package.json",
+  "package-lock.json",
+  "tsconfig.electron.json",
+  "tsconfig.json",
+  "vite.config.ts"
+] as const;
+const manualQaProvenanceBuildRoots = ["dist", "dist-electron"] as const;
+const manualQaProvenanceElectronMainPath = "dist-electron/main.js";
+const manualQaProvenanceRequiredBuildFiles = [
+  "dist/index.html",
+  manualQaProvenanceElectronMainPath,
+  "dist-electron/preload.cjs"
+] as const;
+
+type ManualQaArtifactProvenance = {
+  bytes: number;
+  modifiedAtMs: number;
+  relativePath: string;
+  sha256: string;
+};
+
+type ManualQaProvenance = {
+  builtBundle: {
+    fileCount: number;
+    files: ManualQaArtifactProvenance[];
+    latestMtimeMs: number;
+    roots: string[];
+    sha256: string;
+  };
+  marker: typeof manualQaProvenanceMarker;
+  sourceTree: {
+    fileCount: number;
+    latestMtimeMs: number;
+    sha256: string;
+  };
+};
+
+type ManualQaConfiguration = {
+  autoSong: boolean;
+  autoExit: boolean;
+  dataDirectory: string;
+  electronUserDataDirectory: string;
+  evidenceDirectory: string;
+  exportsDirectory: string;
+  fixturesDirectory: string;
+  launcherManifestPath: string;
+  openPath: string;
+  ownershipSentinelPath: string;
+  ownershipToken: string;
+  projectsDirectory: string;
+  provenance: ManualQaProvenance;
+  savePath: string;
+  workspaceRealPath: string;
+  workspaceRoot: string;
+};
+
+type ManualQaDownloadEvidence = {
+  bytes?: number;
+  fileName: string;
+  filePath: string;
+  mimeType: string;
+  state: "cancelled" | "completed" | "interrupted" | "started";
+};
+
+type ManualQaUiObservation = {
+  activeZone: string;
+  activeZoneCount: number;
+  capturedAt: string;
+  documentHorizontalOverflow: number;
+  projectStatus: string;
+  projectTitle: string;
+  selectedTabCount: number;
+  selectedTabLabels: string[];
+  tabCount: number;
+  tabPanelCount: number;
+  tabStopCount: number;
+  transportPlaying: boolean;
+  visiblePanelCount: number;
+};
+
+type ManualQaPassiveEvidence = {
+  downloads: ManualQaDownloadEvidence[];
+  lastObservedAt: string;
+  openObserved: boolean;
+  playbackObserved: boolean;
+  provenanceValidatedAtLaunch: true;
+  saveObserved: boolean;
+  sourceFixture: string;
+  targetProject: string;
+  provenance: ManualQaProvenance;
+  userDataIsolated: boolean;
+  userDataPath: string;
+  workspaceRoot: string;
+  zones: Partial<Record<"arrange" | "compose" | "deliver" | "mix", ManualQaUiObservation & {
+    screenshot: string;
+    screenshotBytes: number;
+    screenshotSha256: string;
+  }>>;
+};
+
+type ManualQaAutoSongStep = {
+  completedAt?: string;
+  detail?: string;
+  id: string;
+  startedAt: string;
+  status: "failed" | "passed" | "running";
+};
+
+type ManualQaNativeInteraction = {
+  after: Record<string, unknown>;
+  before: Record<string, unknown>;
+  budgetMs: number;
+  category: "general-ui" | "slow-operation";
+  completedAt: string;
+  durationMs: number;
+  hitTestId: string;
+  testId: string;
+  withinBudget: boolean;
+  x: number;
+  y: number;
+};
+
+type ManualQaOverflowOffender = {
+  className: string;
+  clientWidth: number;
+  elementKey: string;
+  hitTestId: string;
+  interactive: boolean;
+  left: number;
+  phase: "active-start" | "deep" | "top-shell";
+  reason: string;
+  right: number;
+  scrollWidth: number;
+  tagName: string;
+  testId: string;
+  width: number;
+};
+
+type ManualQaActiveAccessibility = {
+  accessibleInteractiveCount: number;
+  checkedElementCount: number;
+  checkedInteractiveCount: number;
+  inaccessibleCount: number;
+  inaccessibleElements: ManualQaOverflowOffender[];
+  intentionalScrollerExclusions: number;
+  renderedInteractiveCount: number;
+  uncheckedInteractiveCount: number;
+};
+
+type ManualQaViewportAccessibilitySample = ManualQaActiveAccessibility & {
+  accessibleInteractiveKeys: string[];
+  checkedInteractiveKeys: string[];
+  renderedInteractiveKeys: string[];
+};
+
+type ManualQaTargetedAccessibilityPosture = {
+  afterRendered: boolean;
+  beforeRendered: boolean;
+  className: string;
+  clientWidth: number;
+  elementKey: string;
+  hitTestAccessible: boolean;
+  hitTestId: string;
+  left: number;
+  phase: "deep" | "top-shell";
+  right: number;
+  scrollWidth: number;
+  tagName: string;
+  testId: string;
+  width: number;
+};
+
+type ManualQaAutoSongZoneEvidence = ManualQaUiObservation & {
+  activeAccessibility: ManualQaActiveAccessibility;
+  audioAnalysisState: string;
+  audioAnalysisStatus: string;
+  clientWidth: number;
+  deepScreenshot: string;
+  deepScreenshotBytes: number;
+  deepScreenshotSha256: string;
+  deepScrollTop: number;
+  documentScrollWidth: number;
+  overflowOffenders: ManualQaOverflowOffender[];
+  screenshot: string;
+  screenshotBytes: number;
+  screenshotSha256: string;
+  scrollX: number;
+};
+
+type ManualQaAutoSongReport = {
+  completedAt?: string;
+  downloads: ManualQaDownloadEvidence[];
+  failures: string[];
+  generatedAt: string;
+  interactions: ManualQaNativeInteraction[];
+  mode: "visible-native-auto-song-qa";
+  ok: boolean;
+  performance: {
+    generalBudgetMs: 5000;
+    generalViolations: Array<{ durationMs: number; testId: string }>;
+    maxGeneralInteractionMs: number;
+    maxSlowOperationMs: number;
+    passed: boolean;
+    slowOperationBudgetMs: 120000;
+    slowOperationViolations: Array<{ durationMs: number; testId: string }>;
+  };
+  playback: {
+    arrangement: boolean;
+    patternAuditions: Array<"A" | "B" | "C">;
+    wavPreview: boolean;
+  };
+  project?: {
+    arrangementBars: number;
+    arrangementBlocks: number;
+    bpm: unknown;
+    key: unknown;
+    mode: unknown;
+    path: string;
+    sessionBrief: unknown;
+    sha256: string;
+    styleId: unknown;
+    title: unknown;
+  };
+  provenance: ManualQaProvenance;
+  provenanceValidatedAtLaunch: true;
+  safety: {
+    isolatedWorkspace: true;
+    nativePointerAndKeyboard: true;
+    sourceFixtureUnchanged: boolean;
+    sourceFixtureSha256: string;
+    userDataIsolated: boolean;
+    userDataPath: string;
+  };
+  steps: ManualQaAutoSongStep[];
+  wav?: {
+    bytes: number;
+    path: string;
+    sha256: string;
+  };
+  workspaceRoot: string;
+  zones: Partial<Record<"arrange" | "compose" | "deliver" | "mix", ManualQaAutoSongZoneEvidence>>;
+};
+
+const manualQaAutoSongInteractions: ManualQaNativeInteraction[] = [];
+const manualQaSlowOperationTestIds = new Set([
+  "handoff-pack-action-wav",
+  "handoff-pack-preview-wav",
+  "project-open",
+  "project-save"
+]);
+
+function pathIsInsideRoot(root: string, candidate: string): boolean {
+  const relativePath = path.relative(root, candidate);
+  return relativePath !== "" && !relativePath.startsWith(`..${path.sep}`) && relativePath !== ".." && !path.isAbsolute(relativePath);
+}
+
+function pathIsInsideOrEqual(root: string, candidate: string): boolean {
+  return path.resolve(root) === path.resolve(candidate) || pathIsInsideRoot(root, candidate);
+}
+
+function lstatOrNullSync(filePath: string): ReturnType<typeof lstatSync> | null {
+  try {
+    return lstatSync(filePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function requiredManualQaEnvironment(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} is required when GROOVEFORGE_DESKTOP_MANUAL_QA=1.`);
+  }
+  return value;
+}
+
+function manualQaAllowedWorkspaceBase(workspaceRoot: string): string {
+  const repositoryQaBase = path.join(projectRoot, "build", "desktop");
+  const temporaryQaBase = path.resolve(tmpdir());
+  for (const base of [repositoryQaBase, temporaryQaBase]) {
+    if (pathIsInsideRoot(base, workspaceRoot)) {
+      return base;
+    }
+  }
+  throw new Error(
+    "GROOVEFORGE_DESKTOP_WORKSPACE_ROOT must be a child of the repository build/desktop directory or the operating-system temp directory."
+  );
+}
+
+function assertManualQaNoSymlinkComponentsSync(root: string, candidate: string, label: string): void {
+  if (!pathIsInsideOrEqual(root, candidate)) {
+    throw new Error(`${label} escaped its workspace root.`);
+  }
+  const segments = path.relative(root, candidate).split(path.sep).filter(Boolean);
+  let current = root;
+  for (const [index, segment] of segments.entries()) {
+    current = path.join(current, segment);
+    const stats = lstatOrNullSync(current);
+    if (!stats) {
+      break;
+    }
+    if (stats.isSymbolicLink()) {
+      throw new Error(`${label} rejected symbolic link: ${current}`);
+    }
+    if (index < segments.length - 1 && !stats.isDirectory()) {
+      throw new Error(`${label} parent must be a directory: ${current}`);
+    }
+  }
+}
+
+function assertManualQaWorkspaceTargetSync(
+  workspaceRoot: string,
+  candidate: string,
+  options: { expectedType?: "directory" | "file"; mustExist?: boolean } = {}
+): string {
+  const resolved = path.resolve(candidate);
+  if (!pathIsInsideRoot(workspaceRoot, resolved)) {
+    throw new Error(`Manual QA target escaped its workspace root: ${resolved}`);
+  }
+  const rootStats = lstatOrNullSync(workspaceRoot);
+  if (!rootStats || rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
+    throw new Error("Manual QA workspace root must be an existing non-symbolic-link directory.");
+  }
+  assertManualQaNoSymlinkComponentsSync(workspaceRoot, resolved, "Manual QA target");
+  const targetStats = lstatOrNullSync(resolved);
+  if (options.mustExist && !targetStats) {
+    throw new Error(`Manual QA target must already exist: ${resolved}`);
+  }
+  if (targetStats?.isSymbolicLink()) {
+    throw new Error(`Manual QA target rejected symbolic link: ${resolved}`);
+  }
+  if (targetStats && options.expectedType === "file" && !targetStats.isFile()) {
+    throw new Error(`Manual QA target must be a regular file: ${resolved}`);
+  }
+  if (targetStats && options.expectedType === "directory" && !targetStats.isDirectory()) {
+    throw new Error(`Manual QA target must be a directory: ${resolved}`);
+  }
+  let nearestExisting = targetStats ? resolved : path.dirname(resolved);
+  while (!lstatOrNullSync(nearestExisting)) {
+    const parent = path.dirname(nearestExisting);
+    if (parent === nearestExisting) {
+      throw new Error(`Manual QA target has no existing workspace parent: ${resolved}`);
+    }
+    nearestExisting = parent;
+  }
+  const workspaceRealPath = realpathSync(workspaceRoot);
+  const nearestRealPath = realpathSync(nearestExisting);
+  if (!pathIsInsideOrEqual(workspaceRealPath, nearestRealPath)) {
+    throw new Error(`Manual QA target escaped the real workspace root: ${resolved}`);
+  }
+  return resolved;
+}
+
+function collectManualQaProvenanceSourceFiles(
+  entryPath: string,
+  collected: Array<{ filePath: string; modifiedAtMs: number }>
+): void {
+  const stats = lstatSync(entryPath);
+  if (stats.isSymbolicLink()) {
+    throw new Error(`Manual QA provenance rejects symbolic-link source entries: ${entryPath}`);
+  }
+  if (stats.isDirectory()) {
+    for (const name of readdirSync(entryPath).sort()) {
+      collectManualQaProvenanceSourceFiles(path.join(entryPath, name), collected);
+    }
+    return;
+  }
+  if (!stats.isFile()) {
+    throw new Error(`Manual QA provenance requires regular source files: ${entryPath}`);
+  }
+  collected.push({ filePath: entryPath, modifiedAtMs: stats.mtimeMs });
+}
+
+function buildManualQaProvenanceFileManifestSync(
+  baseRoot: string,
+  rootEntries: readonly string[]
+): ManualQaProvenance["builtBundle"] {
+  const files: Array<{ filePath: string; modifiedAtMs: number }> = [];
+  for (const entry of rootEntries) {
+    collectManualQaProvenanceSourceFiles(path.join(baseRoot, entry), files);
+  }
+  files.sort((left, right) => (left.filePath < right.filePath ? -1 : left.filePath > right.filePath ? 1 : 0));
+  const digest = createHash("sha256");
+  digest.update(`${manualQaProvenanceMarker}\0built-bundle\0`);
+  const manifestFiles: ManualQaArtifactProvenance[] = [];
+  let latestMtimeMs = 0;
+  for (const file of files) {
+    const contents = readFileSync(file.filePath);
+    const relativePath = path.relative(baseRoot, file.filePath).split(path.sep).join("/");
+    const entry = {
+      bytes: contents.byteLength,
+      modifiedAtMs: file.modifiedAtMs,
+      relativePath,
+      sha256: createHash("sha256").update(contents).digest("hex")
+    };
+    digest.update(
+      `${entry.relativePath}\0${entry.bytes}\0${entry.modifiedAtMs}\0${entry.sha256}\0`
+    );
+    manifestFiles.push(entry);
+    latestMtimeMs = Math.max(latestMtimeMs, entry.modifiedAtMs);
+  }
+  return {
+    fileCount: manifestFiles.length,
+    files: manifestFiles,
+    latestMtimeMs,
+    roots: [...rootEntries],
+    sha256: digest.digest("hex")
+  };
+}
+
+function buildManualQaProvenanceSync(): ManualQaProvenance {
+  const sourceFiles: Array<{ filePath: string; modifiedAtMs: number }> = [];
+  for (const entry of manualQaProvenanceSourceEntries) {
+    collectManualQaProvenanceSourceFiles(path.join(projectRoot, entry), sourceFiles);
+  }
+  sourceFiles.sort((left, right) => (left.filePath < right.filePath ? -1 : left.filePath > right.filePath ? 1 : 0));
+  const sourceDigest = createHash("sha256");
+  sourceDigest.update(`${manualQaProvenanceMarker}\0`);
+  let latestSourceMtimeMs = 0;
+  for (const sourceFile of sourceFiles) {
+    const contents = readFileSync(sourceFile.filePath);
+    const relativePath = path.relative(projectRoot, sourceFile.filePath).split(path.sep).join("/");
+    sourceDigest.update(`${relativePath}\0${contents.byteLength}\0`);
+    sourceDigest.update(contents);
+    latestSourceMtimeMs = Math.max(latestSourceMtimeMs, sourceFile.modifiedAtMs);
+  }
+  return {
+    builtBundle: buildManualQaProvenanceFileManifestSync(projectRoot, manualQaProvenanceBuildRoots),
+    marker: manualQaProvenanceMarker,
+    sourceTree: {
+      fileCount: sourceFiles.length,
+      latestMtimeMs: latestSourceMtimeMs,
+      sha256: sourceDigest.digest("hex")
+    }
+  };
+}
+
+function parseManualQaProvenance(value: unknown): ManualQaProvenance {
+  const provenance = value as Partial<ManualQaProvenance> | null;
+  if (
+    !provenance ||
+    provenance.marker !== manualQaProvenanceMarker ||
+    !provenance.sourceTree ||
+    !Number.isInteger(provenance.sourceTree.fileCount) ||
+    provenance.sourceTree.fileCount <= 0 ||
+    typeof provenance.sourceTree.latestMtimeMs !== "number" ||
+    !/^[a-f0-9]{64}$/u.test(provenance.sourceTree.sha256 ?? "") ||
+    !provenance.builtBundle ||
+    !Number.isInteger(provenance.builtBundle.fileCount) ||
+    provenance.builtBundle.fileCount <= 0 ||
+    provenance.builtBundle.fileCount !== provenance.builtBundle.files?.length ||
+    typeof provenance.builtBundle.latestMtimeMs !== "number" ||
+    !Number.isFinite(provenance.builtBundle.latestMtimeMs) ||
+    JSON.stringify(provenance.builtBundle.roots) !== JSON.stringify(manualQaProvenanceBuildRoots) ||
+    !/^[a-f0-9]{64}$/u.test(provenance.builtBundle.sha256 ?? "")
+  ) {
+    throw new Error("Manual QA launcher manifest has invalid source provenance.");
+  }
+  let previousRelativePath = "";
+  const builtPaths = new Set<string>();
+  for (const artifact of provenance.builtBundle.files ?? []) {
+    const normalizedRelativePath = path.posix.normalize(artifact?.relativePath ?? "");
+    const belongsToBuildRoot = manualQaProvenanceBuildRoots.some((rootEntry) =>
+      normalizedRelativePath.startsWith(`${rootEntry}/`)
+    );
+    if (
+      !artifact ||
+      artifact.relativePath !== normalizedRelativePath ||
+      path.posix.isAbsolute(artifact.relativePath) ||
+      artifact.relativePath <= previousRelativePath ||
+      !belongsToBuildRoot ||
+      !Number.isInteger(artifact.bytes) ||
+      artifact.bytes < 0 ||
+      typeof artifact.modifiedAtMs !== "number" ||
+      !Number.isFinite(artifact.modifiedAtMs) ||
+      !/^[a-f0-9]{64}$/u.test(artifact.sha256)
+    ) {
+      throw new Error("Manual QA launcher manifest has an invalid production bundle inventory.");
+    }
+    builtPaths.add(artifact.relativePath);
+    previousRelativePath = artifact.relativePath;
+  }
+  for (const requiredPath of manualQaProvenanceRequiredBuildFiles) {
+    if (!builtPaths.has(requiredPath)) {
+      throw new Error(`Manual QA launcher manifest is missing required production artifact ${requiredPath}.`);
+    }
+  }
+  return provenance as ManualQaProvenance;
+}
+
+function validateManualQaProvenance(expected: ManualQaProvenance): void {
+  const actual = buildManualQaProvenanceSync();
+  if (
+    actual.sourceTree.sha256 !== expected.sourceTree.sha256 ||
+    actual.sourceTree.fileCount !== expected.sourceTree.fileCount
+  ) {
+    throw new Error("Manual QA source tree changed after launcher provenance capture.");
+  }
+  if (
+    JSON.stringify(actual.builtBundle.roots) !== JSON.stringify(expected.builtBundle.roots) ||
+    actual.builtBundle.fileCount !== expected.builtBundle.fileCount ||
+    actual.builtBundle.files.length !== expected.builtBundle.files.length ||
+    actual.builtBundle.latestMtimeMs !== expected.builtBundle.latestMtimeMs ||
+    actual.builtBundle.sha256 !== expected.builtBundle.sha256
+  ) {
+    throw new Error("Manual QA production bundle inventory changed after launcher provenance capture.");
+  }
+  for (const [index, expectedArtifact] of expected.builtBundle.files.entries()) {
+    const actualArtifact = actual.builtBundle.files[index];
+    if (
+      actualArtifact.relativePath !== expectedArtifact.relativePath ||
+      actualArtifact.bytes !== expectedArtifact.bytes ||
+      actualArtifact.modifiedAtMs !== expectedArtifact.modifiedAtMs ||
+      actualArtifact.sha256 !== expectedArtifact.sha256
+    ) {
+      throw new Error(`Manual QA built artifact changed after launcher provenance capture: ${expectedArtifact.relativePath}`);
+    }
+    if (actualArtifact.modifiedAtMs + 1 < actual.sourceTree.latestMtimeMs) {
+      throw new Error(`Manual QA built artifact is stale: ${actualArtifact.relativePath}`);
+    }
+  }
+  if (!readFileSync(path.join(projectRoot, manualQaProvenanceElectronMainPath), "utf8").includes(manualQaProvenanceMarker)) {
+    throw new Error("Manual QA Electron main bundle does not contain the current provenance validator.");
+  }
+}
+
+function requiredManualQaPath(name: string, workspaceRoot: string): string {
+  const configured = requiredManualQaEnvironment(name);
+  const resolved = path.resolve(configured);
+  if (!pathIsInsideRoot(workspaceRoot, resolved)) {
+    throw new Error(`${name} must resolve inside GROOVEFORGE_DESKTOP_WORKSPACE_ROOT.`);
+  }
+  if (!resolved.endsWith(".grooveforge.json")) {
+    throw new Error(`${name} must end with .grooveforge.json.`);
+  }
+  return resolved;
+}
+
+function resolveManualQaConfiguration(): ManualQaConfiguration | null {
+  if (!isManualQa) {
+    return null;
+  }
+  const configuredWorkspaceRoot = requiredManualQaEnvironment("GROOVEFORGE_DESKTOP_WORKSPACE_ROOT");
+  const workspaceRoot = path.resolve(configuredWorkspaceRoot);
+  const repositoryQaBase = path.join(projectRoot, "build", "desktop");
+  const temporaryQaBase = path.resolve(tmpdir());
+  if ([projectRoot, path.resolve(homedir()), repositoryQaBase, temporaryQaBase].includes(workspaceRoot)) {
+    throw new Error("Manual QA workspace root must not be HOME, the repository root, build/desktop itself, or the temp root.");
+  }
+  const allowedBase = manualQaAllowedWorkspaceBase(workspaceRoot);
+  if (allowedBase === repositoryQaBase) {
+    assertManualQaNoSymlinkComponentsSync(projectRoot, repositoryQaBase, "Manual QA repository base");
+  }
+  const allowedBaseStats = lstatOrNullSync(allowedBase);
+  if (!allowedBaseStats || allowedBaseStats.isSymbolicLink() || !allowedBaseStats.isDirectory()) {
+    throw new Error(`Manual QA allowed base must be a real directory: ${allowedBase}`);
+  }
+  assertManualQaNoSymlinkComponentsSync(allowedBase, workspaceRoot, "Manual QA workspace root");
+  const workspaceStats = lstatOrNullSync(workspaceRoot);
+  if (!workspaceStats || workspaceStats.isSymbolicLink() || !workspaceStats.isDirectory()) {
+    throw new Error("Manual QA workspace root must be a prepared non-symbolic-link directory.");
+  }
+  const allowedBaseRealPath = realpathSync(allowedBase);
+  const workspaceRealPath = realpathSync(workspaceRoot);
+  if (!pathIsInsideRoot(allowedBaseRealPath, workspaceRealPath)) {
+    throw new Error("Manual QA workspace real path escaped its allowed base.");
+  }
+
+  const fixturesDirectory = assertManualQaWorkspaceTargetSync(workspaceRoot, path.join(workspaceRoot, "fixtures"), {
+    expectedType: "directory",
+    mustExist: true
+  });
+  const projectsDirectory = assertManualQaWorkspaceTargetSync(workspaceRoot, path.join(workspaceRoot, "Projects"), {
+    expectedType: "directory",
+    mustExist: true
+  });
+  const dataDirectory = assertManualQaWorkspaceTargetSync(workspaceRoot, path.join(workspaceRoot, "Data"), {
+    expectedType: "directory",
+    mustExist: true
+  });
+  const evidenceDirectory = assertManualQaWorkspaceTargetSync(workspaceRoot, path.join(workspaceRoot, "evidence"), {
+    expectedType: "directory",
+    mustExist: true
+  });
+  const exportsDirectory = assertManualQaWorkspaceTargetSync(workspaceRoot, path.join(workspaceRoot, "exports"), {
+    expectedType: "directory",
+    mustExist: true
+  });
+  const electronUserDataDirectory = assertManualQaWorkspaceTargetSync(
+    workspaceRoot,
+    path.join(workspaceRoot, "ElectronUserData"),
+    { expectedType: "directory", mustExist: true }
+  );
+  const openPath = requiredManualQaPath("GROOVEFORGE_DESKTOP_MANUAL_QA_OPEN_PATH", workspaceRoot);
+  const savePath = requiredManualQaPath("GROOVEFORGE_DESKTOP_MANUAL_QA_SAVE_PATH", workspaceRoot);
+  if (openPath === savePath) {
+    throw new Error("Manual QA Open and Save paths must differ so the source fixture cannot be overwritten.");
+  }
+  assertManualQaWorkspaceTargetSync(workspaceRoot, openPath, { expectedType: "file", mustExist: true });
+  assertManualQaWorkspaceTargetSync(workspaceRoot, savePath, { expectedType: "file" });
+
+  const ownershipSentinelPath = assertManualQaWorkspaceTargetSync(
+    workspaceRoot,
+    path.join(workspaceRoot, manualQaSentinelName),
+    { expectedType: "file", mustExist: true }
+  );
+  const ownershipToken = requiredManualQaEnvironment("GROOVEFORGE_DESKTOP_MANUAL_QA_OWNERSHIP_TOKEN");
+  const sentinel = JSON.parse(readFileSync(ownershipSentinelPath, "utf8")) as Record<string, unknown>;
+  if (
+    sentinel.owner !== manualQaSentinelOwner ||
+    sentinel.schemaVersion !== 1 ||
+    sentinel.workspaceRealPath !== workspaceRealPath ||
+    sentinel.ownershipToken !== ownershipToken ||
+    !/^[a-f0-9]{64}$/u.test(ownershipToken)
+  ) {
+    throw new Error("Manual QA workspace ownership sentinel did not match the launcher token.");
+  }
+
+  const launcherManifestPath = assertManualQaWorkspaceTargetSync(
+    workspaceRoot,
+    path.resolve(requiredManualQaEnvironment("GROOVEFORGE_DESKTOP_MANUAL_QA_MANIFEST_PATH")),
+    { expectedType: "file", mustExist: true }
+  );
+  if (launcherManifestPath !== path.join(evidenceDirectory, "manual-qa-launcher.json")) {
+    throw new Error("Manual QA launcher manifest must use the owned evidence directory.");
+  }
+  const launcherManifestContents = readFileSync(launcherManifestPath);
+  const expectedManifestSha256 = requiredManualQaEnvironment("GROOVEFORGE_DESKTOP_MANUAL_QA_MANIFEST_SHA256");
+  if (createHash("sha256").update(launcherManifestContents).digest("hex") !== expectedManifestSha256) {
+    throw new Error("Manual QA launcher manifest changed after the harness wrote it.");
+  }
+  const launcherManifest = JSON.parse(launcherManifestContents.toString("utf8")) as Record<string, unknown>;
+  const manifestOutputs = launcherManifest.outputs as Record<string, unknown> | undefined;
+  if (
+    launcherManifest.workspaceRoot !== workspaceRoot ||
+    (launcherManifest.openFixture as Record<string, unknown> | undefined)?.path !== openPath ||
+    manifestOutputs?.savePath !== savePath ||
+    manifestOutputs?.dataDirectory !== dataDirectory ||
+    manifestOutputs?.evidenceDirectory !== evidenceDirectory ||
+    manifestOutputs?.electronUserDataDirectory !== electronUserDataDirectory ||
+    manifestOutputs?.exportsDirectory !== exportsDirectory ||
+    manifestOutputs?.projectsDirectory !== projectsDirectory
+  ) {
+    throw new Error("Manual QA launcher manifest paths did not match the validated workspace configuration.");
+  }
+  const provenance = parseManualQaProvenance(launcherManifest.provenance);
+  validateManualQaProvenance(provenance);
+
+  return {
+    autoSong: isManualQaAutoSong,
+    autoExit: isManualQaAutoExit,
+    dataDirectory,
+    electronUserDataDirectory,
+    evidenceDirectory,
+    exportsDirectory,
+    fixturesDirectory,
+    launcherManifestPath,
+    openPath,
+    ownershipSentinelPath,
+    ownershipToken,
+    projectsDirectory,
+    provenance,
+    savePath,
+    workspaceRealPath,
+    workspaceRoot
+  };
+}
+
+const manualQaConfiguration = resolveManualQaConfiguration();
+if (manualQaConfiguration) {
+  app.setPath("userData", manualQaConfiguration.electronUserDataDirectory);
+  if (realpathSync(app.getPath("userData")) !== realpathSync(manualQaConfiguration.electronUserDataDirectory)) {
+    throw new Error("Manual QA Electron userData path was not isolated before app readiness.");
+  }
+}
+const manualQaDownloadSessions = new WeakSet<Session>();
+const manualQaReservedDownloadPaths = new Set<string>();
+const manualQaDownloads: ManualQaDownloadEvidence[] = [];
+let manualQaAutoSongOpenPathOverride: string | null = null;
 
 function functionalTabsLaunchSmokeEvidenceDirectory(): string {
   const configuredDirectory = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_EVIDENCE_DIR;
@@ -285,6 +991,7 @@ type LaunchSmokeFunctionalTabInternalSnapshot = LaunchSmokeFunctionalTabStateEvi
 };
 
 type LaunchSmokeLayoutEvidence = {
+  audioAnalysisPrewarm?: LaunchSmokeAudioAnalysisPrewarmEvidence;
   arrangementEssentialBeforeBlockMoves: boolean;
   arrangementPlaybackBeforeTimeline: boolean;
   arrangementPlaybackPresent: boolean;
@@ -457,6 +1164,18 @@ type LaunchSmokeMinimumWindowEvidence = Pick<
   | "minimumWindowViewportWidth"
   | "minimumWindowWideStudioAutoExpandReady"
 >;
+
+type LaunchSmokeAudienceSessionLayoutEvidence = Pick<
+  LaunchSmokeLayoutEvidence,
+  | "audienceSessionActionsDirectVisible"
+  | "audienceSessionProofContentHidden"
+  | "audienceSessionProofInteractionReady"
+  | "audienceSessionProofOpen"
+  | "audienceSessionProofRowsPreserved"
+  | "audienceSessionProofToggleVisible"
+> & {
+  audioAnalysisPrewarm: LaunchSmokeAudioAnalysisPrewarmEvidence;
+};
 
 type LaunchSmokePaletteRouteEvidence = {
   actionPresent: boolean;
@@ -642,7 +1361,14 @@ type LaunchSmokeModalFocusEvidence = {
   dockControlCount: number;
   dockFocusReady: boolean;
   dockInitialHidden: boolean;
+  dockOriginalPlaybackRestored: boolean;
+  dockPlayAfterStart: LaunchSmokeDockPlayPostureEvidence;
+  dockPlayAfterStop: LaunchSmokeDockPlayPostureEvidence;
+  dockPlayBefore: LaunchSmokeDockPlayPostureEvidence;
+  dockPlayHitTargetReady: boolean;
+  dockPlayOriginal: LaunchSmokeDockPlayPostureEvidence;
   dockPositionMirrorsHeader: boolean;
+  dockPostureRestored: boolean;
   dockReturnedHidden: boolean;
   dockSharedPlayReady: boolean;
   dockShortcutMetadataReady: boolean;
@@ -672,6 +1398,24 @@ type LaunchSmokeModalFocusEvidence = {
   quickShortcutFromEditable: boolean;
   switchFocusRestored: boolean;
   switchInitialFocus: string;
+};
+
+type LaunchSmokeDockPlayPostureEvidence = {
+  activeTestId: string;
+  activeZone: string;
+  disabled: boolean;
+  dockPressed: string;
+  dockText: string;
+  height: number;
+  hitTargetTestId: string;
+  left: number;
+  playbackScope: string;
+  projectStatus: string;
+  top: number;
+  transportPressed: string;
+  transportText: string;
+  visible: boolean;
+  width: number;
 };
 
 type LaunchSmokeModalFocusCoreEvidence = Omit<LaunchSmokeModalFocusEvidence, "closedDetails" | "drumGrid" | "noteGrid">;
@@ -709,6 +1453,7 @@ type LaunchSmokePaletteEvidence = {
   deliveryTools: LaunchSmokeDeliveryToolsEvidence;
   opened: boolean;
   producer: LaunchSmokePaletteRouteEvidence;
+  stageTimings: LaunchSmokePaletteStageTiming[];
   routeBridge: LaunchSmokePaletteRouteEvidence;
   routeBridgeCompletion: LaunchSmokePaletteRouteEvidence;
   routeBridgeReadiness: LaunchSmokePaletteRouteEvidence;
@@ -716,10 +1461,48 @@ type LaunchSmokePaletteEvidence = {
   sessionProofProducer: LaunchSmokePaletteRouteEvidence;
   sessionProofReadout: LaunchSmokePaletteRouteEvidence;
   starterBeginner: LaunchSmokeAudienceStarterEvidence;
+  starterBeginnerAudioRefresh: LaunchSmokeAudienceStarterAudioRefreshEvidence;
   starterProducer: LaunchSmokeAudienceStarterEvidence;
+  starterProducerAudioRefresh: LaunchSmokeAudienceStarterAudioRefreshEvidence;
   resultPresent: boolean;
   searchPresent: boolean;
 };
+
+type LaunchSmokePaletteStageTiming = {
+  durationMs: number;
+  id: string;
+};
+
+type LaunchSmokeAudienceStarterAudioRefreshEvidence = {
+  exactState: "ready";
+  guideOpen: boolean;
+  projectMode: "guided" | "studio";
+  projectTitle: string;
+  restored: LaunchSmokeAudioAnalysisTabPosture;
+  retryRequested: boolean;
+  starterActionsVisible: boolean;
+};
+
+type LaunchSmokeAudienceStarterVisibleEvidence = Pick<
+  LaunchSmokeAudienceStarterEvidence,
+  | "buttonPresent"
+  | "followupPresent"
+  | "followupText"
+  | "visibleFollowupActionCount"
+  | "visibleFollowupActionLabels"
+  | "visibleFollowupCompletionPresent"
+  | "visibleFollowupCompletionResult"
+  | "visibleFollowupPrimaryPresent"
+  | "visibleFollowupPrimaryResult"
+  | "visibleFollowupReadinessPresent"
+  | "visibleFollowupReadinessResult"
+  | "visibleResultAudition"
+  | "visibleResultMetricValue"
+  | "visibleResultNextCheck"
+  | "visibleResultPresent"
+  | "visibleResultStatus"
+  | "visibleResultTitle"
+>;
 
 type LaunchSmokeChordCardEvidence = {
   restoreReady: boolean;
@@ -883,10 +1666,23 @@ type ProjectIoSmokeNativeOpenActivationEvidence = {
 };
 
 type CloseFlowSmokeLiveEditEvidence = {
-  dirtyStatus: string;
+  activeTestId: string;
+  blurredBeforeClose: boolean;
+  focusedDraft: boolean;
+  height: number;
+  hitTargetMatched: boolean;
+  hitTargetTestId: string;
   initialTitle: string;
   inputPresent: boolean;
+  nativeInputApplied: boolean;
+  nativeSelectAllFallbackUsed: boolean;
+  projectStatusBeforeClose: string;
+  selectionEndBeforeInput: number;
+  selectionLengthBeforeInput: number;
+  selectionStartBeforeInput: number;
   title: string;
+  valueExact: boolean;
+  width: number;
 };
 
 type CloseFlowSmokeState = {
@@ -963,20 +1759,90 @@ function isRecoveryProjectPayload(value: unknown): value is string {
   );
 }
 
+async function assertManualQaPathSafety(filePath: string, existingFile: boolean): Promise<void> {
+  const configuration = manualQaConfiguration;
+  if (!configuration) {
+    return;
+  }
+  assertManualQaWorkspaceTargetSync(configuration.workspaceRoot, filePath, {
+    expectedType: "file",
+    mustExist: existingFile
+  });
+}
+
+async function writeManualQaFile(
+  filePath: string,
+  contents: string | Uint8Array,
+  options: { encoding?: BufferEncoding; mode?: number } = {}
+): Promise<void> {
+  await assertManualQaPathSafety(filePath, false);
+  await writeFile(filePath, contents, options);
+  await assertManualQaPathSafety(filePath, true);
+}
+
+function manualQaUserDataPosture(configuration: ManualQaConfiguration): {
+  userDataIsolated: boolean;
+  userDataPath: string;
+} {
+  const userDataPath = path.resolve(app.getPath("userData"));
+  let userDataIsolated = false;
+  try {
+    userDataIsolated =
+      realpathSync(userDataPath) === realpathSync(configuration.electronUserDataDirectory) &&
+      pathIsInsideRoot(configuration.workspaceRealPath, realpathSync(userDataPath));
+  } catch {
+    userDataIsolated = false;
+  }
+  return { userDataIsolated, userDataPath };
+}
+
+async function ensureDesktopProjectWorkspace(workspace: ProjectWorkspacePaths): Promise<void> {
+  const configuration = manualQaConfiguration;
+  if (configuration) {
+    assertManualQaWorkspaceTargetSync(configuration.workspaceRoot, workspace.projects, {
+      expectedType: "directory",
+      mustExist: true
+    });
+    assertManualQaWorkspaceTargetSync(configuration.workspaceRoot, workspace.data, {
+      expectedType: "directory",
+      mustExist: true
+    });
+    assertManualQaWorkspaceTargetSync(configuration.workspaceRoot, workspace.databaseFile, {
+      expectedType: "file"
+    });
+  }
+  await ensureProjectWorkspace(workspace);
+  if (configuration) {
+    assertManualQaWorkspaceTargetSync(configuration.workspaceRoot, workspace.projects, {
+      expectedType: "directory",
+      mustExist: true
+    });
+    assertManualQaWorkspaceTargetSync(configuration.workspaceRoot, workspace.data, {
+      expectedType: "directory",
+      mustExist: true
+    });
+    assertManualQaWorkspaceTargetSync(configuration.workspaceRoot, workspace.databaseFile, {
+      expectedType: "file"
+    });
+  }
+}
+
 function desktopProjectWorkspace(): ProjectWorkspacePaths {
-  const isWorkspaceSmoke = isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke;
+  const isWorkspaceSmoke = isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke || isManualQa;
   const configuredSmokeRoot = process.env.GROOVEFORGE_DESKTOP_WORKSPACE_ROOT;
-  const smokeRoot = isWorkspaceSmoke
-    ? configuredSmokeRoot ?? path.join(app.getPath("temp"), `GrooveForge-${process.pid}-smoke`)
-    : undefined;
-  if (isWorkspaceSmoke && !configuredSmokeRoot && smokeRoot) {
+  const smokeRoot = isManualQa
+    ? manualQaConfiguration?.workspaceRoot
+    : isWorkspaceSmoke
+      ? configuredSmokeRoot ?? path.join(app.getPath("temp"), `GrooveForge-${process.pid}-smoke`)
+      : undefined;
+  if (isWorkspaceSmoke && !isManualQa && !configuredSmokeRoot && smokeRoot) {
     generatedSmokeWorkspaceRoot = smokeRoot;
   }
   return resolveProjectWorkspacePaths(app.getPath("home"), smokeRoot);
 }
 
 async function projectLibrary(workspace: ProjectWorkspacePaths): Promise<ProjectLibrary> {
-  await ensureProjectWorkspace(workspace);
+  await ensureDesktopProjectWorkspace(workspace);
   projectLibraryInstance ??= new ProjectLibrary(workspace.databaseFile);
   return projectLibraryInstance;
 }
@@ -1253,14 +2119,17 @@ function registerProjectFileHandlers(): void {
       throw new Error("Invalid save project payload.");
     }
 
-    await ensureProjectWorkspace(workspace);
+    await ensureDesktopProjectWorkspace(workspace);
     const browserWindow = BrowserWindow.fromWebContents(event.sender);
     const options: SaveDialogOptions = {
       title: "Save GrooveForge Project",
       defaultPath: path.join(workspace.projects, payload.defaultName),
       filters: projectFilters
     };
-    const smokeFilePath = projectIoSmokePath() ?? closeFlowSmokePath();
+    const smokeFilePath = projectIoSmokePath() ?? closeFlowSmokePath() ?? manualQaSavePath();
+    if (isManualQa && smokeFilePath) {
+      await assertManualQaPathSafety(smokeFilePath, false);
+    }
     const result = smokeFilePath
       ? { canceled: false, filePath: smokeFilePath }
       : browserWindow
@@ -1270,6 +2139,10 @@ function registerProjectFileHandlers(): void {
       return { canceled: true };
     }
 
+    if (isManualQa) {
+      await assertManualQaPathSafety(result.filePath, false);
+    }
+
     if (isCloseFlowSmoke) {
       closeFlowSmokeState.nativeSaveCount += 1;
       closeFlowSmokeState.nativeSaveDefaultName = payload.defaultName;
@@ -1277,6 +2150,9 @@ function registerProjectFileHandlers(): void {
       closeFlowSmokeState.events.push("native-save-started");
     }
     await atomicWriteUtf8File(result.filePath, payload.contents, maxNativeProjectFileCharacters);
+    if (isManualQa) {
+      await assertManualQaPathSafety(result.filePath, true);
+    }
     let databaseStored = true;
     try {
       const library = await projectLibrary(workspace);
@@ -1293,7 +2169,7 @@ function registerProjectFileHandlers(): void {
   });
 
   ipcMain.handle("grooveforge:open-project", async (event) => {
-    await ensureProjectWorkspace(workspace);
+    await ensureDesktopProjectWorkspace(workspace);
     const browserWindow = BrowserWindow.fromWebContents(event.sender);
     const options: OpenDialogOptions = {
       title: "Open GrooveForge Project",
@@ -1301,7 +2177,10 @@ function registerProjectFileHandlers(): void {
       filters: projectFilters,
       properties: ["openFile"]
     };
-    const smokeFilePath = projectIoSmokePath();
+    const smokeFilePath = projectIoSmokePath() ?? manualQaOpenPath();
+    if (isManualQa && smokeFilePath) {
+      await assertManualQaPathSafety(smokeFilePath, true);
+    }
     const result = smokeFilePath
       ? { canceled: false, filePaths: [smokeFilePath] }
       : browserWindow
@@ -1354,6 +2233,14 @@ function projectIoSmokePath(): string | null {
 function closeFlowSmokePath(): string | null {
   const filePath = process.env.GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE_PATH;
   return isCloseFlowSmoke && filePath ? filePath : null;
+}
+
+function manualQaOpenPath(): string | null {
+  return manualQaAutoSongOpenPathOverride ?? manualQaConfiguration?.openPath ?? null;
+}
+
+function manualQaSavePath(): string | null {
+  return manualQaConfiguration?.savePath ?? null;
 }
 
 function launchSmokeFailure(message: string, details: Record<string, unknown> = {}): void {
@@ -1851,8 +2738,15 @@ function launchSmokeModalFocusFailures(evidence: LaunchSmokeModalFocusEvidence):
   ) {
     failures.push("workspace command dock should mirror transport posture, Undo/Redo availability, and shortcut metadata");
   }
-  if (!evidence.dockSharedPlayReady) {
-    failures.push("workspace command dock native pointer input should reuse the full transport Play/Stop state");
+  if (
+    !evidence.dockSharedPlayReady ||
+    !evidence.dockPlayHitTargetReady ||
+    !evidence.dockOriginalPlaybackRestored ||
+    !evidence.dockPostureRestored
+  ) {
+    failures.push(
+      "workspace command dock native pointer input should hit the visible enabled Play target, reuse the full transport Play/Stop state, and restore the original playback, zone, and scope posture"
+    );
   }
   if (!evidence.dockActionsOpened || !evidence.dockActionsFocusRestored) {
     failures.push("workspace command dock native pointer/Escape input should open Quick Actions and restore dock focus");
@@ -3510,17 +4404,34 @@ async function collectLaunchSmokeMinimumWindowEvidence(
     })();
   `);
   win.setSize(1180, 800);
-  await new Promise((resolve) => setTimeout(resolve, 180));
   try {
     const responsiveStudio = await win.webContents.executeJavaScript(`
       (async () => {
         const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const compactMedia = window.matchMedia("(max-width: 1220px)");
         const header = document.querySelector('[data-testid="workflow-target-transport"]');
         const session = document.querySelector('[data-testid="transport-session-tools"]');
         const exports = document.querySelector('[data-testid="transport-export-tools"]');
         const sessionToggle = document.querySelector('[data-testid="transport-session-toggle"]');
         const exportToggle = document.querySelector('[data-testid="transport-export-toggle"]');
+        const resizeDeadline = performance.now() + 30000;
+        while (
+          performance.now() < resizeDeadline &&
+          !(
+            compactMedia.matches &&
+            window.innerWidth <= 1220 &&
+            session instanceof HTMLDetailsElement &&
+            exports instanceof HTMLDetailsElement &&
+            !session.open &&
+            !exports.open
+          )
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        await settle();
         const resizeCollapseReady = Boolean(session && exports && !session.open && !exports.open);
+        const resizeMediaMatches = compactMedia.matches;
+        const resizeViewportWidth = window.innerWidth;
 
         window.__grooveforgeLaunchSmoke?.setModeAwareToolPanels?.('studio');
         await settle();
@@ -3549,7 +4460,9 @@ async function collectLaunchSmokeMinimumWindowEvidence(
           compactHorizontalOverflow,
           expandedHeight,
           manualReopenReady: sessionManualReady && exportsManualReady,
-          resizeCollapseReady
+          resizeCollapseReady,
+          resizeMediaMatches,
+          resizeViewportWidth
         };
       })();
     `);
@@ -3618,6 +4531,8 @@ async function collectLaunchSmokeMinimumWindowEvidence(
           minimumWindowStudioHorizontalOverflow: ${JSON.stringify(responsiveStudio.compactHorizontalOverflow)},
           minimumWindowStudioManualReopenReady: ${JSON.stringify(responsiveStudio.manualReopenReady)},
           minimumWindowStudioResizeCollapseReady: ${JSON.stringify(responsiveStudio.resizeCollapseReady)},
+          minimumWindowStudioResizeMediaMatches: ${JSON.stringify(responsiveStudio.resizeMediaMatches)},
+          minimumWindowStudioResizeViewportWidth: ${JSON.stringify(responsiveStudio.resizeViewportWidth)},
           minimumWindowTransportHeight: transport?.height ?? 0,
           minimumWindowTransportPlaybackContained: Boolean(
             transportPlaybackRect &&
@@ -3659,6 +4574,321 @@ async function collectLaunchSmokeMinimumWindowEvidence(
     await win.webContents.executeJavaScript(`window.__grooveforgeLaunchSmoke?.setModeAwareToolPanels?.('guided');`);
     win.setSize(1440, 960);
     await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+}
+
+type LaunchSmokeAudioAnalysisState = "error" | "pending" | "ready" | "unknown";
+
+type LaunchSmokeAudioAnalysisTabPosture = {
+  activeZone: string;
+  focusOnSelectedTab: boolean;
+  focusedTestId: string;
+  routeTestId: string;
+  selectedTabCount: number;
+  selectedTabTestId: string;
+  visiblePanelCount: number;
+  visiblePanelZones: string[];
+};
+
+type LaunchSmokeAudioAnalysisPrewarmEvidence = {
+  exactState: "ready";
+  initial: LaunchSmokeAudioAnalysisTabPosture;
+  mix: LaunchSmokeAudioAnalysisTabPosture;
+  nativeRouteSequence: ["workflow-jump-mix", "workflow-jump-compose"];
+  restored: LaunchSmokeAudioAnalysisTabPosture;
+  retryRequested: boolean;
+};
+
+async function readLaunchSmokeAudioAnalysisState(win: BrowserWindow): Promise<LaunchSmokeAudioAnalysisState> {
+  return (await win.webContents.executeJavaScript(`
+    (() => {
+      const text = document.querySelector('[data-testid="audio-analysis-status"]')?.textContent?.trim() ?? "";
+      if (text === "Audio meters ready") return "ready";
+      if (text === "Audio meters updating") return "pending";
+      if (text === "Audio meters unavailable") return "error";
+      return "unknown";
+    })();
+  `)) as LaunchSmokeAudioAnalysisState;
+}
+
+async function waitForLaunchSmokeExactAudioAnalysis(
+  win: BrowserWindow
+): Promise<{ retryRequested: boolean; state: "ready" }> {
+  const deadline = Date.now() + 60000;
+  let retryRequested = false;
+  let state = await readLaunchSmokeAudioAnalysisState(win);
+  while (Date.now() < deadline && state !== "ready") {
+    if (state === "error" && !retryRequested) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "audio-analysis-retry");
+      retryRequested = true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    state = await readLaunchSmokeAudioAnalysisState(win);
+  }
+  if (state !== "ready") {
+    throw new Error(
+      `Exact audio analysis did not become ready before Guide lazy-surface preparation: ${state}; retry requested: ${retryRequested}.`
+    );
+  }
+  return { retryRequested, state };
+}
+
+async function readLaunchSmokeAudioAnalysisTabPosture(
+  win: BrowserWindow
+): Promise<LaunchSmokeAudioAnalysisTabPosture> {
+  return (await win.webContents.executeJavaScript(`
+    (() => {
+      const visible = (target) => {
+        if (!(target instanceof HTMLElement)) return false;
+        const rect = target.getBoundingClientRect();
+        const style = getComputedStyle(target);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      };
+      const tabs = Array.from(
+        document.querySelectorAll('[role="tablist"][aria-label="Workstation function tabs"] [role="tab"]')
+      );
+      const selectedTabs = tabs.filter((tab) => tab.getAttribute("aria-selected") === "true");
+      const selectedTab = selectedTabs[0] ?? null;
+      const activeZone = selectedTab?.id?.replace("workspace-tab-", "") ?? "";
+      const routeTestId = selectedTab instanceof HTMLElement ? selectedTab.dataset.testid ?? "" : "";
+      const panels = ["compose", "arrange", "mix", "deliver"]
+        .map((zone) => document.getElementById("workspace-panel-" + zone))
+        .filter(Boolean);
+      const visiblePanelZones = panels
+        .filter((panel) => !panel.hidden && visible(panel))
+        .map((panel) => panel.getAttribute("data-workspace-zone") ?? "");
+      const active = document.activeElement;
+      return {
+        activeZone,
+        focusOnSelectedTab: active === selectedTab,
+        focusedTestId: active instanceof HTMLElement ? active.dataset.testid ?? "" : "",
+        routeTestId,
+        selectedTabCount: selectedTabs.length,
+        selectedTabTestId: routeTestId,
+        visiblePanelCount: visiblePanelZones.length,
+        visiblePanelZones
+      };
+    })();
+  `)) as LaunchSmokeAudioAnalysisTabPosture;
+}
+
+async function waitForLaunchSmokeAudioAnalysisTabPosture(
+  win: BrowserWindow,
+  zone: "compose" | "mix"
+): Promise<LaunchSmokeAudioAnalysisTabPosture> {
+  const routeTestId = `workflow-jump-${zone}`;
+  const deadline = Date.now() + launchSmokePaletteUiSettleTimeoutMs;
+  let posture = await readLaunchSmokeAudioAnalysisTabPosture(win);
+  const ready = (current: LaunchSmokeAudioAnalysisTabPosture): boolean =>
+    current.activeZone === zone &&
+    current.routeTestId === routeTestId &&
+    current.selectedTabCount === 1 &&
+    current.selectedTabTestId === routeTestId &&
+    current.visiblePanelCount === 1 &&
+    current.visiblePanelZones.length === 1 &&
+    current.visiblePanelZones[0] === zone &&
+    current.focusOnSelectedTab &&
+    current.focusedTestId === routeTestId;
+  while (Date.now() < deadline && !ready(posture)) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    posture = await readLaunchSmokeAudioAnalysisTabPosture(win);
+  }
+  if (!ready(posture)) {
+    throw new Error(`Audio analysis ${zone} tab posture did not settle: ${JSON.stringify(posture)}`);
+  }
+  return posture;
+}
+
+async function prewarmLaunchSmokeExactAudioAnalysis(
+  win: BrowserWindow
+): Promise<LaunchSmokeAudioAnalysisPrewarmEvidence> {
+  const initial = await readLaunchSmokeAudioAnalysisTabPosture(win);
+  if (
+    initial.activeZone !== "compose" ||
+    initial.selectedTabCount !== 1 ||
+    initial.selectedTabTestId !== "workflow-jump-compose" ||
+    initial.visiblePanelCount !== 1 ||
+    initial.visiblePanelZones.length !== 1 ||
+    initial.visiblePanelZones[0] !== "compose"
+  ) {
+    throw new Error(`Audio analysis prewarm must start from the visible selected Compose route: ${JSON.stringify(initial)}`);
+  }
+
+  let mix: LaunchSmokeAudioAnalysisTabPosture | null = null;
+  let exact: { retryRequested: boolean; state: "ready" } | null = null;
+  let restored: LaunchSmokeAudioAnalysisTabPosture | null = null;
+  try {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-mix");
+    mix = await waitForLaunchSmokeAudioAnalysisTabPosture(win, "mix");
+    exact = await waitForLaunchSmokeExactAudioAnalysis(win);
+  } finally {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-compose").catch(() => undefined);
+    restored = await waitForLaunchSmokeAudioAnalysisTabPosture(win, "compose").catch(() => null);
+  }
+
+  if (!mix || !exact || !restored) {
+    throw new Error(
+      `Audio analysis prewarm did not complete its native Mix-to-Compose route: ${JSON.stringify({ exact, initial, mix, restored })}`
+    );
+  }
+  return {
+    exactState: exact.state,
+    initial,
+    mix,
+    nativeRouteSequence: ["workflow-jump-mix", "workflow-jump-compose"],
+    restored,
+    retryRequested: exact.retryRequested
+  };
+}
+
+type LaunchSmokeLazySurfaceState = {
+  actionsVisible: boolean;
+  guideOpen: boolean;
+  proofContentHidden: boolean;
+  proofContentVisible: boolean;
+  proofOpen: boolean;
+  proofRowsPresent: number;
+  proofRowsVisible: number;
+  proofToggleVisible: boolean;
+  readoutVisible: boolean;
+};
+
+async function readLaunchSmokeLazySurfaceState(win: BrowserWindow): Promise<LaunchSmokeLazySurfaceState> {
+  return (await win.webContents.executeJavaScript(`
+    (() => {
+      const visible = (target) => {
+        if (!(target instanceof HTMLElement)) return false;
+        const rect = target.getBoundingClientRect();
+        const style = getComputedStyle(target);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      };
+      const guide = document.querySelector('[data-testid="guidance-center"]');
+      const proof = document.querySelector('[data-testid="audience-session-proof-details"]');
+      const proofContent = document.querySelector('[data-testid="audience-session-proof-content"]');
+      const proofRows = Array.from(document.querySelectorAll(
+        '[data-audience-session-acceptance-row], [data-audience-session-proof-handoff-row], [data-audience-completion-checkpoint-row], [data-audience-delivery-snapshot-row], [data-audience-delivery-proof-bridge-row]'
+      ));
+      return {
+        actionsVisible:
+          visible(document.querySelector('[data-testid="audience-next-step-rail"]')) &&
+          visible(document.querySelector('[data-testid="audience-session-grid"]')),
+        guideOpen: guide instanceof HTMLDetailsElement && guide.open,
+        proofContentHidden: proofContent instanceof HTMLElement && proofContent.getBoundingClientRect().height === 0,
+        proofContentVisible: visible(proofContent),
+        proofOpen: proof instanceof HTMLDetailsElement && proof.open,
+        proofRowsPresent: proofRows.length,
+        proofRowsVisible: proofRows.filter(visible).length,
+        proofToggleVisible: visible(document.querySelector('[data-testid="audience-session-proof-toggle"]')),
+        readoutVisible: visible(document.querySelector('[data-testid="audience-session-readout"]'))
+      };
+    })();
+  `)) as LaunchSmokeLazySurfaceState;
+}
+
+async function waitForLaunchSmokeLazySurfaceState(
+  win: BrowserWindow,
+  predicate: (state: LaunchSmokeLazySurfaceState) => boolean,
+  expectedState: string
+): Promise<LaunchSmokeLazySurfaceState> {
+  const deadline = Date.now() + 30000;
+  let state = await readLaunchSmokeLazySurfaceState(win);
+  while (Date.now() < deadline && !predicate(state)) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    state = await readLaunchSmokeLazySurfaceState(win);
+  }
+  if (!predicate(state)) {
+    throw new Error(`Guide lazy surfaces did not reach ${expectedState}: ${JSON.stringify(state)}`);
+  }
+  return state;
+}
+
+async function prepareLaunchSmokeLazySurfaces(
+  win: BrowserWindow
+): Promise<LaunchSmokeAudienceSessionLayoutEvidence> {
+  const initialState = await readLaunchSmokeLazySurfaceState(win);
+  if (initialState.guideOpen) {
+    throw new Error("Guide should start collapsed before lazy-surface preparation.");
+  }
+  await win.webContents.executeJavaScript(`
+    (() => {
+      const text = (testId) => document.querySelector('[data-testid="' + testId + '"]')?.textContent?.trim() ?? "";
+      window.__grooveforgeLaunchProjectOwnership ??= {
+        projectStatus: text("project-status"),
+        safetyStatus: text("project-safety-status"),
+        safetyLabel: text("project-safety-label"),
+        safetyDetail: text("project-safety-detail")
+      };
+    })();
+  `);
+  const audioAnalysisPrewarm = await prewarmLaunchSmokeExactAudioAnalysis(win);
+
+  let proofInitiallyOpen = false;
+  let openedState: LaunchSmokeLazySurfaceState | null = null;
+  let closedState: LaunchSmokeLazySurfaceState | null = null;
+  try {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle");
+    const mountedState = await waitForLaunchSmokeLazySurfaceState(
+      win,
+      (state) =>
+        state.guideOpen &&
+        state.readoutVisible &&
+        state.actionsVisible &&
+        state.proofToggleVisible &&
+        state.proofRowsPresent === 10,
+      "an open Guide with visible Audience Session actions and mounted proof rows"
+    );
+    proofInitiallyOpen = mountedState.proofOpen;
+    if (mountedState.proofOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "audience-session-proof-toggle");
+      await waitForLaunchSmokeLazySurfaceState(
+        win,
+        (state) => !state.proofOpen && state.proofContentHidden,
+        "a collapsed Audience Session proof baseline"
+      );
+    }
+
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "audience-session-proof-toggle");
+    openedState = await waitForLaunchSmokeLazySurfaceState(
+      win,
+      (state) => state.proofOpen && state.proofContentVisible && state.proofRowsVisible === 10,
+      "an expanded Audience Session proof with ten visible rows"
+    );
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "audience-session-proof-toggle");
+    closedState = await waitForLaunchSmokeLazySurfaceState(
+      win,
+      (state) => !state.proofOpen && state.proofContentHidden && state.proofRowsVisible === 0,
+      "a re-collapsed Audience Session proof with hidden content"
+    );
+
+    return {
+      audioAnalysisPrewarm,
+      audienceSessionActionsDirectVisible: mountedState.actionsVisible,
+      audienceSessionProofContentHidden: closedState.proofContentHidden,
+      audienceSessionProofInteractionReady:
+        !proofInitiallyOpen && openedState.proofOpen && openedState.proofContentVisible && !closedState.proofOpen,
+      audienceSessionProofOpen: closedState.proofOpen,
+      audienceSessionProofRowsPreserved: openedState.proofRowsPresent === 10 && openedState.proofRowsVisible === 10,
+      audienceSessionProofToggleVisible: mountedState.proofToggleVisible
+    };
+  } finally {
+    const proofState = await readLaunchSmokeLazySurfaceState(win).catch(() => null);
+    if (proofState?.guideOpen && proofState.proofOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "audience-session-proof-toggle").catch(() => undefined);
+      await waitForLaunchSmokeLazySurfaceState(
+        win,
+        (state) => !state.proofOpen && state.proofContentHidden,
+        "the collapsed Audience Session proof cleanup posture"
+      ).catch(() => undefined);
+    }
+    const guideState = await readLaunchSmokeLazySurfaceState(win).catch(() => null);
+    if (guideState?.guideOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle").catch(() => undefined);
+      await waitForLaunchSmokeLazySurfaceState(
+        win,
+        (state) => !state.guideOpen,
+        "the original collapsed Guide posture"
+      ).catch(() => undefined);
+    }
   }
 }
 
@@ -4507,10 +5737,81 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
   return evidence as LaunchSmokeEvidence;
 }
 
+async function prepareLaunchSmokeBaseDomReadyPosture(win: BrowserWindow): Promise<void> {
+  await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-mix");
+  await waitForLaunchSmokeAudioAnalysisTabPosture(win, "mix");
+  await waitForLaunchSmokeExactAudioAnalysis(win);
+  await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-compose");
+  await waitForLaunchSmokeAudioAnalysisTabPosture(win, "compose");
+  const launchpadOpen = (await win.webContents.executeJavaScript(
+    `document.querySelector('[data-testid="first-run-launchpad"]')?.open === true`
+  )) as boolean;
+  if (!launchpadOpen) {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "first-run-launchpad-toggle");
+  }
+  const guideOpen = (await win.webContents.executeJavaScript(
+    `document.querySelector('[data-testid="guidance-center"]')?.open === true`
+  )) as boolean;
+  if (!guideOpen) {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle");
+  }
+  await waitForLaunchSmokePaletteSurfaceState(
+    win,
+    (surface) =>
+      surface.activeZone === "compose" &&
+      surface.guideOpen &&
+      surface.audienceStarterActionsVisible &&
+      surface.hookReady,
+    "an exact-ready materialized Guide before base DOM collection"
+  );
+  await clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle");
+  const deadline = Date.now() + 30000;
+  let state = { activeZone: "", analysis: "", guideOpen: true, launchpadOpen: false, selectedTabs: 0, visiblePanels: 0 };
+  while (Date.now() < deadline) {
+    state = (await win.webContents.executeJavaScript(`
+      (() => {
+        const visible = (target) => {
+          if (!(target instanceof HTMLElement)) return false;
+          const rect = target.getBoundingClientRect();
+          const style = getComputedStyle(target);
+          return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+        };
+        const tabs = Array.from(document.querySelectorAll(
+          '[role="tablist"][aria-label="Workstation function tabs"] [role="tab"]'
+        ));
+        const panels = ["compose", "arrange", "mix", "deliver"]
+          .map((zone) => document.getElementById("workspace-panel-" + zone))
+          .filter(Boolean);
+        return {
+          activeZone: tabs.find((tab) => tab.getAttribute("aria-selected") === "true")?.id?.replace("workspace-tab-", "") ?? "",
+          analysis: document.querySelector("main.app-shell")?.getAttribute("data-audio-analysis-state") ?? "",
+          guideOpen: document.querySelector('[data-testid="guidance-center"]')?.open === true,
+          launchpadOpen: document.querySelector('[data-testid="first-run-launchpad"]')?.open === true,
+          selectedTabs: tabs.filter((tab) => tab.getAttribute("aria-selected") === "true").length,
+          visiblePanels: panels.filter((panel) => !panel.hidden && visible(panel)).length
+        };
+      })();
+    `)) as typeof state;
+    if (
+      state.activeZone === "compose" &&
+      state.analysis === "ready" &&
+      !state.guideOpen &&
+      state.launchpadOpen &&
+      state.selectedTabs === 1 &&
+      state.visiblePanels === 1
+    ) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Base DOM exact-ready Compose posture did not settle: ${JSON.stringify(state)}`);
+}
+
 function collectLaunchSmokeEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeEvidence> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Timed out collecting launch smoke DOM evidence.")), 30000);
-    void collectLaunchSmokeEvidence(win)
+    const timeout = setTimeout(() => reject(new Error("Timed out preparing and collecting launch smoke DOM evidence.")), 120000);
+    void prepareLaunchSmokeBaseDomReadyPosture(win)
+      .then(() => collectLaunchSmokeEvidence(win))
       .then((evidence) => {
         clearTimeout(timeout);
         resolve(evidence);
@@ -4522,32 +5823,901 @@ function collectLaunchSmokeEvidenceWithTimeout(win: BrowserWindow): Promise<Laun
   });
 }
 
-async function collectLaunchSmokePaletteEvidence(win: BrowserWindow): Promise<LaunchSmokePaletteEvidence> {
-  const result = await win.webContents.executeJavaScript(`
+type LaunchSmokeVisibleModeToolEvidence = {
+  arrangementTools: LaunchSmokeArrangementToolsEvidence;
+  deliveryTools: LaunchSmokeDeliveryToolsEvidence;
+  instrumentTools: LaunchSmokeInstrumentToolsEvidence;
+  masterTools: Omit<LaunchSmokeMasterToolsEvidence, "routedMasterMixCoachOpen" | "routedMasterReviewQueueOpen">;
+  mixerTools: LaunchSmokeMixerToolsEvidence;
+  transportTools: LaunchSmokeTransportToolsEvidence;
+};
+
+type LaunchSmokeModeToolZoneState = {
+  activeZone: LaunchSmokeFunctionalTabZone | "";
+  arrangementOpen: boolean;
+  auditOpen: boolean;
+  blockMovesFullWidth: boolean;
+  blockMovesOpen: boolean;
+  exportsOpen: boolean;
+  harmonyOpen: boolean;
+  masterMixCoachOpen: boolean;
+  masterPolishOpen: boolean;
+  masterReviewOpen: boolean;
+  masterReviewQueueOpen: boolean;
+  mixMovesOpen: boolean;
+  mixReviewOpen: boolean;
+  processingOpen: boolean;
+  sessionOpen: boolean;
+  soundOpen: boolean;
+  statusOpen: boolean;
+  surfaceVisible: boolean;
+  visibleControlCount: number;
+};
+
+async function setLaunchSmokeVisibleModeToolPosture(win: BrowserWindow, mode: "guided" | "studio"): Promise<void> {
+  const ready = (await win.webContents.executeJavaScript(`
     (async () => {
-      const collector = window.__grooveforgeLaunchSmoke?.collectAudienceSessionQuickActionEvidence;
-      if (window.grooveforge?.launchSmoke !== true || typeof collector !== "function") {
-        return { ready: false, evidence: null };
-      }
-      const evidence = await collector();
-      return { ready: true, evidence };
+      const setter = window.__grooveforgeLaunchSmoke?.setModeAwareToolPanels;
+      if (typeof setter !== "function") return false;
+      setter(${JSON.stringify(mode)});
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      return true;
     })();
-  `);
-  if (!result || result.ready !== true || !result.evidence) {
-    throw new Error("Launch smoke Quick Actions hook was not ready.");
+  `)) as boolean;
+  if (!ready) {
+    throw new Error(`Mode-aware tool handler was unavailable while selecting ${mode}.`);
   }
-  return result.evidence as LaunchSmokePaletteEvidence;
+}
+
+async function readLaunchSmokeModeToolZoneState(win: BrowserWindow): Promise<LaunchSmokeModeToolZoneState> {
+  return (await win.webContents.executeJavaScript(`
+    (() => {
+      const activeZone =
+        document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "";
+      const visible = (target) => {
+        if (!(target instanceof HTMLElement)) return false;
+        const rect = target.getBoundingClientRect();
+        const style = getComputedStyle(target);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      };
+      const details = (testId) => document.querySelector('[data-testid="' + testId + '"]');
+      const open = (testId) => details(testId) instanceof HTMLDetailsElement && details(testId).open;
+      const zoneSurfaceIds = {
+        arrange: "workflow-target-arrange",
+        compose: "workflow-target-sound",
+        deliver: "handoff-pack",
+        mix: "workflow-target-mix"
+      };
+      const zoneControlIds = {
+        arrange: ["block-moves-toggle", "arrangement-tools-toggle"],
+        compose: ["harmony-moves-toggle", "sound-design-toggle"],
+        deliver: ["handoff-status-toggle", "handoff-audit-toggle"],
+        mix: [
+          "mixer-processing-toggle-drum_rack",
+          "mix-moves-toggle",
+          "mix-review-toggle",
+          "master-polish-toggle",
+          "master-review-toggle"
+        ]
+      };
+      const blockMoves = details("block-moves");
+      const blockMovesStyle = blockMoves instanceof HTMLElement ? getComputedStyle(blockMoves) : null;
+      return {
+        activeZone,
+        arrangementOpen: open("arrangement-tools"),
+        auditOpen: open("handoff-audit-tools"),
+        blockMovesFullWidth:
+          blockMovesStyle?.gridColumnStart === "1" && blockMovesStyle.gridColumnEnd === "-1",
+        blockMovesOpen: open("block-moves"),
+        exportsOpen: open("transport-export-tools"),
+        harmonyOpen: open("harmony-moves"),
+        masterMixCoachOpen: open("master-mix-coach-tools"),
+        masterPolishOpen: open("master-polish-tools"),
+        masterReviewOpen: open("master-review-tools"),
+        masterReviewQueueOpen: open("master-review-queue-tools"),
+        mixMovesOpen: open("mix-moves"),
+        mixReviewOpen: open("mix-review-tools"),
+        processingOpen: open("mixer-processing-drum_rack"),
+        sessionOpen: open("transport-session-tools"),
+        soundOpen: open("sound-design-tools"),
+        statusOpen: open("handoff-status-tools"),
+        surfaceVisible: visible(details(zoneSurfaceIds[activeZone])),
+        visibleControlCount: (zoneControlIds[activeZone] ?? []).filter((testId) => visible(details(testId))).length
+      };
+    })();
+  `)) as LaunchSmokeModeToolZoneState;
+}
+
+async function waitForLaunchSmokeModeToolZoneState(
+  win: BrowserWindow,
+  zone: LaunchSmokeFunctionalTabZone,
+  predicate: (state: LaunchSmokeModeToolZoneState) => boolean,
+  expectedState: string
+): Promise<LaunchSmokeModeToolZoneState> {
+  const expectedControlCount = zone === "mix" ? 5 : 2;
+  const deadline = Date.now() + launchSmokePaletteUiSettleTimeoutMs;
+  let state = await readLaunchSmokeModeToolZoneState(win);
+  while (
+    Date.now() < deadline &&
+    !(state.activeZone === zone && state.surfaceVisible && state.visibleControlCount >= expectedControlCount && predicate(state))
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    state = await readLaunchSmokeModeToolZoneState(win);
+  }
+  if (!(state.activeZone === zone && state.surfaceVisible && state.visibleControlCount >= expectedControlCount && predicate(state))) {
+    throw new Error(`Mode-aware ${zone} surface did not reach ${expectedState}: ${JSON.stringify(state)}`);
+  }
+  return state;
+}
+
+async function activateLaunchSmokeModeToolZone(
+  win: BrowserWindow,
+  zone: LaunchSmokeFunctionalTabZone
+): Promise<LaunchSmokeModeToolZoneState> {
+  const state = await readLaunchSmokeModeToolZoneState(win);
+  if (state.activeZone !== zone) {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${zone}`);
+  }
+  return waitForLaunchSmokeModeToolZoneState(win, zone, () => true, "an active visible surface with its controls");
+}
+
+async function collectLaunchSmokeVisibleModeToolEvidence(
+  win: BrowserWindow
+): Promise<LaunchSmokeVisibleModeToolEvidence> {
+  const initialState = await readLaunchSmokeModeToolZoneState(win);
+  const originalZone = initialState.activeZone || "compose";
+  try {
+    await setLaunchSmokeVisibleModeToolPosture(win, "guided");
+    await activateLaunchSmokeModeToolZone(win, "compose");
+    const guidedCompose = await waitForLaunchSmokeModeToolZoneState(
+      win,
+      "compose",
+      (state) => !state.harmonyOpen && !state.soundOpen,
+      "collapsed Guided instrument tools"
+    );
+    await activateLaunchSmokeModeToolZone(win, "arrange");
+    const guidedArrange = await waitForLaunchSmokeModeToolZoneState(
+      win,
+      "arrange",
+      (state) => !state.arrangementOpen && !state.blockMovesOpen,
+      "collapsed Guided arrangement tools"
+    );
+    await activateLaunchSmokeModeToolZone(win, "mix");
+    const guidedMix = await waitForLaunchSmokeModeToolZoneState(
+      win,
+      "mix",
+      (state) =>
+        !state.processingOpen &&
+        !state.mixMovesOpen &&
+        !state.mixReviewOpen &&
+        !state.masterPolishOpen &&
+        !state.masterReviewOpen &&
+        !state.masterReviewQueueOpen &&
+        !state.masterMixCoachOpen,
+      "collapsed Guided mixer and master tools"
+    );
+    await activateLaunchSmokeModeToolZone(win, "deliver");
+    const guidedDeliver = await waitForLaunchSmokeModeToolZoneState(
+      win,
+      "deliver",
+      (state) => !state.statusOpen && !state.auditOpen,
+      "collapsed Guided delivery tools"
+    );
+
+    await setLaunchSmokeVisibleModeToolPosture(win, "guided");
+    await activateLaunchSmokeModeToolZone(win, "compose");
+    await setLaunchSmokeVisibleModeToolPosture(win, "studio");
+    const studioCompose = await waitForLaunchSmokeModeToolZoneState(
+      win,
+      "compose",
+      (state) => state.harmonyOpen && state.soundOpen,
+      "expanded Studio instrument tools"
+    );
+    await setLaunchSmokeVisibleModeToolPosture(win, "guided");
+    await activateLaunchSmokeModeToolZone(win, "arrange");
+    await setLaunchSmokeVisibleModeToolPosture(win, "studio");
+    const studioArrange = await waitForLaunchSmokeModeToolZoneState(
+      win,
+      "arrange",
+      (state) => state.arrangementOpen && state.blockMovesOpen && state.blockMovesFullWidth,
+      "expanded Studio arrangement tools"
+    );
+    await setLaunchSmokeVisibleModeToolPosture(win, "guided");
+    await activateLaunchSmokeModeToolZone(win, "mix");
+    await setLaunchSmokeVisibleModeToolPosture(win, "studio");
+    const studioMix = await waitForLaunchSmokeModeToolZoneState(
+      win,
+      "mix",
+      (state) =>
+        state.processingOpen &&
+        state.mixMovesOpen &&
+        state.mixReviewOpen &&
+        state.masterPolishOpen &&
+        state.masterReviewOpen &&
+        !state.masterReviewQueueOpen &&
+        !state.masterMixCoachOpen,
+      "expanded Studio mixer and master tools with compact nested diagnostics"
+    );
+    await setLaunchSmokeVisibleModeToolPosture(win, "guided");
+    await activateLaunchSmokeModeToolZone(win, "deliver");
+    await setLaunchSmokeVisibleModeToolPosture(win, "studio");
+    const studioDeliver = await waitForLaunchSmokeModeToolZoneState(
+      win,
+      "deliver",
+      (state) => state.statusOpen && state.auditOpen,
+      "expanded Studio delivery tools"
+    );
+
+    await setLaunchSmokeVisibleModeToolPosture(win, "guided");
+    await activateLaunchSmokeModeToolZone(win, "compose");
+    const resetCompose = await waitForLaunchSmokeModeToolZoneState(
+      win,
+      "compose",
+      (state) => !state.harmonyOpen && !state.soundOpen,
+      "reset Guided instrument tools"
+    );
+    await activateLaunchSmokeModeToolZone(win, "arrange");
+    const resetArrange = await waitForLaunchSmokeModeToolZoneState(
+      win,
+      "arrange",
+      (state) => !state.arrangementOpen && !state.blockMovesOpen,
+      "reset Guided arrangement tools"
+    );
+    await activateLaunchSmokeModeToolZone(win, "mix");
+    const resetMix = await waitForLaunchSmokeModeToolZoneState(
+      win,
+      "mix",
+      (state) =>
+        !state.processingOpen &&
+        !state.mixMovesOpen &&
+        !state.mixReviewOpen &&
+        !state.masterPolishOpen &&
+        !state.masterReviewOpen &&
+        !state.masterReviewQueueOpen &&
+        !state.masterMixCoachOpen,
+      "reset Guided mixer and master tools"
+    );
+    await activateLaunchSmokeModeToolZone(win, "deliver");
+    const resetDeliver = await waitForLaunchSmokeModeToolZoneState(
+      win,
+      "deliver",
+      (state) => !state.statusOpen && !state.auditOpen,
+      "reset Guided delivery tools"
+    );
+
+    return {
+      arrangementTools: {
+        guidedArrangementOpen: guidedArrange.arrangementOpen,
+        guidedBlockMovesOpen: guidedArrange.blockMovesOpen,
+        resetArrangementOpen: resetArrange.arrangementOpen,
+        resetBlockMovesOpen: resetArrange.blockMovesOpen,
+        studioArrangementOpen: studioArrange.arrangementOpen,
+        studioBlockMovesFullWidth: studioArrange.blockMovesFullWidth,
+        studioBlockMovesOpen: studioArrange.blockMovesOpen
+      },
+      deliveryTools: {
+        guidedAuditOpen: guidedDeliver.auditOpen,
+        guidedStatusOpen: guidedDeliver.statusOpen,
+        resetAuditOpen: resetDeliver.auditOpen,
+        resetStatusOpen: resetDeliver.statusOpen,
+        studioAuditOpen: studioDeliver.auditOpen,
+        studioStatusOpen: studioDeliver.statusOpen
+      },
+      instrumentTools: {
+        guidedHarmonyOpen: guidedCompose.harmonyOpen,
+        guidedSoundOpen: guidedCompose.soundOpen,
+        resetHarmonyOpen: resetCompose.harmonyOpen,
+        resetSoundOpen: resetCompose.soundOpen,
+        studioHarmonyOpen: studioCompose.harmonyOpen,
+        studioSoundOpen: studioCompose.soundOpen
+      },
+      masterTools: {
+        guidedMasterMixCoachOpen: guidedMix.masterMixCoachOpen,
+        guidedMasterPolishOpen: guidedMix.masterPolishOpen,
+        guidedMasterReviewOpen: guidedMix.masterReviewOpen,
+        guidedMasterReviewQueueOpen: guidedMix.masterReviewQueueOpen,
+        resetMasterMixCoachOpen: resetMix.masterMixCoachOpen,
+        resetMasterPolishOpen: resetMix.masterPolishOpen,
+        resetMasterReviewOpen: resetMix.masterReviewOpen,
+        resetMasterReviewQueueOpen: resetMix.masterReviewQueueOpen,
+        studioMasterMixCoachOpen: studioMix.masterMixCoachOpen,
+        studioMasterPolishOpen: studioMix.masterPolishOpen,
+        studioMasterReviewOpen: studioMix.masterReviewOpen,
+        studioMasterReviewQueueOpen: studioMix.masterReviewQueueOpen
+      },
+      mixerTools: {
+        guidedMixMovesOpen: guidedMix.mixMovesOpen,
+        guidedMixReviewOpen: guidedMix.mixReviewOpen,
+        guidedProcessingOpen: guidedMix.processingOpen,
+        resetMixMovesOpen: resetMix.mixMovesOpen,
+        resetMixReviewOpen: resetMix.mixReviewOpen,
+        resetProcessingOpen: resetMix.processingOpen,
+        studioMixMovesOpen: studioMix.mixMovesOpen,
+        studioMixReviewOpen: studioMix.mixReviewOpen,
+        studioProcessingOpen: studioMix.processingOpen
+      },
+      transportTools: {
+        guidedExportsOpen: guidedDeliver.exportsOpen,
+        guidedSessionOpen: guidedDeliver.sessionOpen,
+        resetExportsOpen: resetDeliver.exportsOpen,
+        resetSessionOpen: resetDeliver.sessionOpen,
+        studioExportsOpen: studioDeliver.exportsOpen,
+        studioSessionOpen: studioDeliver.sessionOpen
+      }
+    };
+  } finally {
+    await setLaunchSmokeVisibleModeToolPosture(win, "guided").catch(() => undefined);
+    const state = await readLaunchSmokeModeToolZoneState(win).catch(() => null);
+    if (state && state.activeZone !== originalZone) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${originalZone}`).catch(() => undefined);
+      await waitForLaunchSmokeModeToolZoneState(
+        win,
+        originalZone,
+        () => true,
+        `the original ${originalZone} zone posture`
+      ).catch(() => undefined);
+    }
+  }
+}
+
+async function collectLaunchSmokeNativeChordCardEvidence(win: BrowserWindow): Promise<LaunchSmokeChordCardEvidence> {
+  const chordTargets = (await win.webContents.executeJavaScript(`
+    (() => {
+      const cards = Array.from(document.querySelectorAll('[data-testid^="chord-slot-"]'));
+      const initial = cards.find((card) => card instanceof HTMLElement && card.dataset.editorOpen === "true");
+      const target = cards.find((card) => card instanceof HTMLElement && card.dataset.editorOpen === "false");
+      return {
+        initialTestId: initial instanceof HTMLElement ? initial.dataset.testid ?? "" : "",
+        targetTestId: target instanceof HTMLElement ? target.dataset.testid ?? "" : ""
+      };
+    })();
+  `)) as { initialTestId: string; targetTestId: string };
+  if (!chordTargets.initialTestId || !chordTargets.targetTestId) {
+    return { restoreReady: false, selectionReady: false };
+  }
+
+  const focusChordCard = async (testId: string): Promise<boolean> =>
+    (await win.webContents.executeJavaScript(`
+      (() => {
+        const target = document.querySelector('[data-testid=${JSON.stringify(testId)}]');
+        if (!(target instanceof HTMLElement)) return false;
+        target.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
+        const rect = target.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return false;
+        target.focus({ preventScroll: true });
+        return document.activeElement === target;
+      })();
+    `)) as boolean;
+  const waitForChordSelection = async (testId: string): Promise<boolean> => {
+    const editorTestId = testId.replace("chord-slot-", "chord-event-editor-");
+    const deadline = Date.now() + launchSmokePaletteUiSettleTimeoutMs;
+    let ready = false;
+    while (Date.now() < deadline && !ready) {
+      ready = (await win.webContents.executeJavaScript(`
+        (() => {
+          const card = document.querySelector('[data-testid=${JSON.stringify(testId)}]');
+          const editor = document.querySelector('[data-testid=${JSON.stringify(editorTestId)}]');
+          const rect = editor?.getBoundingClientRect() ?? null;
+          return card instanceof HTMLElement && card.dataset.editorOpen === "true" && Boolean(rect && rect.width > 0 && rect.height > 0);
+        })();
+      `)) as boolean;
+      if (!ready) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }
+    return ready;
+  };
+
+  if (!(await focusChordCard(chordTargets.targetTestId))) {
+    return { restoreReady: false, selectionReady: false };
+  }
+  await sendLaunchSmokeFunctionalTabNativeKey(win, "Enter");
+  const selectionReady = await waitForChordSelection(chordTargets.targetTestId);
+  if (!(await focusChordCard(chordTargets.initialTestId))) {
+    return { restoreReady: false, selectionReady };
+  }
+  await sendLaunchSmokeFunctionalTabNativeKey(win, "Space");
+  const restoreReady = await waitForChordSelection(chordTargets.initialTestId);
+  return { restoreReady, selectionReady };
+}
+
+async function readLaunchSmokePaletteSurfaceState(win: BrowserWindow): Promise<{
+  activeZone: LaunchSmokeFunctionalTabZone | "";
+  audienceStarterActionsVisible: boolean;
+  captureIdeasVisible: boolean;
+  guideOpen: boolean;
+  hookReady: boolean;
+}> {
+  return (await win.webContents.executeJavaScript(`
+    (() => {
+      const visible = (target) => {
+        if (!(target instanceof HTMLElement)) return false;
+        const rect = target.getBoundingClientRect();
+        const style = getComputedStyle(target);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      };
+      const activeTab = document.querySelector('[role="tab"][aria-selected="true"]');
+      const guide = document.querySelector('[data-testid="guidance-center"]');
+      return {
+        activeZone: activeTab?.id?.replace("workspace-tab-", "") ?? "",
+        audienceStarterActionsVisible:
+          visible(document.querySelector('[data-testid="audience-starter-action-beginner"]')) &&
+          visible(document.querySelector('[data-testid="audience-starter-action-producer"]')),
+        captureIdeasVisible: visible(document.querySelector('[data-testid="capture-ideas"]')),
+        guideOpen: guide instanceof HTMLDetailsElement && guide.open,
+        hookReady: typeof window.__grooveforgeLaunchSmoke?.collectAudienceSessionQuickActionEvidence === "function"
+      };
+    })();
+  `)) as {
+    activeZone: LaunchSmokeFunctionalTabZone | "";
+    audienceStarterActionsVisible: boolean;
+    captureIdeasVisible: boolean;
+    guideOpen: boolean;
+    hookReady: boolean;
+  };
+}
+
+async function waitForLaunchSmokePaletteSurfaceState(
+  win: BrowserWindow,
+  predicate: (state: Awaited<ReturnType<typeof readLaunchSmokePaletteSurfaceState>>) => boolean,
+  expectedState: string
+): Promise<void> {
+  const deadline = Date.now() + launchSmokePaletteUiSettleTimeoutMs;
+  let state = await readLaunchSmokePaletteSurfaceState(win);
+  while (Date.now() < deadline && !predicate(state)) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    state = await readLaunchSmokePaletteSurfaceState(win);
+  }
+  if (!predicate(state)) {
+    throw new Error(`Quick Actions palette surfaces did not reach ${expectedState}: ${JSON.stringify(state)}`);
+  }
+}
+
+async function runLaunchSmokePaletteStage<T>(
+  win: BrowserWindow,
+  timings: LaunchSmokePaletteStageTiming[],
+  id: string,
+  action: () => Promise<T>,
+  onStage: (stage: string) => void
+): Promise<T> {
+  onStage(id);
+  await win.webContents.executeJavaScript(
+    `window.__grooveforgeLaunchSmokePaletteStep = ${JSON.stringify(id)}`
+  );
+  const startedAt = Date.now();
+  try {
+    return await action();
+  } finally {
+    timings.push({ durationMs: Date.now() - startedAt, id });
+  }
+}
+
+async function refreshLaunchSmokeAudienceStarterAudio(
+  win: BrowserWindow,
+  starterId: "beginner" | "producer"
+): Promise<LaunchSmokeAudienceStarterAudioRefreshEvidence> {
+  const expectedTitle = starterId === "beginner" ? "First Guided Beat" : "Producer Fast Pass";
+  const expectedMode = starterId === "beginner" ? "guided" : "studio";
+  const projectDeadline = Date.now() + launchSmokePaletteUiSettleTimeoutMs;
+  let projectState = { modeSelected: false, title: "" };
+  while (Date.now() < projectDeadline) {
+    projectState = (await win.webContents.executeJavaScript(`
+      (() => ({
+        modeSelected: document.querySelector('[data-testid="mode-${expectedMode}"]')?.classList.contains("selected") === true,
+        title: document.querySelector('[data-testid="project-title-input"]')?.value ?? ""
+      }))();
+    `)) as typeof projectState;
+    if (projectState.title === expectedTitle && projectState.modeSelected) {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  if (projectState.title !== expectedTitle || !projectState.modeSelected) {
+    throw new Error(`Audience Starter ${starterId} project did not settle before exact audio refresh: ${JSON.stringify(projectState)}`);
+  }
+
+  await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-mix");
+  await waitForLaunchSmokeAudioAnalysisTabPosture(win, "mix");
+  const exact = await waitForLaunchSmokeExactAudioAnalysis(win);
+  await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-compose");
+  const restored = await waitForLaunchSmokeAudioAnalysisTabPosture(win, "compose");
+  const composeState = await readLaunchSmokePaletteSurfaceState(win);
+  if (!composeState.guideOpen) {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle");
+  }
+  await waitForLaunchSmokePaletteSurfaceState(
+    win,
+    (state) =>
+      state.activeZone === "compose" &&
+      state.guideOpen &&
+      state.captureIdeasVisible &&
+      state.audienceStarterActionsVisible &&
+      state.hookReady,
+    `the exact-ready ${starterId} Audience Starter result on visible Compose and Guide surfaces`
+  );
+  return {
+    exactState: exact.state,
+    guideOpen: true,
+    projectMode: expectedMode,
+    projectTitle: projectState.title,
+    restored,
+    retryRequested: exact.retryRequested,
+    starterActionsVisible: true
+  };
+}
+
+async function waitForLaunchSmokeAudienceStarterVisibleResult(
+  win: BrowserWindow,
+  starterId: "beginner" | "producer"
+): Promise<void> {
+  const expectedAction = `audience-starter-${starterId}`;
+  const expectedFollowups = starterId === "beginner" ? 2 : 3;
+  const deadline = Date.now() + launchSmokePaletteUiSettleTimeoutMs;
+  let state = { action: "", followups: 0, resultVisible: false };
+  while (Date.now() < deadline) {
+    state = (await win.webContents.executeJavaScript(`
+      (() => {
+        const result = document.querySelector('[data-testid="audience-starter-result"]');
+        const rect = result?.getBoundingClientRect() ?? null;
+        return {
+          action: result?.getAttribute("data-audience-starter-result") ?? "",
+          followups: document.querySelectorAll('[data-testid^="audience-starter-result-followup-"]').length,
+          resultVisible: Boolean(rect && rect.width > 0 && rect.height > 0)
+        };
+      })();
+    `)) as typeof state;
+    if (state.action === expectedAction && state.followups === expectedFollowups && state.resultVisible) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Audience Starter ${starterId} visible result did not settle: ${JSON.stringify(state)}`);
+}
+
+async function readLaunchSmokeAudienceStarterVisibleEvidence(
+  win: BrowserWindow,
+  starterId: "beginner" | "producer"
+): Promise<Omit<LaunchSmokeAudienceStarterVisibleEvidence, "visibleFollowupCompletionResult" | "visibleFollowupPrimaryResult" | "visibleFollowupReadinessResult">> {
+  return (await win.webContents.executeJavaScript(`
+    (() => {
+      const text = (selector) => document.querySelector(selector)?.textContent?.trim() ?? "";
+      const visible = (target) => {
+        if (!(target instanceof HTMLElement)) return false;
+        const rect = target.getBoundingClientRect();
+        const style = getComputedStyle(target);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      };
+      const starterId = ${JSON.stringify(starterId)};
+      const action = document.querySelector('[data-testid="audience-starter-action-' + starterId + '"]');
+      const followupText = text('[data-testid="audience-starter-followup-' + starterId + '"]');
+      const buttons = Array.from(document.querySelectorAll('[data-testid^="audience-starter-result-followup-"]'));
+      const routes = new Set(buttons.map((button) => button.getAttribute("data-audience-starter-followup-route") ?? ""));
+      return {
+        buttonPresent: visible(action),
+        followupPresent: followupText.length > 0,
+        followupText,
+        visibleFollowupActionCount: buttons.filter(visible).length,
+        visibleFollowupActionLabels: buttons.map((button) => button.textContent?.trim() ?? "").filter(Boolean).join(" / "),
+        visibleFollowupCompletionPresent: routes.has("completion"),
+        visibleFollowupPrimaryPresent: routes.has("primary"),
+        visibleFollowupReadinessPresent: routes.has("readiness"),
+        visibleResultAudition: text('[data-testid="audience-starter-result-audition"]'),
+        visibleResultMetricValue: text('[data-testid="audience-starter-result-metric-value"]'),
+        visibleResultNextCheck: text('[data-testid="audience-starter-result-next-check"]'),
+        visibleResultPresent: visible(document.querySelector('[data-testid="audience-starter-result"]')),
+        visibleResultStatus: text('[data-testid="audience-starter-result-status"]'),
+        visibleResultTitle: text('[data-testid="audience-starter-result-title"]')
+      };
+    })();
+  `)) as Omit<
+    LaunchSmokeAudienceStarterVisibleEvidence,
+    "visibleFollowupCompletionResult" | "visibleFollowupPrimaryResult" | "visibleFollowupReadinessResult"
+  >;
+}
+
+async function clickLaunchSmokeAudienceStarterFollowup(
+  win: BrowserWindow,
+  starterId: "beginner" | "producer",
+  route: "completion" | "primary" | "readiness"
+): Promise<string> {
+  const target =
+    starterId === "beginner"
+      ? route === "primary"
+        ? { label: "First Beat Path", testId: "first-beat-path", textId: "first-beat-path-headline" }
+        : { label: "Dual Audience Readiness", testId: "dual-audience-readiness", textId: "dual-audience-readiness-headline" }
+      : route === "primary"
+        ? { label: "Review Queue", testId: "review-queue", textId: "review-queue-headline" }
+        : route === "readiness"
+          ? { label: "Export Preflight", testId: "export-preflight", textId: "export-preflight-headline" }
+          : { label: "Handoff Package Check", testId: "handoff-package-check", textId: "handoff-package-check-headline" };
+  await clickLaunchSmokeFunctionalTabNativeTarget(win, `audience-starter-result-followup-${route}`);
+  const deadline = Date.now() + launchSmokePaletteUiSettleTimeoutMs;
+  let state = { text: "", visible: false };
+  while (Date.now() < deadline) {
+    state = (await win.webContents.executeJavaScript(`
+      (() => {
+        const target = document.querySelector('[data-testid=${JSON.stringify(target.testId)}]');
+        const rect = target?.getBoundingClientRect() ?? null;
+        const style = target instanceof HTMLElement ? getComputedStyle(target) : null;
+        return {
+          text: document.querySelector('[data-testid=${JSON.stringify(target.textId)}]')?.textContent?.trim() ?? "",
+          visible: Boolean(
+            rect && rect.width > 0 && rect.height > 0 && style?.display !== "none" && style?.visibility !== "hidden"
+          )
+        };
+      })();
+    `)) as typeof state;
+    if (state.visible && state.text.length > 0) {
+      return `${target.label} / ${state.text}`;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Audience Starter ${starterId} ${route} follow-up did not reveal ${target.label}: ${JSON.stringify(state)}`);
+}
+
+async function readLaunchSmokeLaunchpadOpen(win: BrowserWindow): Promise<boolean> {
+  return (await win.webContents.executeJavaScript(
+    `document.querySelector('[data-testid="first-run-launchpad"]')?.open === true`
+  )) as boolean;
+}
+
+async function waitForLaunchSmokeLaunchpadOpen(
+  win: BrowserWindow,
+  expectedOpen: boolean,
+  expectedState: string
+): Promise<void> {
+  const deadline = Date.now() + launchSmokePaletteUiSettleTimeoutMs;
+  let open = await readLaunchSmokeLaunchpadOpen(win);
+  while (Date.now() < deadline && open !== expectedOpen) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    open = await readLaunchSmokeLaunchpadOpen(win);
+  }
+  if (open !== expectedOpen) {
+    throw new Error(`First-run launchpad did not reach ${expectedState}: ${JSON.stringify({ open })}`);
+  }
+}
+
+async function setLaunchSmokeLaunchpadOpen(win: BrowserWindow, expectedOpen: boolean): Promise<void> {
+  if ((await readLaunchSmokeLaunchpadOpen(win)) !== expectedOpen) {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "first-run-launchpad-toggle");
+  }
+  await waitForLaunchSmokeLaunchpadOpen(win, expectedOpen, expectedOpen ? "open" : "collapsed");
+}
+
+async function collectLaunchSmokeNativeAudienceStarterEvidence(
+  win: BrowserWindow,
+  starterId: "beginner" | "producer"
+): Promise<{
+  audioRefresh: LaunchSmokeAudienceStarterAudioRefreshEvidence;
+  launchpadCollapsedAfterSelection: boolean;
+  visible: LaunchSmokeAudienceStarterVisibleEvidence;
+}> {
+  await clickLaunchSmokeFunctionalTabNativeTarget(win, `audience-starter-action-${starterId}`);
+  await waitForLaunchSmokeLaunchpadOpen(win, false, `collapsed after ${starterId} starter selection`);
+  const launchpadCollapsedAfterSelection = !(await readLaunchSmokeLaunchpadOpen(win));
+  const audioRefresh = await refreshLaunchSmokeAudienceStarterAudio(win, starterId);
+  await waitForLaunchSmokeAudienceStarterVisibleResult(win, starterId);
+  const visible = await readLaunchSmokeAudienceStarterVisibleEvidence(win, starterId);
+  const visibleFollowupPrimaryResult = await clickLaunchSmokeAudienceStarterFollowup(win, starterId, "primary");
+  const visibleFollowupReadinessResult = await clickLaunchSmokeAudienceStarterFollowup(win, starterId, "readiness");
+  const visibleFollowupCompletionResult =
+    starterId === "producer"
+      ? await clickLaunchSmokeAudienceStarterFollowup(win, starterId, "completion")
+      : "";
+  return {
+    audioRefresh,
+    launchpadCollapsedAfterSelection,
+    visible: {
+      ...visible,
+      visibleFollowupCompletionResult,
+      visibleFollowupPrimaryResult,
+      visibleFollowupReadinessResult
+    }
+  };
+}
+
+async function collectLaunchSmokePaletteEvidence(
+  win: BrowserWindow,
+  onStage: (stage: string) => void = () => {}
+): Promise<LaunchSmokePaletteEvidence> {
+  const initialState = await readLaunchSmokePaletteSurfaceState(win);
+  const stageTimings: LaunchSmokePaletteStageTiming[] = [];
+  try {
+    if (initialState.activeZone !== "compose") {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-compose");
+    }
+    await waitForLaunchSmokePaletteSurfaceState(
+      win,
+      (state) => state.activeZone === "compose" && state.captureIdeasVisible,
+      "an active Compose tab with visible Capture & Ideas controls"
+    );
+
+    const composeState = await readLaunchSmokePaletteSurfaceState(win);
+    if (!composeState.guideOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle");
+    }
+    await waitForLaunchSmokePaletteSurfaceState(
+      win,
+      (state) =>
+        state.activeZone === "compose" &&
+        state.guideOpen &&
+        state.captureIdeasVisible &&
+        state.audienceStarterActionsVisible &&
+        state.hookReady,
+      "visible Compose, Guide, Capture & Ideas, Audience Starter actions, and a ready palette hook"
+    );
+    const initialLaunchpadOpen = await readLaunchSmokeLaunchpadOpen(win);
+    if (!initialLaunchpadOpen) {
+      throw new Error("First-run launchpad should be open before native Audience Starter lifecycle evidence.");
+    }
+
+    const visibleModeToolEvidence = await runLaunchSmokePaletteStage(
+      win,
+      stageTimings,
+      "mode-tools",
+      () => collectLaunchSmokeVisibleModeToolEvidence(win),
+      onStage
+    );
+    const modeRestoredState = await readLaunchSmokePaletteSurfaceState(win);
+    if (!modeRestoredState.guideOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle");
+    }
+    await waitForLaunchSmokePaletteSurfaceState(
+      win,
+      (state) =>
+        state.activeZone === "compose" &&
+        state.guideOpen &&
+        state.captureIdeasVisible &&
+        state.audienceStarterActionsVisible &&
+        state.hookReady,
+      "the restored visible Compose and Guide posture after mode-aware tool measurement"
+    );
+    const chordCards = await runLaunchSmokePaletteStage(
+      win,
+      stageTimings,
+      "native-chord-cards",
+      () => collectLaunchSmokeNativeChordCardEvidence(win),
+      onStage
+    );
+
+    const result = await runLaunchSmokePaletteStage(
+      win,
+      stageTimings,
+      "quick-actions-hook-without-starters",
+      () => win.webContents.executeJavaScript(`
+        (async () => {
+          const collector = window.__grooveforgeLaunchSmoke?.collectAudienceSessionQuickActionEvidence;
+          if (window.grooveforge?.launchSmoke !== true || typeof collector !== "function") {
+            return { ready: false, evidence: null };
+          }
+          const evidence = await collector({ skipStarterRoutes: true });
+          return { ready: true, evidence };
+        })();
+      `),
+      onStage
+    );
+    if (!result || result.ready !== true || !result.evidence) {
+      throw new Error("Launch smoke Quick Actions hook was not ready.");
+    }
+    await waitForLaunchSmokeLaunchpadOpen(win, true, "open before changed beginner starter selection");
+    const nativeStarterBeginner = await runLaunchSmokePaletteStage(
+      win,
+      stageTimings,
+      "native-beginner-starter",
+      () => collectLaunchSmokeNativeAudienceStarterEvidence(win, "beginner"),
+      onStage
+    );
+    const changedStarterLaunchpad = await runLaunchSmokePaletteStage(
+      win,
+      stageTimings,
+      "native-launchpad-changed-and-manual",
+      async () => {
+        const collapsedAfterStarter = nativeStarterBeginner.launchpadCollapsedAfterSelection;
+        await setLaunchSmokeLaunchpadOpen(win, true);
+        const manualReopen = await readLaunchSmokeLaunchpadOpen(win);
+        await setLaunchSmokeLaunchpadOpen(win, false);
+        const manualClose = !(await readLaunchSmokeLaunchpadOpen(win));
+        return { collapsedAfterStarter, manualClose, manualReopen };
+      },
+      onStage
+    );
+    const nativeStarterProducer = await runLaunchSmokePaletteStage(
+      win,
+      stageTimings,
+      "native-producer-starter",
+      () => collectLaunchSmokeNativeAudienceStarterEvidence(win, "producer"),
+      onStage
+    );
+    const sameStarterCollapse = await runLaunchSmokePaletteStage(
+      win,
+      stageTimings,
+      "native-launchpad-identical-starter",
+      async () => {
+        await setLaunchSmokeLaunchpadOpen(win, true);
+        await clickLaunchSmokeFunctionalTabNativeTarget(win, "audience-starter-action-producer");
+        await waitForLaunchSmokeLaunchpadOpen(win, false, "collapsed after identical Producer starter selection");
+        return !(await readLaunchSmokeLaunchpadOpen(win));
+      },
+      onStage
+    );
+    onStage("returning-evidence");
+    await win.webContents.executeJavaScript(`window.__grooveforgeLaunchSmokePaletteStep = "returning-evidence"`);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const evidence = result.evidence as LaunchSmokePaletteEvidence;
+    return {
+      ...evidence,
+      arrangementTools: visibleModeToolEvidence.arrangementTools,
+      chordCards,
+      deliveryTools: visibleModeToolEvidence.deliveryTools,
+      instrumentTools: visibleModeToolEvidence.instrumentTools,
+      launchpad: {
+        ...changedStarterLaunchpad,
+        initialOpen: initialLaunchpadOpen,
+        sameStarterCollapse
+      },
+      masterTools: {
+        ...evidence.masterTools,
+        ...visibleModeToolEvidence.masterTools
+      },
+      mixerTools: visibleModeToolEvidence.mixerTools,
+      stageTimings,
+      starterBeginner: {
+        ...evidence.starterBeginner,
+        ...nativeStarterBeginner.visible,
+        resultMetricValue: nativeStarterBeginner.visible.visibleResultMetricValue,
+        resultNextCheck: nativeStarterBeginner.visible.visibleResultNextCheck,
+        resultStatus: nativeStarterBeginner.visible.visibleResultStatus,
+        resultTitle: nativeStarterBeginner.visible.visibleResultTitle
+      },
+      starterBeginnerAudioRefresh: nativeStarterBeginner.audioRefresh,
+      starterProducer: {
+        ...evidence.starterProducer,
+        ...nativeStarterProducer.visible,
+        resultMetricValue: nativeStarterProducer.visible.visibleResultMetricValue,
+        resultNextCheck: nativeStarterProducer.visible.visibleResultNextCheck,
+        resultStatus: nativeStarterProducer.visible.visibleResultStatus,
+        resultTitle: nativeStarterProducer.visible.visibleResultTitle
+      },
+      starterProducerAudioRefresh: nativeStarterProducer.audioRefresh,
+      transportTools: visibleModeToolEvidence.transportTools
+    };
+  } finally {
+    const activeState = await readLaunchSmokePaletteSurfaceState(win);
+    if (initialState.activeZone && activeState.activeZone !== initialState.activeZone) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${initialState.activeZone}`);
+      await waitForLaunchSmokePaletteSurfaceState(
+        win,
+        (state) => state.activeZone === initialState.activeZone,
+        `the original ${initialState.activeZone} tab posture`
+      );
+    }
+
+    const zoneRestoredState = await readLaunchSmokePaletteSurfaceState(win);
+    if (zoneRestoredState.guideOpen !== initialState.guideOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle");
+      await waitForLaunchSmokePaletteSurfaceState(
+        win,
+        (state) => state.guideOpen === initialState.guideOpen,
+        `the original ${initialState.guideOpen ? "open" : "collapsed"} Guide posture`
+      );
+    }
+  }
 }
 
 function collectLaunchSmokePaletteEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokePaletteEvidence> {
+  if (launchSmokePaletteTimeoutMs <= launchSmokePaletteBoundedChildBudgetMs) {
+    throw new Error("Quick Actions palette timeout must exceed its bounded child-operation budget.");
+  }
   return new Promise((resolve, reject) => {
+    let currentStage = "starting";
     const timeout = setTimeout(() => {
-      void win.webContents
-        .executeJavaScript(`window.__grooveforgeLaunchSmokePaletteStep ?? "unknown"`)
-        .then((step: unknown) => reject(new Error(`Timed out collecting live Quick Actions palette evidence at ${String(step)}.`)))
-        .catch(() => reject(new Error("Timed out collecting live Quick Actions palette evidence.")));
-    }, 150000);
-    void collectLaunchSmokePaletteEvidence(win)
+      reject(new Error(
+        `Timed out collecting live Quick Actions palette evidence at ${currentStage} after ${launchSmokePaletteTimeoutMs} ms.`
+      ));
+    }, launchSmokePaletteTimeoutMs);
+    void collectLaunchSmokePaletteEvidence(win, (stage) => {
+      currentStage = stage;
+    })
       .then((evidence) => {
         clearTimeout(timeout);
         resolve(evidence);
@@ -4557,6 +6727,270 @@ function collectLaunchSmokePaletteEvidenceWithTimeout(win: BrowserWindow): Promi
         reject(error);
       });
   });
+}
+
+async function waitForLaunchSmokeStarterZoneSurface(
+  win: BrowserWindow,
+  zone: LaunchSmokeFunctionalTabZone,
+  selectors: string[],
+  expectedState: string
+): Promise<void> {
+  const deadline = Date.now() + 30000;
+  let state: { activeZone: string; visibleTargetCount: number } = { activeZone: "", visibleTargetCount: 0 };
+  while (Date.now() < deadline) {
+    state = (await win.webContents.executeJavaScript(`
+      (() => {
+        const visible = (target) => {
+          if (!(target instanceof HTMLElement)) return false;
+          const rect = target.getBoundingClientRect();
+          const style = getComputedStyle(target);
+          return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+        };
+        const selectors = ${JSON.stringify(selectors)};
+        return {
+          activeZone:
+            document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "",
+          visibleTargetCount: selectors.filter((selector) => visible(document.querySelector(selector))).length
+        };
+      })();
+    `)) as { activeZone: string; visibleTargetCount: number };
+    if (state.activeZone === zone && state.visibleTargetCount === selectors.length) {
+      await win.webContents.executeJavaScript(
+        `new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))`
+      );
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Audience Starter ${zone} surface did not reach ${expectedState}: ${JSON.stringify(state)}`);
+}
+
+async function activateLaunchSmokeStarterZoneSurface(
+  win: BrowserWindow,
+  zone: LaunchSmokeFunctionalTabZone,
+  selectors: string[],
+  expectedState: string
+): Promise<void> {
+  const activeZone = (await win.webContents.executeJavaScript(
+    `document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? ""`
+  )) as string;
+  if (activeZone !== zone) {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${zone}`);
+  }
+  await waitForLaunchSmokeStarterZoneSurface(win, zone, selectors, expectedState);
+}
+
+type LaunchSmokeStarterMixDisclosurePosture = {
+  masterReviewOpen: boolean;
+  masterReviewQueueOpen: boolean;
+};
+
+async function readLaunchSmokeStarterMixDisclosurePosture(
+  win: BrowserWindow
+): Promise<LaunchSmokeStarterMixDisclosurePosture> {
+  return (await win.webContents.executeJavaScript(`
+    (() => ({
+      masterReviewOpen: document.querySelector('[data-testid="master-review-tools"]')?.open === true,
+      masterReviewQueueOpen: document.querySelector('[data-testid="master-review-queue-tools"]')?.open === true
+    }))();
+  `)) as LaunchSmokeStarterMixDisclosurePosture;
+}
+
+async function waitForLaunchSmokeStarterViewport(
+  win: BrowserWindow,
+  expected: { minimumWidth?: number; width?: number },
+  expectedState: string
+): Promise<void> {
+  const deadline = Date.now() + 30000;
+  let state = { innerWidth: 0, wideMediaMatches: false };
+  while (Date.now() < deadline) {
+    state = (await win.webContents.executeJavaScript(`
+      (() => ({
+        innerWidth: window.innerWidth,
+        wideMediaMatches: window.matchMedia("(min-width: 1601px)").matches
+      }))();
+    `)) as typeof state;
+    const minimumWidthReady = expected.minimumWidth === undefined || state.innerWidth >= expected.minimumWidth;
+    const exactWidthReady = expected.width === undefined || Math.abs(state.innerWidth - expected.width) <= 1;
+    const mediaReady = expected.minimumWidth === undefined || state.wideMediaMatches;
+    if (minimumWidthReady && exactWidthReady && mediaReady) {
+      await win.webContents.executeJavaScript(
+        `new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))`
+      );
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Audience Starter viewport did not reach ${expectedState}: ${JSON.stringify(state)}`);
+}
+
+async function waitForLaunchSmokeStarterResponsiveMixSurface(win: BrowserWindow): Promise<void> {
+  const deadline = Date.now() + 30000;
+  let state: Record<string, unknown> = {};
+  while (Date.now() < deadline) {
+    state = (await win.webContents.executeJavaScript(`
+      (() => {
+        const visible = (target) => {
+          if (!(target instanceof HTMLElement)) return false;
+          const rect = target.getBoundingClientRect();
+          const style = getComputedStyle(target);
+          return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+        };
+        const mixerStrips = Array.from(document.querySelectorAll('[data-testid^="mixer-strip-"]'));
+        const mixerNarrowStripCount = mixerStrips.filter((strip) => {
+          const stripTop = strip.querySelector(".strip-top");
+          const trackName = stripTop?.querySelector(":scope > span");
+          const toggles = stripTop?.querySelector(".strip-toggles");
+          const trackRect = trackName?.getBoundingClientRect() ?? null;
+          const togglesRect = toggles?.getBoundingClientRect() ?? null;
+          return Boolean(
+            visible(strip) &&
+            stripTop &&
+            trackRect &&
+            togglesRect &&
+            getComputedStyle(stripTop).gridTemplateColumns.trim().split(/\\s+/).length === 1 &&
+            togglesRect.top >= trackRect.bottom
+          );
+        }).length;
+        const reviewQueue = document.querySelector('[data-testid="review-queue"]');
+        const reviewQueueRect = reviewQueue?.getBoundingClientRect() ?? null;
+        const reviewQueueFields = [
+          "review-queue-focus-status",
+          "review-queue-focus-label",
+          "review-queue-focus-detail",
+          "review-queue-priority-status",
+          "review-queue-priority-label",
+          "review-queue-priority-item",
+          "review-queue-priority-next-check",
+          "review-fix-preview-title",
+          "review-fix-preview-detail",
+          "review-fix-preview-audition",
+          "review-fix-preview-next-check"
+        ]
+          .map((testId) => document.querySelector('[data-testid="' + testId + '"]'))
+          .filter((field) => field instanceof HTMLElement);
+        const reviewQueueReadableFieldCount = reviewQueueFields.filter((field) => {
+          const fieldRect = field.getBoundingClientRect();
+          const fieldStyle = getComputedStyle(field);
+          return Boolean(
+            reviewQueueRect &&
+            fieldRect.width > 0 &&
+            fieldRect.left >= reviewQueueRect.left - 1 &&
+            fieldRect.right <= reviewQueueRect.right + 1 &&
+            fieldStyle.whiteSpace !== "nowrap" &&
+            fieldStyle.overflowWrap === "anywhere"
+          );
+        }).length;
+        const reviewQueueStackedRowCount = [
+          "review-queue-focus-readout",
+          "review-queue-priority",
+          "review-fix-preview"
+        ].filter((testId) => {
+          const row = document.querySelector('[data-testid="' + testId + '"]');
+          return row instanceof HTMLElement && getComputedStyle(row).gridTemplateColumns.trim().split(/\\s+/).length === 1;
+        }).length;
+        return {
+          activeZone:
+            document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "",
+          innerWidth: window.innerWidth,
+          masterReviewContentVisible: visible(document.querySelector('[data-testid="master-review-content"]')),
+          masterReviewOpen: document.querySelector('[data-testid="master-review-tools"]')?.open === true,
+          masterReviewQueueContentVisible: visible(document.querySelector('[data-testid="master-review-queue-content"]')),
+          masterReviewQueueOpen: document.querySelector('[data-testid="master-review-queue-tools"]')?.open === true,
+          mixerNarrowStripCount,
+          mixerStripCount: mixerStrips.length,
+          reviewQueueFieldCount: reviewQueueFields.length,
+          reviewQueueReadableFieldCount,
+          reviewQueueStackedRowCount,
+          reviewQueueVisible: visible(reviewQueue),
+          wideMediaMatches: window.matchMedia("(min-width: 1601px)").matches
+        };
+      })();
+    `)) as Record<string, unknown>;
+    if (
+      state.activeZone === "mix" &&
+      Number(state.innerWidth) > 1600 &&
+      state.wideMediaMatches === true &&
+      state.masterReviewOpen === true &&
+      state.masterReviewQueueOpen === true &&
+      state.masterReviewContentVisible === true &&
+      state.masterReviewQueueContentVisible === true &&
+      state.reviewQueueVisible === true &&
+      state.mixerStripCount === 5 &&
+      state.mixerNarrowStripCount === 5 &&
+      state.reviewQueueFieldCount === 11 &&
+      state.reviewQueueReadableFieldCount === 11 &&
+      state.reviewQueueStackedRowCount === 3
+    ) {
+      await win.webContents.executeJavaScript(
+        `new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))`
+      );
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Audience Starter responsive Mix surface did not settle: ${JSON.stringify(state)}`);
+}
+
+async function openLaunchSmokeStarterMixDisclosures(win: BrowserWindow): Promise<void> {
+  let posture = await readLaunchSmokeStarterMixDisclosurePosture(win);
+  if (!posture.masterReviewOpen) {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "master-review-toggle");
+    await waitForLaunchSmokeStarterZoneSurface(
+      win,
+      "mix",
+      ['[data-testid="master-review-content"]', '[data-testid="master-review-queue-toggle"]'],
+      "the open Master Review disclosure"
+    );
+  }
+  posture = await readLaunchSmokeStarterMixDisclosurePosture(win);
+  if (!posture.masterReviewQueueOpen) {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "master-review-queue-toggle");
+  }
+}
+
+async function restoreLaunchSmokeStarterMixDisclosurePosture(
+  win: BrowserWindow,
+  expected: LaunchSmokeStarterMixDisclosurePosture
+): Promise<void> {
+  await activateLaunchSmokeStarterZoneSurface(
+    win,
+    "mix",
+    ['[data-testid="workflow-target-mix"]', '[data-testid="master-review-toggle"]'],
+    "the visible Mix disclosure controls"
+  );
+  let posture = await readLaunchSmokeStarterMixDisclosurePosture(win);
+  if (posture.masterReviewQueueOpen !== expected.masterReviewQueueOpen) {
+    if (!posture.masterReviewOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "master-review-toggle");
+      await waitForLaunchSmokeStarterZoneSurface(
+        win,
+        "mix",
+        ['[data-testid="master-review-content"]', '[data-testid="master-review-queue-toggle"]'],
+        "the temporarily open Master Review disclosure"
+      );
+    }
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "master-review-queue-toggle");
+  }
+  posture = await readLaunchSmokeStarterMixDisclosurePosture(win);
+  if (posture.masterReviewOpen !== expected.masterReviewOpen) {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "master-review-toggle");
+  }
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    posture = await readLaunchSmokeStarterMixDisclosurePosture(win);
+    if (
+      posture.masterReviewOpen === expected.masterReviewOpen &&
+      posture.masterReviewQueueOpen === expected.masterReviewQueueOpen
+    ) {
+      await win.webContents.executeJavaScript(
+        `new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))`
+      );
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Audience Starter Mix disclosure posture was not restored: ${JSON.stringify(posture)}`);
 }
 
 async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Promise<LaunchSmokeStarterLandingEvidence> {
@@ -4573,12 +7007,26 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
   if (!result || result.ready !== true || !result.evidence) {
     throw new Error("Launch smoke Audience Starter landing hook was not ready.");
   }
-  const zoneMeasurements = await win.webContents.executeJavaScript(`
+  const originalSize = win.getSize();
+  const originalViewportWidth = (await win.webContents.executeJavaScript(`window.innerWidth`)) as number;
+  const originalZone = (await win.webContents.executeJavaScript(
+    `document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "compose"`
+  )) as LaunchSmokeFunctionalTabZone;
+  const originalMixDisclosurePosture = await readLaunchSmokeStarterMixDisclosurePosture(win);
+  let arrangement: Record<string, number>;
+  let mixerAndReview: Record<string, number | boolean>;
+  let noteTools: Record<string, number>;
+  let mixDisclosurePostureRestored = false;
+  let viewportRestored = false;
+  try {
+    await activateLaunchSmokeStarterZoneSurface(
+      win,
+      "arrange",
+      ['[data-testid="workflow-target-arrange"]', ".arrangement-actions", '[data-testid="arrangement-move-left"]'],
+      "a visible arrangement action layout"
+    );
+    arrangement = (await win.webContents.executeJavaScript(`
     (() => {
-      const activeZone =
-        document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "compose";
-      const activate = (zone) => document.querySelector('[data-testid="workflow-jump-' + zone + '"]')?.click();
-      activate("arrange");
       const arrangementMoveGroup = document.querySelector(".arrangement-actions");
       const arrangementMoveButtons = Array.from(
         document.querySelectorAll('[data-testid="arrangement-move-left"], [data-testid="arrangement-move-right"]')
@@ -4597,7 +7045,7 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
           groupRect && buttonRect.left >= groupRect.left - 1 && buttonRect.right <= groupRect.right + 1
         );
       });
-      const arrangement = {
+      return {
         arrangementMoveContainedCount: arrangementMoveContainedButtons.length,
         arrangementMoveControlCount: arrangementMoveButtons.length,
         arrangementMoveInternalOverflow: arrangementMoveGroup
@@ -4606,8 +7054,29 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
         arrangementMoveReadableLabelCount: arrangementMoveReadableLabels.length,
         arrangementMoveUniqueAccessibleNameCount: new Set(arrangementMoveAccessibleNames).size
       };
+    })();
+  `)) as Record<string, number>;
 
-      activate("mix");
+    win.setSize(1680, 960);
+    await waitForLaunchSmokeStarterViewport(
+      win,
+      { minimumWidth: 1601 },
+      "the native 1680px responsive Mix posture"
+    );
+    await activateLaunchSmokeStarterZoneSurface(
+      win,
+      "mix",
+      [
+        '[data-testid="workflow-target-mix"]',
+        '[data-testid^="mixer-strip-"]',
+        '[data-testid="master-review-toggle"]'
+      ],
+      "visible mixer strips and Master Review controls"
+    );
+    await openLaunchSmokeStarterMixDisclosures(win);
+    await waitForLaunchSmokeStarterResponsiveMixSurface(win);
+    mixerAndReview = (await win.webContents.executeJavaScript(`
+    (() => {
       const mixerToggleButtons = Array.from(
         document.querySelectorAll('[data-testid^="mixer-mute-"], [data-testid^="mixer-solo-"]')
       );
@@ -4644,7 +7113,44 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
           togglesRect.top >= trackRect.bottom
         );
       });
-      const mixer = {
+      const reviewQueue = document.querySelector('[data-testid="review-queue"]');
+      const reviewQueueRect = reviewQueue?.getBoundingClientRect() ?? null;
+      const reviewQueueFields = [
+        "review-queue-focus-status",
+        "review-queue-focus-label",
+        "review-queue-focus-detail",
+        "review-queue-priority-status",
+        "review-queue-priority-label",
+        "review-queue-priority-item",
+        "review-queue-priority-next-check",
+        "review-fix-preview-title",
+        "review-fix-preview-detail",
+        "review-fix-preview-audition",
+        "review-fix-preview-next-check"
+      ]
+        .map((testId) => document.querySelector('[data-testid="' + testId + '"]'))
+        .filter((field) => field instanceof HTMLElement);
+      const reviewQueueReadableFields = reviewQueueFields.filter((field) => {
+        const fieldRect = field.getBoundingClientRect();
+        const fieldStyle = getComputedStyle(field);
+        return Boolean(
+          reviewQueueRect &&
+          fieldRect.width > 0 &&
+          fieldRect.left >= reviewQueueRect.left - 1 &&
+          fieldRect.right <= reviewQueueRect.right + 1 &&
+          fieldStyle.whiteSpace !== "nowrap" &&
+          fieldStyle.overflowWrap === "anywhere"
+        );
+      });
+      const reviewQueueStackedRows = [
+        "review-queue-focus-readout",
+        "review-queue-priority",
+        "review-fix-preview"
+      ].filter((testId) => {
+        const row = document.querySelector('[data-testid="' + testId + '"]');
+        return row instanceof HTMLElement && getComputedStyle(row).gridTemplateColumns.trim().split(/\\s+/).length === 1;
+      });
+      return {
         mixerNarrowStripCount: mixerNarrowStrips.length,
         mixerToggleContainedCount: mixerToggleContainedButtons.length,
         mixerToggleCount: mixerToggleButtons.length,
@@ -4657,10 +7163,46 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
         mixerToggleTitleCount: mixerToggleButtons.filter(
           (button) => (button.getAttribute("title")?.trim().length ?? 0) > 0
         ).length,
-        mixerToggleUniqueAccessibleNameCount: new Set(mixerToggleAccessibleNames).size
+        mixerToggleUniqueAccessibleNameCount: new Set(mixerToggleAccessibleNames).size,
+        producerQueueOpen:
+          document.querySelector('[data-testid="master-review-queue-tools"]')?.open === true,
+        producerReviewOpen:
+          document.querySelector('[data-testid="master-review-tools"]')?.open === true,
+        reviewQueueContained: Boolean(
+          reviewQueue &&
+          reviewQueueRect &&
+          reviewQueueRect.left >= 0 &&
+          reviewQueueRect.right <= window.innerWidth &&
+          reviewQueue.scrollWidth <= reviewQueue.clientWidth + 1
+        ),
+        reviewQueueFieldCount: reviewQueueFields.length,
+        reviewQueueInternalOverflow: reviewQueue
+          ? Math.max(0, reviewQueue.scrollWidth - reviewQueue.clientWidth)
+          : 0,
+        reviewQueueReadableFieldCount: reviewQueueReadableFields.length,
+        reviewQueueStackedRowCount: reviewQueueStackedRows.length
       };
+    })();
+  `)) as Record<string, number | boolean>;
 
-      activate("compose");
+    await restoreLaunchSmokeStarterMixDisclosurePosture(win, originalMixDisclosurePosture);
+    mixDisclosurePostureRestored = true;
+    win.setSize(originalSize[0], originalSize[1]);
+    await waitForLaunchSmokeStarterViewport(
+      win,
+      { width: originalViewportWidth },
+      `the original ${originalViewportWidth}px viewport posture`
+    );
+    viewportRestored = true;
+
+    await activateLaunchSmokeStarterZoneSurface(
+      win,
+      "compose",
+      ['[data-testid="workflow-target-compose"]', ".note-action-row", ".note-action-row button"],
+      "a visible selected-note tool layout"
+    );
+    noteTools = (await win.webContents.executeJavaScript(`
+    (() => {
       const noteToolGroup = document.querySelector(".note-action-row");
       const noteToolButtons = noteToolGroup ? Array.from(noteToolGroup.querySelectorAll("button")) : [];
       const noteToolGroupRect = noteToolGroup?.getBoundingClientRect() ?? null;
@@ -4690,7 +7232,7 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
           buttonRect.right <= noteToolGroupRect.right + 1
         );
       });
-      const noteTools = {
+      return {
         noteToolColumnCount: noteToolGroup
           ? getComputedStyle(noteToolGroup).gridTemplateColumns.trim().split(/\\s+/).length
           : 0,
@@ -4703,21 +7245,64 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
         noteToolRowCount: new Set(noteToolButtons.map((button) => Math.round(button.getBoundingClientRect().top))).size,
         noteToolUniqueAccessibleNameCount: new Set(noteToolAccessibleNames).size
       };
-      activate(activeZone);
-      return { arrangement, mixer, noteTools };
     })();
-  `);
+  `)) as Record<string, number>;
+  } finally {
+    if (!viewportRestored) {
+      win.setSize(originalSize[0], originalSize[1]);
+      await waitForLaunchSmokeStarterViewport(
+        win,
+        { width: originalViewportWidth },
+        `the original ${originalViewportWidth}px viewport cleanup posture`
+      ).catch(() => undefined);
+    }
+    if (!mixDisclosurePostureRestored) {
+      await restoreLaunchSmokeStarterMixDisclosurePosture(win, originalMixDisclosurePosture).catch(() => undefined);
+    }
+    const activeZone = (await win.webContents.executeJavaScript(
+      `document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? ""`
+    ).catch(() => "")) as string;
+    if (activeZone !== originalZone) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${originalZone}`).catch(() => undefined);
+      await waitForLaunchSmokeStarterZoneSurface(
+        win,
+        originalZone,
+        [`#workspace-panel-${originalZone}`],
+        `the original ${originalZone} landing posture`
+      ).catch(() => undefined);
+    }
+  }
   const evidence = result.evidence as LaunchSmokeStarterLandingEvidence;
+  const mixerMeasurements = {
+    mixerNarrowStripCount: Number(mixerAndReview.mixerNarrowStripCount),
+    mixerToggleContainedCount: Number(mixerAndReview.mixerToggleContainedCount),
+    mixerToggleCount: Number(mixerAndReview.mixerToggleCount),
+    mixerToggleInternalOverflow: Number(mixerAndReview.mixerToggleInternalOverflow),
+    mixerTogglePressedStateCount: Number(mixerAndReview.mixerTogglePressedStateCount),
+    mixerToggleReadableLabelCount: Number(mixerAndReview.mixerToggleReadableLabelCount),
+    mixerToggleTitleCount: Number(mixerAndReview.mixerToggleTitleCount),
+    mixerToggleUniqueAccessibleNameCount: Number(mixerAndReview.mixerToggleUniqueAccessibleNameCount)
+  };
+  const reviewMeasurements = {
+    producerQueueOpen: Boolean(mixerAndReview.producerQueueOpen),
+    producerReviewOpen: Boolean(mixerAndReview.producerReviewOpen),
+    reviewQueueContained: Boolean(mixerAndReview.reviewQueueContained),
+    reviewQueueFieldCount: Number(mixerAndReview.reviewQueueFieldCount),
+    reviewQueueInternalOverflow: Number(mixerAndReview.reviewQueueInternalOverflow),
+    reviewQueueReadableFieldCount: Number(mixerAndReview.reviewQueueReadableFieldCount),
+    reviewQueueStackedRowCount: Number(mixerAndReview.reviewQueueStackedRowCount)
+  };
   return {
     ...evidence,
     beginner: {
       ...evidence.beginner,
-      ...zoneMeasurements.arrangement,
-      ...zoneMeasurements.mixer
+      ...arrangement,
+      ...mixerMeasurements
     },
     producer: {
       ...evidence.producer,
-      ...zoneMeasurements.noteTools
+      ...reviewMeasurements,
+      ...noteTools
     }
   };
 }
@@ -4742,40 +7327,6 @@ function collectLaunchSmokeStarterLandingEvidenceWithTimeout(win: BrowserWindow)
   });
 }
 
-async function clickLaunchSmokeBridgeDirectTarget(
-  win: BrowserWindow,
-  testId: string,
-  setStep: (step: string) => void
-): Promise<LaunchSmokeBridgeDirectEvidence> {
-  setStep(`${testId}:clicking-dom-button`);
-  const result = await win.webContents.executeJavaScript(`
-    (async () => {
-      const text = (textTestId) => document.querySelector('[data-testid="' + textTestId + '"]')?.textContent?.trim() ?? "";
-      const readResult = (buttonPresent) => ({
-        buttonPresent,
-        resultDestination: text("audience-route-bridge-result-destination"),
-        resultFollowup: text("audience-route-bridge-result-followup"),
-        resultMetric: text("audience-route-bridge-result-metric"),
-        resultPresent: document.querySelector('[data-testid="audience-route-bridge-result"]') !== null,
-        resultTitle: text("audience-route-bridge-result-title")
-      });
-      const button = document.querySelector('[data-testid="${testId}"]');
-      if (!button) {
-        return readResult(false);
-      }
-      button.scrollIntoView({ block: "center", inline: "center" });
-      if (button.disabled === true) {
-        return readResult(true);
-      }
-      button.click();
-      await Promise.resolve();
-      await Promise.resolve();
-      return readResult(true);
-    })();
-  `);
-  return result as LaunchSmokeBridgeDirectEvidence;
-}
-
 async function collectLaunchSmokeBridgeDirectHookEvidence(win: BrowserWindow): Promise<LaunchSmokeBridgeDirectEvidenceBundle | null> {
   const result = await win.webContents.executeJavaScript(`
     (async () => {
@@ -4790,24 +7341,81 @@ async function collectLaunchSmokeBridgeDirectHookEvidence(win: BrowserWindow): P
   return result && result.ready === true && result.evidence ? (result.evidence as LaunchSmokeBridgeDirectEvidenceBundle) : null;
 }
 
+async function readLaunchSmokeBridgeGuideState(win: BrowserWindow): Promise<{
+  actionTargetsVisible: boolean;
+  guideOpen: boolean;
+  hookReady: boolean;
+}> {
+  return (await win.webContents.executeJavaScript(`
+    (() => {
+      const guide = document.querySelector('[data-testid="guidance-center"]');
+      const readiness = document.querySelector('[data-testid="audience-route-bridge-readiness-action"]');
+      const completion = document.querySelector('[data-testid="audience-route-bridge-completion-action"]');
+      const visible = (target) => {
+        if (!(target instanceof HTMLElement)) return false;
+        const rect = target.getBoundingClientRect();
+        const style = getComputedStyle(target);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      };
+      return {
+        actionTargetsVisible: visible(readiness) && visible(completion),
+        guideOpen: guide instanceof HTMLDetailsElement && guide.open,
+        hookReady: typeof window.__grooveforgeLaunchSmoke?.collectAudienceRouteBridgeDirectEvidence === "function"
+      };
+    })();
+  `)) as { actionTargetsVisible: boolean; guideOpen: boolean; hookReady: boolean };
+}
+
+async function waitForLaunchSmokeBridgeGuideState(
+  win: BrowserWindow,
+  predicate: (state: Awaited<ReturnType<typeof readLaunchSmokeBridgeGuideState>>) => boolean,
+  expectedState: string
+): Promise<void> {
+  const deadline = Date.now() + 30000;
+  let state = await readLaunchSmokeBridgeGuideState(win);
+  while (Date.now() < deadline && !predicate(state)) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    state = await readLaunchSmokeBridgeGuideState(win);
+  }
+  if (!predicate(state)) {
+    throw new Error(`Audience Route Bridge Guide did not reach ${expectedState}: ${JSON.stringify(state)}`);
+  }
+}
+
 async function collectLaunchSmokeBridgeDirectEvidence(
   win: BrowserWindow,
   setStep: (step: string) => void = () => undefined
 ): Promise<LaunchSmokeBridgeDirectEvidenceBundle> {
-  setStep("collecting-react-direct-hook");
-  const hookEvidence = await collectLaunchSmokeBridgeDirectHookEvidence(win);
-  if (hookEvidence) {
+  const initialState = await readLaunchSmokeBridgeGuideState(win);
+  try {
+    if (!initialState.guideOpen) {
+      setStep("opening-visible-guide-with-native-pointer");
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle");
+    }
+    setStep("awaiting-visible-bridge-actions-and-react-hook");
+    await waitForLaunchSmokeBridgeGuideState(
+      win,
+      (state) => state.guideOpen && state.actionTargetsVisible && state.hookReady,
+      "an open Guide with visible direct actions and an active React evidence hook"
+    );
+
+    setStep("collecting-visible-react-direct-hook");
+    const hookEvidence = await collectLaunchSmokeBridgeDirectHookEvidence(win);
+    if (!hookEvidence) {
+      throw new Error("Audience Route Bridge direct evidence hook disappeared while its visible Guide actions were active.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 320));
     return hookEvidence;
+  } finally {
+    if (!initialState.guideOpen) {
+      const currentState = await readLaunchSmokeBridgeGuideState(win);
+      if (currentState.guideOpen) {
+        setStep("restoring-collapsed-guide-with-native-pointer");
+        await clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle");
+      }
+      await waitForLaunchSmokeBridgeGuideState(win, (state) => !state.guideOpen, "its original collapsed posture");
+    }
   }
-
-  const readiness = await clickLaunchSmokeBridgeDirectTarget(win, "audience-route-bridge-readiness-action", setStep);
-  const completion = await clickLaunchSmokeBridgeDirectTarget(win, "audience-route-bridge-completion-action", setStep);
-
-  const result = {
-    completion,
-    readiness
-  };
-  return result as LaunchSmokeBridgeDirectEvidenceBundle;
 }
 
 function collectLaunchSmokeBridgeDirectEvidenceWithTimeout(win: BrowserWindow): Promise<LaunchSmokeBridgeDirectEvidenceBundle> {
@@ -4815,7 +7423,7 @@ function collectLaunchSmokeBridgeDirectEvidenceWithTimeout(win: BrowserWindow): 
     let step = "starting";
     const timeout = setTimeout(
       () => reject(new Error(`Timed out collecting live Audience Route Bridge direct button evidence at ${step}.`)),
-      10000
+      60000
     );
     void collectLaunchSmokeBridgeDirectEvidence(win, (nextStep) => {
       step = nextStep;
@@ -4933,12 +7541,18 @@ async function collectLaunchSmokeClosedDetailsEvidence(
     win.webContents.sendInputEvent({ type: "keyUp", keyCode: "Enter" });
     const deadline = Date.now() + 30000;
     let snapshot = await readSnapshot(targetTestId);
-    while (Date.now() < deadline && snapshot.targetOpen !== expectedOpen) {
+    const settled = (current: DisclosureSnapshot): boolean =>
+      expectedOpen
+        ? current.targetOpen && current.targetContentCount > 0 && current.targetControlCount > 0
+        : !current.targetOpen && current.targetContentCount === 0 && current.targetControlCount === 0;
+    while (Date.now() < deadline && !settled(snapshot)) {
       await new Promise((resolve) => setTimeout(resolve, 50));
       snapshot = await readSnapshot(targetTestId);
     }
-    if (snapshot.targetOpen !== expectedOpen) {
-      throw new Error(`Native Enter did not set ${targetTestId} open=${expectedOpen}.`);
+    if (!settled(snapshot)) {
+      throw new Error(
+        `Native Enter did not settle ${targetTestId} open=${expectedOpen} with contained content and controls: ${JSON.stringify(snapshot)}`
+      );
     }
     return snapshot;
   };
@@ -5570,6 +8184,65 @@ async function collectLaunchSmokeModalFocusEvidence(
     win.webContents.sendInputEvent({ type: "mouseUp", x: point.x, y: point.y, button: "left", clickCount: 1 });
     await new Promise((resolve) => setTimeout(resolve, 80));
   };
+  const readDockPlayPosture = (): Promise<LaunchSmokeDockPlayPostureEvidence> =>
+    runStep<LaunchSmokeDockPlayPostureEvidence>(`
+      (() => {
+        const dockPlay = document.querySelector('[data-testid="workspace-command-dock-play"]');
+        const transportPlay = document.querySelector('[data-testid="transport-play"]');
+        const rect = dockPlay?.getBoundingClientRect() ?? null;
+        const hitTarget = rect
+          ? document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+          : null;
+        const playbackScope = [
+          "playback-mode-arrangement",
+          "transport-loop-block",
+          "transport-loop-transition",
+          "playback-mode-pattern"
+        ].find((testId) =>
+          document.querySelector('[data-testid="' + testId + '"]')?.getAttribute("aria-pressed") === "true"
+        ) ?? "";
+        return {
+          activeTestId: document.activeElement instanceof HTMLElement ? document.activeElement.dataset.testid ?? "" : "",
+          activeZone:
+            document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "",
+          disabled: dockPlay instanceof HTMLButtonElement ? dockPlay.disabled : true,
+          dockPressed: dockPlay?.getAttribute("aria-pressed") ?? "missing",
+          dockText: dockPlay?.textContent?.trim() ?? "",
+          height: rect?.height ?? 0,
+          hitTargetTestId:
+            hitTarget instanceof HTMLElement ? hitTarget.closest('[data-testid]')?.getAttribute("data-testid") ?? "" : "",
+          left: rect?.left ?? -1,
+          playbackScope,
+          projectStatus: document.querySelector('[data-testid="project-status"]')?.textContent?.trim() ?? "",
+          top: rect?.top ?? -1,
+          transportPressed: transportPlay?.getAttribute("aria-pressed") ?? "missing",
+          transportText: transportPlay?.textContent?.trim() ?? "",
+          visible: Boolean(
+            dockPlay &&
+            rect &&
+            rect.width > 0 &&
+            rect.height > 0 &&
+            rect.left >= 0 &&
+            rect.right <= innerWidth &&
+            rect.top >= 0 &&
+            rect.bottom <= innerHeight
+          ),
+          width: rect?.width ?? 0
+        };
+      })();
+    `);
+  const sendDockPlayClick = async (): Promise<LaunchSmokeDockPlayPostureEvidence> => {
+    const posture = await readDockPlayPosture();
+    if (
+      !posture.visible ||
+      posture.disabled ||
+      posture.hitTargetTestId !== "workspace-command-dock-play"
+    ) {
+      throw new Error(`Workspace command dock Play target is not visibly native-clickable: ${JSON.stringify(posture)}`);
+    }
+    await sendClick("workspace-command-dock-play");
+    return posture;
+  };
 
   const commandModifier: Electron.InputEvent["modifiers"] = process.platform === "darwin" ? ["meta"] : ["control"];
   const editableTitleBefore = await runStep<string>(`
@@ -5732,6 +8405,16 @@ async function collectLaunchSmokeModalFocusEvidence(
     });
   `);
   await waitFor(`document.querySelector('[data-testid="workspace-command-dock"]') !== null`);
+  const dockPlayOriginal = await readDockPlayPosture();
+  const dockOriginalPlaybackRunning =
+    dockPlayOriginal.dockPressed === "true" && dockPlayOriginal.transportPressed === "true";
+  if (dockOriginalPlaybackRunning) {
+    await sendDockPlayClick();
+    await waitFor(
+      `document.querySelector('[data-testid="workspace-command-dock-play"]')?.getAttribute('aria-pressed') === 'false' && document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'false'`
+    );
+  }
+  const dockPlayBefore = await readDockPlayPosture();
   const dockSnapshot = await runStep<{
     controlCount: number;
     positionMirrorsHeader: boolean;
@@ -5779,18 +8462,20 @@ async function collectLaunchSmokeModalFocusEvidence(
       return document.activeElement === target;
     })();
   `);
-  await sendClick("workspace-command-dock-play");
+  await sendDockPlayClick();
   await waitFor(
     `document.querySelector('[data-testid="workspace-command-dock-play"]')?.getAttribute('aria-pressed') === 'true' && document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'true'`
   );
+  const dockPlayAfterStart = await readDockPlayPosture();
   const dockSharedPlayReady = await runStep<boolean>(`
     document.querySelector('[data-testid="workspace-command-dock-play"]')?.textContent?.trim() === 'Stop' &&
       document.querySelector('[data-testid="transport-play"] strong')?.textContent?.trim() === 'Stop'
   `);
-  await sendClick("workspace-command-dock-play");
+  await sendDockPlayClick();
   await waitFor(
     `document.querySelector('[data-testid="workspace-command-dock-play"]')?.getAttribute('aria-pressed') === 'false' && document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'false'`
   );
+  const dockPlayAfterStop = await readDockPlayPosture();
   await sendClick("workspace-command-dock-actions");
   await waitFor(`document.activeElement?.dataset?.testid === 'quick-actions-search'`);
   const dockActionsOpened = await runStep<boolean>(
@@ -5803,6 +8488,19 @@ async function collectLaunchSmokeModalFocusEvidence(
   const dockActionsFocusRestored = await runStep<boolean>(
     `document.activeElement?.dataset?.testid === 'workspace-command-dock-actions'`
   );
+  if (dockOriginalPlaybackRunning) {
+    await sendDockPlayClick();
+    await waitFor(
+      `document.querySelector('[data-testid="workspace-command-dock-play"]')?.getAttribute('aria-pressed') === 'true' && document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'true'`
+    );
+  }
+  const dockRestoredPlaybackPosture = await readDockPlayPosture();
+  const dockOriginalPlaybackRestored =
+    dockRestoredPlaybackPosture.dockPressed === dockPlayOriginal.dockPressed &&
+    dockRestoredPlaybackPosture.transportPressed === dockPlayOriginal.transportPressed;
+  const dockPostureRestored =
+    dockRestoredPlaybackPosture.activeZone === dockPlayOriginal.activeZone &&
+    dockRestoredPlaybackPosture.playbackScope === dockPlayOriginal.playbackScope;
   await runStep(`
     new Promise((resolve) => {
       window.scrollTo(0, 0);
@@ -5813,6 +8511,10 @@ async function collectLaunchSmokeModalFocusEvidence(
   const dockReturnedHidden = await runStep<boolean>(
     `document.querySelector('[data-testid="workspace-command-dock"]') === null`
   );
+  if (dockPlayOriginal.activeTestId) {
+    await sendClick(dockPlayOriginal.activeTestId);
+    await waitFor(`document.activeElement?.dataset?.testid === ${JSON.stringify(dockPlayOriginal.activeTestId)}`);
+  }
 
   onStep("modal focus evidence complete");
   return {
@@ -5833,7 +8535,19 @@ async function collectLaunchSmokeModalFocusEvidence(
     dockControlCount: dockSnapshot.controlCount,
     dockFocusReady,
     dockInitialHidden,
+    dockOriginalPlaybackRestored,
+    dockPlayAfterStart,
+    dockPlayAfterStop,
+    dockPlayBefore,
+    dockPlayHitTargetReady: [dockPlayOriginal, dockPlayBefore, dockPlayAfterStart, dockPlayAfterStop].every(
+      (posture) =>
+        posture.visible &&
+        !posture.disabled &&
+        posture.hitTargetTestId === "workspace-command-dock-play"
+    ),
+    dockPlayOriginal,
     dockPositionMirrorsHeader: dockSnapshot.positionMirrorsHeader,
+    dockPostureRestored,
     dockReturnedHidden,
     dockSharedPlayReady,
     dockShortcutMetadataReady: dockSnapshot.shortcutMetadataReady,
@@ -6549,6 +9263,7 @@ function projectIoSmokeFailures(evidence: ProjectIoSmokeEvidence): string[] {
 
 function installLaunchSmoke(win: BrowserWindow): void {
   let finished = false;
+  let audienceSessionLayoutEvidence: LaunchSmokeAudienceSessionLayoutEvidence | null = null;
   let closedDetailsEvidence: LaunchSmokeClosedDetailsEvidence | null = null;
   let drumGridKeyboardEvidence: LaunchSmokeDrumGridKeyboardEvidence | null = null;
   let functionalTabsEvidence: LaunchSmokeFunctionalTabsEvidence | null = null;
@@ -6558,9 +9273,20 @@ function installLaunchSmoke(win: BrowserWindow): void {
   let lastReportedProgress = "";
   const updateProgress = (progress: Record<string, unknown>): void => {
     lastProgress = progress;
+    const progressFailures = Array.isArray(progress.failures)
+      ? progress.failures
+          .slice(0, 8)
+          .map((failure) => String(failure).slice(0, 320))
+      : [];
     const publicProgress = {
       phase: typeof progress.phase === "string" ? progress.phase : "unknown",
-      ...(typeof progress.step === "string" ? { step: progress.step } : {})
+      ...(typeof progress.step === "string" ? { step: progress.step } : {}),
+      ...(progressFailures.length > 0
+        ? {
+            failureCount: Array.isArray(progress.failures) ? progress.failures.length : 0,
+            failures: progressFailures
+          }
+        : {})
     };
     const serialized = JSON.stringify(publicProgress);
     if (serialized !== lastReportedProgress) {
@@ -6597,6 +9323,15 @@ function installLaunchSmoke(win: BrowserWindow): void {
     updateProgress({ phase: "collecting-dom" });
     void collectLaunchSmokeEvidenceWithTimeout(win)
       .then((evidence) => {
+        if (audienceSessionLayoutEvidence) {
+          evidence = {
+            ...evidence,
+            layout: {
+              ...evidence.layout,
+              ...audienceSessionLayoutEvidence
+            }
+          };
+        }
         if (minimumWindowEvidence) {
           evidence = {
             ...evidence,
@@ -6916,13 +9651,16 @@ function installLaunchSmoke(win: BrowserWindow): void {
   win.once("ready-to-show", () => {
     updateProgress({ phase: "collecting-minimum-window" });
     void collectLaunchSmokeMinimumWindowEvidence(win)
-      .then((evidence) => {
+      .then(async (evidence) => {
         minimumWindowEvidence = evidence;
         updateProgress({ phase: "minimum-window-collected", evidence });
+        updateProgress({ phase: "preparing-lazy-surfaces" });
+        audienceSessionLayoutEvidence = await prepareLaunchSmokeLazySurfaces(win);
+        updateProgress({ phase: "lazy-surfaces-prepared" });
         poll(Date.now() + launchSmokeTimeoutMs - 35000);
       })
       .catch((error: unknown) => {
-        fail("Production minimum-window smoke JavaScript failed.", {
+        fail("Production minimum-window or lazy-surface preparation JavaScript failed.", {
           error: error instanceof Error ? error.message : String(error)
         });
       });
@@ -7000,8 +9738,23 @@ function closeFlowSmokeFailures(savedContents: string): string[] {
   if (closeFlowSmokeState.liveEdit?.title !== closeFlowSmokeExpectedTitle) {
     failures.push("live renderer edit should reach the expected title");
   }
-  if (closeFlowSmokeState.liveEdit?.dirtyStatus !== "Unsaved changes") {
-    failures.push("live renderer edit should mark the project as unsaved");
+  if (!closeFlowSmokeState.liveEdit?.nativeInputApplied) {
+    failures.push("live renderer edit should use native focused text input");
+  }
+  if (!closeFlowSmokeState.liveEdit?.focusedDraft) {
+    failures.push("live renderer edit should remain focused as an unblurred metadata draft before close");
+  }
+  if (closeFlowSmokeState.liveEdit?.blurredBeforeClose) {
+    failures.push("live renderer edit should exercise the focused-draft close boundary before blur");
+  }
+  if (!closeFlowSmokeState.liveEdit?.hitTargetMatched || !closeFlowSmokeState.liveEdit?.valueExact) {
+    failures.push("live renderer title input should be visible, hit-testable, and contain the exact native value");
+  }
+  if (
+    closeFlowSmokeState.liveEdit?.selectionStartBeforeInput !== 0 ||
+    closeFlowSmokeState.liveEdit?.selectionEndBeforeInput !== closeFlowSmokeState.liveEdit?.selectionLengthBeforeInput
+  ) {
+    failures.push("live renderer title input should prove native select-all before replacement text");
   }
   if (closeFlowSmokeState.willPreventUnloadCount !== 1) {
     failures.push(`first close should be prevented exactly once, got ${closeFlowSmokeState.willPreventUnloadCount}`);
@@ -7039,6 +9792,247 @@ function closeFlowSmokeFailures(savedContents: string): string[] {
     failures.push(`close-flow event order should be ${expectedEvents.join(" -> ")}`);
   }
   return failures;
+}
+
+async function prepareCloseFlowSmokeNativeTitleEdit(win: BrowserWindow): Promise<CloseFlowSmokeLiveEditEvidence> {
+  const expectedTitle = closeFlowSmokeExpectedTitle;
+  const deadline = Date.now() + 120000;
+  let target: {
+    height: number;
+    hitTargetMatched: boolean;
+    hitTargetTestId: string;
+    initialTitle: string;
+    inputPresent: boolean;
+    width: number;
+    x: number;
+    y: number;
+  } = {
+    height: 0,
+    hitTargetMatched: false,
+    hitTargetTestId: "",
+    initialTitle: "",
+    inputPresent: false,
+    width: 0,
+    x: -1,
+    y: -1
+  };
+  while (Date.now() < deadline) {
+    target = (await win.webContents.executeJavaScript(`
+      (() => {
+        const input = document.querySelector('[data-testid="project-title-input"]');
+        if (!(input instanceof HTMLInputElement)) {
+          return {
+            height: 0,
+            hitTargetMatched: false,
+            hitTargetTestId: "",
+            initialTitle: "",
+            inputPresent: false,
+            width: 0,
+            x: -1,
+            y: -1
+          };
+        }
+        input.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
+        const rect = input.getBoundingClientRect();
+        const x = Math.round(rect.left + rect.width / 2);
+        const y = Math.round(rect.top + rect.height / 2);
+        const hitTarget = document.elementFromPoint(x, y);
+        if (input.dataset.closeFlowDraftObserver !== "installed") {
+          input.dataset.closeFlowDraftObserver = "installed";
+          input.dataset.closeFlowBlurred = "false";
+          input.dataset.closeFlowNativeInput = "false";
+          input.addEventListener("blur", () => {
+            input.dataset.closeFlowBlurred = "true";
+          }, { once: true });
+          input.addEventListener("input", (event) => {
+            input.dataset.closeFlowNativeInput = event.isTrusted ? "true" : "false";
+          });
+        }
+        return {
+          height: rect.height,
+          hitTargetMatched: input === hitTarget || Boolean(hitTarget && input.contains(hitTarget)),
+          hitTargetTestId:
+            hitTarget instanceof HTMLElement ? hitTarget.closest('[data-testid]')?.getAttribute("data-testid") ?? "" : "",
+          initialTitle: input.value,
+          inputPresent: true,
+          width: rect.width,
+          x,
+          y
+        };
+      })();
+    `)) as typeof target;
+    if (
+      target.inputPresent &&
+      target.width > 0 &&
+      target.height > 0 &&
+      target.hitTargetMatched &&
+      target.x >= 0 &&
+      target.y >= 0
+    ) {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  if (
+    !target.inputPresent ||
+    target.width <= 0 ||
+    target.height <= 0 ||
+    !target.hitTargetMatched ||
+    target.x < 0 ||
+    target.y < 0
+  ) {
+    throw new Error(`Could not hit-test the visible production title input: ${JSON.stringify(target)}`);
+  }
+
+  win.webContents.focus();
+  win.webContents.sendInputEvent({ type: "mouseMove", x: target.x, y: target.y });
+  win.webContents.sendInputEvent({
+    type: "mouseDown",
+    x: target.x,
+    y: target.y,
+    button: "left",
+    clickCount: 1
+  });
+  win.webContents.sendInputEvent({
+    type: "mouseUp",
+    x: target.x,
+    y: target.y,
+    button: "left",
+    clickCount: 1
+  });
+
+  let focused = false;
+  while (Date.now() < deadline) {
+    focused = (await win.webContents.executeJavaScript(
+      `document.activeElement?.getAttribute("data-testid") === "project-title-input"`
+    )) as boolean;
+    if (focused) {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  if (!focused) {
+    throw new Error("Native pointer input did not focus the production title field.");
+  }
+
+  const commandModifier: Electron.InputEvent["modifiers"] = process.platform === "darwin" ? ["meta"] : ["control"];
+  win.webContents.sendInputEvent({ type: "keyDown", keyCode: "A", modifiers: commandModifier });
+  win.webContents.sendInputEvent({ type: "keyUp", keyCode: "A", modifiers: commandModifier });
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  const selection = (await win.webContents.executeJavaScript(`
+    (() => {
+      const input = document.querySelector('[data-testid="project-title-input"]');
+      return input instanceof HTMLInputElement
+        ? {
+            end: input.selectionEnd ?? -1,
+            length: input.value.length,
+            start: input.selectionStart ?? -1
+          }
+        : { end: -1, length: -1, start: -1 };
+    })();
+  `)) as { end: number; length: number; start: number };
+  let nativeSelectAllFallbackUsed = false;
+  if (selection.start !== 0 || selection.end !== selection.length) {
+    nativeSelectAllFallbackUsed = true;
+    win.webContents.sendInputEvent({ type: "keyDown", keyCode: "Home" });
+    win.webContents.sendInputEvent({ type: "keyUp", keyCode: "Home" });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    win.webContents.sendInputEvent({ type: "keyDown", keyCode: "End", modifiers: ["shift"] });
+    win.webContents.sendInputEvent({ type: "keyUp", keyCode: "End", modifiers: ["shift"] });
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    Object.assign(selection, (await win.webContents.executeJavaScript(`
+      (() => {
+        const input = document.querySelector('[data-testid="project-title-input"]');
+        return input instanceof HTMLInputElement
+          ? {
+              end: input.selectionEnd ?? -1,
+              length: input.value.length,
+              start: input.selectionStart ?? -1
+            }
+          : { end: -1, length: -1, start: -1 };
+      })();
+    `)) as { end: number; length: number; start: number });
+  }
+  if (selection.start !== 0 || selection.end !== selection.length) {
+    throw new Error(`Native select-all failed for the production title field: ${JSON.stringify(selection)}`);
+  }
+
+  await win.webContents.insertText(expectedTitle);
+  let evidence: CloseFlowSmokeLiveEditEvidence = {
+    activeTestId: "",
+    blurredBeforeClose: true,
+    focusedDraft: false,
+    height: 0,
+    hitTargetMatched: false,
+    hitTargetTestId: "",
+    initialTitle: target.initialTitle,
+    inputPresent: false,
+    nativeInputApplied: false,
+    nativeSelectAllFallbackUsed,
+    projectStatusBeforeClose: "",
+    selectionEndBeforeInput: selection.end,
+    selectionLengthBeforeInput: selection.length,
+    selectionStartBeforeInput: selection.start,
+    title: "",
+    valueExact: false,
+    width: 0
+  };
+  while (Date.now() < deadline) {
+    evidence = (await win.webContents.executeJavaScript(`
+      (() => {
+        const input = document.querySelector('[data-testid="project-title-input"]');
+        const status = document.querySelector('[data-testid="project-status"]');
+        const rect = input?.getBoundingClientRect() ?? null;
+        const hitTarget = rect
+          ? document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+          : null;
+        const title = input instanceof HTMLInputElement ? input.value : "";
+        const blurredBeforeClose = input?.dataset.closeFlowBlurred === "true";
+        const activeTestId =
+          document.activeElement instanceof HTMLElement
+            ? document.activeElement.closest('[data-testid]')?.getAttribute("data-testid") ?? ""
+            : "";
+        return {
+          activeTestId,
+          blurredBeforeClose,
+          focusedDraft:
+            input instanceof HTMLInputElement &&
+            document.activeElement === input &&
+            title === ${JSON.stringify(expectedTitle)} &&
+            !blurredBeforeClose,
+          height: rect?.height ?? 0,
+          hitTargetMatched: input === hitTarget || Boolean(hitTarget && input?.contains(hitTarget)),
+          hitTargetTestId:
+            hitTarget instanceof HTMLElement ? hitTarget.closest('[data-testid]')?.getAttribute("data-testid") ?? "" : "",
+          initialTitle: ${JSON.stringify(target.initialTitle)},
+          inputPresent: input instanceof HTMLInputElement,
+          nativeInputApplied: input?.dataset.closeFlowNativeInput === "true",
+          nativeSelectAllFallbackUsed: ${JSON.stringify(nativeSelectAllFallbackUsed)},
+          projectStatusBeforeClose: status?.textContent?.trim() ?? "",
+          selectionEndBeforeInput: ${JSON.stringify(selection.end)},
+          selectionLengthBeforeInput: ${JSON.stringify(selection.length)},
+          selectionStartBeforeInput: ${JSON.stringify(selection.start)},
+          title,
+          valueExact: title === ${JSON.stringify(expectedTitle)},
+          width: rect?.width ?? 0
+        };
+      })();
+    `)) as CloseFlowSmokeLiveEditEvidence;
+    if (
+      evidence.inputPresent &&
+      evidence.nativeInputApplied &&
+      evidence.focusedDraft &&
+      !evidence.blurredBeforeClose &&
+      evidence.hitTargetMatched &&
+      evidence.valueExact &&
+      evidence.width > 0 &&
+      evidence.height > 0
+    ) {
+      return evidence;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Native production title draft did not settle before close: ${JSON.stringify(evidence)}`);
 }
 
 function installCloseFlowSmoke(win: BrowserWindow): void {
@@ -7124,40 +10118,7 @@ function installCloseFlowSmoke(win: BrowserWindow): void {
   });
 
   win.once("ready-to-show", () => {
-    void win.webContents
-      .executeJavaScript(`
-        (async () => {
-          const expectedTitle = ${JSON.stringify(closeFlowSmokeExpectedTitle)};
-          const deadline = Date.now() + 120000;
-          let input = null;
-          let status = null;
-          while (Date.now() < deadline) {
-            input = document.querySelector('[data-testid="project-title-input"]');
-            status = document.querySelector('[data-testid="project-status"]');
-            if (input && status) break;
-            await new Promise((resolve) => setTimeout(resolve, 50));
-          }
-          if (!(input instanceof HTMLInputElement) || !status) {
-            return { dirtyStatus: status?.textContent?.trim() ?? "", initialTitle: "", inputPresent: false, title: "" };
-          }
-
-          const initialTitle = input.value;
-          const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-          valueSetter?.call(input, expectedTitle);
-          input.dispatchEvent(new Event("input", { bubbles: true }));
-
-          while (Date.now() < deadline) {
-            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-            if (input.value === expectedTitle && status.textContent?.trim() === "Unsaved changes") break;
-          }
-          return {
-            dirtyStatus: status.textContent?.trim() ?? "",
-            initialTitle,
-            inputPresent: true,
-            title: input.value
-          };
-        })();
-      `)
+    void prepareCloseFlowSmokeNativeTitleEdit(win)
       .then((evidence: CloseFlowSmokeLiveEditEvidence) => {
         if (finished) {
           return;
@@ -7175,6 +10136,1401 @@ function installCloseFlowSmoke(win: BrowserWindow): void {
   });
 }
 
+const manualQaDownloadExtensions = new Set([".mid", ".midi", ".txt", ".wav", ".zip"]);
+
+function uniqueManualQaDownloadPath(item: DownloadItem, configuration: ManualQaConfiguration): string {
+  const fileName = path.basename(item.getFilename());
+  const extension = path.extname(fileName).toLowerCase();
+  if (!fileName || fileName === "." || fileName === ".." || !manualQaDownloadExtensions.has(extension)) {
+    throw new Error(`Manual QA download rejected unsupported file name: ${fileName || "(empty)"}.`);
+  }
+  const stem = fileName.slice(0, -extension.length);
+  assertManualQaWorkspaceTargetSync(configuration.workspaceRoot, configuration.exportsDirectory, {
+    expectedType: "directory",
+    mustExist: true
+  });
+  let candidate = path.join(configuration.exportsDirectory, fileName);
+  let suffix = 2;
+  while (lstatOrNullSync(candidate) || manualQaReservedDownloadPaths.has(candidate)) {
+    const candidateStats = lstatOrNullSync(candidate);
+    if (candidateStats?.isSymbolicLink()) {
+      throw new Error(`Manual QA export target rejected symbolic link: ${candidate}`);
+    }
+    if (candidateStats && !candidateStats.isFile()) {
+      throw new Error(`Manual QA export target must be a regular file: ${candidate}`);
+    }
+    candidate = path.join(configuration.exportsDirectory, `${stem}-${suffix}${extension}`);
+    suffix += 1;
+  }
+  assertManualQaWorkspaceTargetSync(configuration.workspaceRoot, candidate, { expectedType: "file" });
+  manualQaReservedDownloadPaths.add(candidate);
+  return candidate;
+}
+
+function installManualQaDownloadRouting(win: BrowserWindow): void {
+  const configuration = manualQaConfiguration;
+  if (!configuration || manualQaDownloadSessions.has(win.webContents.session)) {
+    return;
+  }
+  const downloadSession = win.webContents.session;
+  manualQaDownloadSessions.add(downloadSession);
+  downloadSession.on("will-download", (_event, item) => {
+    let filePath: string;
+    try {
+      filePath = uniqueManualQaDownloadPath(item, configuration);
+    } catch (error) {
+      item.cancel();
+      console.error(error);
+      return;
+    }
+    const evidence: ManualQaDownloadEvidence = {
+      fileName: path.basename(filePath),
+      filePath,
+      mimeType: item.getMimeType(),
+      state: "started"
+    };
+    manualQaDownloads.push(evidence);
+    try {
+      assertManualQaWorkspaceTargetSync(configuration.workspaceRoot, filePath, { expectedType: "file" });
+    } catch (error) {
+      evidence.state = "cancelled";
+      item.cancel();
+      console.error(error);
+      return;
+    }
+    item.setSavePath(filePath);
+    item.once("done", (_doneEvent, state) => {
+      evidence.state = state;
+      if (state === "completed") {
+        void assertManualQaPathSafety(filePath, true)
+          .then(() => stat(filePath))
+          .then((fileStats) => {
+            evidence.bytes = fileStats.size;
+            console.log(`${manualQaResultPrefix}${JSON.stringify({ download: evidence, ok: true, phase: "download" })}`);
+          })
+          .catch((error: unknown) => {
+            evidence.state = "interrupted";
+            console.error(
+              `${manualQaResultPrefix}${JSON.stringify({
+                download: evidence,
+                error: error instanceof Error ? error.message : String(error),
+                ok: false,
+                phase: "download"
+              })}`
+            );
+          });
+      } else {
+        console.error(`${manualQaResultPrefix}${JSON.stringify({ download: evidence, ok: false, phase: "download" })}`);
+      }
+    });
+  });
+}
+
+const manualQaZoneIds = new Set(["arrange", "compose", "deliver", "mix"]);
+
+function installManualQaPassiveEvidence(win: BrowserWindow): void {
+  const configuration = manualQaConfiguration;
+  if (!configuration || configuration.autoExit) {
+    return;
+  }
+  const activeConfiguration: ManualQaConfiguration = configuration;
+  const userDataPosture = manualQaUserDataPosture(activeConfiguration);
+  const reportPath = path.join(activeConfiguration.evidenceDirectory, "manual-ui-observations.json");
+  const report: ManualQaPassiveEvidence = {
+    downloads: manualQaDownloads,
+    lastObservedAt: new Date().toISOString(),
+    openObserved: false,
+    playbackObserved: false,
+    provenance: activeConfiguration.provenance,
+    provenanceValidatedAtLaunch: true,
+    saveObserved: false,
+    sourceFixture: activeConfiguration.openPath,
+    targetProject: activeConfiguration.savePath,
+    ...userDataPosture,
+    workspaceRoot: activeConfiguration.workspaceRoot,
+    zones: {}
+  };
+  let observationRunning = false;
+  let lastReportFingerprint = "";
+
+  async function persistReport(): Promise<void> {
+    const contents = `${JSON.stringify(report, null, 2)}\n`;
+    const fingerprint = createHash("sha256").update(contents.replace(report.lastObservedAt, "<time>")).digest("hex");
+    if (fingerprint === lastReportFingerprint) {
+      return;
+    }
+    lastReportFingerprint = fingerprint;
+    await writeManualQaFile(reportPath, contents, { encoding: "utf8", mode: 0o600 });
+  }
+
+  async function observe(): Promise<void> {
+    if (observationRunning || win.isDestroyed() || win.webContents.isDestroyed()) {
+      return;
+    }
+    observationRunning = true;
+    try {
+      const observation = await win.webContents.executeJavaScript(`(() => {
+        const navigator = document.querySelector('[data-testid="workflow-navigator"]');
+        const tabs = Array.from(navigator?.querySelectorAll('[role="tab"]') ?? []);
+        const panels = Array.from(document.querySelectorAll('.workspace-tabpanels > [role="tabpanel"]'));
+        const workspace = document.querySelector('.workspace-tabpanels');
+        const activeZone = workspace?.getAttribute('data-active-workspace-zone') ?? '';
+        const projectTitle = document.querySelector('[data-testid="project-title-input"]');
+        const transport = document.querySelector('[data-testid="transport-play"]');
+        return {
+          activeZone,
+          activeZoneCount: panels.filter((panel) => panel.getAttribute('data-workspace-zone') === activeZone).length,
+          capturedAt: new Date().toISOString(),
+          documentHorizontalOverflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+          projectStatus: document.querySelector('[data-testid="project-status"]')?.textContent?.trim() ?? '',
+          projectTitle: projectTitle instanceof HTMLInputElement ? projectTitle.value : '',
+          selectedTabCount: tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true').length,
+          selectedTabLabels: tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true').map((tab) => tab.textContent?.trim() ?? ''),
+          tabCount: tabs.length,
+          tabPanelCount: panels.length,
+          tabStopCount: tabs.filter((tab) => tab.getAttribute('tabindex') === '0').length,
+          transportPlaying: transport?.getAttribute('aria-pressed') === 'true',
+          visiblePanelCount: panels.filter((panel) => !panel.hasAttribute('hidden')).length
+        };
+      })()`) as ManualQaUiObservation;
+      report.lastObservedAt = new Date().toISOString();
+      report.openObserved ||= /loaded|opened/i.test(observation.projectStatus);
+      report.saveObserved ||= /saved/i.test(observation.projectStatus);
+      report.playbackObserved ||= observation.transportPlaying;
+      if (
+        observation.projectTitle !== "" &&
+        observation.projectTitle !== "Untitled Beat" &&
+        manualQaZoneIds.has(observation.activeZone) &&
+        !(observation.activeZone in report.zones)
+      ) {
+        const zone = observation.activeZone as "arrange" | "compose" | "deliver" | "mix";
+        const screenshot = await win.webContents.capturePage();
+        const png = screenshot.toPNG();
+        const screenshotPath = path.join(activeConfiguration.evidenceDirectory, `manual-${zone}.png`);
+        await writeManualQaFile(screenshotPath, png, { mode: 0o600 });
+        report.zones[zone] = {
+          ...observation,
+          screenshot: screenshotPath,
+          screenshotBytes: png.byteLength,
+          screenshotSha256: createHash("sha256").update(png).digest("hex")
+        };
+      }
+      await persistReport();
+    } catch (error) {
+      if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+        console.warn(`Manual QA passive evidence observation skipped: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    } finally {
+      observationRunning = false;
+    }
+  }
+
+  win.webContents.once("did-finish-load", () => {
+    void observe();
+    const interval = setInterval(() => void observe(), 500);
+    win.once("closed", () => clearInterval(interval));
+  });
+}
+
+function waitForManualQaDelay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function withManualQaTimeout<T>(operation: Promise<T>, description: string, timeoutMs = 90000): Promise<T> {
+  return await Promise.race([
+    operation,
+    new Promise<T>((_resolve, reject) => {
+      setTimeout(() => reject(new Error(`Timed out during ${description}.`)), timeoutMs);
+    })
+  ]);
+}
+
+async function waitForManualQaCondition(
+  win: BrowserWindow,
+  description: string,
+  expression: string,
+  timeoutMs = 90000
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (win.isDestroyed() || win.webContents.isDestroyed()) {
+      throw new Error(`Window closed while waiting for ${description}.`);
+    }
+    const ready = (await win.webContents.executeJavaScript(`Boolean(${expression})`)) as boolean;
+    if (ready) {
+      return;
+    }
+    await waitForManualQaDelay(100);
+  }
+  throw new Error(`Timed out waiting for ${description}.`);
+}
+
+async function clickManualQaNativeTarget(win: BrowserWindow, testId: string): Promise<void> {
+  const interactionStartedAt = Date.now();
+  const category = manualQaSlowOperationTestIds.has(testId) ? "slow-operation" : "general-ui";
+  const budgetMs = category === "slow-operation" ? 120000 : 5000;
+  console.log(`${manualQaResultPrefix}${JSON.stringify({ ok: true, phase: "auto-song-interaction", state: "focus", testId })}`);
+  win.show();
+  win.focus();
+  win.webContents.focus();
+  await waitForManualQaDelay(120);
+  console.log(`${manualQaResultPrefix}${JSON.stringify({ ok: true, phase: "auto-song-interaction", state: "hit-test", testId })}`);
+  const hitTest = (await withManualQaTimeout(win.webContents.executeJavaScript(`(() => {
+    const target = document.querySelector('[data-testid=${JSON.stringify(testId)}]');
+    if (!(target instanceof HTMLElement)) return { error: 'missing' };
+    target.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'center' });
+    const rect = target.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return { error: 'not-rendered' };
+    const x = Math.round(rect.left + rect.width / 2);
+    const y = Math.round(rect.top + rect.height / 2);
+    const hit = document.elementFromPoint(x, y);
+    return {
+      error: target === hit || (hit instanceof Node && target.contains(hit)) ? '' : 'occluded',
+      hitTestId: hit instanceof HTMLElement ? hit.closest('[data-testid]')?.getAttribute('data-testid') ?? '' : '',
+      before: {
+        ariaPressed: target.getAttribute('aria-pressed'),
+        ariaSelected: target.getAttribute('aria-selected'),
+        className: target.className,
+        disabled: 'disabled' in target ? Boolean(target.disabled) : false,
+        text: target.textContent?.trim().replace(/\\s+/g, ' ').slice(0, 180) ?? '',
+        value: 'value' in target ? String(target.value) : ''
+      },
+      x,
+      y
+    };
+  })()`), `${testId} hit-test`)) as { before?: Record<string, unknown>; error: string; hitTestId?: string; x?: number; y?: number };
+  if (hitTest.error || !Number.isFinite(hitTest.x) || !Number.isFinite(hitTest.y)) {
+    throw new Error(
+      `Could not hit-test ${testId} for native pointer input (${hitTest.error || "invalid-point"}; hit ${hitTest.hitTestId || "none"}).`
+    );
+  }
+  win.webContents.sendInputEvent({ type: "mouseMove", x: hitTest.x as number, y: hitTest.y as number });
+  win.webContents.sendInputEvent({
+    type: "mouseDown",
+    x: hitTest.x as number,
+    y: hitTest.y as number,
+    button: "left",
+    clickCount: 1
+  });
+  await waitForManualQaDelay(50);
+  win.webContents.sendInputEvent({
+    type: "mouseUp",
+    x: hitTest.x as number,
+    y: hitTest.y as number,
+    button: "left",
+    clickCount: 1
+  });
+  await waitForManualQaDelay(240);
+  console.log(`${manualQaResultPrefix}${JSON.stringify({ ok: true, phase: "auto-song-interaction", state: "read-after", testId })}`);
+  const after = (await withManualQaTimeout(win.webContents.executeJavaScript(`(() => {
+    const target = document.querySelector('[data-testid=${JSON.stringify(testId)}]');
+    if (!(target instanceof HTMLElement)) return { missing: true };
+    return {
+      ariaPressed: target.getAttribute('aria-pressed'),
+      ariaSelected: target.getAttribute('aria-selected'),
+      activeElementTestId: document.activeElement instanceof HTMLElement ? document.activeElement.closest('[data-testid]')?.getAttribute('data-testid') ?? '' : '',
+      className: target.className,
+      disabled: 'disabled' in target ? Boolean(target.disabled) : false,
+      modeResult: document.querySelector('[data-testid="mode-switch-result"]')?.getAttribute('data-mode-switch-result') ?? '',
+      projectStatus: document.querySelector('[data-testid="project-status"]')?.textContent?.trim() ?? '',
+      text: target.textContent?.trim().replace(/\\s+/g, ' ').slice(0, 180) ?? '',
+      value: 'value' in target ? String(target.value) : ''
+    };
+  })()`), `${testId} after-state`)) as Record<string, unknown>;
+  const durationMs = Date.now() - interactionStartedAt;
+  const interaction: ManualQaNativeInteraction = {
+    after: { ...after, windowFocused: win.isFocused(), webContentsFocused: win.webContents.isFocused() },
+    before: hitTest.before ?? {},
+    budgetMs,
+    category,
+    completedAt: new Date().toISOString(),
+    durationMs,
+    hitTestId: hitTest.hitTestId ?? "",
+    testId,
+    withinBudget: durationMs <= budgetMs,
+    x: hitTest.x as number,
+    y: hitTest.y as number
+  };
+  manualQaAutoSongInteractions.push(interaction);
+  console.log(`${manualQaResultPrefix}${JSON.stringify({ after, budgetMs, category, durationMs, ok: interaction.withinBudget, phase: "auto-song-interaction", state: "complete", testId })}`);
+  if (!interaction.withinBudget) {
+    throw new Error(`${testId} ${category} interaction took ${durationMs}ms, exceeding the ${budgetMs}ms hard gate.`);
+  }
+}
+
+function finalizeManualQaNativeInteraction(testId: string, startedAt: number): void {
+  const interaction = [...manualQaAutoSongInteractions].reverse().find((candidate) => candidate.testId === testId);
+  if (!interaction) {
+    throw new Error(`Missing native interaction evidence for ${testId}.`);
+  }
+  interaction.durationMs = Date.now() - startedAt;
+  interaction.completedAt = new Date().toISOString();
+  interaction.withinBudget = interaction.durationMs <= interaction.budgetMs;
+  if (!interaction.withinBudget) {
+    throw new Error(
+      `${testId} ${interaction.category} interaction took ${interaction.durationMs}ms, exceeding the ${interaction.budgetMs}ms hard gate.`
+    );
+  }
+}
+
+async function replaceManualQaNativeText(win: BrowserWindow, testId: string, value: string): Promise<void> {
+  const interactionStartedAt = Date.now();
+  await clickManualQaNativeTarget(win, testId);
+  const commandModifier: Electron.InputEvent["modifiers"] = process.platform === "darwin" ? ["meta"] : ["control"];
+  win.webContents.sendInputEvent({ type: "keyDown", keyCode: "A", modifiers: commandModifier });
+  win.webContents.sendInputEvent({ type: "keyUp", keyCode: "A", modifiers: commandModifier });
+  await waitForManualQaDelay(150);
+  const readSelection = async (): Promise<{ end: number; length: number; start: number; value: string }> =>
+    (await withManualQaTimeout(win.webContents.executeJavaScript(`(() => {
+      const target = document.querySelector('[data-testid=${JSON.stringify(testId)}]');
+      if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
+        return { end: -1, length: -1, start: -1, value: '' };
+      }
+      return {
+        end: target.selectionEnd ?? -1,
+        length: target.value.length,
+        start: target.selectionStart ?? -1,
+        value: target.value
+      };
+    })()`), `${testId} native selection evidence`)) as { end: number; length: number; start: number; value: string };
+  let selection = await readSelection();
+  if (selection.start !== 0 || selection.end !== selection.length) {
+    win.webContents.sendInputEvent({ type: "keyDown", keyCode: "Home" });
+    win.webContents.sendInputEvent({ type: "keyUp", keyCode: "Home" });
+    await waitForManualQaDelay(80);
+    win.webContents.sendInputEvent({ type: "keyDown", keyCode: "End", modifiers: ["shift"] });
+    win.webContents.sendInputEvent({ type: "keyUp", keyCode: "End", modifiers: ["shift"] });
+    await waitForManualQaDelay(150);
+    selection = await readSelection();
+  }
+  const interaction = [...manualQaAutoSongInteractions].reverse().find((candidate) => candidate.testId === testId);
+  if (interaction) {
+    interaction.after = { ...interaction.after, nativeSelection: selection };
+  }
+  if (selection.start !== 0 || selection.end !== selection.length) {
+    throw new Error(`Native select-all failed for ${testId}: ${JSON.stringify(selection)}.`);
+  }
+  await win.webContents.insertText(value);
+  await waitForManualQaCondition(
+    win,
+    `${testId} native text value`,
+    `document.querySelector('[data-testid=${JSON.stringify(testId)}]')?.value === ${JSON.stringify(value)}`
+  );
+  finalizeManualQaNativeInteraction(testId, interactionStartedAt);
+}
+
+async function ensureManualQaDetailsOpen(win: BrowserWindow, detailsTestId: string, toggleTestId: string): Promise<void> {
+  const interactionStartedAt = Date.now();
+  const alreadyOpen = (await win.webContents.executeJavaScript(
+    `document.querySelector('[data-testid=${JSON.stringify(detailsTestId)}]')?.open === true`
+  )) as boolean;
+  if (!alreadyOpen) {
+    await clickManualQaNativeTarget(win, toggleTestId);
+  }
+  await waitForManualQaCondition(
+    win,
+    `${detailsTestId} disclosure open`,
+    `document.querySelector('[data-testid=${JSON.stringify(detailsTestId)}]')?.open === true`
+  );
+  if (!alreadyOpen) {
+    finalizeManualQaNativeInteraction(toggleTestId, interactionStartedAt);
+  }
+}
+
+async function collectManualQaViewportAccessibility(
+  win: BrowserWindow,
+  phase: "active-start" | "deep" | "top-shell"
+): Promise<ManualQaViewportAccessibilitySample> {
+  return (await win.webContents.executeJavaScript(`(() => {
+    const phase = ${JSON.stringify(phase)};
+    const viewportWidth = document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight;
+    const stickyNavigator = document.querySelector('[data-testid="workflow-navigator"]');
+    const stickyNavigatorRect = stickyNavigator?.getBoundingClientRect();
+    const viewportTop = phase !== 'top-shell' && stickyNavigator instanceof HTMLElement &&
+      getComputedStyle(stickyNavigator).position === 'sticky' && stickyNavigatorRect && stickyNavigatorRect.top <= 9
+      ? Math.min(viewportHeight - 1, stickyNavigatorRect.bottom + 1)
+      : 1;
+    const activePanel = document.querySelector('.workspace-tabpanels > [role="tabpanel"]:not([hidden])');
+    const roots = phase === 'top-shell'
+      ? Array.from(document.querySelectorAll(
+          '.transport-band, .mode-row, [data-testid="workflow-navigator"], [data-testid="workspace-command-dock"]'
+        ))
+      : activePanel instanceof HTMLElement ? [activePanel] : [];
+    const candidates = Array.from(new Set(roots.flatMap((root) => [root, ...root.querySelectorAll('*')])));
+    const interactiveSelector = [
+      'a[href]',
+      'button:not([disabled])',
+      'input:not([disabled]):not([type="hidden"])',
+      'select:not([disabled])',
+      'summary',
+      'textarea:not([disabled])',
+      '[role="button"]',
+      '[role="tab"]',
+      '[tabindex]:not([tabindex="-1"]):not([role="tabpanel"])'
+    ].join(',');
+    let checkedElementCount = 0;
+    let checkedInteractiveCount = 0;
+    let intentionalScrollerExclusions = 0;
+    const accessibleInteractiveKeys = [];
+    const checkedInteractiveKeys = [];
+    const renderedInteractiveKeys = [];
+    const inaccessibleElements = [];
+    const horizontalContainment = (element, rect) => {
+      let ancestor = element.parentElement;
+      let intentionalScroller = false;
+      let clippedByAncestor = '';
+      while (ancestor && !roots.includes(ancestor)) {
+        const style = getComputedStyle(ancestor);
+        const ancestorRect = ancestor.getBoundingClientRect();
+        if (
+          (style.overflowX === 'hidden' || style.overflowX === 'clip') &&
+          (rect.left < ancestorRect.left - 1 || rect.right > ancestorRect.right + 1)
+        ) {
+          clippedByAncestor = nearestTestId(ancestor) ||
+            (typeof ancestor.className === 'string' ? ancestor.className.split(/\\s+/u).filter(Boolean)[0] ?? '' : '') ||
+            ancestor.tagName.toLowerCase();
+          break;
+        }
+        if ((style.overflowX === 'auto' || style.overflowX === 'scroll') && ancestor.scrollWidth > ancestor.clientWidth + 1) {
+          const relativeLeft = rect.left - ancestorRect.left + ancestor.scrollLeft;
+          const relativeRight = relativeLeft + rect.width;
+          if (relativeRight >= -1 && relativeLeft <= ancestor.scrollWidth + 1) {
+            intentionalScroller = true;
+          }
+        }
+        ancestor = ancestor.parentElement;
+      }
+      return { clippedByAncestor, intentionalScroller };
+    };
+    const nearestTestId = (element) => element instanceof Element
+      ? element.closest('[data-testid]')?.getAttribute('data-testid') ?? ''
+      : '';
+    const hasHiddenPosture = (element) => {
+      if (element.closest('[hidden], [inert], [aria-hidden="true"]')) return true;
+      let ancestor = element;
+      while (ancestor instanceof HTMLElement) {
+        if (ancestor instanceof HTMLDetailsElement && !ancestor.open) {
+          const summary = ancestor.querySelector(':scope > summary');
+          if (!(summary instanceof HTMLElement) || !(summary === element || summary.contains(element))) {
+            return true;
+          }
+        }
+        const ancestorStyle = getComputedStyle(ancestor);
+        if (
+          ancestorStyle.display === 'none' ||
+          ancestorStyle.visibility === 'hidden' ||
+          ancestorStyle.visibility === 'collapse' ||
+          Number(ancestorStyle.opacity) === 0
+        ) return true;
+        if (roots.includes(ancestor)) break;
+        ancestor = ancestor.parentElement;
+      }
+      return false;
+    };
+    const elementKey = (element) => {
+      const testId = element.getAttribute('data-testid');
+      if (testId) return 'testid:' + testId;
+      if (element.id) return 'id:' + element.id;
+      const parts = [];
+      let current = element;
+      while (current instanceof HTMLElement && !roots.includes(current)) {
+        const siblings = current.parentElement
+          ? Array.from(current.parentElement.children).filter((candidate) => candidate.tagName === current.tagName)
+          : [];
+        parts.unshift(current.tagName.toLowerCase() + ':' + (siblings.indexOf(current) + 1));
+        current = current.parentElement;
+      }
+      return 'path:' + parts.join('>');
+    };
+    for (const element of candidates) {
+      if (!(element instanceof HTMLElement) || hasHiddenPosture(element)) continue;
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      if (
+        rect.width <= 0 ||
+        rect.height <= 0 ||
+        style.display === 'none' ||
+        style.visibility === 'hidden' ||
+        Number(style.opacity) === 0
+      ) continue;
+      const containment = horizontalContainment(element, rect);
+      if (containment.intentionalScroller && !containment.clippedByAncestor) {
+        intentionalScrollerExclusions += 1;
+        continue;
+      }
+      const interactive = element.matches(interactiveSelector);
+      const key = elementKey(element);
+      if (interactive) renderedInteractiveKeys.push(key);
+      if (rect.bottom <= viewportTop || rect.top >= viewportHeight - 1) continue;
+      checkedElementCount += 1;
+      const reasons = [];
+      if (rect.left < -1) reasons.push('outside-left');
+      if (rect.right > viewportWidth + 1) reasons.push('outside-right');
+      if (rect.width > viewportWidth + 1) reasons.push('wider-than-viewport');
+      if (containment.clippedByAncestor) reasons.push('clipped-by-' + containment.clippedByAncestor);
+      const centerX = Math.min(viewportWidth - 2, Math.max(2, rect.left + rect.width / 2));
+      const centerY = Math.min(viewportHeight - 2, Math.max(viewportTop + 1, rect.top + rect.height / 2));
+      const fullyVerticallyVisible = rect.top >= viewportTop && rect.bottom <= viewportHeight - 1;
+      if (interactive && fullyVerticallyVisible) {
+        checkedInteractiveCount += 1;
+        checkedInteractiveKeys.push(key);
+      }
+      const hit = interactive && reasons.length === 0 && fullyVerticallyVisible
+        ? document.elementFromPoint(centerX, centerY)
+        : null;
+      if (
+        interactive &&
+        reasons.length === 0 &&
+        fullyVerticallyVisible &&
+        !(hit === element || (hit instanceof Node && element.contains(hit)))
+      ) {
+        reasons.push('native-hit-test-blocked');
+      }
+      if (
+        interactive &&
+        fullyVerticallyVisible &&
+        reasons.length === 0 &&
+        (hit === element || (hit instanceof Node && element.contains(hit)))
+      ) {
+        accessibleInteractiveKeys.push(key);
+      }
+      if (reasons.length === 0) continue;
+      inaccessibleElements.push({
+        className: typeof element.className === 'string' ? element.className : '',
+        clientWidth: element.clientWidth,
+        elementKey: key,
+        hitTestId: nearestTestId(hit),
+        interactive,
+        left: Number(rect.left.toFixed(2)),
+        phase,
+        reason: reasons.join(','),
+        right: Number(rect.right.toFixed(2)),
+        scrollWidth: element.scrollWidth,
+        tagName: element.tagName.toLowerCase(),
+        testId: element.getAttribute('data-testid') ?? '',
+        width: Number(rect.width.toFixed(2))
+      });
+    }
+    return {
+      accessibleInteractiveCount: new Set(accessibleInteractiveKeys).size,
+      accessibleInteractiveKeys: [...new Set(accessibleInteractiveKeys)],
+      checkedElementCount,
+      checkedInteractiveCount,
+      checkedInteractiveKeys: [...new Set(checkedInteractiveKeys)],
+      inaccessibleCount: inaccessibleElements.length,
+      inaccessibleElements: inaccessibleElements
+        .sort((left, right) => (right.right - viewportWidth) - (left.right - viewportWidth) || right.width - left.width)
+        .slice(0, 24),
+      intentionalScrollerExclusions,
+      renderedInteractiveCount: new Set(renderedInteractiveKeys).size,
+      renderedInteractiveKeys: [...new Set(renderedInteractiveKeys)],
+      uncheckedInteractiveCount: 0
+    };
+  })()`)) as ManualQaViewportAccessibilitySample;
+}
+
+async function centerManualQaTargetedAccessibility(
+  win: BrowserWindow,
+  elementKey: string
+): Promise<ManualQaTargetedAccessibilityPosture> {
+  return (await win.webContents.executeJavaScript(`new Promise((resolve) => {
+    const elementKey = ${JSON.stringify(elementKey)};
+    const activePanel = document.querySelector('.workspace-tabpanels > [role="tabpanel"]:not([hidden])');
+    const shellRoots = Array.from(document.querySelectorAll(
+      '.transport-band, .mode-row, [data-testid="workflow-navigator"], [data-testid="workspace-command-dock"]'
+    ));
+    const roots = [...(activePanel instanceof HTMLElement ? [activePanel] : []), ...shellRoots];
+    const resolveElement = () => {
+      if (elementKey.startsWith('testid:')) {
+        const testId = elementKey.slice('testid:'.length);
+        return Array.from(document.querySelectorAll('[data-testid]')).find(
+          (candidate) => candidate.getAttribute('data-testid') === testId && roots.some((root) => root.contains(candidate))
+        ) ?? null;
+      }
+      if (elementKey.startsWith('id:')) {
+        const candidate = document.getElementById(elementKey.slice('id:'.length));
+        return candidate && roots.some((root) => root.contains(candidate)) ? candidate : null;
+      }
+      if (!elementKey.startsWith('path:')) return null;
+      const segments = elementKey.slice('path:'.length).split('>').filter(Boolean);
+      for (const root of roots) {
+        let candidate = root;
+        let matched = true;
+        for (const segment of segments) {
+          const match = /^([a-z][a-z0-9-]*):(\\d+)$/u.exec(segment);
+          if (!match || !(candidate instanceof Element)) {
+            matched = false;
+            break;
+          }
+          const tagName = match[1];
+          const position = Number(match[2]);
+          candidate = Array.from(candidate.children).filter(
+            (child) => child.tagName.toLowerCase() === tagName
+          )[position - 1] ?? null;
+          if (!candidate) {
+            matched = false;
+            break;
+          }
+        }
+        if (matched && candidate instanceof HTMLElement) return candidate;
+      }
+      return null;
+    };
+    const hiddenPosture = (element) => {
+      if (!(element instanceof HTMLElement) || element.closest('[hidden], [inert], [aria-hidden="true"]')) return true;
+      let ancestor = element;
+      while (ancestor instanceof HTMLElement) {
+        if (ancestor instanceof HTMLDetailsElement && !ancestor.open) {
+          const summary = ancestor.querySelector(':scope > summary');
+          if (!(summary instanceof HTMLElement) || !(summary === element || summary.contains(element))) {
+            return true;
+          }
+        }
+        const style = getComputedStyle(ancestor);
+        if (
+          style.display === 'none' ||
+          style.visibility === 'hidden' ||
+          style.visibility === 'collapse' ||
+          Number(style.opacity) === 0
+        ) return true;
+        if (roots.includes(ancestor)) break;
+        ancestor = ancestor.parentElement;
+      }
+      return false;
+    };
+    const rendered = (element) => {
+      if (!(element instanceof HTMLElement) || hiddenPosture(element)) return false;
+      const rect = element.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    };
+    const before = resolveElement();
+    const beforeRendered = rendered(before);
+    const phase = before instanceof Element && shellRoots.some((root) => root.contains(before)) ? 'top-shell' : 'deep';
+    if (!beforeRendered || !(before instanceof HTMLElement)) {
+      resolve({
+        afterRendered: false,
+        beforeRendered,
+        className: '',
+        clientWidth: 0,
+        elementKey,
+        hitTestAccessible: false,
+        hitTestId: '',
+        left: 0,
+        phase,
+        right: 0,
+        scrollWidth: 0,
+        tagName: '',
+        testId: elementKey.startsWith('testid:') ? elementKey.slice('testid:'.length) : '',
+        width: 0
+      });
+      return;
+    }
+    before.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const after = resolveElement();
+      const afterRendered = rendered(after);
+      if (!afterRendered || !(after instanceof HTMLElement)) {
+        resolve({
+          afterRendered: false,
+          beforeRendered,
+          className: '',
+          clientWidth: 0,
+          elementKey,
+          hitTestAccessible: false,
+          hitTestId: '',
+          left: 0,
+          phase,
+          right: 0,
+          scrollWidth: 0,
+          tagName: '',
+          testId: elementKey.startsWith('testid:') ? elementKey.slice('testid:'.length) : '',
+          width: 0
+        });
+        return;
+      }
+      const rect = after.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth;
+      const viewportHeight = window.innerHeight;
+      const navigator = document.querySelector('[data-testid="workflow-navigator"]');
+      const navigatorRect = navigator?.getBoundingClientRect();
+      const viewportTop = phase !== 'top-shell' && navigator instanceof HTMLElement &&
+        getComputedStyle(navigator).position === 'sticky' && navigatorRect && navigatorRect.top <= 9
+        ? Math.min(viewportHeight - 1, navigatorRect.bottom + 1)
+        : 1;
+      const fullyVisible = rect.left >= -1 && rect.right <= viewportWidth + 1 &&
+        rect.top >= viewportTop && rect.bottom <= viewportHeight - 1;
+      const hit = fullyVisible
+        ? document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+        : null;
+      resolve({
+        afterRendered,
+        beforeRendered,
+        className: typeof after.className === 'string' ? after.className : '',
+        clientWidth: after.clientWidth,
+        elementKey,
+        hitTestAccessible: Boolean(hit === after || (hit instanceof Node && after.contains(hit))),
+        hitTestId: hit instanceof Element ? hit.closest('[data-testid]')?.getAttribute('data-testid') ?? '' : '',
+        left: Number(rect.left.toFixed(2)),
+        phase,
+        right: Number(rect.right.toFixed(2)),
+        scrollWidth: after.scrollWidth,
+        tagName: after.tagName.toLowerCase(),
+        testId: after.getAttribute('data-testid') ?? '',
+        width: Number(rect.width.toFixed(2))
+      });
+    }));
+  })`)) as ManualQaTargetedAccessibilityPosture;
+}
+
+async function captureManualQaAutoSongZone(
+  win: BrowserWindow,
+  zone: "arrange" | "compose" | "deliver" | "mix",
+  evidenceDirectory: string
+): Promise<ManualQaAutoSongZoneEvidence> {
+  await win.webContents.executeJavaScript(`window.scrollTo({ behavior: 'auto', left: 0, top: 0 })`);
+  await waitForManualQaDelay(300);
+  const observation = (await win.webContents.executeJavaScript(`(() => {
+    const navigator = document.querySelector('[data-testid="workflow-navigator"]');
+    const tabs = Array.from(navigator?.querySelectorAll('[role="tab"]') ?? []);
+    const panels = Array.from(document.querySelectorAll('.workspace-tabpanels > [role="tabpanel"]'));
+    const workspace = document.querySelector('.workspace-tabpanels');
+    const activeZone = workspace?.getAttribute('data-active-workspace-zone') ?? '';
+    const clientWidth = document.documentElement.clientWidth;
+    const title = document.querySelector('[data-testid="project-title-input"]');
+    const transport = document.querySelector('[data-testid="transport-play"]');
+    const appShell = document.querySelector('main[data-audio-analysis-state]');
+    return {
+      activeZone,
+      activeZoneCount: panels.filter((panel) => panel.getAttribute('data-workspace-zone') === activeZone).length,
+      audioAnalysisState: appShell?.getAttribute('data-audio-analysis-state') ?? '',
+      audioAnalysisStatus: document.querySelector('[data-testid="audio-analysis-status"]')?.textContent?.trim() ?? '',
+      capturedAt: new Date().toISOString(),
+      clientWidth,
+      documentHorizontalOverflow: Math.max(0, document.documentElement.scrollWidth - clientWidth),
+      documentScrollWidth: document.documentElement.scrollWidth,
+      projectStatus: document.querySelector('[data-testid="project-status"]')?.textContent?.trim() ?? '',
+      projectTitle: title instanceof HTMLInputElement ? title.value : '',
+      scrollX: window.scrollX,
+      selectedTabCount: tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true').length,
+      selectedTabLabels: tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true').map((tab) => tab.textContent?.trim() ?? ''),
+      tabCount: tabs.length,
+      tabPanelCount: panels.length,
+      tabStopCount: tabs.filter((tab) => tab.getAttribute('tabindex') === '0').length,
+      transportPlaying: transport?.getAttribute('aria-pressed') === 'true',
+      visiblePanelCount: panels.filter((panel) => !panel.hasAttribute('hidden')).length
+    };
+  })()`)) as Omit<
+    ManualQaAutoSongZoneEvidence,
+    | "activeAccessibility"
+    | "deepScreenshot"
+    | "deepScreenshotBytes"
+    | "deepScreenshotSha256"
+    | "deepScrollTop"
+    | "overflowOffenders"
+    | "screenshot"
+    | "screenshotBytes"
+    | "screenshotSha256"
+  >;
+  if (observation.activeZone !== zone) {
+    throw new Error(`Expected ${zone} before screenshot, got ${observation.activeZone || "none"}.`);
+  }
+  if (
+    observation.tabCount !== 4 ||
+    observation.selectedTabCount !== 1 ||
+    observation.tabStopCount !== 1 ||
+    observation.tabPanelCount !== 4 ||
+    observation.visiblePanelCount !== 1
+  ) {
+    throw new Error(`Functional tab contract failed in ${zone}: ${JSON.stringify(observation)}.`);
+  }
+  const screenshot = await win.webContents.capturePage();
+  const png = screenshot.toPNG();
+  const screenshotPath = path.join(evidenceDirectory, `auto-song-${zone}.png`);
+  await writeManualQaFile(screenshotPath, png, { mode: 0o600 });
+  const accessibilitySamples: ManualQaViewportAccessibilitySample[] = [];
+  accessibilitySamples.push(await collectManualQaViewportAccessibility(win, "top-shell"));
+  for (const selector of [".transport-band", ".mode-row", '[data-testid="workflow-navigator"]']) {
+    await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)})?.scrollIntoView({
+      behavior: 'auto',
+      block: 'center',
+      inline: 'nearest'
+    })`);
+    await waitForManualQaDelay(120);
+    accessibilitySamples.push(await collectManualQaViewportAccessibility(win, "top-shell"));
+  }
+  const scrollRange = (await win.webContents.executeJavaScript(`(() => {
+    const panel = document.querySelector('.workspace-tabpanels > [role="tabpanel"]:not([hidden])');
+    if (!(panel instanceof HTMLElement)) return { end: 0, start: 0, step: Math.max(320, window.innerHeight - 240) };
+    const start = Math.max(0, panel.getBoundingClientRect().top + window.scrollY - 188);
+    const end = Math.max(start, panel.getBoundingClientRect().bottom + window.scrollY - window.innerHeight + 24);
+    const navigator = document.querySelector('[data-testid="workflow-navigator"]');
+    const navigatorHeight = navigator instanceof HTMLElement ? navigator.getBoundingClientRect().height : 0;
+    return { end, start, step: Math.max(320, window.innerHeight - navigatorHeight - 120) };
+  })()`)) as { end: number; start: number; step: number };
+  const scrollPositions: number[] = [];
+  for (let top = scrollRange.start; top < scrollRange.end; top += scrollRange.step) {
+    scrollPositions.push(Math.round(top));
+  }
+  scrollPositions.push(Math.round(scrollRange.end));
+  for (const [index, top] of [...new Set(scrollPositions)].entries()) {
+    await win.webContents.executeJavaScript(`window.scrollTo({ behavior: 'auto', left: 0, top: ${top} })`);
+    await waitForManualQaDelay(90);
+    accessibilitySamples.push(await collectManualQaViewportAccessibility(win, index === 0 ? "active-start" : "deep"));
+    accessibilitySamples.push(await collectManualQaViewportAccessibility(win, "top-shell"));
+  }
+  const initiallyAccessibleInteractiveKeys = new Set(
+    accessibilitySamples.flatMap((sample) => sample.accessibleInteractiveKeys)
+  );
+  const initiallyRenderedInteractiveKeys = new Set(
+    accessibilitySamples.flatMap((sample) => sample.renderedInteractiveKeys)
+  );
+  const postureChangedInteractiveKeys = new Set<string>();
+  const targetedPostures = new Map<string, ManualQaTargetedAccessibilityPosture>();
+  const targetedKeys = new Set<string>();
+  const targetQueue = [...initiallyRenderedInteractiveKeys].filter(
+    (elementKey) => !initiallyAccessibleInteractiveKeys.has(elementKey)
+  );
+  while (targetQueue.length > 0 && targetedKeys.size < 1024) {
+    const elementKey = targetQueue.shift();
+    if (!elementKey || targetedKeys.has(elementKey)) continue;
+    targetedKeys.add(elementKey);
+    if (accessibilitySamples.some((sample) => sample.accessibleInteractiveKeys.includes(elementKey))) continue;
+    const posture = await centerManualQaTargetedAccessibility(win, elementKey);
+    targetedPostures.set(elementKey, posture);
+    if (!posture.beforeRendered || !posture.afterRendered) {
+      postureChangedInteractiveKeys.add(elementKey);
+      continue;
+    }
+    await waitForManualQaDelay(60);
+    const targetedSample = await collectManualQaViewportAccessibility(win, posture.phase);
+    accessibilitySamples.push(targetedSample);
+    for (const renderedKey of targetedSample.renderedInteractiveKeys) {
+      if (
+        !targetedKeys.has(renderedKey) &&
+        !targetedSample.accessibleInteractiveKeys.includes(renderedKey) &&
+        !accessibilitySamples.some((sample) => sample.accessibleInteractiveKeys.includes(renderedKey))
+      ) {
+        targetQueue.push(renderedKey);
+      }
+    }
+  }
+  const accessibleInteractiveKeys = new Set(
+    accessibilitySamples.flatMap((sample) => sample.accessibleInteractiveKeys)
+  );
+  const checkedInteractiveKeys = new Set(
+    accessibilitySamples.flatMap((sample) => sample.checkedInteractiveKeys)
+  );
+  const renderedInteractiveKeys = new Set(
+    accessibilitySamples
+      .flatMap((sample) => sample.renderedInteractiveKeys)
+      .filter((elementKey) => !postureChangedInteractiveKeys.has(elementKey))
+  );
+  const inaccessibleByKey = new Map<string, ManualQaOverflowOffender>();
+  for (const offender of accessibilitySamples.flatMap((sample) => sample.inaccessibleElements)) {
+    const transientHitTestBlock = offender.reason === "native-hit-test-blocked";
+    if (transientHitTestBlock && accessibleInteractiveKeys.has(offender.elementKey)) {
+      continue;
+    }
+    inaccessibleByKey.set(`${offender.elementKey}:${offender.reason}`, offender);
+  }
+  const uncheckedInteractiveKeys = [...renderedInteractiveKeys].filter(
+    (elementKey) => !accessibleInteractiveKeys.has(elementKey)
+  );
+  for (const elementKey of uncheckedInteractiveKeys) {
+    const targetedPosture = targetedPostures.get(elementKey);
+    inaccessibleByKey.set(`${elementKey}:not-hit-tested-after-target-scroll`, {
+      className: targetedPosture?.className ?? "",
+      clientWidth: targetedPosture?.clientWidth ?? 0,
+      elementKey,
+      hitTestId: targetedPosture?.hitTestId ?? "",
+      interactive: true,
+      left: targetedPosture?.left ?? 0,
+      phase: targetedPosture?.phase ?? "deep",
+      reason: "not-hit-tested-after-target-scroll",
+      right: targetedPosture?.right ?? 0,
+      scrollWidth: targetedPosture?.scrollWidth ?? 0,
+      tagName: targetedPosture?.tagName ?? "",
+      testId: targetedPosture?.testId ?? (elementKey.startsWith("testid:") ? elementKey.slice("testid:".length) : ""),
+      width: targetedPosture?.width ?? 0
+    });
+  }
+  const inaccessibleElements = [...inaccessibleByKey.values()];
+  const activeAccessibility: ManualQaActiveAccessibility = {
+    accessibleInteractiveCount: accessibleInteractiveKeys.size,
+    checkedElementCount: accessibilitySamples.reduce((total, sample) => total + sample.checkedElementCount, 0),
+    checkedInteractiveCount: checkedInteractiveKeys.size,
+    inaccessibleCount: inaccessibleElements.length,
+    inaccessibleElements: inaccessibleElements.slice(0, 24),
+    intentionalScrollerExclusions: accessibilitySamples.reduce(
+      (total, sample) => total + sample.intentionalScrollerExclusions,
+      0
+    ),
+    renderedInteractiveCount: renderedInteractiveKeys.size,
+    uncheckedInteractiveCount: uncheckedInteractiveKeys.length
+  };
+  const deepScrollTop = (await win.webContents.executeJavaScript(`window.scrollY`)) as number;
+  const deepPng = (await win.webContents.capturePage()).toPNG();
+  const deepScreenshotPath = path.join(evidenceDirectory, `auto-song-${zone}-deep.png`);
+  await writeManualQaFile(deepScreenshotPath, deepPng, { mode: 0o600 });
+  await win.webContents.executeJavaScript(`window.scrollTo({ behavior: 'auto', left: 0, top: 0 })`);
+  await waitForManualQaDelay(120);
+  return {
+    ...observation,
+    activeAccessibility,
+    deepScreenshot: deepScreenshotPath,
+    deepScreenshotBytes: deepPng.byteLength,
+    deepScreenshotSha256: createHash("sha256").update(deepPng).digest("hex"),
+    deepScrollTop,
+    overflowOffenders: activeAccessibility.inaccessibleElements,
+    screenshot: screenshotPath,
+    screenshotBytes: png.byteLength,
+    screenshotSha256: createHash("sha256").update(png).digest("hex")
+  };
+}
+
+function manualQaObject(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+}
+
+function installManualQaAutoSong(win: BrowserWindow): void {
+  const configuration = manualQaConfiguration;
+  if (!configuration?.autoSong) {
+    return;
+  }
+  const activeConfiguration: ManualQaConfiguration = configuration;
+  const expectedSessionBrief = {
+    artist: "GrooveForge Original",
+    vibe: "신비롭고 사색적인 한국어 얼터너티브 팝",
+    reference: "새벽의 무중력, 여백과 질문",
+    notes:
+      "특정 아티스트를 직접 모사하지 않고 공기감 있는 신스, 열린 화음, 절제된 하프타임 리듬, 질문형 서사를 위한 오리지널 테스트 곡."
+  };
+  const userDataPosture = manualQaUserDataPosture(activeConfiguration);
+  const report: ManualQaAutoSongReport = {
+    downloads: manualQaDownloads,
+    failures: [],
+    generatedAt: new Date().toISOString(),
+    interactions: manualQaAutoSongInteractions,
+    mode: "visible-native-auto-song-qa",
+    ok: false,
+    performance: {
+      generalBudgetMs: 5000,
+      generalViolations: [],
+      maxGeneralInteractionMs: 0,
+      maxSlowOperationMs: 0,
+      passed: true,
+      slowOperationBudgetMs: 120000,
+      slowOperationViolations: []
+    },
+    playback: {
+      arrangement: false,
+      patternAuditions: [],
+      wavPreview: false
+    },
+    provenance: activeConfiguration.provenance,
+    provenanceValidatedAtLaunch: true,
+    safety: {
+      isolatedWorkspace: true,
+      nativePointerAndKeyboard: true,
+      sourceFixtureUnchanged: false,
+      sourceFixtureSha256: "",
+      ...userDataPosture
+    },
+    steps: [],
+    workspaceRoot: activeConfiguration.workspaceRoot,
+    zones: {}
+  };
+  const reportPath = path.join(activeConfiguration.evidenceDirectory, "auto-song-qa-report.json");
+  let finished = false;
+
+  async function persistReport(): Promise<void> {
+    const generalInteractions = report.interactions.filter((interaction) => interaction.category === "general-ui");
+    const slowInteractions = report.interactions.filter((interaction) => interaction.category === "slow-operation");
+    report.performance.generalViolations = generalInteractions
+      .filter((interaction) => !interaction.withinBudget)
+      .map(({ durationMs, testId }) => ({ durationMs, testId }));
+    report.performance.slowOperationViolations = slowInteractions
+      .filter((interaction) => !interaction.withinBudget)
+      .map(({ durationMs, testId }) => ({ durationMs, testId }));
+    report.performance.maxGeneralInteractionMs = Math.max(0, ...generalInteractions.map(({ durationMs }) => durationMs));
+    report.performance.maxSlowOperationMs = Math.max(0, ...slowInteractions.map(({ durationMs }) => durationMs));
+    report.performance.passed =
+      report.performance.generalViolations.length === 0 && report.performance.slowOperationViolations.length === 0;
+    await writeManualQaFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  }
+
+  async function runStep(id: string, action: () => Promise<void>): Promise<void> {
+    const step: ManualQaAutoSongStep = { id, startedAt: new Date().toISOString(), status: "running" };
+    report.steps.push(step);
+    await persistReport();
+    try {
+      await withManualQaTimeout(action(), `auto-song step ${id}`, 720000);
+      step.status = "passed";
+    } catch (error) {
+      step.status = "failed";
+      step.detail = error instanceof Error ? error.message : String(error);
+      if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+        const failurePng = (await win.webContents.capturePage()).toPNG();
+        const failureScreenshot = path.join(activeConfiguration.evidenceDirectory, `auto-song-failure-${id}.png`);
+        await writeManualQaFile(failureScreenshot, failurePng, { mode: 0o600 });
+        step.detail += ` / screenshot ${failureScreenshot}`;
+      }
+      report.failures.push(`${id}: ${step.detail}`);
+      throw error;
+    } finally {
+      step.completedAt = new Date().toISOString();
+      await persistReport();
+    }
+  }
+
+  async function clickAndWait(testId: string, description: string, expression: string, timeoutMs = 15000): Promise<void> {
+    const interactionStartedAt = Date.now();
+    await clickManualQaNativeTarget(win, testId);
+    try {
+      await waitForManualQaCondition(win, description, expression, timeoutMs);
+      finalizeManualQaNativeInteraction(testId, interactionStartedAt);
+    } catch (error) {
+      const interaction = [...manualQaAutoSongInteractions].reverse().find((candidate) => candidate.testId === testId);
+      throw new Error(
+        `${error instanceof Error ? error.message : String(error)} Native interaction: ${JSON.stringify(interaction ?? null)}.`
+      );
+    }
+  }
+
+  async function captureZone(zone: "arrange" | "compose" | "deliver" | "mix"): Promise<void> {
+    if (zone === "mix" || zone === "deliver") {
+      await waitForManualQaCondition(
+        win,
+        `${zone} audio analysis ready before final capture`,
+        `document.querySelector('main[data-audio-analysis-state]')?.getAttribute('data-audio-analysis-state') === 'ready' &&
+          document.querySelector('[data-testid="audio-analysis-status"]')?.textContent?.trim() === 'Audio meters ready'`,
+        120000
+      );
+    }
+    const evidence = await captureManualQaAutoSongZone(win, zone, activeConfiguration.evidenceDirectory);
+    report.zones[zone] = evidence;
+    const layoutFailures: string[] = [];
+    if (evidence.documentHorizontalOverflow !== 0 || evidence.scrollX !== 0) {
+      layoutFailures.push(
+        `${evidence.documentHorizontalOverflow}px document overflow at ${evidence.clientWidth}px viewport with scrollX ${evidence.scrollX}`
+      );
+    }
+    if (evidence.activeAccessibility.inaccessibleCount !== 0) {
+      layoutFailures.push(
+        `${evidence.activeAccessibility.inaccessibleCount} inaccessible active or shell elements: ${JSON.stringify(evidence.overflowOffenders)}`
+      );
+    }
+    if (layoutFailures.length > 0) {
+      const failure = `${zone} layout accessibility failed: ${layoutFailures.join("; ")}`;
+      report.failures.push(failure);
+      await persistReport();
+      throw new Error(failure);
+    }
+    if ((zone === "mix" || zone === "deliver") && evidence.audioAnalysisState !== "ready") {
+      report.failures.push(`${zone} audio analysis was not ready at final capture: ${JSON.stringify(evidence)}.`);
+    }
+    await persistReport();
+  }
+
+  async function auditionPattern(pattern: "A" | "B" | "C"): Promise<void> {
+    await clickAndWait(
+      `pattern-tab-${pattern}`,
+      `Pattern ${pattern} selected`,
+      `document.querySelector('[data-testid="pattern-tab-${pattern}"]')?.getAttribute('aria-selected') === 'true'`
+    );
+    await clickAndWait(
+      "playback-mode-pattern",
+      `Pattern ${pattern} loop scope`,
+      `document.querySelector('[data-testid="playback-mode-pattern"]')?.getAttribute('aria-pressed') === 'true'`
+    );
+    await clickAndWait(
+      "transport-play",
+      `Pattern ${pattern} playback started`,
+      `document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'true'`
+    );
+    await waitForManualQaDelay(650);
+    await clickAndWait(
+      "transport-play",
+      `Pattern ${pattern} playback stopped`,
+      `document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'false'`
+    );
+    report.playback.patternAuditions.push(pattern);
+  }
+
+  async function run(): Promise<void> {
+    Object.assign(report.safety, manualQaUserDataPosture(activeConfiguration));
+    if (!report.safety.userDataIsolated) {
+      throw new Error(`Electron userData was not isolated inside the Manual QA workspace: ${report.safety.userDataPath}`);
+    }
+    const sourceContents = await readFile(activeConfiguration.openPath);
+    report.safety.sourceFixtureSha256 = createHash("sha256").update(sourceContents).digest("hex");
+    await waitForManualQaCondition(win, "production renderer controls", `document.querySelector('[data-testid="mode-studio"]') !== null`, 120000);
+    win.setTitle("GrooveForge — Auto Song QA");
+    win.show();
+    win.focus();
+
+    await runStep("studio-blueprint-and-original-brief", async () => {
+      await clickAndWait(
+        "mode-studio",
+        "Studio mode",
+        `document.querySelector('[data-testid="mode-studio"]')?.classList.contains('selected') === true`
+      );
+      await ensureManualQaDetailsOpen(win, "guidance-center", "guidance-center-toggle");
+      await clickAndWait(
+        "beat-blueprint-experimental_pulse",
+        "Experimental Pulse blueprint",
+        `document.querySelector('[data-testid="beat-blueprint-result"]')?.getAttribute('data-result-blueprint') === 'experimental_pulse' &&
+          document.querySelector('[data-testid="project-bpm-input"]')?.value === '110' &&
+          document.querySelector('[data-testid="project-key-select"]')?.value === 'D minor' &&
+          document.querySelector('[data-testid="style-select"]')?.value === 'experimental'`
+      );
+      await replaceManualQaNativeText(win, "project-title-input", "문 없는 방");
+      await replaceManualQaNativeText(win, "session-brief-artist", expectedSessionBrief.artist);
+      await replaceManualQaNativeText(win, "session-brief-vibe", expectedSessionBrief.vibe);
+      await replaceManualQaNativeText(win, "session-brief-reference", expectedSessionBrief.reference);
+      await replaceManualQaNativeText(win, "session-brief-notes", expectedSessionBrief.notes);
+    });
+
+    await runStep("compose-pattern-a-b-c-and-sound", async () => {
+      await clickAndWait(
+        "workflow-jump-compose",
+        "Compose functional tab",
+        `document.querySelector('[data-testid="workflow-jump-compose"]')?.getAttribute('aria-selected') === 'true'`
+      );
+      await ensureManualQaDetailsOpen(win, "pattern-lab", "pattern-lab-toggle");
+
+      await clickAndWait("pattern-tab-A", "Pattern A selected", `document.querySelector('[data-testid="pattern-tab-A"]')?.getAttribute('aria-selected') === 'true'`);
+      await clickAndWait("pattern-stack-pocket", "Pattern A Pocket stack", `document.querySelector('[data-testid="pattern-stack-result"]')?.getAttribute('data-result-pattern-stack') === 'pocket'`);
+      await clickAndWait("drum-foundation-half", "Pattern A Half foundation", `document.querySelector('[data-testid="drum-move-result"]')?.getAttribute('data-result-drum-move') === 'foundation-half'`);
+      await clickAndWait("groove-feel-lazy", "Pattern A Lazy feel", `document.querySelector('[data-testid="drum-move-result"]')?.getAttribute('data-result-drum-move') === 'feel-lazy'`);
+      await clickAndWait("drum-accent-ghost", "Pattern A Ghost accent", `document.querySelector('[data-testid="drum-move-result"]')?.getAttribute('data-result-drum-move') === 'accent-ghost'`);
+
+      await clickAndWait("pattern-tab-B", "Pattern B selected", `document.querySelector('[data-testid="pattern-tab-B"]')?.getAttribute('aria-selected') === 'true'`);
+      await clickAndWait("pattern-stack-hook", "Pattern B Hook stack", `document.querySelector('[data-testid="pattern-stack-result"]')?.getAttribute('data-result-pattern-stack') === 'hook'`);
+      await clickAndWait("drum-foundation-bounce", "Pattern B Bounce foundation", `document.querySelector('[data-testid="drum-move-result"]')?.getAttribute('data-result-drum-move') === 'foundation-bounce'`);
+      await clickAndWait("groove-feel-pocket", "Pattern B Pocket feel", `document.querySelector('[data-testid="drum-move-result"]')?.getAttribute('data-result-drum-move') === 'feel-pocket'`);
+      await clickAndWait("drum-accent-lift", "Pattern B Lift accent", `document.querySelector('[data-testid="drum-move-result"]')?.getAttribute('data-result-drum-move') === 'accent-lift'`);
+      await clickAndWait("pattern-fill-melody_turn", "Pattern B Melody Turn fill", `document.querySelector('[data-testid="pattern-fill-result"]')?.getAttribute('data-result-pattern-fill') === 'B-melody_turn'`);
+
+      await clickAndWait("pattern-tab-C", "Pattern C selected", `document.querySelector('[data-testid="pattern-tab-C"]')?.getAttribute('aria-selected') === 'true'`);
+      await clickAndWait("pattern-stack-break", "Pattern C Break stack", `document.querySelector('[data-testid="pattern-stack-result"]')?.getAttribute('data-result-pattern-stack') === 'break'`);
+      await clickAndWait("drum-foundation-half", "Pattern C Half foundation", `document.querySelector('[data-testid="drum-move-result"]')?.getAttribute('data-result-drum-move') === 'foundation-half'`);
+      await clickAndWait("groove-feel-lazy", "Pattern C Lazy feel", `document.querySelector('[data-testid="drum-move-result"]')?.getAttribute('data-result-drum-move') === 'feel-lazy'`);
+      await clickAndWait("drum-accent-soft", "Pattern C Soft accent", `document.querySelector('[data-testid="drum-move-result"]')?.getAttribute('data-result-drum-move') === 'accent-soft'`);
+      await clickAndWait("pattern-fill-clear_tail", "Pattern C Clear Tail fill", `document.querySelector('[data-testid="pattern-fill-result"]')?.getAttribute('data-result-pattern-fill') === 'C-clear_tail'`);
+
+      await auditionPattern("A");
+      await auditionPattern("B");
+      await auditionPattern("C");
+      await ensureManualQaDetailsOpen(win, "sound-design-tools", "sound-design-toggle");
+      await clickAndWait("sound-focus-space", "Space sound focus", `document.querySelector('[data-testid="sound-focus-result"]')?.getAttribute('data-result-sound-focus') === 'space'`);
+      await clickAndWait("drum-kit-air", "Air drum kit", `document.querySelector('[data-testid="drum-kit-result"]')?.getAttribute('data-result-drum-kit') === 'air'`);
+      await captureZone("compose");
+    });
+
+    await runStep("arrange-breakdown-and-song-playback", async () => {
+      await clickAndWait(
+        "workflow-jump-arrange",
+        "Arrange functional tab",
+        `document.querySelector('[data-testid="workflow-jump-arrange"]')?.getAttribute('aria-selected') === 'true'`
+      );
+      const mute = async (block: number, track: "bass_808" | "drum_rack" | "synth") => {
+        await clickAndWait(
+          `arrangement-block-${block}`,
+          `Arrangement block ${block + 1} selected`,
+          `document.querySelector('[data-testid="arrangement-block-${block}"]')?.getAttribute('aria-pressed') === 'true'`
+        );
+        await clickAndWait(
+          `arrangement-track-mute-${track}`,
+          `Arrangement block ${block + 1} ${track} muted`,
+          `document.querySelector('[data-testid="arrangement-track-mute-${track}"]')?.getAttribute('aria-pressed') === 'true'`
+        );
+      };
+      await mute(0, "bass_808");
+      await mute(2, "drum_rack");
+      await mute(2, "bass_808");
+      await mute(6, "drum_rack");
+      await mute(6, "bass_808");
+      await mute(6, "synth");
+      await clickAndWait("playback-mode-arrangement", "Song loop selected", `document.querySelector('[data-testid="playback-mode-arrangement"]')?.getAttribute('aria-pressed') === 'true'`);
+      await clickAndWait("transport-play", "Song playback started", `document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'true'`);
+      await waitForManualQaDelay(800);
+      await clickAndWait("transport-play", "Song playback stopped", `document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'false'`);
+      report.playback.arrangement = true;
+      await captureZone("arrange");
+    });
+
+    await runStep("mix-wide-space-vocal-fades", async () => {
+      await clickAndWait(
+        "workflow-jump-mix",
+        "Mix functional tab",
+        `document.querySelector('[data-testid="workflow-jump-mix"]')?.getAttribute('aria-selected') === 'true'`
+      );
+      await ensureManualQaDetailsOpen(win, "mix-moves", "mix-moves-toggle");
+      await clickAndWait("space-fx-wide", "Wide space FX", `document.querySelector('[data-testid="space-fx-result"]')?.getAttribute('data-result-space-fx') === 'wide'`);
+      await clickAndWait("mix-balance-wide", "Wide mix balance", `document.querySelector('[data-testid="mix-balance-result"]')?.getAttribute('data-result-mix-balance') === 'wide'`);
+      await ensureManualQaDetailsOpen(win, "master-polish-tools", "master-polish-toggle");
+      await clickAndWait("master-finish-vocal", "Vocal master finish", `document.querySelector('[data-testid="master-finish-result"]')?.getAttribute('data-result-master-finish') === 'vocal'`);
+      await clickAndWait("master-automation-intro_outro", "Intro/Outro master automation", `document.querySelector('[data-testid="master-automation-result"]')?.getAttribute('data-result-master-automation') === 'intro_outro'`);
+      await captureZone("mix");
+    });
+
+    await runStep("deliver-preview-export-save-and-open", async () => {
+      await clickAndWait(
+        "workflow-jump-deliver",
+        "Deliver functional tab",
+        `document.querySelector('[data-testid="workflow-jump-deliver"]')?.getAttribute('aria-selected') === 'true'`
+      );
+      await clickAndWait("handoff-pack-preview-wav", "Rendered WAV preview started", `document.querySelector('[data-testid="handoff-pack-preview-wav"]')?.getAttribute('aria-pressed') === 'true'`, 120000);
+      await waitForManualQaDelay(900);
+      await clickAndWait("handoff-pack-preview-wav", "Rendered WAV preview stopped", `document.querySelector('[data-testid="handoff-pack-preview-wav"]')?.getAttribute('aria-pressed') === 'false'`);
+      report.playback.wavPreview = true;
+      const exportInteractionStartedAt = Date.now();
+      await clickManualQaNativeTarget(win, "handoff-pack-action-wav");
+      const downloadDeadline = Date.now() + 120000;
+      while (Date.now() < downloadDeadline && !manualQaDownloads.some((download) => download.state === "completed" && download.filePath.endsWith(".wav"))) {
+        await waitForManualQaDelay(100);
+      }
+      const wavDownload = manualQaDownloads.find((download) => download.state === "completed" && download.filePath.endsWith(".wav"));
+      if (!wavDownload) {
+        throw new Error(`WAV download did not complete: ${JSON.stringify(manualQaDownloads)}.`);
+      }
+      finalizeManualQaNativeInteraction("handoff-pack-action-wav", exportInteractionStartedAt);
+      const saveInteractionStartedAt = Date.now();
+      await clickManualQaNativeTarget(win, "project-save");
+      await waitForManualQaCondition(win, "UI Save completion", `document.querySelector('[data-testid="project-status"]')?.textContent?.includes('Saved') === true`, 120000);
+      const saveDeadline = Date.now() + 120000;
+      while (Date.now() < saveDeadline && !existsSync(activeConfiguration.savePath)) {
+        await waitForManualQaDelay(100);
+      }
+      if (!existsSync(activeConfiguration.savePath)) {
+        throw new Error("UI Save did not create the isolated target project.");
+      }
+      finalizeManualQaNativeInteraction("project-save", saveInteractionStartedAt);
+      manualQaAutoSongOpenPathOverride = activeConfiguration.savePath;
+      const openInteractionStartedAt = Date.now();
+      await clickManualQaNativeTarget(win, "project-open");
+      await waitForManualQaCondition(
+        win,
+        "UI Open completion",
+        `document.querySelector('[data-testid="project-title-input"]')?.value === '문 없는 방' &&
+          document.querySelector('[data-testid="project-status"]')?.textContent?.includes('Loaded') === true`,
+        120000
+      );
+      finalizeManualQaNativeInteraction("project-open", openInteractionStartedAt);
+      await captureZone("deliver");
+
+      const savedContents = await readFile(activeConfiguration.savePath, "utf8");
+      const savedFile = manualQaObject(JSON.parse(savedContents));
+      const savedProject = manualQaObject(savedFile.project);
+      const savedSessionBrief = manualQaObject(savedProject.sessionBrief);
+      const arrangement = Array.isArray(savedProject.arrangement) ? savedProject.arrangement : [];
+      const arrangementBars = arrangement.reduce((total, block) => {
+        const bars = manualQaObject(block).bars;
+        return total + (typeof bars === "number" ? bars : 0);
+      }, 0);
+      if (
+        savedProject.title !== "문 없는 방" ||
+        savedProject.mode !== "studio" ||
+        savedProject.bpm !== 110 ||
+        savedProject.key !== "D minor" ||
+        savedProject.styleId !== "experimental" ||
+        arrangement.length !== 7 ||
+        arrangementBars !== 20 ||
+        savedSessionBrief.artist !== expectedSessionBrief.artist ||
+        savedSessionBrief.vibe !== expectedSessionBrief.vibe ||
+        savedSessionBrief.reference !== expectedSessionBrief.reference ||
+        savedSessionBrief.notes !== expectedSessionBrief.notes
+      ) {
+        throw new Error(`Saved project contract mismatch: ${JSON.stringify({ arrangementBars, blocks: arrangement.length, title: savedProject.title, mode: savedProject.mode, bpm: savedProject.bpm, key: savedProject.key, styleId: savedProject.styleId, sessionBrief: savedSessionBrief })}.`);
+      }
+      const wavContents = await readFile(wavDownload.filePath);
+      report.project = {
+        arrangementBars,
+        arrangementBlocks: arrangement.length,
+        bpm: savedProject.bpm,
+        key: savedProject.key,
+        mode: savedProject.mode,
+        path: activeConfiguration.savePath,
+        sessionBrief: savedSessionBrief,
+        sha256: createHash("sha256").update(savedContents).digest("hex"),
+        styleId: savedProject.styleId,
+        title: savedProject.title
+      };
+      report.wav = {
+        bytes: wavContents.byteLength,
+        path: wavDownload.filePath,
+        sha256: createHash("sha256").update(wavContents).digest("hex")
+      };
+    });
+
+    const finalSourceContents = await readFile(activeConfiguration.openPath);
+    report.safety.sourceFixtureUnchanged =
+      createHash("sha256").update(finalSourceContents).digest("hex") === report.safety.sourceFixtureSha256;
+    if (!report.safety.sourceFixtureUnchanged) {
+      report.failures.push("The isolated source fixture changed during auto-song QA.");
+    }
+    Object.assign(report.safety, manualQaUserDataPosture(activeConfiguration));
+    if (!report.safety.userDataIsolated) {
+      report.failures.push(`Electron userData isolation changed during auto-song QA: ${report.safety.userDataPath}.`);
+    }
+    if (
+      report.playback.patternAuditions.join(",") !== "A,B,C" ||
+      !report.playback.arrangement ||
+      !report.playback.wavPreview
+    ) {
+      report.failures.push(`Playback coverage was incomplete: ${JSON.stringify(report.playback)}.`);
+    }
+    report.ok = report.failures.length === 0 && report.performance.passed;
+    report.completedAt = new Date().toISOString();
+    await persistReport();
+    console.log(`${manualQaResultPrefix}${JSON.stringify({ ok: report.ok, phase: "auto-song", reportPath, report })}`);
+    finished = true;
+    if (activeConfiguration.autoExit) {
+      await waitForManualQaDelay(250);
+      exitDesktopSmoke(report.ok ? 0 : 1);
+    }
+  }
+
+  const timeout = setTimeout(() => {
+    if (!finished) {
+      report.failures.push("Auto-song QA timed out before completion.");
+      report.completedAt = new Date().toISOString();
+      void persistReport().finally(() => exitDesktopSmoke(1));
+    }
+  }, 900000);
+  win.once("closed", () => clearTimeout(timeout));
+  win.webContents.once("did-finish-load", () => {
+    void run().catch(async (error: unknown) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      clearTimeout(timeout);
+      const message = error instanceof Error ? error.message : String(error);
+      try {
+        const finalSourceContents = await readFile(activeConfiguration.openPath);
+        report.safety.sourceFixtureUnchanged =
+          createHash("sha256").update(finalSourceContents).digest("hex") === report.safety.sourceFixtureSha256;
+      } catch {
+        report.safety.sourceFixtureUnchanged = false;
+      }
+      if (!report.failures.some((failure) => failure.includes(message))) {
+        report.failures.push(message);
+      }
+      report.completedAt = new Date().toISOString();
+      report.ok = false;
+      await persistReport();
+      console.error(`${manualQaResultPrefix}${JSON.stringify({ ok: false, phase: "auto-song", reportPath, report })}`);
+      if (activeConfiguration.autoExit) {
+        await waitForManualQaDelay(250);
+        exitDesktopSmoke(1);
+      }
+    });
+  });
+}
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1440,
@@ -7184,7 +11540,7 @@ function createWindow(): void {
     title: "GrooveForge",
     backgroundColor: "#0f1115",
     paintWhenInitiallyHidden: true,
-    show: isProjectIoSmoke,
+    show: isProjectIoSmoke || isManualQa,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       nodeIntegration: false,
@@ -7196,10 +11552,16 @@ function createWindow(): void {
           ? `grooveforge-project-io-smoke-${process.pid}`
         : isCloseFlowSmoke
           ? `grooveforge-close-flow-smoke-${process.pid}`
+        : isManualQa
+          ? `grooveforge-manual-qa-${isManualQaAutoSong ? "auto-song" : isManualQaAutoExit ? "auto" : "visible"}-${process.pid}`
           : undefined,
-      backgroundThrottling: !(isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke)
+      backgroundThrottling: !(isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke || isManualQa)
     }
   });
+
+  installManualQaDownloadRouting(win);
+  installManualQaPassiveEvidence(win);
+  installManualQaAutoSong(win);
 
   if (isLaunchSmoke) {
     installLaunchSmoke(win);
@@ -7275,7 +11637,22 @@ if (ownsSingleInstanceLock) {
     });
   }
 
-  void app.whenReady().then(() => {
+  void app.whenReady().then(async () => {
+    if (manualQaConfiguration) {
+      await ensureDesktopProjectWorkspace(desktopProjectWorkspace());
+      assertManualQaWorkspaceTargetSync(
+        manualQaConfiguration.workspaceRoot,
+        manualQaConfiguration.evidenceDirectory,
+        { expectedType: "directory", mustExist: true }
+      );
+      assertManualQaWorkspaceTargetSync(
+        manualQaConfiguration.workspaceRoot,
+        manualQaConfiguration.exportsDirectory,
+        { expectedType: "directory", mustExist: true }
+      );
+      await assertManualQaPathSafety(manualQaConfiguration.openPath, true);
+      await assertManualQaPathSafety(manualQaConfiguration.savePath, false);
+    }
     registerProjectFileHandlers();
     Menu.setApplicationMenu(createNativeCommandMenu());
     createWindow();
@@ -7289,7 +11666,7 @@ if (ownsSingleInstanceLock) {
 }
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin" && !isCloseFlowSmoke) {
+  if ((process.platform !== "darwin" || isManualQa) && !isCloseFlowSmoke) {
     app.quit();
   }
 });

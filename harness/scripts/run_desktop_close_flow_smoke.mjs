@@ -184,6 +184,7 @@ function buildMarkdown(report) {
 - Guarded Save-before-close ready: ${report.guardedCloseFlowReady ? "yes" : "no"}
 - Product scope: ${report.productScope}
 - Saved path: \`${report.targetPath}\`
+- Native focused title draft: ${report.nativeFocusedDraft ? "yes" : "no"}
 - Exact live edit saved: ${report.savedExactLiveEdit ? "yes" : "no"}
 - First close prevented: ${report.firstClosePrevented ? "yes" : "no"}
 - Second guarded close completed: ${report.secondGuardedCloseCompleted ? "yes" : "no"}
@@ -220,7 +221,16 @@ check(evidence.productionRenderer === true, "close-flow smoke should run the pro
 check(evidence.liveEdit?.inputPresent === true, "close-flow smoke should find the production project title input");
 check(evidence.liveEdit?.initialTitle !== expectedTitle, "close-flow smoke should start from a different title");
 check(evidence.liveEdit?.title === expectedTitle, "close-flow smoke should apply the live title edit");
-check(evidence.liveEdit?.dirtyStatus === "Unsaved changes", "live title edit should mark the project unsaved");
+check(evidence.liveEdit?.nativeInputApplied === true, "close-flow smoke should replace the title with native text input");
+check(evidence.liveEdit?.focusedDraft === true, "close-flow smoke should close while the exact title draft remains focused");
+check(evidence.liveEdit?.blurredBeforeClose === false, "close-flow smoke should exercise the pre-blur metadata draft boundary");
+check(evidence.liveEdit?.hitTargetMatched === true, "close-flow smoke should native-hit-test the visible project title input");
+check(evidence.liveEdit?.valueExact === true, "close-flow smoke should observe the exact local title draft before close");
+check(
+  evidence.liveEdit?.selectionStartBeforeInput === 0 &&
+    evidence.liveEdit?.selectionEndBeforeInput === evidence.liveEdit?.selectionLengthBeforeInput,
+  "close-flow smoke should prove native select-all before title replacement"
+);
 check(evidence.firstClosePrevented === true, "renderer beforeunload should prevent the first close");
 check(evidence.smokeChoiceSubstituted === true, "smoke should substitute only the native Save choice");
 check(evidence.nativeSaveCount === 1, "native project writer should run exactly once");
@@ -249,6 +259,10 @@ const report = {
   arrangementBars: workstation.arrangementTotalBars(project),
   events: evidence.events,
   firstClosePrevented: evidence.firstClosePrevented === true,
+  nativeFocusedDraft:
+    evidence.liveEdit?.nativeInputApplied === true &&
+    evidence.liveEdit?.focusedDraft === true &&
+    evidence.liveEdit?.blurredBeforeClose === false,
   savedExactLiveEdit: evidence.savedExactLiveEdit === true,
   secondGuardedCloseCompleted: evidence.secondGuardedCloseCompleted === true,
   guardedCloseFlowReady: failures.length === 0,
@@ -264,6 +278,7 @@ const report = {
 const reportMarkdown = buildMarkdown(report);
 
 check(report.guardedCloseFlowReady === true, "guarded close-flow report should be ready");
+check(report.nativeFocusedDraft === true, "guarded close-flow report should prove the native focused title draft");
 check(report.physicalNativeButtonAutomated === false, "report should not claim physical native warning-button automation");
 check(report.localEnvValueRecorded === false, "report should not record local env values");
 check(report.privateValuesRecorded === false, "report should not record private values");

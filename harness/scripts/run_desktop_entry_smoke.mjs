@@ -119,6 +119,11 @@ function checkPackageScripts() {
   checkIncludes(packageJson.description ?? "", "desktop beat workstation", "package.json description");
   checkIncludes(packageJson.scripts?.build ?? "", "tsc -p tsconfig.electron.json", "package.json build script");
   checkIncludes(packageJson.scripts?.desktop ?? "", "run_desktop_app.mjs", "package.json desktop script");
+  checkIncludes(
+    packageJson.scripts?.["desktop:manual-qa"] ?? "",
+    "run_desktop_manual_qa.mjs",
+    "package.json desktop:manual-qa script"
+  );
   checkIncludes(packageJson.scripts?.["desktop:smoke"] ?? "", "run_desktop_entry_smoke.mjs", "package.json desktop:smoke script");
   checkIncludes(
     packageJson.scripts?.["desktop:crash-report-regression-smoke"] ?? "",
@@ -214,6 +219,7 @@ function checkDesktopGuiLaunchGuardContract() {
   const guardSource = readText("harness/scripts/desktop_gui_launch_guard.mjs");
   const bundleDependencyGuardSource = readText("harness/scripts/desktop_bundle_dependency_guard.mjs");
   const desktopAppSource = readText("harness/scripts/run_desktop_app.mjs");
+  const manualQaSource = readText("harness/scripts/run_desktop_manual_qa.mjs");
   const launchSmokeSource = readText("harness/scripts/run_desktop_launch_smoke.mjs");
   const projectIoSmokeSource = readText("harness/scripts/run_desktop_project_io_smoke.mjs");
   const closeFlowSmokeSource = readText("harness/scripts/run_desktop_close_flow_smoke.mjs");
@@ -259,6 +265,33 @@ function checkDesktopGuiLaunchGuardContract() {
   checkIncludes(desktopAppSource, "isMacAppKitAbort({ code, signal })", "harness/scripts/run_desktop_app.mjs");
   checkIncludes(desktopAppSource, "macGuiLaunchAbortDetails(\"npm run desktop\"", "harness/scripts/run_desktop_app.mjs");
   checkIncludes(desktopAppSource, "macGuiLaunchBlockDetails(\"npm run desktop\")", "harness/scripts/run_desktop_app.mjs");
+  checkIncludes(manualQaSource, 'GROOVEFORGE_DESKTOP_MANUAL_QA: "1"', "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "workstation.starterProject", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "sourceAndTargetDiffer", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "visible-stable-manual-qa", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, 'args.has("--auto-song-qa")', "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, 'GROOVEFORGE_DESKTOP_MANUAL_QA_AUTO_SONG: "1"', "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, 'args.has("--safety-self-test")', "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, 'const manualQaSentinelName = ".grooveforge-manual-qa-owned.json"', "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "manualQaAllowedBase", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "assertExistingComponentsDoNotSymlink", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "assertSafeWorkspaceTarget", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "existing empty non-owned workspace", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "intermediate symbolic-link escape", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "final symbolic-link target", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "tampered ownership sentinel", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "stale/tampered build provenance", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, 'const provenanceBuildRoots = ["dist", "dist-electron"]', "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "buildProvenanceFileManifest", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "production bundle file inventory changed", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "modified renderer chunk", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "added production bundle file", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "deleted production bundle file", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "production bundle symbolic-link entry", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(electronMainSource, "buildManualQaProvenanceFileManifestSync", "electron/main.ts");
+  checkIncludes(electronMainSource, "Manual QA production bundle inventory changed after launcher provenance capture.", "electron/main.ts");
+  checkIncludes(manualQaSource, "GROOVEFORGE_DESKTOP_MANUAL_QA_MANIFEST_SHA256", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "GROOVEFORGE_DESKTOP_MANUAL_QA_OWNERSHIP_TOKEN", "harness/scripts/run_desktop_manual_qa.mjs");
   checkIncludes(launchSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:launch-smoke\")", "harness/scripts/run_desktop_launch_smoke.mjs");
   checkIncludes(launchSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:launch-smoke\"", "harness/scripts/run_desktop_launch_smoke.mjs");
   checkIncludes(projectIoSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:project-io-smoke\")", "harness/scripts/run_desktop_project_io_smoke.mjs");
@@ -418,6 +451,7 @@ function checkDesktopGuiLaunchGuardContract() {
 }
 
 function checkElectronMainContract() {
+  const appSource = readText("src/ui/App.tsx");
   const source = readText("electron/main.ts");
   const updateFeedConfigSource = readText("electron/updateFeedConfig.ts");
   const updateFeedConfigBuilt = readText("dist-electron/updateFeedConfig.js");
@@ -427,6 +461,91 @@ function checkElectronMainContract() {
     source,
     "async function collectLaunchSmokeFunctionalTabsEvidence(",
     "async function collectLaunchSmokeClosedDetailsEvidence",
+    label
+  );
+  const closedDetailsCollector = textBetween(
+    source,
+    "async function collectLaunchSmokeClosedDetailsEvidence(",
+    "function collectLaunchSmokeClosedDetailsEvidenceWithTimeout(",
+    label
+  );
+  const launchSmokeLazyPreparation = textBetween(
+    source,
+    "async function prepareLaunchSmokeLazySurfaces(",
+    "async function collectLaunchSmokeEvidence(",
+    label
+  );
+  const launchSmokeAudioAnalysisPreparation = textBetween(
+    source,
+    'type LaunchSmokeAudioAnalysisState =',
+    'type LaunchSmokeLazySurfaceState =',
+    label
+  );
+  const launchSmokeMinimumWindowCollector = textBetween(
+    source,
+    "async function collectLaunchSmokeMinimumWindowEvidence(",
+    "type LaunchSmokeLazySurfaceState =",
+    label
+  );
+  const launchSmokeInstaller = textBetween(source, "function installLaunchSmoke(", "function installProjectIoSmoke(", label);
+  const launchSmokeBridgeDirectCollector = textBetween(
+    source,
+    "async function collectLaunchSmokeBridgeDirectEvidence(",
+    "function collectLaunchSmokeBridgeDirectEvidenceWithTimeout(",
+    label
+  );
+  const launchSmokePaletteCollector = textBetween(
+    source,
+    "async function collectLaunchSmokePaletteEvidence(",
+    "function collectLaunchSmokePaletteEvidenceWithTimeout(",
+    label
+  );
+  const launchSmokePaletteTimeout = textBetween(
+    source,
+    "function collectLaunchSmokePaletteEvidenceWithTimeout(",
+    "async function waitForLaunchSmokeStarterZoneSurface(",
+    label
+  );
+  const launchSmokeAudienceStarterNativeCollector = textBetween(
+    source,
+    "async function refreshLaunchSmokeAudienceStarterAudio(",
+    "async function collectLaunchSmokePaletteEvidence(",
+    label
+  );
+  const launchSmokeBaseDomPreparation = textBetween(
+    source,
+    "async function prepareLaunchSmokeBaseDomReadyPosture(",
+    "type LaunchSmokeVisibleModeToolEvidence =",
+    label
+  );
+  const launchSmokeModeToolCollector = textBetween(
+    source,
+    "async function collectLaunchSmokeVisibleModeToolEvidence(",
+    "async function collectLaunchSmokeNativeChordCardEvidence(",
+    label
+  );
+  const launchSmokeNativeChordCollector = textBetween(
+    source,
+    "async function collectLaunchSmokeNativeChordCardEvidence(",
+    "async function readLaunchSmokePaletteSurfaceState(",
+    label
+  );
+  const launchSmokeStarterSurfaceHelpers = textBetween(
+    source,
+    "type LaunchSmokeStarterMixDisclosurePosture = {",
+    "async function collectLaunchSmokeStarterLandingEvidence(",
+    label
+  );
+  const launchSmokeStarterCollector = textBetween(
+    source,
+    "async function collectLaunchSmokeStarterLandingEvidence(",
+    "function collectLaunchSmokeStarterLandingEvidenceWithTimeout(",
+    label
+  );
+  const launchSmokeModalFocusCollector = textBetween(
+    source,
+    "async function collectLaunchSmokeModalFocusEvidence(",
+    "function collectLaunchSmokeModalFocusEvidenceWithTimeout(",
     label
   );
   const projectIoCollector = textBetween(
@@ -441,28 +560,237 @@ function checkElectronMainContract() {
     "async function collectProjectIoSmokeEvidence(",
     label
   );
+  const beforeUnloadHandler = textBetween(
+    appSource,
+    "const handleBeforeUnload = (event: BeforeUnloadEvent): void => {",
+    'window.addEventListener("beforeunload", handleBeforeUnload);',
+    "src/ui/App.tsx"
+  );
+  const closeFlowNativeTitleEditor = textBetween(
+    source,
+    "async function prepareCloseFlowSmokeNativeTitleEdit(",
+    "function installCloseFlowSmoke(",
+    label
+  );
+  const closeFlowInstaller = textBetween(
+    source,
+    "function installCloseFlowSmoke(",
+    "const manualQaDownloadExtensions =",
+    label
+  );
 
   checkIncludes(source, "const isDev = process.env.VITE_DEV_SERVER_URL !== undefined", label);
   checkIncludes(source, 'preload: path.join(__dirname, "preload.cjs")', label);
   checkIncludes(source, "nodeIntegration: false", label);
   checkIncludes(source, "contextIsolation: true", label);
   checkIncludes(source, "sandbox: true", label);
-  checkIncludes(source, "backgroundThrottling: !(isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke)", label);
+  checkIncludes(source, "backgroundThrottling: !(isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke || isManualQa)", label);
   checkIncludes(source, "paintWhenInitiallyHidden: true", label);
+  checkIncludes(source, 'const isManualQa = process.env.GROOVEFORGE_DESKTOP_MANUAL_QA === "1"', label);
+  checkIncludes(source, 'GROOVEFORGE_DESKTOP_MANUAL_QA_OPEN_PATH', label);
+  checkIncludes(source, 'GROOVEFORGE_DESKTOP_MANUAL_QA_SAVE_PATH', label);
+  checkIncludes(source, 'app.setPath("userData", manualQaConfiguration.electronUserDataDirectory)', label);
+  checkIncludes(source, "assertManualQaWorkspaceTargetSync", label);
+  checkIncludes(source, "validateManualQaProvenance", label);
+  checkIncludes(source, "provenanceValidatedAtLaunch: true", label);
+  checkIncludes(source, "Manual QA source tree changed after launcher provenance capture.", label);
+  checkIncludes(source, "Manual QA built artifact changed after launcher provenance capture", label);
+  checkIncludes(source, "Manual QA workspace ownership sentinel did not match the launcher token.", label);
+  checkIncludes(source, "writeManualQaFile", label);
+  checkIncludes(source, "manualQaUserDataPosture", label);
+  checkIncludes(source, "userDataIsolated", label);
+  check(!source.includes("userDataTouched"), `${label} should not claim hardcoded userDataTouched evidence`);
+  checkIncludes(source, 'grooveforge-manual-qa-${isManualQaAutoSong ? "auto-song" : isManualQaAutoExit ? "auto" : "visible"}-${process.pid}', label);
+  checkIncludes(source, "installManualQaDownloadRouting(win)", label);
+  checkIncludes(source, "installManualQaAutoSong(win)", label);
+  checkIncludes(source, 'process.argv.includes("--auto-song-qa")', label);
+  checkIncludes(source, 'path.join(workspaceRoot, "exports")', label);
+  checkIncludes(source, "Open and Save paths must differ", label);
   checkIncludes(source, 'void win.loadFile(path.join(__dirname, "../dist/index.html"))', label);
   checkIncludes(source, "win.webContents.setWindowOpenHandler", label);
   checkIncludes(source, 'return { action: "deny" }', label);
   checkIncludes(source, "registerProjectFileHandlers();", label);
+  checkIncludes(
+    beforeUnloadHandler,
+    'flushActiveMetadataDraft("commit");',
+    "src/ui/App.tsx beforeunload focused metadata draft flush"
+  );
+  check(
+    beforeUnloadHandler.indexOf('flushActiveMetadataDraft("commit");') <
+      beforeUnloadHandler.indexOf("resolveProjectCloseGuard("),
+    "src/ui/App.tsx beforeunload should flush the focused metadata draft before resolving the close guard"
+  );
+  checkIncludes(
+    closeFlowNativeTitleEditor,
+    'type: "mouseDown"',
+    `${label} close-flow native title pointer focus`
+  );
+  checkIncludes(
+    closeFlowNativeTitleEditor,
+    'keyCode: "A", modifiers: commandModifier',
+    `${label} close-flow native title select-all`
+  );
+  checkIncludes(
+    closeFlowNativeTitleEditor,
+    'keyCode: "End", modifiers: ["shift"]',
+    `${label} close-flow native title select-all fallback`
+  );
+  checkIncludes(
+    closeFlowNativeTitleEditor,
+    "selection.start !== 0 || selection.end !== selection.length",
+    `${label} close-flow exact native title selection guard`
+  );
+  checkIncludes(
+    closeFlowNativeTitleEditor,
+    "await win.webContents.insertText(expectedTitle);",
+    `${label} close-flow native title text input`
+  );
+  checkIncludes(
+    closeFlowNativeTitleEditor,
+    "document.activeElement === input",
+    `${label} close-flow focused metadata draft evidence`
+  );
+  checkIncludes(
+    closeFlowNativeTitleEditor,
+    "document.elementFromPoint",
+    `${label} close-flow visible title hit-test evidence`
+  );
+  checkIncludes(
+    closeFlowNativeTitleEditor,
+    'input.dataset.closeFlowNativeInput = event.isTrusted ? "true" : "false";',
+    `${label} close-flow trusted native input evidence`
+  );
+  checkIncludes(
+    closeFlowNativeTitleEditor,
+    'input.dataset.closeFlowBlurred = "true";',
+    `${label} close-flow pre-blur draft evidence`
+  );
+  check(
+    !closeFlowNativeTitleEditor.includes("Object.getOwnPropertyDescriptor") &&
+      !closeFlowNativeTitleEditor.includes('dispatchEvent(new Event("input"'),
+    `${label} close-flow title edit should not use a synthetic value setter or input event`
+  );
+  checkIncludes(
+    closeFlowInstaller,
+    "void prepareCloseFlowSmokeNativeTitleEdit(win)",
+    `${label} close-flow native title edit installation`
+  );
+  checkIncludes(
+    launchSmokeLazyPreparation,
+    'clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle")',
+    `${label} lazy launch-smoke native Guide preparation`
+  );
+  checkIncludes(
+    launchSmokeLazyPreparation,
+    'clickLaunchSmokeFunctionalTabNativeTarget(win, "audience-session-proof-toggle")',
+    `${label} lazy launch-smoke native Audience proof interaction`
+  );
+  checkIncludes(
+    launchSmokeLazyPreparation,
+    "state.proofOpen && state.proofContentVisible && state.proofRowsVisible === 10",
+    `${label} lazy launch-smoke Audience proof open settle`
+  );
+  checkIncludes(
+    launchSmokeLazyPreparation,
+    "!state.proofOpen && state.proofContentHidden && state.proofRowsVisible === 0",
+    `${label} lazy launch-smoke Audience proof close settle`
+  );
+  checkIncludes(
+    launchSmokeLazyPreparation,
+    "Guide should start collapsed before lazy-surface preparation.",
+    `${label} lazy launch-smoke preparation`
+  );
+  checkIncludes(
+    launchSmokeLazyPreparation,
+    "const audioAnalysisPrewarm = await prewarmLaunchSmokeExactAudioAnalysis(win);",
+    `${label} lazy launch-smoke visible exact audio prewarm`
+  );
+  checkIncludes(
+    launchSmokeLazyPreparation,
+    "window.__grooveforgeLaunchProjectOwnership ??=",
+    `${label} pre-prewarm project ownership capture`
+  );
+  check(
+    launchSmokeLazyPreparation.indexOf("window.__grooveforgeLaunchProjectOwnership ??=") <
+      launchSmokeLazyPreparation.indexOf("const audioAnalysisPrewarm = await prewarmLaunchSmokeExactAudioAnalysis(win);"),
+    "electron/main.ts should preserve the honest initial project ownership copy before native Mix/Compose prewarm changes workflow status"
+  );
+  checkIncludes(
+    launchSmokeAudioAnalysisPreparation,
+    'clickLaunchSmokeFunctionalTabNativeTarget(win, "audio-analysis-retry")',
+    `${label} lazy launch-smoke native meter retry`
+  );
+  checkIncludes(
+    launchSmokeAudioAnalysisPreparation,
+    'state !== "ready"',
+    `${label} lazy launch-smoke exact meter wait`
+  );
+  checkIncludes(
+    launchSmokeAudioAnalysisPreparation,
+    'clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-mix")',
+    `${label} lazy launch-smoke native Mix prewarm route`
+  );
+  checkIncludes(
+    launchSmokeAudioAnalysisPreparation,
+    'clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-compose")',
+    `${label} lazy launch-smoke native Compose restoration route`
+  );
+  checkIncludes(
+    launchSmokeAudioAnalysisPreparation,
+    'mix = await waitForLaunchSmokeAudioAnalysisTabPosture(win, "mix")',
+    `${label} lazy launch-smoke selected visible Mix posture`
+  );
+  checkIncludes(
+    launchSmokeAudioAnalysisPreparation,
+    'restored = await waitForLaunchSmokeAudioAnalysisTabPosture(win, "compose")',
+    `${label} lazy launch-smoke selected visible focused Compose restoration`
+  );
+  checkIncludes(
+    launchSmokeLazyPreparation,
+    "audioAnalysisPrewarm,",
+    `${label} lazy launch-smoke audio prewarm evidence receipt`
+  );
+  check(!launchSmokeLazyPreparation.includes("guide.open ="), "electron/main.ts launch-smoke preparation should use the real Guide toggle");
+  checkIncludes(
+    launchSmokeInstaller,
+    "audienceSessionLayoutEvidence = await prepareLaunchSmokeLazySurfaces(win);",
+    `${label} launch-smoke installer`
+  );
+  check(
+    launchSmokeInstaller.indexOf("audienceSessionLayoutEvidence = await prepareLaunchSmokeLazySurfaces(win);") <
+      launchSmokeInstaller.indexOf("poll(Date.now() + launchSmokeTimeoutMs - 35000);"),
+    "electron/main.ts launch smoke should prepare lazy surfaces before collecting the unchanged full-DOM contract"
+  );
+  checkIncludes(
+    launchSmokeInstaller,
+    "...audienceSessionLayoutEvidence",
+    `${label} launch-smoke visible Audience evidence merge`
+  );
+  checkIncludes(
+    launchSmokeMinimumWindowCollector,
+    'const compactMedia = window.matchMedia("(max-width: 1220px)")',
+    `${label} Studio resize media-query settle`
+  );
+  checkIncludes(
+    launchSmokeMinimumWindowCollector,
+    "performance.now() < resizeDeadline",
+    `${label} bounded Studio resize settle`
+  );
+  checkIncludes(
+    launchSmokeMinimumWindowCollector,
+    "compactMedia.matches &&",
+    `${label} Studio resize media-query match prerequisite`
+  );
   checkIncludes(source, "ipcMain.on(closeWindowChannel", label);
   checkIncludes(source, "BrowserWindow.fromWebContents(event.sender)?.close();", label);
   checkIncludes(source, 'const isCloseFlowSmoke = process.env.GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE === "1"', label);
   checkIncludes(source, "installCloseFlowSmoke(win);", label);
   checkIncludes(source, 'closeFlowSmokeState.events.push("first-close-prevented")', label);
   checkIncludes(source, 'closeFlowSmokeState.events.push("renderer-close-request")', label);
-  checkIncludes(source, "const smokeFilePath = projectIoSmokePath() ?? closeFlowSmokePath();", label);
+  checkIncludes(source, "const smokeFilePath = projectIoSmokePath() ?? closeFlowSmokePath() ?? manualQaSavePath();", label);
   checkIncludes(source, "secondGuardedCloseCompleted: true", label);
   checkIncludes(source, '!isCloseFlowSmoke && BrowserWindow.getAllWindows().length === 0', label);
-  checkIncludes(source, 'process.platform !== "darwin" && !isCloseFlowSmoke', label);
+  checkIncludes(source, 'process.platform !== "darwin" || isManualQa', label);
   checkIncludes(source, "Menu.setApplicationMenu(createNativeCommandMenu())", label);
   checkIncludes(source, "createWindow();", label);
   checkIncludes(source, "autoUpdater", label);
@@ -497,9 +825,361 @@ function checkElectronMainContract() {
   checkIncludes(functionalTabsCollector, 'await win.webContents.insertText("beat passport route")', `${label} functional-tab Guide route native search`);
   checkIncludes(functionalTabsCollector, '"quick-action-beat-passport-route-readout-action"', `${label} functional-tab Guide route target`);
   checkIncludes(functionalTabsCollector, "guidanceBeatPassportQuickActionEvidence", `${label} functional-tab Guide route evidence`);
+  checkIncludes(
+    launchSmokeBridgeDirectCollector,
+    'clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle")',
+    `${label} Audience Route Bridge visible Guide preparation`
+  );
+  checkIncludes(launchSmokeBridgeDirectCollector, "state.actionTargetsVisible", `${label} Audience Route Bridge visible actions`);
+  checkIncludes(launchSmokeBridgeDirectCollector, "state.hookReady", `${label} Audience Route Bridge React hook readiness`);
+  checkIncludes(
+    launchSmokeBridgeDirectCollector,
+    "collectLaunchSmokeBridgeDirectHookEvidence(win)",
+    `${label} Audience Route Bridge React evidence collection`
+  );
+  checkIncludes(
+    launchSmokeBridgeDirectCollector,
+    "restoring-collapsed-guide-with-native-pointer",
+    `${label} Audience Route Bridge Guide posture restoration`
+  );
+  check(
+    !source.includes("clickLaunchSmokeBridgeDirectTarget"),
+    "electron/main.ts should never programmatically click hidden Audience Route Bridge controls"
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    'clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-compose")',
+    `${label} Quick Actions palette visible Compose preparation`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    'clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle")',
+    `${label} Quick Actions palette visible Guide preparation`
+  );
+  checkIncludes(launchSmokePaletteCollector, "state.captureIdeasVisible", `${label} Quick Actions palette Capture visibility`);
+  checkIncludes(
+    launchSmokePaletteCollector,
+    "state.audienceStarterActionsVisible",
+    `${label} Quick Actions palette Audience Starter visibility`
+  );
+  checkIncludes(launchSmokePaletteCollector, "state.hookReady", `${label} Quick Actions palette hook readiness`);
+  checkIncludes(
+    launchSmokePaletteCollector,
+    "collectLaunchSmokeVisibleModeToolEvidence(win)",
+    `${label} Quick Actions visible mode-aware tool evidence`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    "const modeRestoredState = await readLaunchSmokePaletteSurfaceState(win);",
+    `${label} Quick Actions post-mode Guide posture read`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    "if (!modeRestoredState.guideOpen)",
+    `${label} Quick Actions post-mode Guide native restoration guard`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    "collectLaunchSmokeNativeChordCardEvidence(win)",
+    `${label} Quick Actions native chord-card keyboard evidence`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    'collectLaunchSmokeNativeAudienceStarterEvidence(win, "beginner")',
+    `${label} Quick Actions native beginner starter evidence`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    "await setLaunchSmokeLaunchpadOpen(win, true);",
+    `${label} Quick Actions native launchpad reopen`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    'throw new Error("First-run launchpad should be open before native Audience Starter lifecycle evidence.")',
+    `${label} Quick Actions observed initial launchpad-open contract`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    'waitForLaunchSmokeLaunchpadOpen(win, true, "open before changed beginner starter selection")',
+    `${label} Quick Actions changed starter open launchpad precondition`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    "const collapsedAfterStarter = nativeStarterBeginner.launchpadCollapsedAfterSelection;",
+    `${label} Quick Actions changed-starter launchpad collapse evidence`
+  );
+  checkIncludes(
+    source,
+    "await waitForLaunchSmokeLaunchpadOpen(win, false, `collapsed after ${starterId} starter selection`);",
+    `${label} Quick Actions immediate native starter launchpad settle`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    'clickLaunchSmokeFunctionalTabNativeTarget(win, "audience-starter-action-producer")',
+    `${label} Quick Actions identical native producer starter selection`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    'waitForLaunchSmokeLaunchpadOpen(win, false, "collapsed after identical Producer starter selection")',
+    `${label} Quick Actions identical-starter launchpad collapse evidence`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    "...changedStarterLaunchpad",
+    `${label} Quick Actions native launchpad evidence merge`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    'collector({ skipStarterRoutes: true })',
+    `${label} Quick Actions duplicate starter-route skip`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    '"quick-actions-hook-without-starters"',
+    `${label} Quick Actions hook substage timing`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    '"native-producer-starter"',
+    `${label} Quick Actions native producer substage timing`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    '"native-beginner-starter"',
+    `${label} Quick Actions native beginner substage timing`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    '"native-launchpad-changed-and-manual"',
+    `${label} Quick Actions changed launchpad substage timing`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    '"native-launchpad-identical-starter"',
+    `${label} Quick Actions identical launchpad substage timing`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    'window.__grooveforgeLaunchSmokePaletteStep = "returning-evidence"',
+    `${label} Quick Actions returning-evidence progress marker`
+  );
+  checkIncludes(source, "const launchSmokePaletteUiSettleTimeoutMs = 10_000;", `${label} palette UI settle budget`);
+  checkIncludes(source, "const launchSmokePaletteBoundedChildBudgetMs = 700_000;", `${label} palette bounded child budget`);
+  checkIncludes(source, "const launchSmokePaletteTimeoutMs = 900_000;", `${label} palette parent timeout`);
+  checkIncludes(
+    launchSmokePaletteTimeout,
+    "launchSmokePaletteTimeoutMs <= launchSmokePaletteBoundedChildBudgetMs",
+    `${label} palette timeout hierarchy guard`
+  );
+  checkIncludes(
+    launchSmokePaletteTimeout,
+    "}, launchSmokePaletteTimeoutMs);",
+    `${label} palette bounded parent timeout use`
+  );
+  checkIncludes(launchSmokePaletteTimeout, 'let currentStage = "starting";', `${label} palette main-process stage receipt`);
+  checkIncludes(launchSmokePaletteTimeout, "currentStage = stage;", `${label} palette main-process stage updates`);
+  check(!launchSmokePaletteTimeout.includes("executeJavaScript"), `${label} palette timeout should reject without renderer IPC`);
+  checkIncludes(
+    launchSmokeAudienceStarterNativeCollector,
+    'clickLaunchSmokeFunctionalTabNativeTarget(win, `audience-starter-action-${starterId}`)',
+    `${label} visible native Audience Starter activation`
+  );
+  checkIncludes(
+    launchSmokeAudienceStarterNativeCollector,
+    'clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-mix")',
+    `${label} Audience Starter native Mix analysis route`
+  );
+  checkIncludes(
+    launchSmokeAudienceStarterNativeCollector,
+    "await waitForLaunchSmokeExactAudioAnalysis(win);",
+    `${label} Audience Starter exact audio wait`
+  );
+  checkIncludes(
+    launchSmokeAudienceStarterNativeCollector,
+    'clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-compose")',
+    `${label} Audience Starter native Compose restoration`
+  );
+  checkIncludes(
+    launchSmokeAudienceStarterNativeCollector,
+    "clickLaunchSmokeAudienceStarterFollowup",
+    `${label} Audience Starter native visible follow-up routes`
+  );
+  checkIncludes(
+    launchSmokeBaseDomPreparation,
+    'clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-mix")',
+    `${label} base DOM native Mix exact-ready prerequisite`
+  );
+  checkIncludes(
+    launchSmokeBaseDomPreparation,
+    'state.analysis === "ready"',
+    `${label} base DOM exact-ready prerequisite`
+  );
+  checkIncludes(
+    launchSmokeBaseDomPreparation,
+    '!state.guideOpen &&',
+    `${label} base DOM collapsed Guide prerequisite`
+  );
+  checkIncludes(
+    launchSmokeBaseDomPreparation,
+    ".then(() => collectLaunchSmokeEvidence(win))",
+    `${label} base DOM collection after ready-posture preparation`
+  );
+  checkIncludes(
+    launchSmokeModeToolCollector,
+    "await activateLaunchSmokeModeToolZone(win,",
+    `${label} native mode-aware zone activation`
+  );
+  checkIncludes(
+    launchSmokeModeToolCollector,
+    "waitForLaunchSmokeModeToolZoneState(",
+    `${label} visible mode-aware disclosure settle`
+  );
+  checkIncludes(
+    launchSmokeNativeChordCollector,
+    'sendLaunchSmokeFunctionalTabNativeKey(win, "Enter")',
+    `${label} native chord-card Enter selection`
+  );
+  checkIncludes(
+    launchSmokeNativeChordCollector,
+    'sendLaunchSmokeFunctionalTabNativeKey(win, "Space")',
+    `${label} native chord-card Space restoration`
+  );
+  checkIncludes(
+    launchSmokeNativeChordCollector,
+    "rect.width > 0 && rect.height > 0",
+    `${label} native chord-card positive editor rect settle`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    "the original ${initialState.activeZone} tab posture",
+    `${label} Quick Actions palette tab restoration`
+  );
+  checkIncludes(
+    launchSmokePaletteCollector,
+    'the original ${initialState.guideOpen ? "open" : "collapsed"} Guide posture',
+    `${label} Quick Actions palette Guide restoration`
+  );
+  checkIncludes(
+    launchSmokeStarterCollector,
+    'activateLaunchSmokeStarterZoneSurface(\n      win,\n      "arrange"',
+    `${label} Audience Starter native Arrange activation`
+  );
+  checkIncludes(
+    launchSmokeStarterCollector,
+    'activateLaunchSmokeStarterZoneSurface(\n      win,\n      "mix"',
+    `${label} Audience Starter native Mix activation`
+  );
+  checkIncludes(
+    launchSmokeStarterCollector,
+    "win.setSize(1680, 960);",
+    `${label} Audience Starter native responsive Mix resize`
+  );
+  checkIncludes(
+    launchSmokeStarterCollector,
+    "await openLaunchSmokeStarterMixDisclosures(win);",
+    `${label} Audience Starter visible Mix disclosure preparation`
+  );
+  checkIncludes(
+    launchSmokeStarterCollector,
+    "await waitForLaunchSmokeStarterResponsiveMixSurface(win);",
+    `${label} Audience Starter responsive Mix predicate settle`
+  );
+  checkIncludes(
+    launchSmokeStarterCollector,
+    "await restoreLaunchSmokeStarterMixDisclosurePosture(win, originalMixDisclosurePosture);",
+    `${label} Audience Starter Mix disclosure posture restoration`
+  );
+  checkIncludes(
+    launchSmokeStarterCollector,
+    "{ width: originalViewportWidth }",
+    `${label} Audience Starter native viewport restoration`
+  );
+  checkIncludes(
+    launchSmokeStarterCollector,
+    'activateLaunchSmokeStarterZoneSurface(\n      win,\n      "compose"',
+    `${label} Audience Starter native Compose activation`
+  );
+  checkIncludes(
+    launchSmokeStarterSurfaceHelpers,
+    '"review-queue-focus-readout"',
+    `${label} Audience Starter visible Review Queue settle`
+  );
+  checkIncludes(
+    launchSmokeStarterSurfaceHelpers,
+    "state.mixerNarrowStripCount === 5",
+    `${label} Audience Starter five responsive mixer strips settle`
+  );
+  checkIncludes(
+    launchSmokeStarterSurfaceHelpers,
+    "state.reviewQueueReadableFieldCount === 11",
+    `${label} Audience Starter eleven readable Review Queue fields settle`
+  );
+  checkIncludes(
+    launchSmokeStarterSurfaceHelpers,
+    "state.reviewQueueStackedRowCount === 3",
+    `${label} Audience Starter three responsive Review Queue rows settle`
+  );
+  checkIncludes(
+    launchSmokeStarterCollector,
+    "reviewQueueReadableFieldCount: reviewQueueReadableFields.length",
+    `${label} Audience Starter Review Queue readable evidence`
+  );
+  checkIncludes(
+    launchSmokeModalFocusCollector,
+    "const dockPlayOriginal = await readDockPlayPosture();",
+    `${label} workspace dock original playback posture`
+  );
+  checkIncludes(
+    launchSmokeModalFocusCollector,
+    "if (dockOriginalPlaybackRunning)",
+    `${label} workspace dock running-playback native normalization`
+  );
+  checkIncludes(
+    launchSmokeModalFocusCollector,
+    "await sendDockPlayClick();",
+    `${label} workspace dock visible native Play clicks`
+  );
+  checkIncludes(
+    launchSmokeModalFocusCollector,
+    "document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)",
+    `${label} workspace dock Play hit target evidence`
+  );
+  checkIncludes(
+    launchSmokeModalFocusCollector,
+    'posture.hitTargetTestId !== "workspace-command-dock-play"',
+    `${label} workspace dock Play native hit guard`
+  );
+  checkIncludes(
+    launchSmokeModalFocusCollector,
+    "dockOriginalPlaybackRestored",
+    `${label} workspace dock original playback restoration`
+  );
+  checkIncludes(
+    launchSmokeModalFocusCollector,
+    "dockRestoredPlaybackPosture.activeZone === dockPlayOriginal.activeZone",
+    `${label} workspace dock original zone restoration`
+  );
+  checkIncludes(
+    launchSmokeModalFocusCollector,
+    "dockRestoredPlaybackPosture.playbackScope === dockPlayOriginal.playbackScope",
+    `${label} workspace dock original playback scope restoration`
+  );
   checkIncludes(source, "Menu.getApplicationMenu()?.getMenuItemById", `${label} native menu smoke activation`);
   checkIncludes(source, "menuItem.click({}, win, win.webContents)", `${label} native menu smoke activation`);
   checkIncludes(source, "480000", `${label} functional-tab screen timeout`);
+  checkIncludes(
+    closedDetailsCollector,
+    "current.targetOpen && current.targetContentCount > 0 && current.targetControlCount > 0",
+    `${label} native disclosure open settle`
+  );
+  checkIncludes(
+    closedDetailsCollector,
+    "!current.targetOpen && current.targetContentCount === 0 && current.targetControlCount === 0",
+    `${label} native disclosure close settle`
+  );
+  checkIncludes(closedDetailsCollector, "guideOpen.targetControlCount >= 150", `${label} Guide disclosure threshold`);
+  checkIncludes(closedDetailsCollector, "patternOpen.targetControlCount >= 40", `${label} Pattern Lab disclosure threshold`);
+  checkIncludes(closedDetailsCollector, "mixerOpen.targetControlCount >= 10", `${label} mixer disclosure threshold`);
   checkIncludes(projectIoCollector, 'clickProjectIoSmokeNativeOpen(win)', `${label} project IO collector`);
   check(!projectIoCollector.includes("button?.click()"), "electron/main.ts project IO collector should not DOM-click the visible Open button");
   checkIncludes(projectIoCollector, "sourceUiFingerprint", `${label} project IO collector`);

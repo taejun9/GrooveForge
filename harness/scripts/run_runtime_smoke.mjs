@@ -33,6 +33,11 @@ function checkWavBytes(bytes, label) {
 
 const workstation = await import("../../src/domain/workstation.ts");
 const render = await import("../../src/audio/render.ts");
+const projectAudioAnalysis = await import("../../src/audio/projectAudioAnalysis.ts");
+const projectAudioAnalysisCommitGate = await import("../../src/ui/projectAudioAnalysisCommitGate.ts");
+const projectAudioAnalysisHook = await import("../../src/ui/useProjectAudioAnalysis.ts");
+const savedSnapshotAudioAnalysis = await import("../../src/ui/useSavedSnapshotAudioAnalyses.ts");
+const chordCardKeyboardActivation = await import("../../src/ui/chordCardKeyboardActivation.ts");
 const midi = await import("../../src/audio/midi.ts");
 const handoff = await import("../../src/audio/handoff.ts");
 const deliveryBundle = await import("../../src/audio/deliveryBundle.ts");
@@ -43,11 +48,90 @@ const localDraftLifecycle = await import("../../src/ui/localDraftLifecycle.ts");
 const projectCloseGuard = await import("../../src/ui/projectCloseGuard.ts");
 const projectReplacementGuard = await import("../../src/ui/projectReplacementGuard.ts");
 const projectSaveCompletion = await import("../../src/ui/projectSaveCompletion.ts");
+const projectExportCompletion = await import("../../src/ui/projectExportCompletion.ts");
 const styleChangePreview = await import("../../src/ui/styleChangePreview.ts");
+const workflowNavigatorAnalysisPosture = await import("../../src/ui/workflowNavigatorAnalysisPosture.ts");
 const unsavedCloseDialog = await import("../../electron/unsavedCloseDialog.ts");
 const coreTrackTypes = new Set(["drum_rack", "bass_808", "synth", "chord", "fx_return", "master"]);
 const smokeKey = "F minor";
 const smokeScope = "sample-free first-run starter project plus all-style 8-bar beats with local project-file roundtrips, bounded mixer-topology recovery, Handoff Sheet checks, and mocked download-path checks without writing media artifacts";
+
+function validateChordCardKeyboardActivation() {
+  function activate(key, source = "card") {
+    let defaultPrevented = false;
+    let propagationStopped = false;
+    let selections = 0;
+    let transportToggles = 0;
+    let childClicks = 0;
+    const cardTarget = {};
+    const eventTarget = source === "card" ? cardTarget : {};
+    const handled = chordCardKeyboardActivation.handleChordCardKeyboardActivation(
+      {
+        key,
+        target: eventTarget,
+        currentTarget: cardTarget,
+        preventDefault() {
+          defaultPrevented = true;
+        },
+        stopPropagation() {
+          propagationStopped = true;
+        }
+      },
+      () => {
+        selections += 1;
+      }
+    );
+    if (source === "child" && !defaultPrevented && (key === "Enter" || key === " ")) {
+      childClicks += 1;
+    } else if (!propagationStopped) {
+      transportToggles += 1;
+    }
+    return { childClicks, defaultPrevented, handled, propagationStopped, selections, transportToggles };
+  }
+
+  const enter = activate("Enter");
+  const space = activate(" ");
+  const arrow = activate("ArrowRight");
+  const childEnter = activate("Enter", "child");
+  const childSpace = activate(" ", "child");
+  check(
+    [enter, space].every(
+      (result) =>
+        result.handled &&
+        result.defaultPrevented &&
+        result.propagationStopped &&
+        result.selections === 1 &&
+        result.transportToggles === 0
+    ),
+    "chord-card-keyboard: Enter and Space should select once without reaching the global transport shortcut"
+  );
+  check(
+    !arrow.handled &&
+      !arrow.defaultPrevented &&
+      !arrow.propagationStopped &&
+      arrow.selections === 0 &&
+      arrow.transportToggles === 1,
+    "chord-card-keyboard: unrelated keys should remain available to outer keyboard handlers"
+  );
+  check(
+    [childEnter, childSpace].every(
+      (result) =>
+        !result.handled &&
+        !result.defaultPrevented &&
+        !result.propagationStopped &&
+        result.selections === 0 &&
+        result.childClicks === 1 &&
+        result.transportToggles === 0
+    ),
+    "chord-card-keyboard: Enter and Space from nested controls should click the child once without selecting the card or toggling transport"
+  );
+
+  return {
+    activationKeys: 2,
+    childActivationKeys: 2,
+    transportToggles: enter.transportToggles + space.transportToggles + childEnter.transportToggles + childSpace.transportToggles
+  };
+}
 
 async function validateAllGenreBassVoiceRuntime() {
   const styleIdsByVoice = {
@@ -195,6 +279,270 @@ function stableJson(value) {
       .join(",")}}`;
   }
   return JSON.stringify(value);
+}
+
+function validateProjectAudioAnalysisIdentity() {
+  const project = {
+    ...structuredClone(workstation.starterProject),
+    arrangement: [{ section: "Loop", pattern: "A", energy: 0.8, bars: 1, mutedTracks: [] }],
+    snapshots: []
+  };
+  const baseIdentity = projectAudioAnalysis.projectAudioAnalysisIdentity(project);
+  const metadataOnlyProject = {
+    ...project,
+    title: "Metadata-only identity edit",
+    mode: "studio",
+    selectedPattern: project.selectedPattern === "A" ? "B" : "A",
+    deliveryTarget: "beat_store",
+    sessionBrief: {
+      artist: "Local QA",
+      vibe: "Reflective",
+      reference: "No external reference",
+      notes: "UI metadata must not invalidate PCM analysis."
+    },
+    snapshots: [{ id: "snapshot-1", name: "Snapshot", createdAt: "2026-08-13T00:00:00.000Z", project }]
+  };
+  const metadataIdentity = projectAudioAnalysis.projectAudioAnalysisIdentity(metadataOnlyProject);
+  check(baseIdentity === metadataIdentity, "project-audio-analysis: mode, title, selected Pattern UI posture, delivery, brief, and snapshots must reuse one audio identity");
+  const audioEdits = [
+    ["tempo", { ...project, bpm: project.bpm + 1 }],
+    ["key", { ...project, key: "D minor" }],
+    ["style", { ...project, styleId: "experimental" }],
+    ["pattern", { ...project, patterns: { ...project.patterns, A: { ...project.patterns.A, bassNotes: [] } } }],
+    ["arrangement", { ...project, arrangement: [{ ...project.arrangement[0], energy: 0.35 }] }],
+    ["mixer", { ...project, mixer: project.mixer.map((channel, index) => index === 0 ? { ...channel, volumeDb: channel.volumeDb - 1 } : channel) }],
+    ["sound", { ...project, sound: { ...project.sound, chordWidth: 0.91 } }],
+    ["automation", { ...project, automation: [{ step: 0, gain: 0.7 }] }]
+  ];
+  for (const [label, editedProject] of audioEdits) {
+    check(
+      baseIdentity !== projectAudioAnalysis.projectAudioAnalysisIdentity(editedProject),
+      `project-audio-analysis: a ${label} edit must invalidate the audio identity`
+    );
+  }
+  check(
+    projectAudioAnalysis.shouldAcceptProjectAudioAnalysisResponse(7, 7, baseIdentity, baseIdentity) &&
+      !projectAudioAnalysis.shouldAcceptProjectAudioAnalysisResponse(6, 7, baseIdentity, baseIdentity) &&
+      !projectAudioAnalysis.shouldAcceptProjectAudioAnalysisResponse(7, 7, baseIdentity, `${baseIdentity}-stale`),
+    "project-audio-analysis: only the latest request for the current audio identity may replace the exact snapshot"
+  );
+  check(
+    projectAudioAnalysisHook.shouldAcceptProjectAudioAnalysisFailure(7, 7, baseIdentity, baseIdentity) &&
+      !projectAudioAnalysisHook.shouldAcceptProjectAudioAnalysisFailure(6, 7, baseIdentity, baseIdentity) &&
+      !projectAudioAnalysisHook.shouldAcceptProjectAudioAnalysisFailure(7, 7, `${baseIdentity}-stale`, baseIdentity),
+    "project-audio-analysis: only a current request failure for the current identity may enter error state"
+  );
+  check(
+    projectAudioAnalysisHook.projectAudioAnalysisStatus(baseIdentity, false, baseIdentity, null) === "pending" &&
+      projectAudioAnalysisHook.projectAudioAnalysisStatus(baseIdentity, false, baseIdentity, baseIdentity) === "error" &&
+      projectAudioAnalysisHook.projectAudioAnalysisStatus(baseIdentity, false, baseIdentity, `${baseIdentity}-stale`) === "pending" &&
+      projectAudioAnalysisHook.projectAudioAnalysisStatus(baseIdentity, true, baseIdentity, baseIdentity) === "ready",
+    "project-audio-analysis: stale failures must not poison the current identity and an exact retry response must recover ready state"
+  );
+  const snapshotTasks = savedSnapshotAudioAnalysis.createSavedSnapshotAudioAnalysisTasks([
+    {
+      id: "snapshot-base",
+      name: "Base",
+      createdAt: "2026-08-13T00:00:00.000Z",
+      project
+    },
+    {
+      id: "snapshot-metadata",
+      name: "Metadata clone",
+      createdAt: "2026-08-13T00:01:00.000Z",
+      project: metadataOnlyProject
+    },
+    {
+      id: "snapshot-audio-edit",
+      name: "Tempo edit",
+      createdAt: "2026-08-13T00:02:00.000Z",
+      project: { ...project, bpm: project.bpm + 1 }
+    }
+  ]);
+  check(
+    snapshotTasks.length === 2 &&
+      snapshotTasks[0].identity === baseIdentity &&
+      snapshotTasks.every((task) => task.project.snapshots.length === 0),
+    "saved-snapshot-audio-analysis: metadata-equivalent slots should deduplicate by PCM identity and strip nested snapshots"
+  );
+  check(
+    savedSnapshotAudioAnalysis.shouldAcceptSavedSnapshotAudioAnalysisResponse(
+      9,
+      9,
+      baseIdentity,
+      baseIdentity,
+      4,
+      4
+    ) &&
+      !savedSnapshotAudioAnalysis.shouldAcceptSavedSnapshotAudioAnalysisResponse(
+        8,
+        9,
+        baseIdentity,
+        baseIdentity,
+        4,
+        4
+      ) &&
+      !savedSnapshotAudioAnalysis.shouldAcceptSavedSnapshotAudioAnalysisResponse(
+        9,
+        9,
+        baseIdentity,
+        baseIdentity,
+        3,
+        4
+      ),
+    "saved-snapshot-audio-analysis: only the active queue run and latest matching request may commit"
+  );
+  const commitHoldTestIds = [
+    "project-title-input",
+    "session-brief-artist",
+    "session-brief-vibe",
+    "session-brief-reference",
+    "session-brief-notes"
+  ];
+  check(
+    commitHoldTestIds.every((testId) => projectAudioAnalysis.shouldHoldProjectAudioAnalysisCommit(testId)) &&
+      !projectAudioAnalysis.shouldHoldProjectAudioAnalysisCommit("workflow-jump-compose") &&
+      !projectAudioAnalysis.shouldHoldProjectAudioAnalysisCommit(null),
+    "project-audio-analysis: exact meter commits should hold only across title/brief text entry and release for non-editable focus"
+  );
+  const commitZoneCases = [
+    ["compose", false],
+    ["arrange", false],
+    ["mix", true],
+    ["deliver", true]
+  ];
+  for (const [zone, expected] of commitZoneCases) {
+    check(
+      projectAudioAnalysisCommitGate.projectAudioAnalysisCommitEnabledForZone(zone) === expected,
+      `project-audio-analysis:${zone} exact meter commit gate should be ${expected ? "enabled" : "held"}`
+    );
+  }
+  const retryZoneCases = [
+    ["compose", "mix"],
+    ["arrange", "mix"],
+    ["mix", "mix"],
+    ["deliver", "deliver"]
+  ];
+  for (const [zone, expected] of retryZoneCases) {
+    check(
+      projectAudioAnalysisCommitGate.projectAudioAnalysisRetryZone(zone) === expected,
+      `project-audio-analysis:${zone} Retry should land in commit-enabled ${expected}`
+    );
+  }
+  const first = projectAudioAnalysis.analyzeProjectAudio(project);
+  const metadataOnly = projectAudioAnalysis.analyzeProjectAudio(metadataOnlyProject);
+  check(first === metadataOnly, "project-audio-analysis: metadata-only clones must return the cached exact analysis object");
+  check(first.mix.status !== "Silent", "project-audio-analysis: cached mix analysis must stay audible");
+  check(
+    render.stemTrackIds.every((track) => first.stems[track].status !== "Silent"),
+    "project-audio-analysis: cached stem analyses must stay audible"
+  );
+  const analysisFields = [
+    "sampleRate",
+    "channels",
+    "bitDepth",
+    "durationSeconds",
+    "peakDb",
+    "rmsDb",
+    "headroomDb",
+    "ceilingDb",
+    "limitedSamples",
+    "limitedPercent",
+    "status"
+  ];
+  const combinedCases = [
+    ["base", project],
+    [
+      "mute-solo",
+      {
+        ...project,
+        mixer: project.mixer.map((channel) =>
+          channel.id === "drum_rack"
+            ? { ...channel, muted: true }
+            : channel.id === "synth"
+              ? { ...channel, solo: true }
+              : channel
+        )
+      }
+    ],
+    [
+      "arrangement-mute",
+      {
+        ...project,
+        arrangement: [{ ...project.arrangement[0], mutedTracks: ["bass_808", "synth"] }]
+      }
+    ],
+    ["automation", { ...project, automation: [{ step: 0, gain: 0.72 }, { step: 8, gain: 1.08 }] }]
+  ];
+  const twentyBarProject = {
+    ...project,
+    bpm: 110,
+    arrangement: [
+      { ...project.arrangement[0], bars: 16 },
+      { ...project.arrangement[0], section: "Outro", bars: 4 }
+    ]
+  };
+  check(
+    render.projectExportAnalysisStrategy(twentyBarProject) === "combined" &&
+      render.estimatedPeakBytes(twentyBarProject) <= render.projectExportAnalysisPeakByteCap,
+    "project-audio-analysis: a normal 20-bar/110 BPM song must retain the exact combined traversal under the PCM cap"
+  );
+  const maximumProject = {
+    ...project,
+    bpm: 60,
+    arrangement: Array.from({ length: 4 }, (_, index) => ({
+      ...project.arrangement[0],
+      section: `Maximum ${index + 1}`,
+      bars: 16
+    }))
+  };
+  check(
+    render.projectExportAnalysisStrategy(maximumProject) === "bounded-sequential" &&
+      render.estimatedPeakBytes(maximumProject) <= render.projectExportAnalysisPeakByteCap &&
+      render.estimatedPeakBytes(maximumProject, "combined") > render.projectExportAnalysisPeakByteCap,
+    "project-audio-analysis: a valid 64-bar/60 BPM maximum must select bounded sequential analysis below the PCM cap"
+  );
+  let boundedCompletionChecked = false;
+  for (const [label, candidate] of combinedCases) {
+    const combined = render.analyzeProjectExports(candidate);
+    const legacy = { mix: render.analyzeExport(candidate), stems: render.analyzeStemExports(candidate) };
+    for (const target of ["mix", ...render.stemTrackIds]) {
+      const combinedAnalysis = target === "mix" ? combined.mix : combined.stems[target];
+      const legacyAnalysis = target === "mix" ? legacy.mix : legacy.stems[target];
+      check(
+        analysisFields.every((field) => Object.is(combinedAnalysis[field], legacyAnalysis[field])),
+        `project-audio-analysis:${label}/${target} combined traversal must exactly match the established renderer metrics`
+      );
+    }
+    if (label === "base") {
+      const bounded = render.analyzeProjectExports(candidate, { forceBoundedSequential: true });
+      for (const target of ["mix", ...render.stemTrackIds]) {
+        const boundedAnalysis = target === "mix" ? bounded.mix : bounded.stems[target];
+        const legacyAnalysis = target === "mix" ? legacy.mix : legacy.stems[target];
+        check(
+          analysisFields.every((field) => Object.is(boundedAnalysis[field], legacyAnalysis[field])),
+          `project-audio-analysis:${label}/${target} injected bounded traversal must complete with exact established metrics`
+        );
+      }
+      boundedCompletionChecked = true;
+    }
+  }
+  return {
+    metadataPaths: 6,
+    audioInvalidations: audioEdits.length,
+    cacheHit: first === metadataOnly,
+    staleGuards: 3,
+    commitFocusPaths: commitHoldTestIds.length + 2,
+    commitZonePaths: commitZoneCases.length,
+    retryZonePaths: retryZoneCases.length,
+    combinedRegressionCases: combinedCases.length,
+    analysisStrategies: 2,
+    boundedCompletionChecked,
+    failureGuards: 3,
+    failureStatusPaths: 4,
+    snapshotTasks: snapshotTasks.length,
+    snapshotStaleGuards: 3
+  };
 }
 
 function validateLocalDraftWriteGate() {
@@ -417,6 +765,70 @@ function validateProjectSaveCompletion() {
     changedPaths: cases.filter((entry) => entry.expected === "saved-snapshot").length,
     closeAttempts: closeAttempts.length
   };
+}
+
+function validateProjectExportReceiptIdentity() {
+  const exportedProject = {
+    title: "Receipt Source",
+    bpm: 110,
+    mixer: [{ id: "master", volumeDb: -2.4 }]
+  };
+  const firstReceipt = { status: "Exported WAV" };
+  const firstBinding = projectExportCompletion.bindProjectExportReceipt(exportedProject, firstReceipt);
+  check(
+    projectExportCompletion.currentProjectExportReceipt(firstBinding, exportedProject) === firstReceipt,
+    "project-export-receipt: the exact exported project should retain its receipt"
+  );
+
+  const mutations = [
+    { ...exportedProject, title: "Receipt Renamed" },
+    { ...exportedProject, bpm: 111 },
+    { ...exportedProject, mixer: [{ ...exportedProject.mixer[0], volumeDb: -3 }] }
+  ];
+  for (const mutation of mutations) {
+    check(
+      projectExportCompletion.currentProjectExportReceipt(firstBinding, mutation) === null,
+      "project-export-receipt: every metadata or content mutation should stale the prior receipt"
+    );
+  }
+
+  const currentProject = mutations[2];
+  const currentReceipt = { status: "Exported bundle" };
+  check(
+    projectExportCompletion.currentProjectExportReceipt(
+      projectExportCompletion.bindProjectExportReceipt(currentProject, currentReceipt),
+      currentProject
+    ) === currentReceipt,
+    "project-export-receipt: re-exporting the current project should restore a valid receipt"
+  );
+
+  return { invalidations: mutations.length, reexports: 1 };
+}
+
+function validateWorkflowNavigatorAnalysisPosture() {
+  const pendingMix = workflowNavigatorAnalysisPosture.workflowNavigatorAnalysisPosture("mix", "pending");
+  const pendingDeliver = workflowNavigatorAnalysisPosture.workflowNavigatorAnalysisPosture("deliver", "pending");
+  const errorMix = workflowNavigatorAnalysisPosture.workflowNavigatorAnalysisPosture("mix", "error");
+  const errorDeliver = workflowNavigatorAnalysisPosture.workflowNavigatorAnalysisPosture("deliver", "error");
+  const readyMix = workflowNavigatorAnalysisPosture.workflowNavigatorAnalysisPosture("mix", "ready");
+
+  check(
+    pendingMix?.value === "Analyzing" &&
+      pendingMix.detail.includes("Waiting for meters") &&
+      pendingDeliver?.value === "Waiting for meters" &&
+      pendingDeliver.detail.includes("export readiness deferred"),
+    "workflow-navigator-analysis: deferred meters should stay neutral and must not claim Silent or Hold export"
+  );
+  check(
+    errorMix?.value === "Meters unavailable" &&
+      errorMix.detail.includes("Retry meters") &&
+      errorDeliver?.value === "Meters unavailable" &&
+      errorDeliver.detail.includes("Retry meters"),
+    "workflow-navigator-analysis: failed meters should expose retry posture without synthetic signal claims"
+  );
+  check(readyMix === null, "workflow-navigator-analysis: ready meters should preserve the exact computed navigator posture");
+
+  return { states: 3, deferredZones: 2, retryZones: 2 };
 }
 
 function validateUnicodeFileIdentity() {
@@ -1947,8 +2359,12 @@ const localDraftWriteGateSummary = validateLocalDraftWriteGate();
 const projectCloseGuardSummary = validateProjectCloseGuard();
 const projectReplacementGuardSummary = validateProjectReplacementGuard();
 const projectSaveCompletionSummary = validateProjectSaveCompletion();
+const projectExportReceiptIdentitySummary = validateProjectExportReceiptIdentity();
+const workflowNavigatorAnalysisPostureSummary = validateWorkflowNavigatorAnalysisPosture();
 const styleChangePreviewSummary = validateStyleChangePreview();
 const allGenreBassVoiceSummary = await validateAllGenreBassVoiceRuntime();
+const projectAudioAnalysisSummary = validateProjectAudioAnalysisIdentity();
+const chordCardKeyboardActivationSummary = validateChordCardKeyboardActivation();
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -1985,8 +2401,12 @@ console.log(`- Local draft write gate: ${localDraftWriteGateSummary.paths}/4 boo
 console.log(`- Project close guard: ${projectCloseGuardSummary.paths}/4 dirty/recovery paths / protected ${projectCloseGuardSummary.protectedPaths}/3 / synchronous draft refresh ${projectCloseGuardSummary.refreshPaths}/2 / save gates ${projectCloseGuardSummary.saveGates}/4 / native actions ${projectCloseGuardSummary.nativeActions}/3`);
 console.log(`- Project replacement guard: ${projectReplacementGuardSummary.paths}/8 open/starter dirty/recovery paths / protected loss paths ${projectReplacementGuardSummary.protectedPaths}/6`);
 console.log(`- Project Save completion: ${projectSaveCompletionSummary.paths}/4 async paths / stale completions ${projectSaveCompletionSummary.stalePaths}/2 / changed snapshot ${projectSaveCompletionSummary.changedPaths}/1 / close outcomes ${projectSaveCompletionSummary.closeAttempts}/5`);
+console.log(`- Project export receipt identity: exact reference / invalidations ${projectExportReceiptIdentitySummary.invalidations}/3 / re-export recovery ${projectExportReceiptIdentitySummary.reexports}/1`);
+console.log(`- Workflow navigator analysis: ${workflowNavigatorAnalysisPostureSummary.states}/3 states / deferred zones ${workflowNavigatorAnalysisPostureSummary.deferredZones}/2 / retry zones ${workflowNavigatorAnalysisPostureSummary.retryZones}/2 / no synthetic no-signal posture`);
 console.log(`- Style change preview: ${styleChangePreviewSummary.target} / Pattern A/B/C ${styleChangePreviewSummary.patterns}/3 / ${styleChangePreviewSummary.beforeEvents}->${styleChangePreviewSummary.afterEvents} events / preview immutable`);
 console.log(`- All-genre Bass Voice: ${allGenreBassVoiceSummary.distinctBassStems}/${allGenreBassVoiceSummary.voices} distinct voice stems / connected glide audible ${allGenreBassVoiceSummary.glideAudible ? "yes" : "no"} / durable bass_808 id preserved`);
+console.log(`- Project audio analysis identity: ${projectAudioAnalysisSummary.metadataPaths}/6 metadata paths reused / ${projectAudioAnalysisSummary.audioInvalidations}/8 audio edits invalidated / stale guards ${projectAudioAnalysisSummary.staleGuards}/3 / failure guards ${projectAudioAnalysisSummary.failureGuards}/3 / failure/retry states ${projectAudioAnalysisSummary.failureStatusPaths}/4 / commit focus paths ${projectAudioAnalysisSummary.commitFocusPaths}/7 / commit zones ${projectAudioAnalysisSummary.commitZonePaths}/4 / retry routes ${projectAudioAnalysisSummary.retryZonePaths}/4 / exact cache hit ${projectAudioAnalysisSummary.cacheHit ? "yes" : "no"} / combined traversal exact ${projectAudioAnalysisSummary.combinedRegressionCases}/4 / bounded traversal exact ${projectAudioAnalysisSummary.boundedCompletionChecked ? "yes" : "no"} / memory strategies ${projectAudioAnalysisSummary.analysisStrategies}/2 / saved snapshot identities ${projectAudioAnalysisSummary.snapshotTasks}/2 / saved queue stale guards ${projectAudioAnalysisSummary.snapshotStaleGuards}/3`);
+console.log(`- Chord card keyboard activation: ${chordCardKeyboardActivationSummary.activationKeys}/2 card keys / ${chordCardKeyboardActivationSummary.childActivationKeys}/2 child-control keys / transport toggles ${chordCardKeyboardActivationSummary.transportToggles}`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

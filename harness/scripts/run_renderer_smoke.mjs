@@ -9,15 +9,48 @@ import { createServer } from "vite";
 const failures = [];
 const styles = readFileSync(new URL("../../src/styles.css", import.meta.url), "utf8");
 const appSource = readFileSync(new URL("../../src/ui/App.tsx", import.meta.url), "utf8");
+const projectAudioAnalysisSource = readFileSync(
+  new URL("../../src/audio/projectAudioAnalysis.ts", import.meta.url),
+  "utf8"
+);
+const projectAudioAnalysisWorkerSource = readFileSync(
+  new URL("../../src/audio/projectAudioAnalysisWorker.ts", import.meta.url),
+  "utf8"
+);
+const projectAudioAnalysisHookSource = readFileSync(
+  new URL("../../src/ui/useProjectAudioAnalysis.ts", import.meta.url),
+  "utf8"
+);
+const savedSnapshotAudioAnalysisHookSource = readFileSync(
+  new URL("../../src/ui/useSavedSnapshotAudioAnalyses.ts", import.meta.url),
+  "utf8"
+);
+const workstationHelpersSource = readFileSync(
+  new URL("../../src/ui/workstationAppHelpers.tsx", import.meta.url),
+  "utf8"
+);
+const workflowNavigatorAnalysisPostureSource = readFileSync(
+  new URL("../../src/ui/workflowNavigatorAnalysisPosture.ts", import.meta.url),
+  "utf8"
+);
 const workstationSource = readFileSync(new URL("../../src/domain/workstation.ts", import.meta.url), "utf8");
 const electronMainSource = readFileSync(new URL("../../electron/main.ts", import.meta.url), "utf8");
 const electronPreloadSource = readFileSync(new URL("../../electron/preload.cts", import.meta.url), "utf8");
 const projectLibrarySource = readFileSync(new URL("../../electron/projectLibrary.ts", import.meta.url), "utf8");
 const projectWorkspaceSource = readFileSync(new URL("../../electron/projectWorkspace.ts", import.meta.url), "utf8");
 const composePanelsSource = readFileSync(new URL("../../src/ui/workstationComposePanels.tsx", import.meta.url), "utf8");
+const chordCardKeyboardActivationSource = readFileSync(
+  new URL("../../src/ui/chordCardKeyboardActivation.ts", import.meta.url),
+  "utf8"
+);
+const guidancePanelsSource = readFileSync(
+  new URL("../../src/ui/workstationGuidancePanels.tsx", import.meta.url),
+  "utf8"
+);
 const graphSource = readFileSync(new URL("../../src/ui/workstationAppQuickActionGraph.ts", import.meta.url), "utf8");
 const quickActionSource = readFileSync(new URL("../../src/ui/workstationAppQuickActions.tsx", import.meta.url), "utf8");
 const desktopLaunchSmokeSource = readFileSync(new URL("./run_desktop_launch_smoke.mjs", import.meta.url), "utf8");
+const desktopManualQaSource = readFileSync(new URL("./run_desktop_manual_qa.mjs", import.meta.url), "utf8");
 const shellSource = readFileSync(new URL("../../src/ui/workstationShellPanels.tsx", import.meta.url), "utf8");
 const styleChangeDialogSource = readFileSync(new URL("../../src/ui/StyleChangeDialog.tsx", import.meta.url), "utf8");
 const styleChangePreviewSource = readFileSync(new URL("../../src/ui/styleChangePreview.ts", import.meta.url), "utf8");
@@ -27,6 +60,17 @@ const launchBearingPackageSources = [
   "run_desktop_pkg_payload_smoke.mjs",
   "run_desktop_install_smoke.mjs"
 ].map((fileName) => readFileSync(new URL(`./${fileName}`, import.meta.url), "utf8"));
+
+checkIncludes(
+  appSource,
+  "(options.skipStarterRoutes ||\n              (starterBeginner.resultTitle.length > 0 && starterProducer.resultTitle.length > 0))",
+  "launch-smoke skipped Starter aggregate result contract"
+);
+checkIncludes(
+  appSource,
+  "deliveryProofProducer.resultTitle.length > 0 &&",
+  "launch-smoke non-Starter aggregate result contract"
+);
 
 function check(condition, message) {
   if (!condition) {
@@ -71,7 +115,7 @@ function validateProjectFileLoadErrorStatus(uiModel) {
     "project loading should route parser failures through the actionable status helper"
   );
   check(
-    /async function handleSaveProject\(\): Promise<ProjectSaveAttempt> \{\s*const requestId = \+\+projectSaveRequestIdRef\.current;\s*try \{\s*commitMasterCeilingDraft\(\);\s*const projectToSave = projectRef\.current;\s*const contents = serializeProjectFile\(projectToSave\);/u.test(appSource),
+    /async function handleSaveProject\(\): Promise<ProjectSaveAttempt> \{\s*let requestId = 0;\s*try \{\s*commitMasterCeilingDraft\(\);\s*flushActiveMetadataDraft\("commit"\);\s*requestId = \+\+projectSaveRequestIdRef\.current;\s*const projectToSave = projectRef\.current;\s*const contents = serializeProjectFile\(projectToSave\);/u.test(appSource),
     "project serialization should stay inside the Save failure boundary and use the current project reference"
   );
   check(
@@ -156,8 +200,8 @@ function validateProjectReplacementGuard(replacementGuard) {
     appSource.includes("const projectHasUnsavedChangesRef = useRef(false);") &&
       dirtySetterSource.includes("projectHasUnsavedChangesRef.current = value;") &&
       dirtySetterSource.includes("setProjectHasUnsavedChangesState(value);") &&
-      loadSource.includes("projectHasUnsavedChangesRef.current,") &&
-      loadSource.includes("localDraftRecovery !== null"),
+      loadSource.includes("projectHasUnsavedChangesRef.current || metadataReplacementDraftDirtyRef.current") &&
+      loadSource.includes("localDraftRecoveryRef.current !== null"),
     "project replacement confirmation should read current dirty and recovery-draft state"
   );
 
@@ -303,19 +347,26 @@ function validateProjectCloseGuard(closeGuard) {
   );
 
   const createWindowSource = printNamedFunction(electronMainSource, "main.ts", "createWindow");
+  const beforeUnloadStart = appSource.indexOf("const handleBeforeUnload = (event: BeforeUnloadEvent): void => {");
   const unloadGuardIndex = appSource.indexOf('window.addEventListener("beforeunload", handleBeforeUnload);');
+  const beforeUnloadSource = appSource.slice(beforeUnloadStart, unloadGuardIndex);
+  const metadataDraftFlushIndex = beforeUnloadSource.indexOf('flushActiveMetadataDraft("commit");');
+  const ceilingDraftCommitIndex = beforeUnloadSource.indexOf("commitMasterCeilingDraft();");
+  const closeGuardIndex = beforeUnloadSource.indexOf("resolveProjectCloseGuard(");
   check(
-    unloadGuardIndex >= 0 &&
+    beforeUnloadStart >= 0 &&
+      unloadGuardIndex > beforeUnloadStart &&
       appSource.includes('window.removeEventListener("beforeunload", handleBeforeUnload)') &&
-      appSource.includes("commitMasterCeilingDraft();") &&
-      appSource.includes("resolveProjectCloseGuard(") &&
-      appSource.includes("projectHasUnsavedChangesRef.current,") &&
-      appSource.includes("localDraftRecoveryRef.current !== null") &&
+      metadataDraftFlushIndex >= 0 &&
+      ceilingDraftCommitIndex > metadataDraftFlushIndex &&
+      closeGuardIndex > ceilingDraftCommitIndex &&
+      beforeUnloadSource.includes("projectHasUnsavedChangesRef.current,") &&
+      beforeUnloadSource.includes("localDraftRecoveryRef.current !== null") &&
       appSource.includes("localDraftRecoveryRef.current = value;") &&
-      appSource.includes("writeLocalDraft(projectRef.current)") &&
-      appSource.includes("event.preventDefault();") &&
-      appSource.includes('event.returnValue = "";'),
-    "renderer beforeunload should resolve focused input, protect current dirty/recovery state, refresh the current draft, and unregister cleanly"
+      beforeUnloadSource.includes("writeLocalDraft(projectRef.current)") &&
+      beforeUnloadSource.includes("event.preventDefault();") &&
+      beforeUnloadSource.includes('event.returnValue = "";'),
+    "renderer beforeunload should synchronously commit focused metadata then ceiling drafts before its dirty/recovery decision, refresh the exact current project, and unregister cleanly"
   );
   check(
     createWindowSource.includes('win.webContents.on("will-prevent-unload"') &&
@@ -356,12 +407,16 @@ function validateProjectSaveCompletion(saveCompletion) {
   const resultSource = printNamedFunction(appSource, "App.tsx", "createProjectFileResult");
   const replaceSource = printNamedFunction(appSource, "App.tsx", "replaceProject");
   const commitIndex = saveSource.indexOf("commitMasterCeilingDraft();");
+  const metadataFlushIndex = saveSource.indexOf('flushActiveMetadataDraft("commit");');
+  const requestIndex = saveSource.indexOf("requestId = ++projectSaveRequestIdRef.current;");
   const snapshotIndex = saveSource.indexOf("const projectToSave = projectRef.current;");
   const awaitIndex = saveSource.indexOf("await window.grooveforge?.saveProject?.");
   check(
-    saveSource.includes("const requestId = ++projectSaveRequestIdRef.current;") &&
+    saveSource.includes("let requestId = 0;") &&
       commitIndex >= 0 &&
-      snapshotIndex > commitIndex &&
+      metadataFlushIndex > commitIndex &&
+      requestIndex > metadataFlushIndex &&
+      snapshotIndex > requestIndex &&
       awaitIndex > snapshotIndex,
     "Save should sequence the request and resolve focused project state before capturing the durable snapshot"
   );
@@ -396,6 +451,107 @@ function validateProjectSaveCompletion(saveCompletion) {
   );
 }
 
+function validateProjectScopedUiState(exportCompletion) {
+  const exportedProject = { id: "project-a" };
+  const replacementProject = { id: "project-b" };
+  const exportReceipt = { status: "Exported WAV" };
+  check(
+    exportCompletion.shouldCommitProjectExportResult(4, 4, exportedProject, exportedProject) === true &&
+      exportCompletion.shouldCommitProjectExportResult(3, 4, exportedProject, exportedProject) === false &&
+      exportCompletion.shouldCommitProjectExportResult(4, 4, exportedProject, replacementProject) === false,
+    "project export completion should require both the latest request and the exact exported project"
+  );
+  const receiptBinding = exportCompletion.bindProjectExportReceipt(exportedProject, exportReceipt);
+  check(
+    exportCompletion.currentProjectExportReceipt(receiptBinding, exportedProject) === exportReceipt &&
+      exportCompletion.currentProjectExportReceipt(receiptBinding, { ...exportedProject, title: "Renamed" }) === null &&
+      exportCompletion.currentProjectExportReceipt(receiptBinding, { ...exportedProject, bpm: 111 }) === null &&
+      exportCompletion.currentProjectExportReceipt(receiptBinding, { ...exportedProject, mixer: [] }) === null,
+    "Latest Export should be bound to the exact immutable project and stale after title, tempo, or mixer mutation"
+  );
+  const reexportedReceipt = { status: "Exported bundle" };
+  check(
+    exportCompletion.currentProjectExportReceipt(
+      exportCompletion.bindProjectExportReceipt(replacementProject, reexportedReceipt),
+      replacementProject
+    ) === reexportedReceipt,
+    "re-exporting the current project should restore a valid Latest Export receipt"
+  );
+
+  const resetSource = printNamedFunction(appSource, "App.tsx", "resetProjectDependentUiState");
+  const replaceSource = printNamedFunction(appSource, "App.tsx", "replaceProject");
+  const starterSource = printNamedFunction(appSource, "App.tsx", "createAudienceStarter");
+  const draftSource = printNamedFunction(appSource, "App.tsx", "restoreLocalDraft");
+  check(
+    resetSource.includes("projectSaveRequestIdRef.current += 1;") &&
+      resetSource.includes("projectExportRequestIdRef.current += 1;") &&
+      resetSource.includes("setProjectFileLabel(null);") &&
+      resetSource.includes("setSoundSnapshots({ A: null, B: null });") &&
+      resetSource.includes("setMixSnapshots({ A: null, B: null });") &&
+      resetSource.includes("setStudioToneBaseline(createStudioToneBaseline(nextProject.sound));") &&
+      resetSource.includes("setStudioToneBaselineResult(null);") &&
+      resetSource.includes("setStudioToneResetResult(null);") &&
+      resetSource.includes("handoffExportReceiptRef.current = null;") &&
+      resetSource.includes("handoffExportReceiptProjectRef.current = null;") &&
+      resetSource.includes("setHandoffExportReceipt(null);"),
+    "project replacement UI reset should clear project identity, A/B snapshots, Studio Tone baseline results, and export receipt state"
+  );
+  check(
+    replaceSource.includes("resetProjectDependentUiState(nextProject, false);") &&
+      starterSource.includes("resetProjectDependentUiState(projectRef.current);") &&
+      draftSource.includes("resetProjectDependentUiState(draftProject);"),
+    "file replacement, audience starter creation, and local draft restore should share the project-dependent UI reset"
+  );
+
+  const wavSource = printNamedFunction(appSource, "App.tsx", "handleExportWav");
+  const stemsSource = printNamedFunction(appSource, "App.tsx", "handleExportStems");
+  const midiSource = printNamedFunction(appSource, "App.tsx", "handleExportMidi");
+  const sheetSource = printNamedFunction(appSource, "App.tsx", "handleExportHandoffSheet");
+  const bundleSource = printNamedFunction(appSource, "App.tsx", "handleExportDeliveryBundle");
+  const receiptSource = printNamedFunction(appSource, "App.tsx", "recordHandoffExportReceipt");
+  const currentReceiptSource = printNamedFunction(appSource, "App.tsx", "currentHandoffExportReceiptForProject");
+  const invalidateReceiptSource = printNamedFunction(appSource, "App.tsx", "invalidateHandoffExportReceipt");
+  const updateProjectSource = printNamedFunction(appSource, "App.tsx", "updateProject");
+  const updateMetadataSource = printNamedFunction(appSource, "App.tsx", "updateProjectMetadata");
+  const updateViewSource = printNamedFunction(appSource, "App.tsx", "updateProjectView");
+  const restoreHistorySource = printNamedFunction(appSource, "App.tsx", "restoreProjectFromHistory");
+  const quickActionSource = printNamedFunction(appSource, "App.tsx", "runQuickAction");
+  check(
+    [wavSource, stemsSource, midiSource, sheetSource, bundleSource].every(
+      (source) => source.includes("const request = beginProjectExportRequest();") && source.includes("const exportProject = request.project;")
+    ) &&
+      wavSource.includes("exportWav(exportProject)") &&
+      stemsSource.includes("exportStems(exportProject)") &&
+      midiSource.includes("exportMidi(exportProject)") &&
+      sheetSource.includes("createHandoffSheet(exportProject, currentExportAnalysis, currentStemAnalyses)") &&
+      bundleSource.includes("exportDeliveryBundleZip(exportProject, currentExportAnalysis, currentStemAnalyses)"),
+    "direct and Quick Actions export callbacks should resolve projectRef-backed export context at execution time"
+  );
+  check(
+    receiptSource.includes("if (!projectExportRequestIsCurrent(request))") &&
+      bundleSource.includes("function handleExportDeliveryBundle(): Promise<void>") &&
+      bundleSource.split("projectExportRequestIsCurrent(request)").length - 1 >= 1 &&
+      quickActionSource.includes('const exportRequestId = action.group === "Export" ? projectExportRequestIdRef.current : null;') &&
+      quickActionSource.split("shouldCommitProjectExportResult(").length - 1 === 2 &&
+      graphSource.includes("return nextHandoffItem.run();"),
+    "async bundle and Quick Actions completion should ignore stale requests or a replaced project before recording UI results"
+  );
+  check(
+    receiptSource.includes("handoffExportReceiptProjectRef.current = request.project") &&
+      receiptSource.includes("setHandoffExportReceiptProject(request.project)") &&
+      currentReceiptSource.includes("currentProjectExportReceipt(") &&
+      currentReceiptSource.includes("projectRef.current") &&
+      invalidateReceiptSource.includes("handoffExportReceiptRef.current = null") &&
+      invalidateReceiptSource.includes("handoffExportReceiptProjectRef.current = null") &&
+      invalidateReceiptSource.includes("setDeliveryStatusOpen(false)") &&
+      [updateProjectSource, updateMetadataSource, updateViewSource, restoreHistorySource].every((source) =>
+        source.includes("invalidateHandoffExportReceipt()")
+      ) &&
+      appSource.includes("exportReceipt={currentHandoffExportReceipt}"),
+    "Handoff receipt consumers should mask mismatched snapshots and every mutation path should permanently invalidate package-ready state until re-export"
+  );
+}
+
 function validateSqliteProjectStorage() {
   const clearRecoverySource = printNamedFunction(appSource, "App.tsx", "clearLocalDraftRecovery");
   check(
@@ -417,6 +573,32 @@ function validateSqliteProjectStorage() {
       electronMainSource.includes('ipcMain.handle("grooveforge:clear-project-recovery"') &&
       electronMainSource.includes("return { savedAt: library.saveRecovery(payload).savedAt };"),
     "Electron main should own the user-home workspace, SQLite library mirror, and recovery IPC"
+  );
+  check(
+    desktopManualQaSource.includes("manualQaAllowedBase") &&
+      desktopManualQaSource.includes("assertExistingComponentsDoNotSymlink") &&
+      desktopManualQaSource.includes("assertSafeWorkspaceTarget") &&
+      desktopManualQaSource.includes("existing empty non-owned workspace") &&
+      desktopManualQaSource.includes("intermediate symbolic-link escape") &&
+      desktopManualQaSource.includes("final symbolic-link target") &&
+      desktopManualQaSource.includes("stale/tampered build provenance") &&
+      desktopManualQaSource.includes('const provenanceBuildRoots = ["dist", "dist-electron"]') &&
+      desktopManualQaSource.includes("buildProvenanceFileManifest") &&
+      desktopManualQaSource.includes("modified renderer chunk") &&
+      desktopManualQaSource.includes("added production bundle file") &&
+      desktopManualQaSource.includes("deleted production bundle file") &&
+      desktopManualQaSource.includes("production bundle symbolic-link entry") &&
+      electronMainSource.includes("assertManualQaWorkspaceTargetSync") &&
+      electronMainSource.includes("validateManualQaProvenance") &&
+      electronMainSource.includes("buildManualQaProvenanceFileManifestSync") &&
+      electronMainSource.includes("Manual QA production bundle inventory changed after launcher provenance capture.") &&
+      electronMainSource.includes("provenanceValidatedAtLaunch: true") &&
+      electronMainSource.includes('app.setPath("userData", manualQaConfiguration.electronUserDataDirectory)') &&
+      electronMainSource.includes("manualQaUserDataPosture") &&
+      electronMainSource.includes("userDataIsolated") &&
+      !electronMainSource.includes("userDataTouched") &&
+      !desktopManualQaSource.includes("userDataTouched"),
+    "visible Manual QA should require an owned non-symlink workspace, validate source/build provenance, and derive isolated Electron userData evidence"
   );
   check(
     projectLibrarySource.includes('import { DatabaseSync } from "node:sqlite"') &&
@@ -1383,6 +1565,17 @@ function validateWorkspaceFunctionTabs(html) {
       tablistTag.includes('class="workflow-navigator-grid"'),
     "Workflow Navigator should expose a labelled horizontal workstation function tablist"
   );
+  const workspaceTabsSurfaceIndex = html.indexOf('data-testid="workspace-tabs-surface"');
+  const workspaceTabsHeadingIndex = html.indexOf("WORKSPACE TABS");
+  check(
+    workspaceTabsSurfaceIndex >= 0 &&
+      workspaceTabsHeadingIndex > workspaceTabsSurfaceIndex &&
+      tablistTagStart > workspaceTabsHeadingIndex &&
+      html.includes('data-active-workspace-tab="compose"') &&
+      html.includes('id="workspace-tabs-title"') &&
+      html.includes('class="workflow-tab-status" aria-hidden="true">ACTIVE</span>'),
+    "function tabs should live in a dedicated labelled WORKSPACE TABS surface with an explicit active-state badge"
+  );
 
   const tabTags = Object.fromEntries(
     zones.map((zone) => [zone, openingTagById("button", `workspace-tab-${zone}`)])
@@ -1443,6 +1636,10 @@ function validateWorkspaceFunctionTabs(html) {
 
   const hiddenRule = cssRuleBody('.workspace-zone-panel[hidden]');
   const selectedRule = cssRuleBody('.workflow-navigator-card[aria-selected="true"]');
+  const selectedUnderlineRule = cssRuleBody('.workflow-navigator-card[aria-selected="true"]::after');
+  const selectedBadgeRule = cssRuleBody('.workflow-navigator-card[aria-selected="true"] .workflow-tab-status');
+  const appShellRule = cssRuleBody(".app-shell");
+  const tabsSurfaceRule = cssRuleBody(".workspace-tabs-surface");
   const workspaceGridRule = cssRuleBody(".workspace-grid");
   const arrangeRule = cssRuleBody(".workspace-arrange-panel");
   const mixRule = cssRuleBody(".workspace-mix-panel");
@@ -1451,15 +1648,36 @@ function validateWorkspaceFunctionTabs(html) {
   const deliverRule = cssRuleBody(".workspace-deliver-panel");
   const desktopDeliverHandoffRule = cssRuleBody(".workspace-deliver-panel .handoff-pack");
   check(
+    appShellRule.includes("overflow-x: clip;") &&
+      !appShellRule.includes("overflow-x: hidden;"),
+    "the app shell should clip accidental inline paint overflow without becoming a horizontal scroll container"
+  );
+  check(
     hiddenRule.includes("display: none !important;") &&
       selectedRule.includes("border-block-end-width: 3px;") &&
       selectedRule.includes("background:") &&
-      selectedRule.includes("box-shadow:"),
-    "inactive workspace panels should stay forcibly hidden while the selected function tab has a persistent visual state"
+      selectedRule.includes("box-shadow:") &&
+      selectedUnderlineRule.includes("height: 4px;") &&
+      selectedUnderlineRule.includes("background: #82d7ff;") &&
+      selectedBadgeRule.includes("background: #82d7ff;") &&
+      selectedBadgeRule.includes("color: #071317;") &&
+      tabsSurfaceRule.includes("border: 1px solid rgba(130, 215, 255, 0.54);") &&
+      tabsSurfaceRule.includes("box-shadow:"),
+    "inactive panels should stay hidden while the selected tab has a high-contrast badge, underline, and independent surface"
+  );
+  check(
+    guidancePanelsSource.includes("const tablistRef = useRef<HTMLDivElement | null>(null);") &&
+      guidancePanelsSource.includes("const nearestScrollLeft =") &&
+      guidancePanelsSource.includes("tablist.scrollTo({") &&
+      guidancePanelsSource.includes('behavior: "auto"') &&
+      guidancePanelsSource.includes("tablist.scrollWidth - tablist.clientWidth"),
+    "external mobile workspace routes should reveal an offscreen active tab with nearest horizontal tablist scrolling only"
   );
   check(
     panelTags.compose.includes("workspace-grid workspace-zone-panel workspace-compose-panel") &&
-      workspaceGridRule.includes("grid-template-columns: 1.3fr 1.2fr 0.92fr;") &&
+      workspaceGridRule.includes(
+        "grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.2fr) minmax(0, 0.92fr);"
+      ) &&
       panelTags.arrange.includes("workspace-grid workspace-zone-panel workspace-arrange-panel") &&
       arrangeRule.includes("grid-template-columns: minmax(0, 1fr);") &&
       panelTags.mix.includes("workspace-grid workspace-zone-panel workspace-mix-panel") &&
@@ -1470,6 +1688,330 @@ function validateWorkspaceFunctionTabs(html) {
       deliverRule.includes("display: grid;") &&
       desktopDeliverHandoffRule.includes("grid-template-columns: 250px minmax(0, 1fr);"),
     "Compose, Arrange, Mix, and Deliver should retain purpose-built zone layouts and a readable desktop Handoff summary after tab grouping"
+  );
+  check(
+    styles.includes("@media (max-width: 1600px) {") &&
+      styles.includes(".workspace-compose-panel {\n    grid-template-columns: repeat(2, minmax(0, 1fr));") &&
+      styles.includes(".workspace-compose-panel .pattern-stack-preview {\n    grid-template-columns: repeat(2, minmax(0, 1fr));") &&
+      styles.includes(".workspace-compose-panel .pattern-stack-preview > * {\n    overflow: visible;\n    overflow-wrap: anywhere;\n    text-overflow: clip;\n    white-space: normal;") &&
+      styles.includes(".workspace-mix-panel {\n    grid-template-columns: minmax(0, 1fr);") &&
+      styles.includes(".mode-row > .session-meter {\n    flex: 1 1 720px;\n    min-width: 0;\n    flex-wrap: wrap;") &&
+      styles.includes(".mode-row > .quick-action-result {\n    flex: 1 1 100%;\n    width: 100%;") &&
+      electronMainSource.includes("collectManualQaViewportAccessibility") &&
+      electronMainSource.includes("intentionalScrollerExclusions") &&
+      electronMainSource.includes("clipped-by-") &&
+      electronMainSource.includes("relativeLeft <= ancestor.scrollWidth + 1") &&
+      electronMainSource.includes("window.innerHeight - navigatorHeight - 120") &&
+      electronMainSource.includes("native-hit-test-blocked") &&
+      electronMainSource.includes("accessibleInteractiveKeys.has(offender.elementKey)") &&
+      electronMainSource.includes("centerManualQaTargetedAccessibility") &&
+      electronMainSource.includes("element.closest('[hidden], [inert], [aria-hidden=\"true\"]')") &&
+      electronMainSource.includes("not-hit-tested-after-target-scroll") &&
+      electronMainSource.includes("targetedPosture?.left") &&
+      electronMainSource.includes("renderedInteractiveCount: renderedInteractiveKeys.size") &&
+      electronMainSource.includes("auto-song-${zone}-deep.png") &&
+      electronMainSource.includes("inaccessible active or shell elements"),
+    "1440px workspace QA should shrink intrinsic tracks and hard-fail clipped active elements with deep-scroll native hit-test evidence"
+  );
+}
+
+function validateProjectAudioAnalysisPerformance(html, helpers) {
+  check(
+    appSource.includes("const projectAudioAnalysis = useProjectAudioAnalysis(") &&
+      appSource.includes("projectAudioAnalysisCommitEnabledForZone(activeWorkspaceZone)") &&
+      !appSource.includes("const exportAnalysis = useMemo(() => analyzeExport(project), [project]);") &&
+      !appSource.includes("const stemAnalyses = useMemo(() => analyzeStemExports(project), [project]);"),
+    "App render should route exact PCM meter work through the off-main-thread hook and gate commits by functional tab"
+  );
+  const modeSwitchSource = printNamedFunction(appSource, "App.tsx", "switchProjectMode");
+  const loopScopeSource = printNamedFunction(appSource, "App.tsx", "selectTransportLoopScope");
+  check(
+    modeSwitchSource.includes("afterModeFocusSummary,") &&
+      modeSwitchSource.includes("afterSessionPassSummary,") &&
+      modeSwitchSource.includes("afterFirstBeatPathSummary,") &&
+      modeSwitchSource.includes("createModeFocusSummary(") &&
+      !modeSwitchSource.includes("analyzeExport(") &&
+      !modeSwitchSource.includes("analyzeStemExports(") &&
+      !modeSwitchSource.includes("createBeatReadinessChecks("),
+    "mode switching should build target-mode result summaries from current exact meters without synchronously rebuilding PCM analysis"
+  );
+  check(
+    loopScopeSource.includes("if (!isPlaying && scope === transportLoopScope)") &&
+      loopScopeSource.includes("return;") &&
+      loopScopeSource.indexOf("if (!isPlaying && scope === transportLoopScope)") < loopScopeSource.indexOf("setTransportLoopScope(scope)"),
+    "re-selecting the active transport loop scope while stopped should be a no-op before workstation-wide state updates"
+  );
+  check(
+    appSource.includes("createSnapshotCompareProjectProfileFromAnalysis(project, exportAnalysis, stemAnalyses)") &&
+      appSource.includes("useSavedSnapshotAudioAnalyses(") &&
+      appSource.includes("guidanceCenterOpen && !projectAudioAnalysis.pending && project.snapshots.length > 0") &&
+      appSource.includes("savedSnapshotAudioAnalyses.byIdentity[projectAudioAnalysisIdentity(savedProject)]") &&
+      appSource.includes("createSnapshotCompareDeferredProjectProfile(") &&
+      !appSource.includes("currentSnapshotCompareProfile, createSnapshotCompareProjectProfile") &&
+      workstationHelpersSource.includes("createSnapshotCompareProjectProfileFromAnalysis(") &&
+      !printNamedFunction(
+        workstationHelpersSource,
+        "workstationAppHelpers.tsx",
+        "createSnapshotCompareProjectProfileFromAnalysis"
+      ).includes("analyzeExport("),
+    "current and saved Snapshot Compare profiles should reuse exact worker meters without synchronously rendering PCM"
+  );
+  check(
+    savedSnapshotAudioAnalysisHookSource.includes("createSavedSnapshotAudioAnalysisTasks(") &&
+      savedSnapshotAudioAnalysisHookSource.includes("projectAudioAnalysisIdentity(project)") &&
+      savedSnapshotAudioAnalysisHookSource.includes("const runNext = (taskIndex: number)") &&
+      savedSnapshotAudioAnalysisHookSource.includes("grooveforge-saved-snapshot-audio-analysis") &&
+      savedSnapshotAudioAnalysisHookSource.includes("worker.onmessageerror") &&
+      savedSnapshotAudioAnalysisHookSource.includes('status: "error"') &&
+      savedSnapshotAudioAnalysisHookSource.includes("workerRef.current?.terminate()") &&
+      !savedSnapshotAudioAnalysisHookSource.includes("analyzeProjectAudio(") &&
+      !savedSnapshotAudioAnalysisHookSource.includes("analyzeExport(") &&
+      !savedSnapshotAudioAnalysisHookSource.includes("analyzeStemExports("),
+    "saved Snapshot Compare analysis should use one sequential, cached, stale-safe worker queue with explicit pending/error posture"
+  );
+  const reviewQueueStart = workstationHelpersSource.indexOf("export function ReviewQueue(");
+  const reviewQueueEnd = workstationHelpersSource.indexOf("export type ReviewQueuePriority", reviewQueueStart);
+  const reviewQueueSource = workstationHelpersSource.slice(reviewQueueStart, reviewQueueEnd);
+  check(
+    appSource.includes("analysis={exportAnalysis}") &&
+      appSource.includes("analysisPending={projectAudioAnalysis.pending}") &&
+      reviewQueueSource.includes("createReviewFixPreview") &&
+      reviewQueueSource.includes("focusedItemId, project, analysis") &&
+      reviewQueueSource.includes("createReviewFixOption(item, project, analysis)") &&
+      !reviewQueueSource.includes("analyzeExport(") &&
+      reviewQueueSource.includes("analysisPending || item.tone"),
+    "Review Queue render should reuse worker meters and disable fixes while exact audio analysis is pending"
+  );
+  const workflowNavigatorItemsSource = printNamedFunction(
+    workstationHelpersSource,
+    "workstationAppHelpers.tsx",
+    "createWorkflowNavigatorItems"
+  );
+  check(
+    appSource.includes("projectAudioAnalysis.status") &&
+      workflowNavigatorItemsSource.includes('analysisStatus: WorkflowNavigatorAnalysisStatus = "ready"') &&
+      workflowNavigatorItemsSource.includes('workflowNavigatorAnalysisPosture("mix", analysisStatus)') &&
+      workflowNavigatorItemsSource.includes('workflowNavigatorAnalysisPosture("deliver", analysisStatus)') &&
+      workflowNavigatorAnalysisPostureSource.includes('{ value: "Analyzing", detail: "Waiting for meters / mix signal checks deferred" }') &&
+      workflowNavigatorAnalysisPostureSource.includes('{ value: "Waiting for meters", detail: "Analysis in progress / export readiness deferred" }') &&
+      workflowNavigatorAnalysisPostureSource.includes('value: "Meters unavailable"') &&
+      !workflowNavigatorAnalysisPostureSource.includes("Silent") &&
+      !workflowNavigatorAnalysisPostureSource.includes("Hold export"),
+    "Workflow Navigator and review summaries should defer synthetic no-signal claims until exact meters are ready"
+  );
+  const titleInputSource = printNamedFunction(appSource, "App.tsx", "ProjectTitleInput");
+  const sessionBriefFieldsSource = printNamedFunction(
+    workstationHelpersSource,
+    "workstationAppHelpers.tsx",
+    "SessionBriefFields"
+  );
+  const metadataUpdateSource = printNamedFunction(appSource, "App.tsx", "updateProjectMetadata");
+  const sessionBriefUpdateSource = printNamedFunction(appSource, "App.tsx", "updateSessionBrief");
+  const metadataFlushSource = printNamedFunction(appSource, "App.tsx", "flushActiveMetadataDraft");
+  const metadataBlurSource = printNamedFunction(appSource, "App.tsx", "blurMetadataDraftElement");
+  const metadataRevisionSource = printNamedFunction(appSource, "App.tsx", "advanceMetadataDraftRevision");
+  const undoProjectSource = printNamedFunction(appSource, "App.tsx", "undoProject");
+  const openProjectSource = printNamedFunction(appSource, "App.tsx", "handleOpenProject");
+  const loadProjectSource = printNamedFunction(appSource, "App.tsx", "loadProjectText");
+  const replaceProjectSource = printNamedFunction(appSource, "App.tsx", "replaceProject");
+  check(
+    titleInputSource.includes("setDraft(nextTitle)") &&
+      titleInputSource.includes("startTransition") &&
+      titleInputSource.includes("onCommit(normalized)") &&
+      titleInputSource.includes("authoritativeRevision") &&
+      titleInputSource.includes("setDraft(title)") &&
+      titleInputSource.includes("[authoritativeRevision, title]") &&
+      appSource.includes("onBlur={(event) => commitDraft(event.currentTarget.value)}") &&
+      sessionBriefFieldsSource.includes("setDraft") &&
+      sessionBriefFieldsSource.includes("startTransition") &&
+      sessionBriefFieldsSource.includes("onChange(field, value)") &&
+      sessionBriefFieldsSource.includes("activeFieldRef") &&
+      sessionBriefFieldsSource.includes("activeFieldRef.current = null") &&
+      sessionBriefFieldsSource.includes("setDraft(brief)") &&
+      sessionBriefFieldsSource.includes("[authoritativeRevision, brief]") &&
+      workstationHelpersSource.includes('onBlur={(event) => commitDraft("artist", event.currentTarget.value)}') &&
+      workstationHelpersSource.includes('onBlur={(event) => commitDraft("notes", event.currentTarget.value)}') &&
+      metadataFlushSource.includes('intent: "commit" | "prepare-replacement" | "discard"') &&
+      metadataBlurSource.includes("metadataBlurCommitSuppressedRef.current = true") &&
+      metadataBlurSource.includes("metadataBlurCommitSuppressedRef.current = false") &&
+      metadataFlushSource.includes("pendingMetadataDraftRef.current") &&
+      metadataFlushSource.includes("commitMetadataDraft(snapshot)") &&
+      openProjectSource.includes('flushActiveMetadataDraft("prepare-replacement")') &&
+      /if \(result\.canceled \|\| !result\.contents\) \{\s*flushActiveMetadataDraft\("commit"\)/u.test(openProjectSource) &&
+      /!window\.confirm\(replacementGuard\.warning\)\) \{\s*flushActiveMetadataDraft\("commit"\)/u.test(loadProjectSource) &&
+      replaceProjectSource.indexOf('flushActiveMetadataDraft("discard")') <
+        replaceProjectSource.indexOf("advanceMetadataDraftRevision()") &&
+      metadataRevisionSource.includes("pendingMetadataDraftRef.current = null") &&
+      metadataRevisionSource.includes("setMetadataDraftRevision(nextRevision)") &&
+      undoProjectSource.indexOf('flushActiveMetadataDraft("commit")') <
+        undoProjectSource.indexOf("const currentUndoStack = undoStackRef.current"),
+    "project title and isolated Session Brief fields should type locally, accept authoritative replacements, and flush exactly once for native project operations"
+  );
+  check(
+    metadataUpdateSource.includes("projectRef.current = nextProject") &&
+      metadataUpdateSource.includes("replaceUndoHistory") &&
+      metadataUpdateSource.includes("replaceRedoHistory([])") &&
+      metadataUpdateSource.includes("setLocalDraftWriteArmed(true)") &&
+      metadataUpdateSource.includes("setProjectHasUnsavedChanges(true)") &&
+      metadataUpdateSource.includes("setProject(nextProject)") &&
+      metadataUpdateSource.includes("setSessionBriefCompassResult(null)") &&
+      !metadataUpdateSource.includes("setComposerActionResult(null)") &&
+      sessionBriefUpdateSource.includes("updateProjectMetadata") &&
+      appSource.includes("(current) => (current.title === title ? current : { ...current, title })"),
+    "non-musical title and Session Brief edits should preserve durable project ownership without invalidating every musical result"
+  );
+  check(
+    projectAudioAnalysisHookSource.includes("workerRef.current?.terminate();") &&
+      projectAudioAnalysisHookSource.includes("inFlightRequestRef.current") &&
+      projectAudioAnalysisHookSource.includes("An idle") &&
+      projectAudioAnalysisHookSource.includes("deferredResponseRef.current = response") &&
+      projectAudioAnalysisHookSource.includes("commitEnabledRef.current = commitEnabled") &&
+      projectAudioAnalysisHookSource.includes("!commitEnabledRef.current || shouldHoldProjectAudioAnalysisCommit(activeTestId)") &&
+      projectAudioAnalysisHookSource.includes("if (!commitEnabled && !retryForced)") &&
+      projectAudioAnalysisHookSource.includes("requestIdRef.current += 1") &&
+      projectAudioAnalysisHookSource.includes("(snapshot.identity === identity && snapshot.exact)") &&
+      projectAudioAnalysisHookSource.includes("retryRequest.generation") &&
+      projectAudioAnalysisHookSource.includes("shouldHoldProjectAudioAnalysisCommit(activeTestId)") &&
+      projectAudioAnalysisHookSource.includes('document.addEventListener("focusout", releaseDeferredResponse)') &&
+      projectAudioAnalysisHookSource.includes("analysisCommitTargetTestId(event.relatedTarget)") &&
+      projectAudioAnalysisHookSource.includes("!commitEnabled ||") &&
+      projectAudioAnalysisHookSource.includes("}, [commitEnabled]);") &&
+      projectAudioAnalysisHookSource.includes("deferredResponseRef.current = null") &&
+      projectAudioAnalysisHookSource.includes("startTransition(() => {") &&
+      projectAudioAnalysisHookSource.includes("shouldAcceptProjectAudioAnalysisResponse(") &&
+      projectAudioAnalysisHookSource.includes("response.id,") &&
+      projectAudioAnalysisHookSource.includes("latestIdentityRef.current") &&
+      projectAudioAnalysisHookSource.includes("setSnapshot({ identity: response.identity, analysis: response.analysis, exact: true })"),
+    "audio analysis should defer offline work through creative tabs, reuse an idle worker in review tabs, terminate superseded edits, hold exact commits during metadata entry, and preserve stale guards"
+  );
+  check(
+    projectAudioAnalysisHookSource.includes("shouldAcceptProjectAudioAnalysisFailure(") &&
+      projectAudioAnalysisHookSource.includes("projectAudioAnalysisStatus(") &&
+      projectAudioAnalysisHookSource.includes("try {\n        worker = new Worker(") &&
+      projectAudioAnalysisHookSource.includes("createdWorker.onerror") &&
+      projectAudioAnalysisHookSource.includes("createdWorker.onmessageerror") &&
+      projectAudioAnalysisHookSource.includes("worker.postMessage(") &&
+      projectAudioAnalysisHookSource.includes("commitAnalysisFailure(") &&
+      projectAudioAnalysisHookSource.includes('pending: status !== "ready"') &&
+      projectAudioAnalysisHookSource.includes("setRetryRequest") &&
+      projectAudioAnalysisHookSource.includes("generation: current.generation + 1") &&
+      appSource.includes('data-audio-analysis-state={projectAudioAnalysis.status}') &&
+      appSource.includes('"Audio meters unavailable"') &&
+      appSource.includes('data-testid="audio-analysis-retry"') &&
+      appSource.includes("onClick={retryCurrentProjectAudioAnalysis}") &&
+      styles.includes(".session-meter .audio-analysis-retry:focus-visible"),
+    "audio analysis worker failures should converge on an identity-safe error state with blocked exact actions and a visible focusable Retry meters control"
+  );
+  const analysisGateSource = printNamedFunction(
+    workstationHelpersSource,
+    "workstationAppHelpers.tsx",
+    "ProjectAudioAnalysisGate"
+  );
+  const retrySource = printNamedFunction(appSource, "App.tsx", "retryCurrentProjectAudioAnalysis");
+  const surfaceGuardSource = printNamedFunction(appSource, "App.tsx", "exactAudioAnalysisReadyForSurface");
+  const pendingGuideGateHtml = renderToStaticMarkup(
+    React.createElement(helpers.ProjectAudioAnalysisGate, {
+      onRetry() {},
+      status: "pending",
+      surface: "Guide"
+    })
+  );
+  const errorGuideGateHtml = renderToStaticMarkup(
+    React.createElement(helpers.ProjectAudioAnalysisGate, {
+      onRetry() {},
+      status: "error",
+      surface: "Guide"
+    })
+  );
+  check(
+    analysisGateSource.includes('"Analyzing"') &&
+      analysisGateSource.includes('"Meters unavailable"') &&
+      workstationHelpersSource.includes("Meter values, readiness claims, and delivery actions stay hidden") &&
+      workstationHelpersSource.includes("Retry meters") &&
+      workstationHelpersSource.includes('data-testid={`audio-analysis-gate-${surface.toLowerCase()}`}') &&
+      appSource.includes("exactProjectAudioAnalysisReady && isStemTrackId(channel.id)") &&
+      appSource.includes("exactProjectAudioAnalysisReady ? (") &&
+      appSource.includes('surface="Guide"') &&
+      appSource.includes('surface="Mix"') &&
+      appSource.includes('surface="Master"') &&
+      appSource.includes('surface="Deliver"') &&
+      appSource.includes("exportReceipt={currentHandoffExportReceipt}") &&
+      surfaceGuardSource.includes('projectAudioAnalysis.status === "ready"') &&
+      styles.includes(".project-audio-analysis-gate.error"),
+    "Mix, Master, and Handoff meter-derived surfaces and delivery actions should stay behind an exact ready-state gate"
+  );
+  check(
+    pendingGuideGateHtml.includes('data-testid="audio-analysis-gate-guide"') &&
+      pendingGuideGateHtml.includes("Analyzing") &&
+      !pendingGuideGateHtml.includes("Retry meters") &&
+      errorGuideGateHtml.includes('data-testid="audio-analysis-gate-guide"') &&
+      errorGuideGateHtml.includes("Meters unavailable") &&
+      errorGuideGateHtml.includes("Retry meters") &&
+      [pendingGuideGateHtml, errorGuideGateHtml].every(
+        (gateHtml) => !gateHtml.includes("Silent") && !/[+-]?\d+(?:\.\d+)?\s*dB\b/.test(gateHtml)
+      ) &&
+      appSource.includes("{exactProjectAudioAnalysisReady && (\n      <AudienceSessionReadout") &&
+      appSource.includes("{exactProjectAudioAnalysisReady && (\n      <StyleInspector") &&
+      appSource.includes("analysisStatus={projectAudioAnalysis.status}") &&
+      workstationHelpersSource.includes('surface="Guide"'),
+    "Guide pending and error states should keep creative brief controls available while hiding stale meter, dB, and readiness result cards"
+  );
+  check(
+    retrySource.includes("projectAudioAnalysisRetryZone(sourceZone)") &&
+      retrySource.includes("activateWorkspaceZone(retryZone)") &&
+      retrySource.indexOf("activateWorkspaceZone(retryZone)") < retrySource.indexOf("projectAudioAnalysis.retry()"),
+    "Retry from Compose or Arrange should navigate to a commit-enabled review zone before requesting exact meters"
+  );
+  check(
+    projectAudioAnalysisWorkerSource.includes("analyzeProjectAudio(project)") &&
+      projectAudioAnalysisWorkerSource.includes("self.postMessage({ id, identity, analysis:"),
+    "audio meter worker should return request-scoped exact mix and stem analyses"
+  );
+  check(
+    ["arrangement", "automation", "bpm", "key", "masterCeilingDb", "mixer", "patterns", "sound", "styleId", "swing"].every(
+      (field) => projectAudioAnalysisSource.includes(`${field}: project.${field}`)
+    ) &&
+      ["title", "mode", "selectedPattern", "deliveryTarget", "sessionBrief", "snapshots", "metronomeEnabled"].every(
+        (field) => !projectAudioAnalysisSource.includes(`${field}: project.${field}`)
+      ),
+    "audio analysis identity should include every PCM input and exclude UI-only project metadata"
+  );
+  check(
+    styles.includes(".guidance-center-content > * {\n  content-visibility: auto;\n  contain-intrinsic-block-size: auto 320px;") &&
+      styles.includes(".workspace-zone-panel:not([hidden]) > .panel") &&
+      styles.includes("contain-intrinsic-block-size: auto 720px;"),
+    "distant Guide and active workspace cards should use intrinsic-size content visibility to bound cold layout work"
+  );
+  check(
+    html.includes('data-audio-analysis-state="ready"') &&
+      html.includes('data-testid="audio-analysis-status">Audio meters ready</span>'),
+    "audio analysis readiness should be explicit instead of presenting an unlabeled pending Silent meter"
+  );
+  const modePanelsSource = printNamedFunction(appSource, "App.tsx", "updateModeAwareToolPanels");
+  const expandZoneSource = printNamedFunction(appSource, "App.tsx", "expandStudioWorkspaceZone");
+  const activateZoneSource = printNamedFunction(appSource, "App.tsx", "activateWorkspaceZone");
+  check(
+    modePanelsSource.includes("expandStudioWorkspaceZone(activeWorkspaceZoneRef.current)") &&
+      !modePanelsSource.includes("setArrangementToolsOpen(advancedOpen)") &&
+      !modePanelsSource.includes("Object.fromEntries(projectRef.current.mixer") &&
+      expandZoneSource.includes('zone === "compose"') &&
+      expandZoneSource.includes('zone === "arrange"') &&
+      expandZoneSource.includes('zone === "mix"') &&
+      activateZoneSource.includes('projectRef.current.mode === "studio"') &&
+      activateZoneSource.includes("expandStudioWorkspaceZone(zone)"),
+    "Studio mode should expand only the active workspace zone immediately and materialize each inactive zone once on first activation"
+  );
+  check(
+    appSource.includes('import { Activity, startTransition, useEffect, useMemo, useRef, useState } from "react";') &&
+      appSource.includes('function workspaceActivityMode(visible: boolean): "visible" | "hidden"') &&
+      appSource.includes('typeof document === "undefined" || visible') &&
+      appSource.includes('<Activity mode={workspaceActivityMode(guidanceCenterOpen)} name="guide-review-center">') &&
+      ["compose", "arrange", "mix", "deliver"].every((zone) =>
+        appSource.includes(
+          `<Activity mode={workspaceActivityMode(activeWorkspaceZone === "${zone}")} name="workspace-${zone}">`
+        )
+      ),
+    "closed Guide content and inactive functional tab bodies should use React Activity to defer hidden updates while preserving their DOM and local state"
   );
 }
 
@@ -1545,10 +2087,12 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
   const workspaceZoneSource = printNamedFunction(appSource, "App.tsx", "workspaceZoneForTarget");
   const workspaceActivationSource = printNamedFunction(appSource, "App.tsx", "activateWorkspaceZone");
   const workspaceScrollSource = printNamedFunction(appSource, "App.tsx", "scrollWorkspaceTargetIntoView");
+  const workspaceRouteSource = printNamedFunction(appSource, "App.tsx", "routeWorkspaceTargetIntoView");
   const guidanceScrollSource = printNamedFunction(appSource, "App.tsx", "scrollGuidanceTargetIntoView");
   const beatPassportRouteSource = printNamedFunction(appSource, "App.tsx", "focusBeatPassportRouteReadout");
   const runQuickActionSource = printNamedFunction(appSource, "App.tsx", "runQuickAction");
   const workflowJumpSource = printNamedFunction(appSource, "App.tsx", "jumpToWorkflowZone");
+  const workflowTabSelectionSource = printNamedFunction(appSource, "App.tsx", "selectWorkflowNavigatorTab");
   const desktopShortcutSource = printNamedFunction(appSource, "App.tsx", "handleDesktopShortcut");
   const nativeMenuSource = printNamedFunction(appSource, "App.tsx", "handleNativeMenuCommand");
   const midiCaptureSource = printNamedFunction(appSource, "App.tsx", "captureMidiNoteEvent");
@@ -1562,6 +2106,29 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
     "App.tsx",
     "focusReviewQueueRouteReadout"
   );
+  const coldWorkspaceRouteSources = [
+    "focusBeatReadinessCheck",
+    "focusBeatPassportMetric",
+    "focusProductionSnapshotMetric",
+    "focusSnapshotCompareMetric",
+    "focusHookReadinessCard",
+    "focusToplineSpaceCard",
+    "focusModeFocusCard",
+    "focusSessionPassCard",
+    "focusReviewQueueItem"
+  ].map((name) => printNamedFunction(appSource, "App.tsx", name));
+  const coldWorkspaceReadoutRoutes = [
+    ["focusPatternPlaybackReadout", 'routeWorkspaceTargetIntoView("compose", "start")'],
+    ["focusPatternUseReadout", 'routeWorkspaceTargetIntoView("arrange", "start")'],
+    ["focusStemAuditionReadout", 'routeWorkspaceTargetIntoView("mix", "start")'],
+    ["focusMasterFinishReadout", 'routeWorkspaceTargetIntoView("master", "center")'],
+    ["focusTimbreCheck", 'routeWorkspaceTargetIntoView("sound", "start")'],
+    ["focusExportPreflightRouteReadout", 'routeWorkspaceTargetIntoView("deliver", "start")'],
+    ["focusTransportPositionReadout", 'routeWorkspaceTargetIntoView("transport", "start")']
+  ].map(([name, route]) => ({
+    route,
+    source: printNamedFunction(appSource, "App.tsx", name)
+  }));
   check(
     html.includes("Guided · opens the drum grid") &&
       html.includes("Studio · opens Review Queue") &&
@@ -1569,7 +2136,7 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       html.includes('data-testid="review-queue" aria-label="Review queue" tabindex="-1"'),
     "first-run choices should name their direct destinations and keep both landing regions programmatically focusable"
   );
-  const zoneResolutionIndex = workspaceScrollSource.indexOf("workspaceZoneForTarget(target)");
+  const zoneResolutionIndex = workspaceScrollSource.indexOf("zoneHint ?? workspaceZoneForTarget(initialTarget)");
   const zoneActivationIndex = workspaceScrollSource.indexOf("activateWorkspaceZone(zone)");
   const focusTransferIndex = workspaceScrollSource.indexOf("if (shouldTransferFocus)");
   const targetFocusIndex = workspaceScrollSource.indexOf("target.focus({ preventScroll: true })");
@@ -1585,9 +2152,9 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       audienceStarterLandingSource.includes("setMasterReviewOpen(true)") &&
       audienceStarterLandingSource.includes("setMasterReviewQueueOpen(true)") &&
       audienceStarterLandingSource.includes(
-        'starterId === "beginner" ? composePanelRef.current : reviewQueuePanelRef.current'
+        'scrollWorkspaceTargetIntoView(() => reviewQueuePanelRef.current, "start", "mix")'
       ) &&
-      audienceStarterLandingSource.includes("scrollWorkspaceTargetIntoView(target)") &&
+      audienceStarterLandingSource.includes('routeWorkspaceTargetIntoView("compose")') &&
       audienceStarterLandingSource.includes("focus({ preventScroll: true })") &&
       createAudienceStarterSource.includes("focusAudienceStarterLanding(starterId)") &&
       workspaceZoneSource.includes('[data-workspace-zone]') &&
@@ -1604,19 +2171,35 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       !workspaceScrollSource.includes("window.innerWidth < 1221") &&
       workspaceScrollSource.includes("navigator.getBoundingClientRect().bottom + 12") &&
       workspaceScrollSource.includes('window.scrollBy({ top: targetTop - desiredTop, behavior: "auto" })') &&
-      workflowJumpSource.includes("scrollWorkspaceTargetIntoView(targetRefs[zone])") &&
+      workspaceRouteSource.includes("scrollWorkspaceTargetIntoView(() => workspaceRouteElement(target), block, zone)") &&
+      workspaceScrollSource.includes('document.getElementById(`workspace-panel-${zone}`)') &&
+      coldWorkspaceRouteSources.every((source) => source.includes("routeWorkspaceTargetIntoView")) &&
+      workflowJumpSource.includes("routeWorkspaceTargetIntoView(zone)") &&
+      workflowTabSelectionSource.includes("guidanceCenterRef.current?.open") &&
+      workflowTabSelectionSource.includes("flushSync(() => setGuidanceCenterOpen(false))") &&
+      workflowTabSelectionSource.includes("jumpToWorkflowNavigatorItem(item)") &&
+      appSource.includes("onJump={selectWorkflowNavigatorTab}") &&
+      appSource.includes("onJumpWorkflowSpotlight={jumpToWorkflowNavigatorItem}") &&
       mixTabpanelIndex >= 0 &&
       reviewQueueIndex > mixTabpanelIndex &&
       reviewQueueIndex < deliverTabpanelIndex,
-    "central workspace reveal should activate the target tab before scrolling, including beginner Compose and producer Review Queue in Mix"
+    "direct functional-tab selection should collapse Guide Activity before revealing the workspace while internal Guide routes preserve their open context"
+  );
+  check(
+    coldWorkspaceReadoutRoutes.every(({ route, source }) => source.includes(route)) &&
+      !/scrollWorkspaceTargetIntoView\((?:compose|arrange|mix|master|sound|deliver|transport)PanelRef\.current/.test(
+        appSource
+      ),
+    "cold Quick Action readouts should resolve functional-tab targets only after the destination Activity is activated"
   );
   const guidanceRevealIndex = guidanceScrollSource.indexOf("flushSync(() => setGuidanceCenterOpen(true))");
   const guidanceFocusIndex = guidanceScrollSource.indexOf("target.focus({ preventScroll: true })");
   const guidanceScrollIndex = guidanceScrollSource.indexOf('target.scrollIntoView({ block, behavior: "auto" })');
   check(
-    appSource.includes("const guidanceCenterRef = useRef<HTMLDetailsElement | null>(null);") &&
+      appSource.includes("const guidanceCenterRef = useRef<HTMLDetailsElement | null>(null);") &&
       appSource.includes("ref={guidanceCenterRef}") &&
-      guidanceScrollSource.includes("guidanceCenter?.contains(target)") &&
+      guidanceScrollSource.includes("initialGuidanceCenter?.contains(initialTarget)") &&
+      guidanceScrollSource.includes('const deferredTarget = typeof targetResolver === "function"') &&
       guidanceScrollSource.includes("activeElement === document.body") &&
       guidanceScrollSource.includes("activeElement?.closest('[role=\"dialog\"], [data-testid=\"quick-actions\"]')") &&
       guidanceRevealIndex >= 0 &&
@@ -1626,7 +2209,7 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       guidanceScrollIndex > guidanceFocusIndex &&
       guidanceScrollSource.includes("getComputedStyle(navigator).position !== \"sticky\"") &&
       guidanceScrollSource.includes("navigator.getBoundingClientRect().bottom + 12") &&
-      beatPassportRouteSource.includes('scrollGuidanceTargetIntoView(beatPassportPanelRef.current, "start")') &&
+      beatPassportRouteSource.includes('scrollGuidanceTargetIntoView(() => beatPassportPanelRef.current, "start")') &&
       html.includes('data-testid="beat-passport" tabindex="-1"') &&
       runQuickActionSource.includes('action.group === "Project" || action.group === "Export"') &&
       runQuickActionSource.includes("flushSync(() => setGuidanceCenterOpen(true))"),
@@ -1697,14 +2280,16 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
   );
   check(
     finishChecklistRouteSource.includes("flushSync(() => setMasterReviewOpen(true))") &&
-      finishChecklistRouteSource.includes('scrollWorkspaceTargetIntoView(finishChecklistPanelRef.current, "start")') &&
+      finishChecklistRouteSource.includes(
+        'scrollWorkspaceTargetIntoView(() => finishChecklistPanelRef.current, "start", "mix")'
+      ) &&
       !finishChecklistRouteSource.includes("finishChecklistPanelRef.current?.scrollIntoView"),
     "Finish Checklist route readout should synchronously reveal its disclosure and use the central Mix-tab reveal path"
   );
   const reviewQueueOuterRevealIndex = reviewQueueRouteSource.indexOf("setMasterReviewOpen(true)");
   const reviewQueueInnerRevealIndex = reviewQueueRouteSource.indexOf("setMasterReviewQueueOpen(true)");
   const reviewQueueScrollIndex = reviewQueueRouteSource.indexOf(
-    'scrollWorkspaceTargetIntoView(reviewQueuePanelRef.current, "start")'
+    'scrollWorkspaceTargetIntoView(() => reviewQueuePanelRef.current, "start", "mix")'
   );
   check(
     reviewQueueRouteSource.includes("flushSync(() => {") &&
@@ -2079,12 +2664,13 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
     "the reachable minimum desktop width should use an intermediate transport layout without hiding setup, audience, command, or disclosure surfaces"
   );
   check(
-    styles.includes("clamp(118px, 13vw, 150px)") &&
-      styles.includes("clamp(138px, 15vw, 180px)") &&
-      styles.includes("clamp(150px, 16vw, 190px)") &&
+    styles.includes(".workspace-tabs-surface {\n    grid-template-columns: minmax(180px, 0.22fr) minmax(0, 1fr);") &&
+      styles.includes(
+        ".workflow-review-surface {\n    grid-template-columns: minmax(145px, 0.18fr) minmax(280px, 0.36fr) minmax(240px, 0.46fr);"
+      ) &&
       styles.includes(".app-shell > .workflow-navigator {\n    position: sticky;\n    top: 8px;") &&
       styles.includes(
-        ".workspace-zone-panel,\n  .workspace-grid > .panel,\n  .guidance-center-content > *,\n  .review-queue,\n  .handoff-pack {\n    scroll-margin-top: 116px;"
+        ".workspace-zone-panel,\n  .workspace-grid > .panel,\n  .guidance-center-content > *,\n  .review-queue,\n  .handoff-pack {\n    scroll-margin-top: 176px;"
       ) &&
       electronMainSource.includes("stickyNavigatorAfterDeepScroll") &&
       electronMainSource.includes('navigatorPosition !== "sticky"') &&
@@ -2296,10 +2882,9 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
   );
   check(
     appSource.includes("sanitizeProjectTitleInput(event.target.value)") &&
-      appSource.includes("normalizeProjectTitle(projectRef.current.title)") &&
+      appSource.includes("normalizeProjectTitle(value)") &&
       appSource.includes("maxLength={maxProjectTitleLength * 2}") &&
-      /maxLength="160"/.test(html) &&
-      appSource.includes('"Normalized project title"'),
+      /maxLength="160"/.test(html),
     "project title input should sanitize while typing, preserve the Unicode code-point budget, and finalize on blur"
   );
   check(
@@ -2442,6 +3027,16 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       html.includes("Select to edit") &&
       html.includes("Editing"),
     "Chord event cards should keep exactly one selected editor expanded while peers remain compact and scannable"
+  );
+  check(
+    composePanelsSource.includes("handleChordCardKeyboardActivation(event, () => onSelect(index));") &&
+      chordCardKeyboardActivationSource.includes("event.target !== event.currentTarget") &&
+      chordCardKeyboardActivationSource.includes('event.key !== "Enter" && event.key !== " "') &&
+      chordCardKeyboardActivationSource.includes("event.preventDefault();") &&
+      chordCardKeyboardActivationSource.includes("event.stopPropagation();") &&
+      chordCardKeyboardActivationSource.indexOf("event.stopPropagation();") <
+        chordCardKeyboardActivationSource.indexOf("onActivate();"),
+    "Chord card Enter/Space activation should only handle the card itself, preserving nested control keyboard clicks while stopping the global Space transport shortcut"
   );
   const arrangementPanelIndex = html.indexOf('data-testid="workflow-target-arrange"');
   const arrangementPlaybackIndex = html.indexOf('data-testid="arrangement-playback-readout"');
@@ -4180,9 +4775,14 @@ try {
     workstation: await server.ssrLoadModule("/src/domain/workstation.ts")
   });
   validateProjectSaveCompletion(await server.ssrLoadModule("/src/ui/projectSaveCompletion.ts"));
+  validateProjectScopedUiState(await server.ssrLoadModule("/src/ui/projectExportCompletion.ts"));
   validateSqliteProjectStorage();
   const html = renderToStaticMarkup(React.createElement(App));
   validateFirstRunRenderer(html, workstation.styleProfiles.length);
+  validateProjectAudioAnalysisPerformance(
+    html,
+    await server.ssrLoadModule("/src/ui/workstationAppHelpers.tsx")
+  );
   check(
     html.includes('data-testid="keyboard-capture-step-mode-playhead"') &&
       html.includes("<span>Overdub</span>") &&

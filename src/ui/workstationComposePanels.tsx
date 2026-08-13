@@ -14,6 +14,7 @@ import {
 import { chanceBadgeLabel, clampStepStart, compactChanceBadgeLabel, nextEmptyChordStep, percentLabel, pitchParts, timingLabel, trackOctaveRange } from "./workstationPatternTools";
 import type { StudioToneBaseline, StudioToneBaselineResult, StudioToneDriftSummary, StudioToneResetResult } from "./studioToneTools";
 import { studioToneControls, studioToneResetNextCheck } from "./studioToneTools";
+import { handleChordCardKeyboardActivation } from "./chordCardKeyboardActivation";
 
 export function DrumStepInspector({
   selectedStep,
@@ -2898,10 +2899,7 @@ export function ChordEditor({
               onClick={() => onSelect(index)}
               onFocusCapture={() => onSelect(index)}
               onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onSelect(index);
-                }
+                handleChordCardKeyboardActivation(event, () => onSelect(index));
               }}
               onPointerDownCapture={() => onSelect(index)}
               role="group"
