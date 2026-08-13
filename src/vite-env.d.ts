@@ -500,7 +500,9 @@ interface Window {
     collectAudienceStarterLandingEvidence?: () =>
       | GrooveforgeLaunchSmokeStarterLandingEvidence
       | Promise<GrooveforgeLaunchSmokeStarterLandingEvidence>;
-    collectAudienceSessionQuickActionEvidence?: () => GrooveforgeLaunchSmokePaletteEvidence | Promise<GrooveforgeLaunchSmokePaletteEvidence>;
+    collectAudienceSessionQuickActionEvidence?: (options?: {
+      skipStarterRoutes?: boolean;
+    }) => GrooveforgeLaunchSmokePaletteEvidence | Promise<GrooveforgeLaunchSmokePaletteEvidence>;
     collectChordCardKeyboardEvidence?: () => GrooveforgeLaunchSmokeChordCardEvidence;
     setModeAwareToolPanels?: (mode: "guided" | "studio") => void;
   };

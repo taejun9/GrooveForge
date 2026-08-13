@@ -482,6 +482,9 @@ function checkResult(result) {
       evidence?.modalFocus?.dockShortcutMetadataReady === true &&
       evidence?.modalFocus?.dockFocusReady === true &&
       evidence?.modalFocus?.dockSharedPlayReady === true &&
+      evidence?.modalFocus?.dockPlayHitTargetReady === true &&
+      evidence?.modalFocus?.dockOriginalPlaybackRestored === true &&
+      evidence?.modalFocus?.dockPostureRestored === true &&
       evidence?.modalFocus?.dockActionsOpened === true &&
       evidence?.modalFocus?.dockActionsFocusRestored === true,
     "live desktop workspace command dock should mirror header state and reuse Play plus Quick Actions through native pointer/Escape input"
@@ -510,6 +513,32 @@ function checkResult(result) {
       evidence?.layout?.audienceSessionProofInteractionReady === true &&
       evidence?.layout?.audienceSessionProofRowsPreserved === true,
     `live desktop Audience Session should keep actions direct and proof compact with native open-close behavior (actions ${evidence?.layout?.audienceSessionActionsDirectVisible}, open ${evidence?.layout?.audienceSessionProofOpen}, toggle ${evidence?.layout?.audienceSessionProofToggleVisible}, hidden ${evidence?.layout?.audienceSessionProofContentHidden}, interaction ${evidence?.layout?.audienceSessionProofInteractionReady}, rows ${evidence?.layout?.audienceSessionProofRowsPreserved})`
+  );
+  const audioAnalysisPrewarm = evidence?.layout?.audioAnalysisPrewarm;
+  check(
+    audioAnalysisPrewarm?.exactState === "ready" &&
+      typeof audioAnalysisPrewarm?.retryRequested === "boolean" &&
+      audioAnalysisPrewarm?.nativeRouteSequence?.join(",") === "workflow-jump-mix,workflow-jump-compose" &&
+      audioAnalysisPrewarm?.initial?.activeZone === "compose" &&
+      audioAnalysisPrewarm?.initial?.selectedTabCount === 1 &&
+      audioAnalysisPrewarm?.initial?.selectedTabTestId === "workflow-jump-compose" &&
+      audioAnalysisPrewarm?.initial?.visiblePanelCount === 1 &&
+      audioAnalysisPrewarm?.initial?.visiblePanelZones?.join(",") === "compose" &&
+      audioAnalysisPrewarm?.mix?.activeZone === "mix" &&
+      audioAnalysisPrewarm?.mix?.selectedTabCount === 1 &&
+      audioAnalysisPrewarm?.mix?.selectedTabTestId === "workflow-jump-mix" &&
+      audioAnalysisPrewarm?.mix?.visiblePanelCount === 1 &&
+      audioAnalysisPrewarm?.mix?.visiblePanelZones?.join(",") === "mix" &&
+      audioAnalysisPrewarm?.mix?.focusOnSelectedTab === true &&
+      audioAnalysisPrewarm?.mix?.focusedTestId === "workflow-jump-mix" &&
+      audioAnalysisPrewarm?.restored?.activeZone === "compose" &&
+      audioAnalysisPrewarm?.restored?.selectedTabCount === 1 &&
+      audioAnalysisPrewarm?.restored?.selectedTabTestId === "workflow-jump-compose" &&
+      audioAnalysisPrewarm?.restored?.visiblePanelCount === 1 &&
+      audioAnalysisPrewarm?.restored?.visiblePanelZones?.join(",") === "compose" &&
+      audioAnalysisPrewarm?.restored?.focusOnSelectedTab === true &&
+      audioAnalysisPrewarm?.restored?.focusedTestId === "workflow-jump-compose",
+    `live desktop exact-audio prewarm should use native Mix, reach ready, and restore the selected visible focused Compose route (${JSON.stringify(audioAnalysisPrewarm)})`
   );
   check(
     evidence?.layout?.launchpadOpen === true &&
@@ -1229,6 +1258,47 @@ function checkResult(result) {
       String(evidence?.palette?.starterProducer?.visibleFollowupReadinessResult ?? "").includes("Export Preflight") &&
       String(evidence?.palette?.starterProducer?.visibleFollowupCompletionResult ?? "").includes("Package"),
     "live desktop Audience Starter producer follow-up buttons should route to Review Queue, Export Preflight, and Handoff Package Check surfaces"
+  );
+  for (const [starterId, expectedTitle, expectedMode] of [
+    ["Beginner", "First Guided Beat", "guided"],
+    ["Producer", "Producer Fast Pass", "studio"]
+  ]) {
+    const refresh = evidence?.palette?.[`starter${starterId}AudioRefresh`];
+    check(
+      refresh?.exactState === "ready" &&
+        typeof refresh?.retryRequested === "boolean" &&
+        refresh?.projectTitle === expectedTitle &&
+        refresh?.projectMode === expectedMode &&
+        refresh?.guideOpen === true &&
+        refresh?.starterActionsVisible === true &&
+        refresh?.restored?.activeZone === "compose" &&
+        refresh?.restored?.selectedTabCount === 1 &&
+        refresh?.restored?.selectedTabTestId === "workflow-jump-compose" &&
+        refresh?.restored?.visiblePanelCount === 1 &&
+        refresh?.restored?.visiblePanelZones?.join(",") === "compose" &&
+        refresh?.restored?.focusOnSelectedTab === true &&
+        refresh?.restored?.focusedTestId === "workflow-jump-compose",
+      `live desktop ${starterId.toLowerCase()} Audience Starter should refresh exact audio through native Mix and restore visible focused Compose+Guide (${JSON.stringify(refresh)})`
+    );
+  }
+  const paletteStageTimings = Array.isArray(evidence?.palette?.stageTimings)
+    ? evidence.palette.stageTimings
+    : [];
+  const paletteStageIds = paletteStageTimings.map((timing) => timing?.id);
+  check(
+    [
+      "mode-tools",
+      "native-chord-cards",
+      "quick-actions-hook-without-starters",
+      "native-producer-starter",
+      "native-beginner-starter",
+      "native-launchpad-changed-and-manual",
+      "native-launchpad-identical-starter"
+    ].every((id) => paletteStageIds.includes(id)) &&
+      paletteStageTimings.every(
+        (timing) => Number.isFinite(timing?.durationMs) && timing.durationMs >= 0 && timing.durationMs < 900_000
+      ),
+    `live desktop Quick Actions palette should report every bounded substage duration (${JSON.stringify(paletteStageTimings)})`
   );
   check(
     evidence?.commandReference?.opened === true &&

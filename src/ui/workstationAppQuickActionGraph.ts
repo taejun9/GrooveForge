@@ -7369,7 +7369,7 @@ export function createQuickActions({
       disabled: !nextHandoffItem,
       run: () => {
         if (nextHandoffItem) {
-          nextHandoffItem.run();
+          return nextHandoffItem.run();
         }
       }
     },

@@ -10,6 +10,7 @@
     "build": "tsc -p tsconfig.json && vite build && tsc -p tsconfig.electron.json",
     "quick-actions:bundle-smoke": "node harness/scripts/run_quick_actions_bundle_smoke.mjs",
     "desktop": "npm run build && node harness/scripts/run_desktop_app.mjs",
+    "desktop:manual-qa": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_manual_qa.mjs",
     "desktop:smoke": "node harness/scripts/run_desktop_entry_smoke.mjs",
     "desktop:crash-report-regression-smoke": "node harness/scripts/run_desktop_crash_report_regression_smoke.mjs",
     "desktop:launch-smoke": "node harness/scripts/run_desktop_launch_smoke.mjs",
