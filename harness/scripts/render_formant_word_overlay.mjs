@@ -27,7 +27,8 @@ const BYTES_PER_SAMPLE = 3;
 const BLOCK_ALIGN = CHANNELS * BYTES_PER_SAMPLE;
 const WORD_BEATS = 1.5;
 const TERMINAL_FADE_SECONDS = 0.08;
-const MAX_INPUT_BYTES = 1_000_000_000;
+const MAX_DURATION_SECONDS = 150;
+const MAX_INPUT_BYTES = 44 + MAX_DURATION_SECONDS * SAMPLE_RATE * BLOCK_ALIGN;
 const SUPPORTED_VARIANTS = new Set(["ghost", "narrow", "full", "lift", "outro"]);
 
 function fail(message) {
@@ -93,7 +94,14 @@ function writeInt24Le(bytes, offset, value) {
   bytes[offset + 2] = (unsigned >>> 16) & 0xff;
 }
 
-function parseCanonicalPcm24(bytes, label) {
+function assertBoundedInputByteLength(byteLength, label) {
+  if (!Number.isSafeInteger(byteLength) || byteLength < 44 || byteLength > MAX_INPUT_BYTES) {
+    fail(`${label} must fit the canonical ${MAX_DURATION_SECONDS}-second PCM24 byte budget (${MAX_INPUT_BYTES} bytes).`);
+  }
+}
+
+function inspectCanonicalPcm24Header(bytes, totalBytes, label) {
+  assertBoundedInputByteLength(totalBytes, label);
   if (bytes.length < 44) fail(`${label} must have a canonical 44-byte WAV header.`);
   const ascii = (offset, length) => bytes.subarray(offset, offset + length).toString("ascii");
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -109,10 +117,19 @@ function parseCanonicalPcm24(bytes, label) {
   const dataBytes = view.getUint32(40, true);
   if (view.getUint32(16, true) !== 16 || audioFormat !== 1 || channels !== CHANNELS || sampleRate !== SAMPLE_RATE ||
       byteRate !== SAMPLE_RATE * BLOCK_ALIGN || blockAlign !== BLOCK_ALIGN || bitDepth !== BIT_DEPTH ||
-      view.getUint32(4, true) !== bytes.length - 8 || dataBytes !== bytes.length - 44 || dataBytes % BLOCK_ALIGN !== 0) {
+      view.getUint32(4, true) !== totalBytes - 8 || dataBytes !== totalBytes - 44 || dataBytes % BLOCK_ALIGN !== 0) {
     fail(`${label} must be stereo 44.1 kHz signed PCM 24-bit with a canonical header.`);
   }
   const frames = dataBytes / BLOCK_ALIGN;
+  const durationSeconds = frames / SAMPLE_RATE;
+  if (durationSeconds < 110 || durationSeconds > MAX_DURATION_SECONDS) {
+    fail(`${label} duration must be 110-${MAX_DURATION_SECONDS} seconds.`);
+  }
+  return { frames, durationSeconds };
+}
+
+function parseCanonicalPcm24(bytes, label) {
+  const { frames } = inspectCanonicalPcm24Header(bytes, bytes.length, label);
   const left = new Float64Array(frames);
   const right = new Float64Array(frames);
   for (let frame = 0, offset = 44; frame < frames; frame += 1, offset += BLOCK_ALIGN) {
@@ -414,6 +431,34 @@ async function assertRegularNonSymlink(filePath, label, maxBytes = MAX_INPUT_BYT
   return stats;
 }
 
+async function readBoundedCanonicalPcm24(filePath, label) {
+  const pathStats = await assertRegularNonSymlink(filePath, label, MAX_INPUT_BYTES);
+  assertBoundedInputByteLength(pathStats.size, label);
+  const handle = await open(filePath, "r");
+  try {
+    const openedStats = await handle.stat();
+    if (!openedStats.isFile() || openedStats.size !== pathStats.size) fail(`${label} changed before bounded read.`);
+    assertBoundedInputByteLength(openedStats.size, label);
+    const header = Buffer.alloc(44);
+    const headerRead = await handle.read(header, 0, header.length, 0);
+    if (headerRead.bytesRead !== header.length) fail(`${label} header ended before 44 bytes.`);
+    const headerInfo = inspectCanonicalPcm24Header(header, openedStats.size, label);
+
+    const bytes = Buffer.allocUnsafe(openedStats.size);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const chunk = await handle.read(bytes, offset, Math.min(1_048_576, bytes.length - offset), offset);
+      if (chunk.bytesRead <= 0) fail(`${label} ended during bounded read.`);
+      offset += chunk.bytesRead;
+    }
+    const finalStats = await handle.stat();
+    if (finalStats.size !== openedStats.size) fail(`${label} changed during bounded read.`);
+    return { bytes, headerInfo };
+  } finally {
+    await handle.close();
+  }
+}
+
 async function assertOutputPath(filePath, label) {
   if (typeof filePath !== "string" || !path.isAbsolute(filePath) || path.basename(filePath) === "") {
     fail(`${label} must be an absolute file path.`);
@@ -473,7 +518,32 @@ async function writeNew(filePath, bytes) {
   }
 }
 
+function runSafetySelfTest() {
+  const maximumHeader = wavHeader(MAX_INPUT_BYTES - 44);
+  const maximum = inspectCanonicalPcm24Header(maximumHeader, MAX_INPUT_BYTES, "Safety maximum WAV");
+  if (maximum.frames !== MAX_DURATION_SECONDS * SAMPLE_RATE || maximum.durationSeconds !== MAX_DURATION_SECONDS) {
+    fail("Safety self-test failed to accept the exact 150-second PCM24 boundary.");
+  }
+  let rejectedOversizedInput = false;
+  try {
+    assertBoundedInputByteLength(MAX_INPUT_BYTES + BLOCK_ALIGN, "Safety oversized WAV");
+  } catch (error) {
+    rejectedOversizedInput = error instanceof Error && error.message.includes("byte budget");
+  }
+  if (!rejectedOversizedInput) fail("Safety self-test failed to reject an over-budget input before allocation.");
+  console.log(JSON.stringify({
+    ok: true,
+    maxInputBytes: MAX_INPUT_BYTES,
+    maxDurationSeconds: MAX_DURATION_SECONDS,
+    oversizedRejectedBeforeAllocation: true
+  }));
+}
+
 async function main() {
+  if (process.argv.length === 3 && process.argv[2] === "--safety-self-test") {
+    runSafetySelfTest();
+    return;
+  }
   const specIndex = process.argv.indexOf("--spec");
   if (specIndex < 0 || specIndex + 1 >= process.argv.length || process.argv.length !== 4) {
     fail("Usage: node harness/scripts/render_formant_word_overlay.mjs --spec /absolute/path/spec.json");
@@ -483,18 +553,17 @@ async function main() {
   await assertRegularNonSymlink(specPath, "Spec file", 1_000_000);
   const specBytes = await readFile(specPath);
   const spec = parseSpec(JSON.parse(specBytes.toString("utf8")));
-  await assertRegularNonSymlink(spec.instrumentalPath, "Instrumental WAV");
   await Promise.all([
     assertOutputPath(spec.outputMixPath, "Output mix"),
     assertOutputPath(spec.outputVocalPath, "Output vocal"),
     assertOutputPath(spec.reportPath, "Output report")
   ]);
 
-  const instrumentalBytes = await readFile(spec.instrumentalPath);
+  const instrumentalRead = await readBoundedCanonicalPcm24(spec.instrumentalPath, "Instrumental WAV");
+  const instrumentalBytes = instrumentalRead.bytes;
   const instrumentalSha256 = sha256(instrumentalBytes);
   const decoded = parseCanonicalPcm24(instrumentalBytes, "Instrumental WAV");
-  const durationSeconds = decoded.frames / SAMPLE_RATE;
-  if (durationSeconds < 110 || durationSeconds > 150) fail("Instrumental duration must be 110-150 seconds.");
+  const durationSeconds = instrumentalRead.headerInfo.durationSeconds;
 
   const vocalLeft = new Float64Array(decoded.frames);
   const vocalRight = new Float64Array(decoded.frames);
@@ -598,7 +667,7 @@ async function main() {
   check(vocalAnalysis.rmsDbfs > -80, "vocal: stem is unexpectedly silent");
   check(Object.values(formantChecks).every((value) => Number.isFinite(value) && value > 0), "formant: expected spectral bands are absent");
 
-  const sourceFinalBytes = await readFile(spec.instrumentalPath);
+  const sourceFinalBytes = (await readBoundedCanonicalPcm24(spec.instrumentalPath, "Instrumental WAV postflight")).bytes;
   const sourceFinalSha256 = sha256(sourceFinalBytes);
   check(sourceFinalSha256 === instrumentalSha256 && sourceFinalBytes.equals(instrumentalBytes), "instrumental source changed during render");
   if (qaFailures.length > 0) fail(`Rendered QA failed: ${qaFailures.join("; ")}`);
