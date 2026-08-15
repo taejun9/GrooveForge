@@ -10886,10 +10886,11 @@ async function selectManualQaNativeOption(win: BrowserWindow, testId: string, va
     if (!(target instanceof HTMLSelectElement)) return null;
     return {
       current: target.value,
+      currentIndex: target.selectedIndex,
       optionIndex: Array.from(target.options).findIndex((option) => option.value === ${JSON.stringify(value)}),
       options: Array.from(target.options).map((option) => option.value)
     };
-  })()`)) as { current: string; optionIndex: number; options: string[] } | null;
+  })()`)) as { current: string; currentIndex: number; optionIndex: number; options: string[] } | null;
   if (!optionState || optionState.optionIndex < 0) {
     throw new Error(`${testId} does not expose option ${value}.`);
   }
@@ -10898,9 +10899,10 @@ async function selectManualQaNativeOption(win: BrowserWindow, testId: string, va
   }
   const interactionStartedAt = Date.now();
   await clickManualQaNativeTarget(win, testId);
-  await sendManualQaNativeKey(win, "Home");
-  for (let index = 0; index < optionState.optionIndex; index += 1) {
-    await sendManualQaNativeKey(win, "Down", [], 45);
+  const optionDelta = optionState.optionIndex - optionState.currentIndex;
+  const keyCode = optionDelta > 0 ? "Down" : "Up";
+  for (let index = 0; index < Math.abs(optionDelta); index += 1) {
+    await sendManualQaNativeKey(win, keyCode, [], 60);
   }
   await sendManualQaNativeKey(win, "Enter", [], 180);
   await waitForManualQaCondition(
