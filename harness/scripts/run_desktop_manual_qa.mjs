@@ -438,6 +438,76 @@ async function readExternalRegularFile(filePath, { label, maxBytes }) {
   return { contents: await readFile(resolved), path: resolved, stats };
 }
 
+async function collectExternalSourcePostflight(initialEvidence) {
+  try {
+    const finalFile = await readExternalRegularFile(initialEvidence.externalSourcePath, {
+      label: "Movement source project postflight",
+      maxBytes: initialEvidence.maxBytes
+    });
+    const externalSourceFinalBytes = finalFile.contents.byteLength;
+    const externalSourceFinalSha256 = sha256(finalFile.contents);
+    return {
+      externalSourceFinalBytes,
+      externalSourceFinalSha256,
+      externalSourceVerifiedAt: new Date().toISOString(),
+      sourceUnchanged:
+        externalSourceFinalBytes === initialEvidence.externalSourceBytes &&
+        externalSourceFinalSha256 === initialEvidence.externalSourceSha256
+    };
+  } catch (error) {
+    return {
+      externalSourcePostflightError: error instanceof Error ? error.message : String(error),
+      externalSourceVerifiedAt: new Date().toISOString(),
+      sourceUnchanged: false
+    };
+  }
+}
+
+async function persistMovementExternalSourcePostflight(reportPath, initialEvidence, postflight) {
+  await assertSafeWorkspaceTarget(reportPath, { expectedType: "file", mustExist: true });
+  const report = objectValue(JSON.parse(await readFile(reportPath, "utf8")));
+  if (
+    !report ||
+    report.mode !== "visible-native-auto-movement-qa" ||
+    !Array.isArray(report.failures) ||
+    !objectValue(report.safety)
+  ) {
+    throw new Error("Movement QA report is missing its required mode, failures, or safety contract.");
+  }
+  const safety = report.safety;
+  safety.externalSourceBytes = initialEvidence.externalSourceBytes;
+  safety.externalSourcePath = initialEvidence.externalSourcePath;
+  safety.externalSourceSha256 = initialEvidence.externalSourceSha256;
+  safety.externalSourceVerifiedAt = postflight.externalSourceVerifiedAt;
+  safety.sourceUnchanged = postflight.sourceUnchanged;
+  if (typeof postflight.externalSourceFinalBytes === "number") {
+    safety.externalSourceFinalBytes = postflight.externalSourceFinalBytes;
+  }
+  if (typeof postflight.externalSourceFinalSha256 === "string") {
+    safety.externalSourceFinalSha256 = postflight.externalSourceFinalSha256;
+  }
+  if (typeof postflight.externalSourcePostflightError === "string") {
+    safety.externalSourcePostflightError = postflight.externalSourcePostflightError;
+  }
+  if (!postflight.sourceUnchanged) {
+    const failure = `External movement source was changed or became unsafe after launch: ${
+      postflight.externalSourcePostflightError ??
+      JSON.stringify({
+        actualBytes: postflight.externalSourceFinalBytes,
+        actualSha256: postflight.externalSourceFinalSha256,
+        expectedBytes: initialEvidence.externalSourceBytes,
+        expectedSha256: initialEvidence.externalSourceSha256
+      })
+    }.`;
+    if (!report.failures.includes(failure)) {
+      report.failures.push(failure);
+    }
+    report.ok = false;
+  }
+  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  await assertSafeWorkspaceTarget(reportPath, { expectedType: "file", mustExist: true });
+}
+
 async function writeOwnedFixtureOrVerify(filePath, contents, label) {
   const existing = await lstatOrNull(filePath);
   if (existing) {
@@ -703,6 +773,28 @@ async function runSafetySelfTest() {
     await expectSafetyRejection("production bundle symbolic-link entry", () =>
       buildProvenanceFileManifest(fakeBuildRoot, provenanceBuildRoots)
     );
+
+    const externalSourcePath = path.join(testRoot, "movement-source.grooveforge.json");
+    await writeFile(externalSourcePath, "source-v1\n", "utf8");
+    const externalSource = await readExternalRegularFile(externalSourcePath, {
+      label: "Safety self-test movement source",
+      maxBytes: 1024
+    });
+    const initialExternalSourceEvidence = {
+      externalSourceBytes: externalSource.contents.byteLength,
+      externalSourcePath: externalSource.path,
+      externalSourceSha256: sha256(externalSource.contents),
+      maxBytes: 1024
+    };
+    const unchangedPostflight = await collectExternalSourcePostflight(initialExternalSourceEvidence);
+    if (!unchangedPostflight.sourceUnchanged) {
+      throw new Error("Manual QA safety self-test could not prove an unchanged external source.");
+    }
+    await writeFile(externalSourcePath, "source-v2\n", "utf8");
+    const changedPostflight = await collectExternalSourcePostflight(initialExternalSourceEvidence);
+    if (changedPostflight.sourceUnchanged) {
+      throw new Error("Manual QA safety self-test did not detect a changed external source hash.");
+    }
     console.log("GrooveForge desktop manual QA safety self-test passed.");
   } finally {
     await rm(testRoot, { recursive: true, force: true });
@@ -752,6 +844,7 @@ const expectedStarterProject = {
 const starterContents = workstation.serializeProjectFile(expectedStarterProject);
 let movementSpec = null;
 let movementSpecContents = null;
+let externalSourceEvidence = null;
 let openContents = starterContents;
 let openProject = expectedStarterProject;
 let savePath;
@@ -767,6 +860,12 @@ if (autoMovementQa) {
       label: "Movement source project",
       maxBytes: workstation.maxProjectFileBytes
     });
+    externalSourceEvidence = {
+      externalSourceBytes: externalSourceFile.contents.byteLength,
+      externalSourcePath: externalSourceFile.path,
+      externalSourceSha256: sha256(externalSourceFile.contents),
+      maxBytes: workstation.maxProjectFileBytes
+    };
     openContents = externalSourceFile.contents.toString("utf8");
     openProject = workstation.parseProjectFile(openContents);
     movementSpecContents = Buffer.from(`${JSON.stringify(movementSpec, null, 2)}\n`, "utf8");
@@ -844,6 +943,15 @@ const launcherManifest = {
     : autoSongQa
       ? "visible-native-auto-song-qa"
       : "visible-stable-manual-qa",
+  ...(externalSourceEvidence
+    ? {
+        externalSource: {
+          bytes: externalSourceEvidence.externalSourceBytes,
+          path: externalSourceEvidence.externalSourcePath,
+          sha256: externalSourceEvidence.externalSourceSha256
+        }
+      }
+    : {}),
   ...(movementSpec && movementSpecContents
     ? {
         movementSpec: {
@@ -979,15 +1087,49 @@ const autoQaParentTimeout = autoQa
   : null;
 autoQaParentTimeout?.unref();
 child.on("error", (error) => fail(`Could not start Electron: ${error.message}`));
-child.on("exit", (code, signal) => {
+child.on("exit", async (code, signal) => {
   if (autoQaParentTimeout) {
     clearTimeout(autoQaParentTimeout);
   }
-  if (code && code !== 0) {
+  let postflightFailure = "";
+  if (autoMovementQa) {
+    if (!externalSourceEvidence) {
+      postflightFailure = "Movement external source launch evidence was unavailable.";
+    } else {
+      const postflight = await collectExternalSourcePostflight(externalSourceEvidence);
+      try {
+        await persistMovementExternalSourcePostflight(
+          path.join(evidenceDirectory, "auto-movement-qa-report.json"),
+          externalSourceEvidence,
+          postflight
+        );
+      } catch (error) {
+        postflightFailure = `Could not persist Movement external source postflight: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+      }
+      if (!postflight.sourceUnchanged && !postflightFailure) {
+        postflightFailure = postflight.externalSourcePostflightError
+          ? `Movement external source postflight failed: ${postflight.externalSourcePostflightError}`
+          : "Movement external source size or SHA-256 changed after launch.";
+      }
+    }
+  }
+  const childFailed = code !== 0 || signal !== null;
+  if (childFailed || postflightFailure) {
+    const details = [];
+    if (childFailed) {
+      details.push(macGuiLaunchAbortDetails("npm run desktop:manual-qa", { code, signal, output: "" }));
+    }
+    if (postflightFailure) {
+      details.push(postflightFailure);
+    }
     fail(
-      `Electron manual QA exited with code ${code}${signal ? ` / signal ${signal}` : ""}.`,
-      macGuiLaunchAbortDetails("npm run desktop:manual-qa", { code, signal, output: "" })
+      childFailed
+        ? `Electron manual QA exited with code ${code ?? "none"}${signal ? ` / signal ${signal}` : ""}.`
+        : "Movement external source postflight failed.",
+      details.filter(Boolean).join("\n")
     );
   }
-  process.exit(code ?? 0);
+  process.exit(0);
 });

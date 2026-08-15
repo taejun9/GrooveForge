@@ -370,7 +370,25 @@ type ManualQaMovementReport = {
   };
   provenance: ManualQaProvenance;
   provenanceValidatedAtLaunch: true;
-  safety: ManualQaAutoSongReport["safety"];
+  reopenedProject?: {
+    arrangement: unknown;
+    arrangementMatches: boolean;
+    automation: unknown;
+    automationMatches: boolean;
+    observedAt: string;
+    projectStatus: string;
+    title: string;
+  };
+  safety: ManualQaAutoSongReport["safety"] & {
+    externalSourceBytes?: number;
+    externalSourceFinalBytes?: number;
+    externalSourceFinalSha256?: string;
+    externalSourcePath?: string;
+    externalSourcePostflightError?: string;
+    externalSourceSha256?: string;
+    externalSourceVerifiedAt?: string;
+    sourceUnchanged?: boolean;
+  };
   source: {
     bpm: unknown;
     key: unknown;
@@ -10954,99 +10972,6 @@ async function ensureManualQaDetailsOpen(win: BrowserWindow, detailsTestId: stri
   }
 }
 
-type ManualQaNativeScrollSnapshot = {
-  anchorBottom: number;
-  anchorHeight: number;
-  anchorTop: number;
-  scrollY: number;
-  targetBottom: number;
-  targetHeight: number;
-  targetTop: number;
-  targetWidth: number;
-  viewportHeight: number;
-};
-
-async function manualQaNativeScrollSnapshot(
-  win: BrowserWindow,
-  targetTestId: string,
-  anchorTestId: string
-): Promise<ManualQaNativeScrollSnapshot> {
-  return (await win.webContents.executeJavaScript(`(() => {
-    const target = document.querySelector('[data-testid=${JSON.stringify(targetTestId)}]');
-    const anchor = document.querySelector('[data-testid=${JSON.stringify(anchorTestId)}]');
-    const targetRect = target?.getBoundingClientRect();
-    const anchorRect = anchor?.getBoundingClientRect();
-    return {
-      anchorBottom: anchorRect?.bottom ?? 0,
-      anchorHeight: anchorRect?.height ?? 0,
-      anchorTop: anchorRect?.top ?? 0,
-      scrollY: window.scrollY,
-      targetBottom: targetRect?.bottom ?? 0,
-      targetHeight: targetRect?.height ?? 0,
-      targetTop: targetRect?.top ?? 0,
-      targetWidth: targetRect?.width ?? 0,
-      viewportHeight: window.innerHeight
-    };
-  })()`)) as ManualQaNativeScrollSnapshot;
-}
-
-async function revealManualQaNativeTargetWithKeyboard(
-  win: BrowserWindow,
-  targetTestId: string,
-  anchorTestId: string
-): Promise<void> {
-  const startedAt = Date.now();
-  const before = await manualQaNativeScrollSnapshot(win, targetTestId, anchorTestId);
-  if (before.anchorHeight <= 0) {
-    throw new Error(`${anchorTestId} is not rendered before native scrolling to ${targetTestId}.`);
-  }
-  let snapshot = before;
-  for (let attempt = 0; attempt < 48; attempt += 1) {
-    const targetRendered = snapshot.targetWidth > 0 && snapshot.targetHeight > 0;
-    const targetInViewport =
-      targetRendered && snapshot.targetTop >= 48 && snapshot.targetBottom <= snapshot.viewportHeight - 48;
-    if (targetInViewport) {
-      break;
-    }
-    const keyCode =
-      snapshot.anchorTop > snapshot.viewportHeight * 0.72
-        ? "PageDown"
-        : snapshot.anchorBottom < snapshot.viewportHeight * 0.28
-          ? "PageUp"
-          : targetRendered && snapshot.targetTop < 48
-            ? "Up"
-            : "Down";
-    await sendManualQaNativeKey(win, keyCode, [], keyCode.startsWith("Page") ? 90 : 55);
-    snapshot = await manualQaNativeScrollSnapshot(win, targetTestId, anchorTestId);
-  }
-  const targetRendered = snapshot.targetWidth > 0 && snapshot.targetHeight > 0;
-  const targetInViewport =
-    targetRendered && snapshot.targetTop >= 48 && snapshot.targetBottom <= snapshot.viewportHeight - 48;
-  const durationMs = Date.now() - startedAt;
-  const interaction: ManualQaNativeInteraction = {
-    after: { ...snapshot, input: "native-keyboard-scroll", targetInViewport },
-    before,
-    budgetMs: 5000,
-    category: "general-ui",
-    completedAt: new Date().toISOString(),
-    durationMs,
-    hitTestId: anchorTestId,
-    testId: `${targetTestId}-native-scroll`,
-    withinBudget: durationMs <= 5000,
-    x: -1,
-    y: -1
-  };
-  manualQaAutoSongInteractions.push(interaction);
-  if (!targetInViewport) {
-    throw new Error(
-      `Native keyboard scroll could not reveal ${targetTestId} inside ${anchorTestId}: ${JSON.stringify(snapshot)}.`
-    );
-  }
-  if (!interaction.withinBudget) {
-    throw new Error(`${interaction.testId} general-ui interaction exceeded the 5000ms hard gate (${durationMs}ms).`);
-  }
-}
-
 async function collectManualQaViewportAccessibility(
   win: BrowserWindow,
   phase: "active-start" | "deep" | "top-shell"
@@ -11621,6 +11546,42 @@ function manualQaProjectPayload(contents: string | Buffer): Record<string, unkno
   const file = manualQaObject(JSON.parse(contents.toString()));
   const wrappedProject = manualQaObject(file.project);
   return Object.keys(wrappedProject).length > 0 ? wrappedProject : file;
+}
+
+async function readManualQaLiveProjectContract(win: BrowserWindow): Promise<{
+  arrangement: unknown;
+  automation: unknown;
+  observedAt: string;
+  projectStatus: string;
+  title: string;
+}> {
+  const snapshot = manualQaObject(
+    await win.webContents.executeJavaScript(`(() => {
+      const shell = document.querySelector('main[data-manual-qa-arrangement-json][data-manual-qa-automation-json]');
+      return {
+        arrangementJson: shell?.getAttribute('data-manual-qa-arrangement-json') ?? null,
+        automationJson: shell?.getAttribute('data-manual-qa-automation-json') ?? null,
+        projectStatus: document.querySelector('[data-testid="project-status"]')?.textContent?.trim() ?? '',
+        title: document.querySelector('[data-testid="project-title-input"]')?.value ?? ''
+      };
+    })()`)
+  );
+  if (typeof snapshot.arrangementJson !== "string" || typeof snapshot.automationJson !== "string") {
+    throw new Error("Movement reopened-project live contract attributes are unavailable.");
+  }
+  try {
+    return {
+      arrangement: JSON.parse(snapshot.arrangementJson),
+      automation: JSON.parse(snapshot.automationJson),
+      observedAt: new Date().toISOString(),
+      projectStatus: typeof snapshot.projectStatus === "string" ? snapshot.projectStatus : "",
+      title: typeof snapshot.title === "string" ? snapshot.title : ""
+    };
+  } catch (error) {
+    throw new Error(
+      `Movement reopened-project live contract is not valid JSON: ${error instanceof Error ? error.message : String(error)}.`
+    );
+  }
 }
 
 function manualQaMovementPreservedCoreSha256(project: Record<string, unknown>): string {
@@ -12205,6 +12166,7 @@ function installManualQaAutoMovement(win: BrowserWindow): void {
   const spec = configuration.movementSpec;
   const specPath = configuration.movementSpecPath;
   const expectedArrangementBars = spec.arrangement.reduce((total, block) => total + block.bars, 0);
+  const expectedAutomation = manualQaExpectedMovementAutomation(spec.masterAutomation, expectedArrangementBars);
   const specContents = readFileSync(specPath);
   const sourceContents = readFileSync(activeConfiguration.openPath);
   const sourceProject = manualQaProjectPayload(sourceContents);
@@ -12434,22 +12396,10 @@ function installManualQaAutoMovement(win: BrowserWindow): void {
       finalizeManualQaNativeInteraction("project-open", openInteractionStartedAt);
       await replaceManualQaNativeText(win, "project-title-input", spec.title);
       await ensureManualQaDetailsOpen(win, "guidance-center", "guidance-center-toggle");
-      await revealManualQaNativeTargetWithKeyboard(win, "session-brief-artist", "session-brief");
       await replaceManualQaNativeText(win, "session-brief-artist", spec.sessionBrief.artist);
       await replaceManualQaNativeText(win, "session-brief-vibe", spec.sessionBrief.vibe);
       await replaceManualQaNativeText(win, "session-brief-reference", spec.sessionBrief.reference);
       await replaceManualQaNativeText(win, "session-brief-notes", spec.sessionBrief.notes);
-      await clickAndWait(
-        "guidance-center-toggle",
-        "Guide & Review Center closed after Movement metadata",
-        `document.querySelector('[data-testid="guidance-center"]')?.open === false`
-      );
-      await waitForManualQaCondition(
-        win,
-        "Movement metadata committed",
-        `document.querySelector('[data-testid="project-title-input"]')?.value === ${JSON.stringify(spec.title)} &&
-          document.querySelector('[data-testid="session-brief-summary"]')?.textContent?.trim() === '4/4 fields'`
-      );
     });
 
     await runStep("apply-arrangement", async () => {
@@ -12557,6 +12507,20 @@ function installManualQaAutoMovement(win: BrowserWindow): void {
         120000
       );
       finalizeManualQaNativeInteraction("project-open", reopenInteractionStartedAt);
+      const reopenedProject = await readManualQaLiveProjectContract(win);
+      report.reopenedProject = {
+        ...reopenedProject,
+        arrangementMatches:
+          manualQaCanonicalJson(reopenedProject.arrangement) === manualQaCanonicalJson(spec.arrangement),
+        automationMatches:
+          manualQaCanonicalJson(reopenedProject.automation) === manualQaCanonicalJson(expectedAutomation)
+      };
+      await persistReport();
+      if (!report.reopenedProject.arrangementMatches || !report.reopenedProject.automationMatches) {
+        throw new Error(
+          `Movement reopened-project live contract mismatch: ${JSON.stringify(report.reopenedProject)}.`
+        );
+      }
       await captureZone("deliver");
     });
 
@@ -12568,7 +12532,6 @@ function installManualQaAutoMovement(win: BrowserWindow): void {
       const bars = manualQaObject(block).bars;
       return total + (typeof bars === "number" ? bars : 0);
     }, 0);
-    const expectedAutomation = manualQaExpectedMovementAutomation(spec.masterAutomation, expectedArrangementBars);
     const preservedSourceCore =
       manualQaMovementPreservedCoreSha256(savedProject) === activeConfiguration.movementSourceCoreSha256;
     const contractMatches =

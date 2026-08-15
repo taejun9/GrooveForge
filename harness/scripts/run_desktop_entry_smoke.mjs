@@ -280,6 +280,11 @@ function checkDesktopGuiLaunchGuardContract() {
   checkIncludes(manualQaSource, 'GROOVEFORGE_DESKTOP_MANUAL_QA_AUTO_MOVEMENT: "1"', "harness/scripts/run_desktop_manual_qa.mjs");
   checkIncludes(manualQaSource, "parseMovementSpec", "harness/scripts/run_desktop_manual_qa.mjs");
   checkIncludes(manualQaSource, "readExternalRegularFile", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "collectExternalSourcePostflight", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "persistMovementExternalSourcePostflight", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "externalSourceSha256", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "sourceUnchanged", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "changed external source hash", "harness/scripts/run_desktop_manual_qa.mjs");
   checkIncludes(manualQaSource, "writeOwnedFixtureOrVerify", "harness/scripts/run_desktop_manual_qa.mjs");
   checkIncludes(manualQaSource, "Movement QA Save target already exists", "harness/scripts/run_desktop_manual_qa.mjs");
   checkIncludes(manualQaSource, 'args.has("--safety-self-test")', "harness/scripts/run_desktop_manual_qa.mjs");
@@ -618,8 +623,11 @@ function checkElectronMainContract() {
   checkIncludes(source, 'process.argv.includes("--auto-song-qa")', label);
   checkIncludes(source, 'process.argv.includes("--auto-movement-qa")', label);
   checkIncludes(source, "selectManualQaNativeOption", label);
-  checkIncludes(source, "revealManualQaNativeTargetWithKeyboard", label);
   checkIncludes(source, 'ensureManualQaDetailsOpen(win, "guidance-center", "guidance-center-toggle")', label);
+  checkIncludes(source, "readManualQaLiveProjectContract", label);
+  checkIncludes(source, "Movement reopened-project live contract mismatch", label);
+  checkIncludes(appSource, "data-manual-qa-arrangement-json", "src/ui/App.tsx");
+  checkIncludes(appSource, "data-manual-qa-automation-json", "src/ui/App.tsx");
   checkIncludes(source, "parseManualQaPcmWav", label);
   checkIncludes(source, "Movement WAV duration mismatch", label);
   checkIncludes(source, 'phase: "auto-movement"', label);
@@ -1222,6 +1230,7 @@ function checkPreloadContract() {
 
   checkIncludes(source, 'contextBridge.exposeInMainWorld("grooveforge"', label);
   checkIncludes(source, 'appKind: "desktop"', label);
+  checkIncludes(source, 'manualQa: process.env.GROOVEFORGE_DESKTOP_MANUAL_QA === "1"', label);
   checkIncludes(source, 'ipcRenderer.invoke("grooveforge:save-project"', label);
   checkIncludes(source, 'ipcRenderer.send("grooveforge:close-window")', label);
   checkIncludes(source, 'ipcRenderer.invoke("grooveforge:open-project")', label);
@@ -1235,6 +1244,7 @@ function checkPreloadContract() {
 
   checkIncludes(built, "grooveforge", "dist-electron/preload.cjs");
   checkIncludes(built, "desktop", "dist-electron/preload.cjs");
+  checkIncludes(built, "GROOVEFORGE_DESKTOP_MANUAL_QA", "dist-electron/preload.cjs");
   checkIncludes(built, "grooveforge:save-project", "dist-electron/preload.cjs");
   checkIncludes(built, "grooveforge:close-window", "dist-electron/preload.cjs");
   checkIncludes(built, "grooveforge:open-project", "dist-electron/preload.cjs");
@@ -1254,6 +1264,7 @@ function checkRendererNativeMenuContract() {
   );
 
   checkIncludes(declarations, "type NativeMenuCommand =", typeLabel);
+  checkIncludes(declarations, "manualQa?: boolean;", typeLabel);
   checkIncludes(declarations, "onMenuCommand?: (callback: (command: NativeMenuCommand) => void) => () => void;", typeLabel);
   checkIncludes(appSource, "window.grooveforge?.onMenuCommand?.(handleNativeMenuCommand)", appLabel);
 

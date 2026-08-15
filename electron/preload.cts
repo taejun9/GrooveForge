@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld("grooveforge", {
   platform: process.platform,
   appKind: "desktop",
   launchSmoke: process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1",
+  manualQa: process.env.GROOVEFORGE_DESKTOP_MANUAL_QA === "1",
   reportLaunchSmokeDrumGridSnapshot: (payload: unknown) => {
     if (process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1") {
       ipcRenderer.send("grooveforge:launch-smoke-drum-grid-snapshot", payload);

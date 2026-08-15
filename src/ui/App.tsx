@@ -13277,6 +13277,12 @@ export function App(): ReactElement {
       }
       data-quick-actions-materialized={quickActionsMaterialized}
       data-audio-analysis-state={projectAudioAnalysis.status}
+      data-manual-qa-arrangement-json={
+        window.grooveforge?.manualQa ? JSON.stringify(project.arrangement) : undefined
+      }
+      data-manual-qa-automation-json={
+        window.grooveforge?.manualQa ? JSON.stringify(project.automation) : undefined
+      }
     >
       <header className="transport-band" data-testid="workflow-target-transport" ref={transportPanelRef}>
         <div className="brand-start">
