@@ -618,6 +618,8 @@ function checkElectronMainContract() {
   checkIncludes(source, 'process.argv.includes("--auto-song-qa")', label);
   checkIncludes(source, 'process.argv.includes("--auto-movement-qa")', label);
   checkIncludes(source, "selectManualQaNativeOption", label);
+  checkIncludes(source, "revealManualQaNativeTargetWithKeyboard", label);
+  checkIncludes(source, 'ensureManualQaDetailsOpen(win, "guidance-center", "guidance-center-toggle")', label);
   checkIncludes(source, "parseManualQaPcmWav", label);
   checkIncludes(source, "Movement WAV duration mismatch", label);
   checkIncludes(source, 'phase: "auto-movement"', label);

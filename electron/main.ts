@@ -10898,6 +10898,99 @@ async function ensureManualQaDetailsOpen(win: BrowserWindow, detailsTestId: stri
   }
 }
 
+type ManualQaNativeScrollSnapshot = {
+  anchorBottom: number;
+  anchorHeight: number;
+  anchorTop: number;
+  scrollY: number;
+  targetBottom: number;
+  targetHeight: number;
+  targetTop: number;
+  targetWidth: number;
+  viewportHeight: number;
+};
+
+async function manualQaNativeScrollSnapshot(
+  win: BrowserWindow,
+  targetTestId: string,
+  anchorTestId: string
+): Promise<ManualQaNativeScrollSnapshot> {
+  return (await win.webContents.executeJavaScript(`(() => {
+    const target = document.querySelector('[data-testid=${JSON.stringify(targetTestId)}]');
+    const anchor = document.querySelector('[data-testid=${JSON.stringify(anchorTestId)}]');
+    const targetRect = target?.getBoundingClientRect();
+    const anchorRect = anchor?.getBoundingClientRect();
+    return {
+      anchorBottom: anchorRect?.bottom ?? 0,
+      anchorHeight: anchorRect?.height ?? 0,
+      anchorTop: anchorRect?.top ?? 0,
+      scrollY: window.scrollY,
+      targetBottom: targetRect?.bottom ?? 0,
+      targetHeight: targetRect?.height ?? 0,
+      targetTop: targetRect?.top ?? 0,
+      targetWidth: targetRect?.width ?? 0,
+      viewportHeight: window.innerHeight
+    };
+  })()`)) as ManualQaNativeScrollSnapshot;
+}
+
+async function revealManualQaNativeTargetWithKeyboard(
+  win: BrowserWindow,
+  targetTestId: string,
+  anchorTestId: string
+): Promise<void> {
+  const startedAt = Date.now();
+  const before = await manualQaNativeScrollSnapshot(win, targetTestId, anchorTestId);
+  if (before.anchorHeight <= 0) {
+    throw new Error(`${anchorTestId} is not rendered before native scrolling to ${targetTestId}.`);
+  }
+  let snapshot = before;
+  for (let attempt = 0; attempt < 48; attempt += 1) {
+    const targetRendered = snapshot.targetWidth > 0 && snapshot.targetHeight > 0;
+    const targetInViewport =
+      targetRendered && snapshot.targetTop >= 48 && snapshot.targetBottom <= snapshot.viewportHeight - 48;
+    if (targetInViewport) {
+      break;
+    }
+    const keyCode =
+      snapshot.anchorTop > snapshot.viewportHeight * 0.72
+        ? "PageDown"
+        : snapshot.anchorBottom < snapshot.viewportHeight * 0.28
+          ? "PageUp"
+          : targetRendered && snapshot.targetTop < 48
+            ? "Up"
+            : "Down";
+    await sendManualQaNativeKey(win, keyCode, [], keyCode.startsWith("Page") ? 90 : 55);
+    snapshot = await manualQaNativeScrollSnapshot(win, targetTestId, anchorTestId);
+  }
+  const targetRendered = snapshot.targetWidth > 0 && snapshot.targetHeight > 0;
+  const targetInViewport =
+    targetRendered && snapshot.targetTop >= 48 && snapshot.targetBottom <= snapshot.viewportHeight - 48;
+  const durationMs = Date.now() - startedAt;
+  const interaction: ManualQaNativeInteraction = {
+    after: { ...snapshot, input: "native-keyboard-scroll", targetInViewport },
+    before,
+    budgetMs: 5000,
+    category: "general-ui",
+    completedAt: new Date().toISOString(),
+    durationMs,
+    hitTestId: anchorTestId,
+    testId: `${targetTestId}-native-scroll`,
+    withinBudget: durationMs <= 5000,
+    x: -1,
+    y: -1
+  };
+  manualQaAutoSongInteractions.push(interaction);
+  if (!targetInViewport) {
+    throw new Error(
+      `Native keyboard scroll could not reveal ${targetTestId} inside ${anchorTestId}: ${JSON.stringify(snapshot)}.`
+    );
+  }
+  if (!interaction.withinBudget) {
+    throw new Error(`${interaction.testId} general-ui interaction exceeded the 5000ms hard gate (${durationMs}ms).`);
+  }
+}
+
 async function collectManualQaViewportAccessibility(
   win: BrowserWindow,
   phase: "active-start" | "deep" | "top-shell"
@@ -12284,10 +12377,23 @@ function installManualQaAutoMovement(win: BrowserWindow): void {
       );
       finalizeManualQaNativeInteraction("project-open", openInteractionStartedAt);
       await replaceManualQaNativeText(win, "project-title-input", spec.title);
+      await ensureManualQaDetailsOpen(win, "guidance-center", "guidance-center-toggle");
+      await revealManualQaNativeTargetWithKeyboard(win, "session-brief-artist", "session-brief");
       await replaceManualQaNativeText(win, "session-brief-artist", spec.sessionBrief.artist);
       await replaceManualQaNativeText(win, "session-brief-vibe", spec.sessionBrief.vibe);
       await replaceManualQaNativeText(win, "session-brief-reference", spec.sessionBrief.reference);
       await replaceManualQaNativeText(win, "session-brief-notes", spec.sessionBrief.notes);
+      await clickAndWait(
+        "guidance-center-toggle",
+        "Guide & Review Center closed after Movement metadata",
+        `document.querySelector('[data-testid="guidance-center"]')?.open === false`
+      );
+      await waitForManualQaCondition(
+        win,
+        "Movement metadata committed",
+        `document.querySelector('[data-testid="project-title-input"]')?.value === ${JSON.stringify(spec.title)} &&
+          document.querySelector('[data-testid="session-brief-summary"]')?.textContent?.trim() === '4/4 fields'`
+      );
     });
 
     await runStep("apply-arrangement", async () => {
