@@ -407,7 +407,8 @@ const manualQaSlowOperationTestIds = new Set([
   "handoff-pack-action-wav",
   "handoff-pack-preview-wav",
   "project-open",
-  "project-save"
+  "project-save",
+  "workflow-jump-deliver"
 ]);
 
 function pathIsInsideRoot(root: string, candidate: string): boolean {
