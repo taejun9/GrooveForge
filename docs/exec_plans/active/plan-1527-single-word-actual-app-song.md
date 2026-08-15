@@ -54,14 +54,14 @@ project_lead / plan_keeper / harness_builder / quality_runner / review_judge / p
 
 ## Implementation Plan
 
-- [ ] Preserve reference metadata and document a non-imitative creative palette.
-- [ ] Establish a fresh actual-app starter project through the visible product path and prove its provenance.
-- [ ] Build a 64-bar 137 BPM / F-sharp minor instrumental with Pattern A/B/C, distinct density changes, and an original 8+16+8+16+8+8-bar arc.
-- [ ] Save, export, reopen, and exactly verify the project through native Electron UI interactions.
-- [ ] Add a deterministic, non-human formant vocal layer whose only semantic word is `틈`.
-- [ ] Mix and export a final stereo 44.1kHz signed PCM 24-bit WAV within 1:50–2:30.
-- [ ] Create Korean SoundCloud metadata, rights/privacy checklist, production report, editable project, evidence, and manifest.
-- [ ] Run repository, actual-app, audio, privacy, file-set, checksum, and source-preservation QA.
+- [x] Preserve reference metadata and document a non-imitative creative palette.
+- [x] Establish a fresh actual-app starter project through the visible product path and prove its provenance.
+- [x] Build a 64-bar 137 BPM / F-sharp minor instrumental with Pattern A/B/C, distinct density changes, and an original 8+16+8+16+8+8-bar arc.
+- [x] Save, export, reopen, and exactly verify the project through native Electron UI interactions.
+- [x] Add a deterministic, non-human formant vocal layer whose only semantic word is `틈`.
+- [x] Mix and export a final stereo 44.1kHz signed PCM 24-bit WAV within 1:50–2:30.
+- [x] Create Korean SoundCloud metadata, rights/privacy checklist, production report, editable project, evidence, and manifest.
+- [x] Run repository, actual-app, audio, privacy, file-set, checksum, and source-preservation QA.
 - [ ] Complete a separate post-QA review, deliver to a new Downloads folder, and revalidate at the destination.
 
 ## Arrangement Direction
@@ -94,6 +94,9 @@ After QA, review_judge independently checks non-imitation, actual-app provenance
 | 2026-08-15 | Use 137 BPM and F-sharp minor rather than the reference's 143 BPM / D major. | The new tempo and tonal center support an original identity while preserving only the broad compact electronic energy requested. |
 | 2026-08-15 | Make the instrumental in the actual app, then add a deterministic non-human formant layer after export. | GrooveForge is event-based and does not import or synthesize spoken audio; this keeps app provenance honest without turning sampling into a product feature. |
 | 2026-08-15 | Do not perform the actual SoundCloud upload. | Artist/rightsholder identity, rights confirmation, publication, and processed-stream listening require the user's final decision and account action. |
+| 2026-08-15 | Discard a delegated `/tmp` reference-audio analysis and remove every downloaded copy and helper before composition. | The approved creative boundary uses only visible/public metadata and must not depend on extracted reference PCM, melody, cadence, or production fingerprint. |
+| 2026-08-15 | Preserve the source arrangement's existing section labels while implementing the intended sonic arc through Pattern C/B assignments, energy, mutes, and bar lengths. | The first isolated UI run failed closed because macOS did not commit a native `Bridge` option change. The fresh successful run kept the harmless labels and produced the intended 8+16+8+16+8+4+4-bar sound structure without direct JSON mutation. |
+| 2026-08-15 | Keep the synthetic word layer as a strict local post-render artifact rather than changing the GrooveForge project schema. | The product remains event-based and sample-free, while the final deliverable can contain an original non-human voice texture with explicit provenance and deterministic QA. |
 
 ## Progress Log
 
@@ -101,3 +104,11 @@ After QA, review_judge independently checks non-imitation, actual-app provenance
 |---|---|---|
 | 2026-08-15 | project_lead | Opened the user-provided YouTube page read-only, dismissed a promotional overlay, and verified the visible title, credits, and 1:54 duration without downloading reference media. |
 | 2026-08-15 | project_lead | Cross-checked public Beatport/Shazam metadata, chose a deliberately different word, tempo, key, and arrangement concept, and created the dedicated branch/worktree. |
+| 2026-08-15 | privacy_guard | A delegated analysis disclosed three downloaded reference-audio copies and helper directories under `/tmp`; the lead verified the exact paths, excluded all audio-derived findings, removed all six temporary targets, and confirmed they no longer exist. |
+| 2026-08-15 | project_lead | Created the seed through the visible GrooveForge Electron UI at 137 BPM / F-sharp minor / Experimental, applied Pocket/Push/Tight timing moves to Pattern A/B/C, wrote the Korean Session Brief, saved the durable project, and retained a UI screenshot and passive observations. |
+| 2026-08-15 | harness_builder | The first isolated movement run failed closed on the native `Bridge` select option and wrote a failure report/screenshot. No failed-run project or WAV will be delivered. |
+| 2026-08-15 | harness_builder | A fresh movement workspace passed native Open, seven-block 64-bar arrangement, length-bound Intro/Outro automation, WAV export, Save, live reopen, source-hash preservation, and exact arrangement/automation checks. The instrumental is 112.866802721 seconds, stereo 44.1 kHz signed PCM 24-bit. |
+| 2026-08-15 | harness_builder | Added a strict local formant renderer and placed eight bounded `/tʰɯm/` events over the actual-app instrumental. Three clean runs were byte-deterministic; the input hash and 4,977,426-frame duration remained unchanged. |
+| 2026-08-15 | quality_runner | Independently parsed the final mix and dry voice stem. The final mix is 112.866802721 seconds, stereo 44.1 kHz PCM24, peaks at -1.200002542 dBFS, has zero full-scale samples, low DC, active lower bytes, click-bounded word events, and terminal digital zero. |
+| 2026-08-15 | doc_gardener | Staged an eight-file Korean SoundCloud package with final mix, instrumental, dry synthetic stem, editable project, upload copy, production QA report, redacted synthesis report, and a passing SHA-256 manifest. |
+| 2026-08-15 | quality_runner | Passed syntax, typecheck, build, renderer/workflow/desktop smokes, manual-QA safety self-test, repository QA, quality gate, diff check, exact eight-file package audit, checksum validation, privacy/reference-name scan, `afinfo`, `afclip`, and the independent PCM/provenance parser with no failures. |
