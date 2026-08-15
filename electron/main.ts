@@ -10882,16 +10882,34 @@ async function selectManualQaNativeOption(win: BrowserWindow, testId: string, va
 
 async function ensureManualQaDetailsOpen(win: BrowserWindow, detailsTestId: string, toggleTestId: string): Promise<void> {
   const interactionStartedAt = Date.now();
-  const alreadyOpen = (await win.webContents.executeJavaScript(
-    `document.querySelector('[data-testid=${JSON.stringify(detailsTestId)}]')?.open === true`
-  )) as boolean;
+  const openExpression = `document.querySelector('[data-testid=${JSON.stringify(detailsTestId)}]')?.open === true`;
+  const alreadyOpen = (await win.webContents.executeJavaScript(openExpression)) as boolean;
   if (!alreadyOpen) {
     await clickManualQaNativeTarget(win, toggleTestId);
+    const pointerSettleDeadline = Date.now() + 1000;
+    let openedByPointer = false;
+    while (Date.now() < pointerSettleDeadline) {
+      openedByPointer = (await win.webContents.executeJavaScript(openExpression)) as boolean;
+      if (openedByPointer) {
+        break;
+      }
+      await waitForManualQaDelay(100);
+    }
+    if (!openedByPointer) {
+      const toggleFocused = (await win.webContents.executeJavaScript(
+        `document.activeElement?.closest('[data-testid]')?.getAttribute('data-testid') === ${JSON.stringify(toggleTestId)}`
+      )) as boolean;
+      if (!toggleFocused) {
+        throw new Error(`${toggleTestId} did not retain native focus for keyboard disclosure activation.`);
+      }
+      await sendManualQaNativeKey(win, "Enter", [], 180);
+    }
   }
   await waitForManualQaCondition(
     win,
     `${detailsTestId} disclosure open`,
-    `document.querySelector('[data-testid=${JSON.stringify(detailsTestId)}]')?.open === true`
+    openExpression,
+    5000
   );
   if (!alreadyOpen) {
     finalizeManualQaNativeInteraction(toggleTestId, interactionStartedAt);
