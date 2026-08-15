@@ -10789,6 +10789,19 @@ async function replaceManualQaNativeText(win: BrowserWindow, testId: string, val
     await waitForManualQaDelay(150);
     selection = await readSelection();
   }
+  if (selection.start !== 0 || selection.end !== selection.length) {
+    const targetIsTextArea = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid=${JSON.stringify(testId)}]') instanceof HTMLTextAreaElement`
+    )) as boolean;
+    if (targetIsTextArea) {
+      const startKey = process.platform === "darwin" ? "Up" : "Home";
+      const endKey = process.platform === "darwin" ? "Down" : "End";
+      const documentModifier: Electron.InputEvent["modifiers"] = process.platform === "darwin" ? ["meta"] : ["control"];
+      await sendManualQaNativeKey(win, startKey, documentModifier, 100);
+      await sendManualQaNativeKey(win, endKey, [...documentModifier, "shift"], 150);
+      selection = await readSelection();
+    }
+  }
   const interaction = [...manualQaAutoSongInteractions].reverse().find((candidate) => candidate.testId === testId);
   if (interaction) {
     interaction.after = { ...interaction.after, nativeSelection: selection };
