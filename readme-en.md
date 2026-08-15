@@ -692,6 +692,14 @@ npm run desktop:manual-qa
 
 This command requires built artifacts, creates a starter fixture and separate Open/Save targets under ignored `build/desktop/plan-1525-manual-qa/`, uses a non-persistent Electron partition and dedicated SQLite workspace, and routes WAV/MIDI/text/ZIP downloads into that workspace.
 
+Run a reproducible visible movement edit through the same isolated native UI path:
+
+```sh
+GROOVEFORGE_DESKTOP_WORKSPACE_ROOT=/absolute/path/to/fresh-workspace npm run desktop:movement-qa -- --movement-spec /absolute/path/to/movement-spec.json
+```
+
+`desktop:movement-qa` copies the declared source project into the fresh owned workspace, opens it through the real desktop `Open` control, applies spec-bounded metadata, arrangement, mute, and master-automation edits through native pointer/keyboard input, exports WAV through `Deliver`, saves and reopens the project, and writes screenshots plus `evidence/auto-movement-qa-report.json`. It fails closed if the workspace already owns a Save target or if source hashes, arrangement limits, reopen state, or stereo 44.1 kHz PCM 24-bit output do not match the spec.
+
 Validation:
 
 ```sh

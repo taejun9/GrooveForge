@@ -480,6 +480,7 @@ interface Window {
     platform: NodeJS.Platform;
     appKind: "desktop";
     launchSmoke?: boolean;
+    manualQa?: boolean;
     reportLaunchSmokeDrumGridSnapshot?: (payload: unknown) => void;
     reportLaunchSmokeNoteGridSnapshot?: (payload: unknown) => void;
     saveProject?: (
