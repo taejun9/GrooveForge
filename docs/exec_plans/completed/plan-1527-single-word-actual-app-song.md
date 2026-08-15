@@ -2,7 +2,7 @@
 
 ## Status
 
-active
+completed
 
 ## Owner
 
@@ -62,7 +62,7 @@ project_lead / plan_keeper / harness_builder / quality_runner / review_judge / p
 - [x] Mix and export a final stereo 44.1kHz signed PCM 24-bit WAV within 1:50–2:30.
 - [x] Create Korean SoundCloud metadata, rights/privacy checklist, production report, editable project, evidence, and manifest.
 - [x] Run repository, actual-app, audio, privacy, file-set, checksum, and source-preservation QA.
-- [ ] Complete a separate post-QA review, deliver to a new Downloads folder, and revalidate at the destination.
+- [x] Complete a separate post-QA review, deliver to a new Downloads folder, and revalidate at the destination.
 
 ## Arrangement Direction
 
@@ -115,3 +115,15 @@ After QA, review_judge independently checks non-imitation, actual-app provenance
 | 2026-08-15 | quality_runner | Passed syntax, typecheck, build, renderer/workflow/desktop smokes, manual-QA safety self-test, repository QA, quality gate, diff check, exact eight-file package audit, checksum validation, privacy/reference-name scan, `afinfo`, `afclip`, and the independent PCM/provenance parser with no failures. |
 | 2026-08-15 | review_judge | Initial post-QA review found no P0/P1 but requested two P2 fixes: pre-allocation rejection of over-150-second WAVs and accurate effected-stem wording. Both were implemented before delivery and sent through targeted plus repository QA again. |
 | 2026-08-15 | quality_runner | Post-fix QA passed the new 150-second boundary self-test, a real 50,996,402-byte pre-allocation rejection with no outputs, byte-identical final rerender hashes, typecheck/build/smokes, repository QA/quality gate, diff check, and unchanged eight-file package manifest. |
+| 2026-08-15 | review_judge | Final re-review closed both P2 findings and approved the result at P0 0 / P1 0 / P2 0 / P3 0, with human word-recognition, full-track listening, and SoundCloud transcoding retained as explicit residual checks. |
+| 2026-08-15 | project_lead | Copied the exact eight-file package to `~/Downloads/틈_Electronic_Vocal_Mix_SoundCloud_패키지`; destination diff, seven payload checksums, privacy scan, `afinfo`, and final/stem `afclip` all passed. |
+| 2026-08-15 | plan_keeper | Marked the plan complete after destination revalidation and the approved post-QA review. |
+
+## Completion Notes
+
+- 실제 GrooveForge Electron 화면에서 137 BPM / F-sharp minor / Experimental 프로젝트를 만들고 Pattern A/B/C를 편집한 뒤, 별도 격리 workspace에서 64마디 편곡, automation, WAV export, Save, 실제 재열기 exact match를 완료했다.
+- 최종 `틈_Electronic_Vocal_Mix_24bit.wav`는 112.866802721초, stereo 44.1kHz signed PCM 24-bit이며 SHA-256은 `a6e4161878e9c286045ea871b71d3e05afcdd6169e790fdd0454183e6ef0f853`다. Sample peak는 -1.200002542 dBFS, full-scale sample은 0, 마지막 프레임은 L/R 0이다.
+- 의미를 가진 유일한 단어는 `틈`이다. 보컬은 사람 녹음, TTS, 음성 모델, 레퍼런스 오디오, 네트워크를 사용하지 않은 deterministic local formant synthesis이며, 앱의 event project와 분리된 후반 작업임을 한글 문서에 명시했다.
+- 입력 렌더는 작업 전후 SHA-256 `1cb0ab2f77d6971f1789ec16886d11ef1f63da461f41feac4f22d7d5fe90e059`로 불변이다. Formant renderer는 150초 canonical PCM24 크기·헤더를 전체 읽기 전에 제한하고, 초과 입력 self-test와 실제 50,996,402-byte fail-closed 검사에서 출력을 만들지 않았다.
+- Downloads 전달 폴더에는 최종 믹스, 악기 버전, 분리된 이펙트 포함 보컬 stem, 재편집 프로젝트, 한글 SoundCloud 업로드 정보, 제작·QA 보고서, 합성 보고서, SHA-256 manifest의 정확히 8개 파일이 있다. 모든 destination checksum과 형식 검사가 통과했다.
+- 최종 review verdict는 P0 0 / P1 0 / P2 0 / P3 0이다. 자동 검사는 한국어 청자의 `틈` 인지, 음악적 취향, 재생기별 밸런스, LUFS/true peak, SoundCloud 변환 스트림을 대신하지 않는다. 실제 업로드·공개는 하지 않았으며, 공개 전 자리표시자 교체, 권리 확인, 사람의 전곡 청취와 Private-first 검수가 필요하다.
