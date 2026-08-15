@@ -10789,6 +10789,7 @@ async function replaceManualQaNativeText(win: BrowserWindow, testId: string, val
     await waitForManualQaDelay(150);
     selection = await readSelection();
   }
+  let clearedByNativeDeletion = false;
   if (selection.start !== 0 || selection.end !== selection.length) {
     const targetIsTextArea = (await win.webContents.executeJavaScript(
       `document.querySelector('[data-testid=${JSON.stringify(testId)}]') instanceof HTMLTextAreaElement`
@@ -10801,12 +10802,24 @@ async function replaceManualQaNativeText(win: BrowserWindow, testId: string, val
       await sendManualQaNativeKey(win, endKey, [...documentModifier, "shift"], 150);
       selection = await readSelection();
     }
+    if (targetIsTextArea && (selection.start !== 0 || selection.end !== selection.length)) {
+      const boundedDeletionCount = Math.min(selection.length + 1, 241);
+      for (const keyCode of ["Backspace", "Delete"]) {
+        for (let index = 0; index < boundedDeletionCount; index += 1) {
+          win.webContents.sendInputEvent({ type: "keyDown", keyCode });
+          win.webContents.sendInputEvent({ type: "keyUp", keyCode });
+        }
+      }
+      await waitForManualQaDelay(250);
+      selection = await readSelection();
+      clearedByNativeDeletion = selection.value === "";
+    }
   }
   const interaction = [...manualQaAutoSongInteractions].reverse().find((candidate) => candidate.testId === testId);
   if (interaction) {
     interaction.after = { ...interaction.after, nativeSelection: selection };
   }
-  if (selection.start !== 0 || selection.end !== selection.length) {
+  if (!clearedByNativeDeletion && (selection.start !== 0 || selection.end !== selection.length)) {
     throw new Error(`Native select-all failed for ${testId}: ${JSON.stringify(selection)}.`);
   }
   await win.webContents.insertText(value);
