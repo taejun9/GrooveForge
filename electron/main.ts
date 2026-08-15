@@ -10854,11 +10854,20 @@ async function replaceManualQaNativeNumber(win: BrowserWindow, testId: string, v
   if (currentValue === expectedValue) {
     return;
   }
+  const currentNumber = Number(currentValue);
+  if (!Number.isInteger(currentNumber) || !Number.isInteger(value)) {
+    throw new Error(`${testId} native number replacement requires finite integer values.`);
+  }
+  const stepCount = Math.abs(value - currentNumber);
+  if (stepCount > 100) {
+    throw new Error(`${testId} native number replacement exceeds the 100-step safety bound.`);
+  }
   const interactionStartedAt = Date.now();
   await clickManualQaNativeTarget(win, testId);
-  const commandModifier: Electron.InputEvent["modifiers"] = process.platform === "darwin" ? ["meta"] : ["control"];
-  await sendManualQaNativeKey(win, "A", commandModifier, 150);
-  await win.webContents.insertText(expectedValue);
+  const keyCode = value > currentNumber ? "Up" : "Down";
+  for (let index = 0; index < stepCount; index += 1) {
+    await sendManualQaNativeKey(win, keyCode, [], 15);
+  }
   await waitForManualQaCondition(
     win,
     `${testId} native number value`,
