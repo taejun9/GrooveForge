@@ -32,8 +32,12 @@ const isManualQa = process.env.GROOVEFORGE_DESKTOP_MANUAL_QA === "1";
 const isManualQaAutoSong =
   isManualQa &&
   (process.env.GROOVEFORGE_DESKTOP_MANUAL_QA_AUTO_SONG === "1" || process.argv.includes("--auto-song-qa"));
+const isManualQaAutoMovement =
+  isManualQa &&
+  (process.env.GROOVEFORGE_DESKTOP_MANUAL_QA_AUTO_MOVEMENT === "1" || process.argv.includes("--auto-movement-qa"));
 const isManualQaAutoExit =
-  isManualQa && (process.env.GROOVEFORGE_DESKTOP_MANUAL_QA_AUTO_EXIT === "1" || isManualQaAutoSong);
+  isManualQa &&
+  (process.env.GROOVEFORGE_DESKTOP_MANUAL_QA_AUTO_EXIT === "1" || isManualQaAutoSong || isManualQaAutoMovement);
 const isDesktopSmoke = isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke || isManualQa;
 const ownsSingleInstanceLock = isDesktopSmoke || app.requestSingleInstanceLock();
 if (!ownsSingleInstanceLock) {
@@ -105,7 +109,36 @@ type ManualQaProvenance = {
   };
 };
 
+type ManualQaMovementSection = "Intro" | "Verse" | "Hook" | "Bridge" | "Outro";
+type ManualQaMovementPattern = "A" | "B" | "C";
+type ManualQaMovementMuteTrack = "drum_rack" | "bass_808" | "synth" | "chord";
+type ManualQaMovementAutomation = "none" | "fade_in" | "fade_out" | "intro_outro";
+
+type ManualQaMovementBlock = {
+  bars: number;
+  energy: number;
+  mutedTracks: ManualQaMovementMuteTrack[];
+  pattern: ManualQaMovementPattern;
+  section: ManualQaMovementSection;
+};
+
+type ManualQaMovementSpec = {
+  arrangement: ManualQaMovementBlock[];
+  masterAutomation: ManualQaMovementAutomation;
+  outputProjectFileName: string;
+  schemaVersion: 1;
+  sessionBrief: {
+    artist: string;
+    notes: string;
+    reference: string;
+    vibe: string;
+  };
+  sourceProjectPath: string;
+  title: string;
+};
+
 type ManualQaConfiguration = {
+  autoMovement: boolean;
   autoSong: boolean;
   autoExit: boolean;
   dataDirectory: string;
@@ -114,6 +147,9 @@ type ManualQaConfiguration = {
   exportsDirectory: string;
   fixturesDirectory: string;
   launcherManifestPath: string;
+  movementSpec: ManualQaMovementSpec | null;
+  movementSpecPath: string | null;
+  movementSourceCoreSha256: string | null;
   openPath: string;
   ownershipSentinelPath: string;
   ownershipToken: string;
@@ -309,6 +345,61 @@ type ManualQaAutoSongReport = {
   };
   workspaceRoot: string;
   zones: Partial<Record<"arrange" | "compose" | "deliver" | "mix", ManualQaAutoSongZoneEvidence>>;
+};
+
+type ManualQaMovementZoneEvidence = ManualQaUiObservation & {
+  audioAnalysisState: string;
+  audioAnalysisStatus: string;
+  screenshot: string;
+  screenshotBytes: number;
+  screenshotSha256: string;
+};
+
+type ManualQaMovementReport = {
+  completedAt?: string;
+  downloads: ManualQaDownloadEvidence[];
+  failures: string[];
+  generatedAt: string;
+  interactions: ManualQaNativeInteraction[];
+  mode: "visible-native-auto-movement-qa";
+  ok: boolean;
+  performance: ManualQaAutoSongReport["performance"];
+  project?: ManualQaAutoSongReport["project"] & {
+    automation: unknown;
+    preservedSourceCore: boolean;
+  };
+  provenance: ManualQaProvenance;
+  provenanceValidatedAtLaunch: true;
+  safety: ManualQaAutoSongReport["safety"];
+  source: {
+    bpm: unknown;
+    key: unknown;
+    mode: unknown;
+    path: string;
+    sha256: string;
+    styleId: unknown;
+    title: unknown;
+  };
+  spec: {
+    arrangementBars: number;
+    arrangementBlocks: number;
+    masterAutomation: ManualQaMovementAutomation;
+    path: string;
+    sha256: string;
+    title: string;
+  };
+  steps: ManualQaAutoSongStep[];
+  wav?: {
+    bitDepth: number;
+    bytes: number;
+    channels: number;
+    durationSeconds: number;
+    path: string;
+    sampleRate: number;
+    sha256: string;
+  };
+  workspaceRoot: string;
+  zones: Partial<Record<"arrange" | "deliver" | "mix", ManualQaMovementZoneEvidence>>;
 };
 
 const manualQaAutoSongInteractions: ManualQaNativeInteraction[] = [];
@@ -609,9 +700,147 @@ function requiredManualQaPath(name: string, workspaceRoot: string): string {
   return resolved;
 }
 
+function manualQaExactKeys(value: Record<string, unknown>, expected: string[], label: string): void {
+  const actual = Object.keys(value).sort();
+  const sortedExpected = [...expected].sort();
+  if (JSON.stringify(actual) !== JSON.stringify(sortedExpected)) {
+    throw new Error(`${label} keys must be exactly: ${sortedExpected.join(", ")}.`);
+  }
+}
+
+function manualQaRequiredString(value: unknown, label: string): string {
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be a string.`);
+  }
+  return value;
+}
+
+function parseManualQaMovementSpec(value: unknown): ManualQaMovementSpec {
+  const spec = manualQaObject(value);
+  manualQaExactKeys(
+    spec,
+    [
+      "arrangement",
+      "masterAutomation",
+      "outputProjectFileName",
+      "schemaVersion",
+      "sessionBrief",
+      "sourceProjectPath",
+      "title"
+    ],
+    "Manual QA movement spec"
+  );
+  if (spec.schemaVersion !== 1) {
+    throw new Error("Manual QA movement spec schemaVersion must be 1.");
+  }
+  const sourceProjectPath = manualQaRequiredString(spec.sourceProjectPath, "Manual QA movement sourceProjectPath");
+  if (!path.isAbsolute(sourceProjectPath) || !sourceProjectPath.endsWith(".grooveforge.json")) {
+    throw new Error("Manual QA movement sourceProjectPath must be an absolute .grooveforge.json path.");
+  }
+  const outputProjectFileName = manualQaRequiredString(
+    spec.outputProjectFileName,
+    "Manual QA movement outputProjectFileName"
+  );
+  if (
+    path.basename(outputProjectFileName) !== outputProjectFileName ||
+    !outputProjectFileName.endsWith(".grooveforge.json") ||
+    outputProjectFileName === ".grooveforge.json"
+  ) {
+    throw new Error("Manual QA movement outputProjectFileName must be a safe .grooveforge.json basename.");
+  }
+  const title = manualQaRequiredString(spec.title, "Manual QA movement title");
+  if (!title || title.length > 160 || /[\u0000-\u001f\u007f-\u009f]/u.test(title)) {
+    throw new Error("Manual QA movement title must be non-empty, bounded, and free of control characters.");
+  }
+  const sessionBriefValue = manualQaObject(spec.sessionBrief);
+  manualQaExactKeys(sessionBriefValue, ["artist", "notes", "reference", "vibe"], "Manual QA movement sessionBrief");
+  const sessionBrief = {
+    artist: manualQaRequiredString(sessionBriefValue.artist, "Manual QA movement sessionBrief.artist"),
+    notes: manualQaRequiredString(sessionBriefValue.notes, "Manual QA movement sessionBrief.notes"),
+    reference: manualQaRequiredString(sessionBriefValue.reference, "Manual QA movement sessionBrief.reference"),
+    vibe: manualQaRequiredString(sessionBriefValue.vibe, "Manual QA movement sessionBrief.vibe")
+  };
+  if (
+    sessionBrief.artist.length > 64 ||
+    sessionBrief.vibe.length > 64 ||
+    sessionBrief.reference.length > 64 ||
+    sessionBrief.notes.length > 240
+  ) {
+    throw new Error("Manual QA movement sessionBrief exceeds the renderer field limits.");
+  }
+  const automationIds: ManualQaMovementAutomation[] = ["none", "fade_in", "fade_out", "intro_outro"];
+  if (!automationIds.includes(spec.masterAutomation as ManualQaMovementAutomation)) {
+    throw new Error("Manual QA movement masterAutomation is invalid.");
+  }
+  if (!Array.isArray(spec.arrangement) || spec.arrangement.length < 1 || spec.arrangement.length > 64) {
+    throw new Error("Manual QA movement arrangement must contain 1-64 blocks.");
+  }
+  const sections: ManualQaMovementSection[] = ["Intro", "Verse", "Hook", "Bridge", "Outro"];
+  const patterns: ManualQaMovementPattern[] = ["A", "B", "C"];
+  const muteTracks: ManualQaMovementMuteTrack[] = ["drum_rack", "bass_808", "synth", "chord"];
+  let arrangementBars = 0;
+  const arrangement = spec.arrangement.map((candidate, index): ManualQaMovementBlock => {
+    const block = manualQaObject(candidate);
+    manualQaExactKeys(
+      block,
+      ["bars", "energy", "mutedTracks", "pattern", "section"],
+      `Manual QA movement arrangement[${index}]`
+    );
+    if (!sections.includes(block.section as ManualQaMovementSection)) {
+      throw new Error(`Manual QA movement arrangement[${index}].section is invalid.`);
+    }
+    if (!patterns.includes(block.pattern as ManualQaMovementPattern)) {
+      throw new Error(`Manual QA movement arrangement[${index}].pattern is invalid.`);
+    }
+    if (!Number.isInteger(block.bars) || (block.bars as number) < 1 || (block.bars as number) > 16) {
+      throw new Error(`Manual QA movement arrangement[${index}].bars must be an integer from 1-16.`);
+    }
+    if (
+      typeof block.energy !== "number" ||
+      !Number.isFinite(block.energy) ||
+      block.energy < 0 ||
+      block.energy > 1 ||
+      Math.abs(block.energy * 100 - Math.round(block.energy * 100)) > 1e-9
+    ) {
+      throw new Error(`Manual QA movement arrangement[${index}].energy must use a 0.01 step from 0-1.`);
+    }
+    if (
+      !Array.isArray(block.mutedTracks) ||
+      new Set(block.mutedTracks).size !== block.mutedTracks.length ||
+      !block.mutedTracks.every((track) => muteTracks.includes(track as ManualQaMovementMuteTrack))
+    ) {
+      throw new Error(`Manual QA movement arrangement[${index}].mutedTracks is invalid.`);
+    }
+    const blockMutedTracks = block.mutedTracks as ManualQaMovementMuteTrack[];
+    arrangementBars += block.bars as number;
+    return {
+      bars: block.bars as number,
+      energy: block.energy,
+      mutedTracks: muteTracks.filter((track) => blockMutedTracks.includes(track)),
+      pattern: block.pattern as ManualQaMovementPattern,
+      section: block.section as ManualQaMovementSection
+    };
+  });
+  if (arrangementBars > 64) {
+    throw new Error(`Manual QA movement arrangement totals ${arrangementBars} bars; the limit is 64.`);
+  }
+  return {
+    arrangement,
+    masterAutomation: spec.masterAutomation as ManualQaMovementAutomation,
+    outputProjectFileName,
+    schemaVersion: 1,
+    sessionBrief,
+    sourceProjectPath,
+    title
+  };
+}
+
 function resolveManualQaConfiguration(): ManualQaConfiguration | null {
   if (!isManualQa) {
     return null;
+  }
+  if (isManualQaAutoSong && isManualQaAutoMovement) {
+    throw new Error("Manual QA auto-song and auto-movement modes are mutually exclusive.");
   }
   const configuredWorkspaceRoot = requiredManualQaEnvironment("GROOVEFORGE_DESKTOP_WORKSPACE_ROOT");
   const workspaceRoot = path.resolve(configuredWorkspaceRoot);
@@ -704,8 +933,14 @@ function resolveManualQaConfiguration(): ManualQaConfiguration | null {
   }
   const launcherManifest = JSON.parse(launcherManifestContents.toString("utf8")) as Record<string, unknown>;
   const manifestOutputs = launcherManifest.outputs as Record<string, unknown> | undefined;
+  const expectedMode = isManualQaAutoMovement
+    ? "visible-native-auto-movement-qa"
+    : isManualQaAutoSong
+      ? "visible-native-auto-song-qa"
+      : "visible-stable-manual-qa";
   if (
     launcherManifest.workspaceRoot !== workspaceRoot ||
+    launcherManifest.mode !== expectedMode ||
     (launcherManifest.openFixture as Record<string, unknown> | undefined)?.path !== openPath ||
     manifestOutputs?.savePath !== savePath ||
     manifestOutputs?.dataDirectory !== dataDirectory ||
@@ -716,10 +951,58 @@ function resolveManualQaConfiguration(): ManualQaConfiguration | null {
   ) {
     throw new Error("Manual QA launcher manifest paths did not match the validated workspace configuration.");
   }
+  const openFixtureManifest = manualQaObject(launcherManifest.openFixture);
+  const openFixtureContents = readFileSync(openPath);
+  if (
+    openFixtureManifest.bytes !== openFixtureContents.byteLength ||
+    openFixtureManifest.sha256 !== createHash("sha256").update(openFixtureContents).digest("hex")
+  ) {
+    throw new Error("Manual QA Open fixture changed after the launcher manifest was written.");
+  }
+  let movementSpec: ManualQaMovementSpec | null = null;
+  let movementSpecPath: string | null = null;
+  let movementSourceCoreSha256: string | null = null;
+  if (isManualQaAutoMovement) {
+    const movementManifest = manualQaObject(launcherManifest.movementSpec);
+    movementSpecPath = assertManualQaWorkspaceTargetSync(
+      workspaceRoot,
+      path.resolve(requiredManualQaEnvironment("GROOVEFORGE_DESKTOP_MANUAL_QA_MOVEMENT_SPEC_PATH")),
+      { expectedType: "file", mustExist: true }
+    );
+    if (movementSpecPath !== path.join(fixturesDirectory, "movement-spec.json") || movementManifest.path !== movementSpecPath) {
+      throw new Error("Manual QA movement spec must use the owned fixtures directory.");
+    }
+    const movementSpecContents = readFileSync(movementSpecPath);
+    if (
+      movementManifest.bytes !== movementSpecContents.byteLength ||
+      movementManifest.sha256 !== createHash("sha256").update(movementSpecContents).digest("hex")
+    ) {
+      throw new Error("Manual QA movement spec changed after the launcher manifest was written.");
+    }
+    movementSpec = parseManualQaMovementSpec(JSON.parse(movementSpecContents.toString("utf8")));
+    movementSourceCoreSha256 =
+      typeof openFixtureManifest.preservedCoreSha256 === "string" ? openFixtureManifest.preservedCoreSha256 : null;
+    if (!movementSourceCoreSha256 || !/^[a-f0-9]{64}$/u.test(movementSourceCoreSha256)) {
+      throw new Error("Manual QA movement source preserved-core digest is missing or invalid.");
+    }
+    const arrangementBars = movementSpec.arrangement.reduce((total, block) => total + block.bars, 0);
+    if (
+      movementManifest.arrangementBars !== arrangementBars ||
+      movementManifest.arrangementBlocks !== movementSpec.arrangement.length ||
+      movementManifest.masterAutomation !== movementSpec.masterAutomation ||
+      movementManifest.targetTitle !== movementSpec.title ||
+      savePath !== path.join(projectsDirectory, movementSpec.outputProjectFileName)
+    ) {
+      throw new Error("Manual QA movement spec did not match its launcher manifest or Save target.");
+    }
+  } else if (launcherManifest.movementSpec !== undefined) {
+    throw new Error("Manual QA movement spec is only allowed in auto-movement mode.");
+  }
   const provenance = parseManualQaProvenance(launcherManifest.provenance);
   validateManualQaProvenance(provenance);
 
   return {
+    autoMovement: isManualQaAutoMovement,
     autoSong: isManualQaAutoSong,
     autoExit: isManualQaAutoExit,
     dataDirectory,
@@ -728,6 +1011,9 @@ function resolveManualQaConfiguration(): ManualQaConfiguration | null {
     exportsDirectory,
     fixturesDirectory,
     launcherManifestPath,
+    movementSpec,
+    movementSpecPath,
+    movementSourceCoreSha256,
     openPath,
     ownershipSentinelPath,
     ownershipToken,
@@ -749,7 +1035,7 @@ if (manualQaConfiguration) {
 const manualQaDownloadSessions = new WeakSet<Session>();
 const manualQaReservedDownloadPaths = new Set<string>();
 const manualQaDownloads: ManualQaDownloadEvidence[] = [];
-let manualQaAutoSongOpenPathOverride: string | null = null;
+let manualQaOpenPathOverride: string | null = null;
 
 function functionalTabsLaunchSmokeEvidenceDirectory(): string {
   const configuredDirectory = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_EVIDENCE_DIR;
@@ -2236,7 +2522,7 @@ function closeFlowSmokePath(): string | null {
 }
 
 function manualQaOpenPath(): string | null {
-  return manualQaAutoSongOpenPathOverride ?? manualQaConfiguration?.openPath ?? null;
+  return manualQaOpenPathOverride ?? manualQaConfiguration?.openPath ?? null;
 }
 
 function manualQaSavePath(): string | null {
@@ -10519,6 +10805,81 @@ async function replaceManualQaNativeText(win: BrowserWindow, testId: string, val
   finalizeManualQaNativeInteraction(testId, interactionStartedAt);
 }
 
+async function sendManualQaNativeKey(
+  win: BrowserWindow,
+  keyCode: string,
+  modifiers: Electron.InputEvent["modifiers"] = [],
+  settleMs = 80
+): Promise<void> {
+  win.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
+  win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
+  await waitForManualQaDelay(settleMs);
+}
+
+async function replaceManualQaNativeNumber(win: BrowserWindow, testId: string, value: number): Promise<void> {
+  const expectedValue = String(value);
+  const currentValue = (await win.webContents.executeJavaScript(`(() => {
+    const target = document.querySelector('[data-testid=${JSON.stringify(testId)}]');
+    return target instanceof HTMLInputElement && target.type === 'number' ? target.value : null;
+  })()`)) as string | null;
+  if (currentValue === null) {
+    throw new Error(`${testId} is not a rendered number input.`);
+  }
+  if (currentValue === expectedValue) {
+    return;
+  }
+  const interactionStartedAt = Date.now();
+  await clickManualQaNativeTarget(win, testId);
+  const commandModifier: Electron.InputEvent["modifiers"] = process.platform === "darwin" ? ["meta"] : ["control"];
+  await sendManualQaNativeKey(win, "A", commandModifier, 150);
+  await win.webContents.insertText(expectedValue);
+  await waitForManualQaCondition(
+    win,
+    `${testId} native number value`,
+    `document.querySelector('[data-testid=${JSON.stringify(testId)}]')?.value === ${JSON.stringify(expectedValue)}`
+  );
+  const interaction = [...manualQaAutoSongInteractions].reverse().find((candidate) => candidate.testId === testId);
+  if (interaction) {
+    interaction.after = { ...interaction.after, nativeNumberReplacement: { before: currentValue, value: expectedValue } };
+  }
+  finalizeManualQaNativeInteraction(testId, interactionStartedAt);
+}
+
+async function selectManualQaNativeOption(win: BrowserWindow, testId: string, value: string): Promise<void> {
+  const optionState = (await win.webContents.executeJavaScript(`(() => {
+    const target = document.querySelector('[data-testid=${JSON.stringify(testId)}]');
+    if (!(target instanceof HTMLSelectElement)) return null;
+    return {
+      current: target.value,
+      optionIndex: Array.from(target.options).findIndex((option) => option.value === ${JSON.stringify(value)}),
+      options: Array.from(target.options).map((option) => option.value)
+    };
+  })()`)) as { current: string; optionIndex: number; options: string[] } | null;
+  if (!optionState || optionState.optionIndex < 0) {
+    throw new Error(`${testId} does not expose option ${value}.`);
+  }
+  if (optionState.current === value) {
+    return;
+  }
+  const interactionStartedAt = Date.now();
+  await clickManualQaNativeTarget(win, testId);
+  await sendManualQaNativeKey(win, "Home");
+  for (let index = 0; index < optionState.optionIndex; index += 1) {
+    await sendManualQaNativeKey(win, "Down", [], 45);
+  }
+  await sendManualQaNativeKey(win, "Enter", [], 180);
+  await waitForManualQaCondition(
+    win,
+    `${testId} native option ${value}`,
+    `document.querySelector('[data-testid=${JSON.stringify(testId)}]')?.value === ${JSON.stringify(value)}`
+  );
+  const interaction = [...manualQaAutoSongInteractions].reverse().find((candidate) => candidate.testId === testId);
+  if (interaction) {
+    interaction.after = { ...interaction.after, nativeOptionSelection: { before: optionState.current, value } };
+  }
+  finalizeManualQaNativeInteraction(testId, interactionStartedAt);
+}
+
 async function ensureManualQaDetailsOpen(win: BrowserWindow, detailsTestId: string, toggleTestId: string): Promise<void> {
   const interactionStartedAt = Date.now();
   const alreadyOpen = (await win.webContents.executeJavaScript(
@@ -11093,6 +11454,161 @@ function manualQaObject(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
 }
 
+function manualQaCanonicalJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => manualQaCanonicalJson(entry)).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    const object = value as Record<string, unknown>;
+    return `{${Object.keys(object)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${manualQaCanonicalJson(object[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+function manualQaProjectPayload(contents: string | Buffer): Record<string, unknown> {
+  const file = manualQaObject(JSON.parse(contents.toString()));
+  const wrappedProject = manualQaObject(file.project);
+  return Object.keys(wrappedProject).length > 0 ? wrappedProject : file;
+}
+
+function manualQaMovementPreservedCoreSha256(project: Record<string, unknown>): string {
+  const preserved = { ...project };
+  for (const key of ["arrangement", "automation", "selectedPattern", "sessionBrief", "title"]) {
+    delete preserved[key];
+  }
+  return createHash("sha256").update(manualQaCanonicalJson(preserved)).digest("hex");
+}
+
+function manualQaExpectedMovementAutomation(
+  preset: ManualQaMovementAutomation,
+  arrangementBars: number
+): Array<Record<string, unknown>> {
+  if (preset === "none") {
+    return [];
+  }
+  const totalSteps = arrangementBars * 16;
+  const fadeSteps = Math.min(16, totalSteps);
+  const fadeIn = {
+    curve: "linear",
+    endStep: fadeSteps,
+    endValue: 1,
+    startStep: 0,
+    startValue: 0,
+    target: "master_volume"
+  };
+  const fadeOut = {
+    curve: "linear",
+    endStep: totalSteps,
+    endValue: 0,
+    startStep: Math.max(0, totalSteps - fadeSteps),
+    startValue: 1,
+    target: "master_volume"
+  };
+  return preset === "fade_in" ? [fadeIn] : preset === "fade_out" ? [fadeOut] : [fadeIn, fadeOut];
+}
+
+function parseManualQaPcmWav(contents: Buffer): {
+  bitDepth: number;
+  channels: number;
+  durationSeconds: number;
+  frameCount: number;
+  sampleRate: number;
+} {
+  if (contents.byteLength < 44 || contents.toString("ascii", 0, 4) !== "RIFF" || contents.toString("ascii", 8, 12) !== "WAVE") {
+    throw new Error("Movement WAV is not a complete RIFF/WAVE file.");
+  }
+  if (contents.toString("ascii", 12, 16) !== "fmt " || contents.toString("ascii", 36, 40) !== "data") {
+    throw new Error("Movement WAV does not use the expected PCM fmt/data layout.");
+  }
+  const riffSize = contents.readUInt32LE(4);
+  const formatSize = contents.readUInt32LE(16);
+  const audioFormat = contents.readUInt16LE(20);
+  const channels = contents.readUInt16LE(22);
+  const sampleRate = contents.readUInt32LE(24);
+  const byteRate = contents.readUInt32LE(28);
+  const blockAlign = contents.readUInt16LE(32);
+  const bitDepth = contents.readUInt16LE(34);
+  const dataSize = contents.readUInt32LE(40);
+  const expectedBlockAlign = channels * (bitDepth / 8);
+  if (
+    formatSize !== 16 ||
+    audioFormat !== 1 ||
+    channels !== 2 ||
+    sampleRate !== 44_100 ||
+    bitDepth !== 24 ||
+    blockAlign !== expectedBlockAlign ||
+    byteRate !== sampleRate * blockAlign ||
+    riffSize + 8 !== contents.byteLength ||
+    dataSize + 44 !== contents.byteLength ||
+    dataSize === 0 ||
+    dataSize % blockAlign !== 0
+  ) {
+    throw new Error(
+      `Movement WAV PCM contract mismatch: ${JSON.stringify({ audioFormat, bitDepth, blockAlign, byteRate, channels, dataSize, riffSize, sampleRate })}.`
+    );
+  }
+  const frameCount = dataSize / blockAlign;
+  return { bitDepth, channels, durationSeconds: frameCount / sampleRate, frameCount, sampleRate };
+}
+
+async function captureManualQaMovementZone(
+  win: BrowserWindow,
+  zone: "arrange" | "deliver" | "mix",
+  evidenceDirectory: string
+): Promise<ManualQaMovementZoneEvidence> {
+  await win.webContents.executeJavaScript(`window.scrollTo({ behavior: 'auto', left: 0, top: 0 })`);
+  await waitForManualQaDelay(150);
+  const observation = (await win.webContents.executeJavaScript(`(() => {
+    const navigator = document.querySelector('[data-testid="workflow-navigator"]');
+    const tabs = Array.from(navigator?.querySelectorAll('[role="tab"]') ?? []);
+    const panels = Array.from(document.querySelectorAll('.workspace-tabpanels > [role="tabpanel"]'));
+    const workspace = document.querySelector('.workspace-tabpanels');
+    const activeZone = workspace?.getAttribute('data-active-workspace-zone') ?? '';
+    const projectTitle = document.querySelector('[data-testid="project-title-input"]');
+    const transport = document.querySelector('[data-testid="transport-play"]');
+    return {
+      activeZone,
+      activeZoneCount: panels.filter((panel) => panel.getAttribute('data-workspace-zone') === activeZone).length,
+      audioAnalysisState: document.querySelector('main[data-audio-analysis-state]')?.getAttribute('data-audio-analysis-state') ?? '',
+      audioAnalysisStatus: document.querySelector('[data-testid="audio-analysis-status"]')?.textContent?.trim() ?? '',
+      capturedAt: new Date().toISOString(),
+      documentHorizontalOverflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+      projectStatus: document.querySelector('[data-testid="project-status"]')?.textContent?.trim() ?? '',
+      projectTitle: projectTitle instanceof HTMLInputElement ? projectTitle.value : '',
+      selectedTabCount: tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true').length,
+      selectedTabLabels: tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true').map((tab) => tab.textContent?.trim() ?? ''),
+      tabCount: tabs.length,
+      tabPanelCount: panels.length,
+      tabStopCount: tabs.filter((tab) => tab.getAttribute('tabindex') === '0').length,
+      transportPlaying: transport?.getAttribute('aria-pressed') === 'true',
+      visiblePanelCount: panels.filter((panel) => !panel.hasAttribute('hidden')).length
+    };
+  })()`)) as Omit<ManualQaMovementZoneEvidence, "screenshot" | "screenshotBytes" | "screenshotSha256">;
+  if (
+    observation.activeZone !== zone ||
+    observation.tabCount !== 4 ||
+    observation.selectedTabCount !== 1 ||
+    observation.tabStopCount !== 1 ||
+    observation.tabPanelCount !== 4 ||
+    observation.visiblePanelCount !== 1 ||
+    observation.documentHorizontalOverflow !== 0
+  ) {
+    throw new Error(`Movement ${zone} visible-tab contract failed: ${JSON.stringify(observation)}.`);
+  }
+  const png = (await win.webContents.capturePage()).toPNG();
+  const screenshotPath = path.join(evidenceDirectory, `auto-movement-${zone}.png`);
+  await writeManualQaFile(screenshotPath, png, { mode: 0o600 });
+  return {
+    ...observation,
+    screenshot: screenshotPath,
+    screenshotBytes: png.byteLength,
+    screenshotSha256: createHash("sha256").update(png).digest("hex")
+  };
+}
+
 function installManualQaAutoSong(win: BrowserWindow): void {
   const configuration = manualQaConfiguration;
   if (!configuration?.autoSong) {
@@ -11408,7 +11924,7 @@ function installManualQaAutoSong(win: BrowserWindow): void {
         throw new Error("UI Save did not create the isolated target project.");
       }
       finalizeManualQaNativeInteraction("project-save", saveInteractionStartedAt);
-      manualQaAutoSongOpenPathOverride = activeConfiguration.savePath;
+      manualQaOpenPathOverride = activeConfiguration.savePath;
       const openInteractionStartedAt = Date.now();
       await clickManualQaNativeTarget(win, "project-open");
       await waitForManualQaCondition(
@@ -11531,6 +12047,488 @@ function installManualQaAutoSong(win: BrowserWindow): void {
   });
 }
 
+function installManualQaAutoMovement(win: BrowserWindow): void {
+  const configuration = manualQaConfiguration;
+  if (!configuration?.autoMovement || !configuration.movementSpec || !configuration.movementSpecPath) {
+    return;
+  }
+  const activeConfiguration: ManualQaConfiguration = configuration;
+  const spec = configuration.movementSpec;
+  const specPath = configuration.movementSpecPath;
+  const expectedArrangementBars = spec.arrangement.reduce((total, block) => total + block.bars, 0);
+  const specContents = readFileSync(specPath);
+  const sourceContents = readFileSync(activeConfiguration.openPath);
+  const sourceProject = manualQaProjectPayload(sourceContents);
+  const userDataPosture = manualQaUserDataPosture(activeConfiguration);
+  const report: ManualQaMovementReport = {
+    downloads: manualQaDownloads,
+    failures: [],
+    generatedAt: new Date().toISOString(),
+    interactions: manualQaAutoSongInteractions,
+    mode: "visible-native-auto-movement-qa",
+    ok: false,
+    performance: {
+      generalBudgetMs: 5000,
+      generalViolations: [],
+      maxGeneralInteractionMs: 0,
+      maxSlowOperationMs: 0,
+      passed: true,
+      slowOperationBudgetMs: 120000,
+      slowOperationViolations: []
+    },
+    provenance: activeConfiguration.provenance,
+    provenanceValidatedAtLaunch: true,
+    safety: {
+      isolatedWorkspace: true,
+      nativePointerAndKeyboard: true,
+      sourceFixtureSha256: createHash("sha256").update(sourceContents).digest("hex"),
+      sourceFixtureUnchanged: false,
+      ...userDataPosture
+    },
+    source: {
+      bpm: sourceProject.bpm,
+      key: sourceProject.key,
+      mode: sourceProject.mode,
+      path: activeConfiguration.openPath,
+      sha256: createHash("sha256").update(sourceContents).digest("hex"),
+      styleId: sourceProject.styleId,
+      title: sourceProject.title
+    },
+    spec: {
+      arrangementBars: expectedArrangementBars,
+      arrangementBlocks: spec.arrangement.length,
+      masterAutomation: spec.masterAutomation,
+      path: specPath,
+      sha256: createHash("sha256").update(specContents).digest("hex"),
+      title: spec.title
+    },
+    steps: [],
+    workspaceRoot: activeConfiguration.workspaceRoot,
+    zones: {}
+  };
+  const reportPath = path.join(activeConfiguration.evidenceDirectory, "auto-movement-qa-report.json");
+  let finished = false;
+
+  async function persistReport(): Promise<void> {
+    const generalInteractions = report.interactions.filter((interaction) => interaction.category === "general-ui");
+    const slowInteractions = report.interactions.filter((interaction) => interaction.category === "slow-operation");
+    report.performance.generalViolations = generalInteractions
+      .filter((interaction) => !interaction.withinBudget)
+      .map(({ durationMs, testId }) => ({ durationMs, testId }));
+    report.performance.slowOperationViolations = slowInteractions
+      .filter((interaction) => !interaction.withinBudget)
+      .map(({ durationMs, testId }) => ({ durationMs, testId }));
+    report.performance.maxGeneralInteractionMs = Math.max(0, ...generalInteractions.map(({ durationMs }) => durationMs));
+    report.performance.maxSlowOperationMs = Math.max(0, ...slowInteractions.map(({ durationMs }) => durationMs));
+    report.performance.passed =
+      report.performance.generalViolations.length === 0 && report.performance.slowOperationViolations.length === 0;
+    await writeManualQaFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  }
+
+  async function runStep(id: string, action: () => Promise<void>): Promise<void> {
+    const step: ManualQaAutoSongStep = { id, startedAt: new Date().toISOString(), status: "running" };
+    report.steps.push(step);
+    await persistReport();
+    try {
+      await withManualQaTimeout(action(), `auto-movement step ${id}`, 900000);
+      step.status = "passed";
+    } catch (error) {
+      step.status = "failed";
+      step.detail = error instanceof Error ? error.message : String(error);
+      if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+        const failurePng = (await win.webContents.capturePage()).toPNG();
+        const failureScreenshot = path.join(activeConfiguration.evidenceDirectory, `auto-movement-failure-${id}.png`);
+        await writeManualQaFile(failureScreenshot, failurePng, { mode: 0o600 });
+        step.detail += ` / screenshot ${failureScreenshot}`;
+      }
+      report.failures.push(`${id}: ${step.detail}`);
+      throw error;
+    } finally {
+      step.completedAt = new Date().toISOString();
+      await persistReport();
+    }
+  }
+
+  async function clickAndWait(testId: string, description: string, expression: string, timeoutMs = 15000): Promise<void> {
+    const interactionStartedAt = Date.now();
+    await clickManualQaNativeTarget(win, testId);
+    try {
+      await waitForManualQaCondition(win, description, expression, timeoutMs);
+      finalizeManualQaNativeInteraction(testId, interactionStartedAt);
+    } catch (error) {
+      const interaction = [...manualQaAutoSongInteractions].reverse().find((candidate) => candidate.testId === testId);
+      throw new Error(
+        `${error instanceof Error ? error.message : String(error)} Native interaction: ${JSON.stringify(interaction ?? null)}.`
+      );
+    }
+  }
+
+  async function arrangementBlockCount(): Promise<number> {
+    return (await win.webContents.executeJavaScript(
+      `document.querySelectorAll('[data-testid="arrangement-timeline"] > [data-testid^="arrangement-block-"]').length`
+    )) as number;
+  }
+
+  async function selectArrangementBlock(index: number): Promise<void> {
+    const selected = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="arrangement-block-${index}"]')?.getAttribute('aria-pressed') === 'true'`
+    )) as boolean;
+    if (selected) {
+      return;
+    }
+    await clickAndWait(
+      `arrangement-block-${index}`,
+      `Arrangement block ${index + 1} selected`,
+      `document.querySelector('[data-testid="arrangement-block-${index}"]')?.getAttribute('aria-pressed') === 'true'`
+    );
+  }
+
+  async function resizeArrangement(): Promise<void> {
+    let currentCount = await arrangementBlockCount();
+    while (currentCount > spec.arrangement.length) {
+      const deleteIndex = currentCount - 1;
+      await selectArrangementBlock(deleteIndex);
+      const expectedCount = currentCount - 1;
+      await clickAndWait(
+        "arrangement-delete",
+        `Arrangement reduced to ${expectedCount} blocks`,
+        `document.querySelectorAll('[data-testid="arrangement-timeline"] > [data-testid^="arrangement-block-"]').length === ${expectedCount}`
+      );
+      currentCount = expectedCount;
+    }
+    for (let index = 0; index < currentCount; index += 1) {
+      await selectArrangementBlock(index);
+      await replaceManualQaNativeNumber(win, "arrangement-bars-input", 1);
+    }
+    while (currentCount < spec.arrangement.length) {
+      await selectArrangementBlock(currentCount - 1);
+      const expectedCount = currentCount + 1;
+      await clickAndWait(
+        "arrangement-duplicate",
+        `Arrangement expanded to ${expectedCount} blocks`,
+        `document.querySelectorAll('[data-testid="arrangement-timeline"] > [data-testid^="arrangement-block-"]').length === ${expectedCount}`
+      );
+      currentCount = expectedCount;
+    }
+  }
+
+  async function applyArrangementBlock(index: number, block: ManualQaMovementBlock): Promise<void> {
+    await selectArrangementBlock(index);
+    await selectManualQaNativeOption(win, "arrangement-section-select", block.section);
+    const patternSelected = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="arrangement-pattern-${block.pattern}"]')?.classList.contains('selected') === true`
+    )) as boolean;
+    if (!patternSelected) {
+      await clickAndWait(
+        `arrangement-pattern-${block.pattern}`,
+        `Arrangement block ${index + 1} Pattern ${block.pattern}`,
+        `document.querySelector('[data-testid="arrangement-pattern-${block.pattern}"]')?.classList.contains('selected') === true`
+      );
+    }
+    await replaceManualQaNativeNumber(win, "arrangement-energy-input", Math.round(block.energy * 100));
+    for (const track of ["drum_rack", "bass_808", "synth", "chord"] as const) {
+      const expectedMuted = block.mutedTracks.includes(track);
+      const muted = (await win.webContents.executeJavaScript(
+        `document.querySelector('[data-testid="arrangement-track-mute-${track}"]')?.getAttribute('aria-pressed') === 'true'`
+      )) as boolean;
+      if (muted !== expectedMuted) {
+        await clickAndWait(
+          `arrangement-track-mute-${track}`,
+          `Arrangement block ${index + 1} ${track} mute ${expectedMuted ? "on" : "off"}`,
+          `document.querySelector('[data-testid="arrangement-track-mute-${track}"]')?.getAttribute('aria-pressed') === '${expectedMuted}'`
+        );
+      }
+    }
+    await replaceManualQaNativeNumber(win, "arrangement-bars-input", block.bars);
+  }
+
+  async function captureZone(zone: "arrange" | "deliver" | "mix"): Promise<void> {
+    if (zone === "mix" || zone === "deliver") {
+      await waitForManualQaCondition(
+        win,
+        `${zone} exact audio analysis`,
+        `document.querySelector('main[data-audio-analysis-state]')?.getAttribute('data-audio-analysis-state') === 'ready' &&
+          document.querySelector('[data-testid="audio-analysis-status"]')?.textContent?.trim() === 'Audio meters ready'`,
+        180000
+      );
+    }
+    report.zones[zone] = await captureManualQaMovementZone(win, zone, activeConfiguration.evidenceDirectory);
+    await persistReport();
+  }
+
+  async function run(): Promise<void> {
+    Object.assign(report.safety, manualQaUserDataPosture(activeConfiguration));
+    if (!report.safety.userDataIsolated) {
+      throw new Error(`Electron userData was not isolated inside the Movement QA workspace: ${report.safety.userDataPath}`);
+    }
+    await waitForManualQaCondition(
+      win,
+      "production renderer movement controls",
+      `document.querySelector('[data-testid="project-open"]') !== null &&
+        document.querySelector('[data-testid="workflow-jump-arrange"]') !== null`,
+      120000
+    );
+    win.setTitle("GrooveForge — Auto Movement QA");
+    win.show();
+    win.focus();
+
+    await runStep("open-source-and-edit-metadata", async () => {
+      const openInteractionStartedAt = Date.now();
+      await clickManualQaNativeTarget(win, "project-open");
+      await waitForManualQaCondition(
+        win,
+        "Movement source Open completion",
+        `document.querySelector('[data-testid="project-title-input"]')?.value === ${JSON.stringify(String(sourceProject.title ?? ""))} &&
+          document.querySelector('[data-testid="project-status"]')?.textContent?.includes('Loaded') === true`,
+        120000
+      );
+      finalizeManualQaNativeInteraction("project-open", openInteractionStartedAt);
+      await replaceManualQaNativeText(win, "project-title-input", spec.title);
+      await replaceManualQaNativeText(win, "session-brief-artist", spec.sessionBrief.artist);
+      await replaceManualQaNativeText(win, "session-brief-vibe", spec.sessionBrief.vibe);
+      await replaceManualQaNativeText(win, "session-brief-reference", spec.sessionBrief.reference);
+      await replaceManualQaNativeText(win, "session-brief-notes", spec.sessionBrief.notes);
+    });
+
+    await runStep("apply-arrangement", async () => {
+      await clickAndWait(
+        "workflow-jump-arrange",
+        "Arrange functional tab",
+        `document.querySelector('[data-testid="workflow-jump-arrange"]')?.getAttribute('aria-selected') === 'true'`
+      );
+      await resizeArrangement();
+      for (const [index, block] of spec.arrangement.entries()) {
+        await applyArrangementBlock(index, block);
+      }
+      await waitForManualQaCondition(
+        win,
+        "Movement arrangement block and bar totals",
+        `(() => {
+          const blocks = Array.from(document.querySelectorAll('[data-testid="arrangement-timeline"] > [data-testid^="arrangement-block-"]'));
+          const bars = blocks.reduce((total, block) => {
+            const match = /([0-9]+) bars?/.exec(block.textContent ?? '');
+            return total + Number(match?.[1] ?? 0);
+          }, 0);
+          return blocks.length === ${spec.arrangement.length} && bars === ${expectedArrangementBars};
+        })()`
+      );
+      await captureZone("arrange");
+    });
+
+    await runStep("apply-length-bound-master-automation", async () => {
+      await clickAndWait(
+        "workflow-jump-mix",
+        "Mix functional tab",
+        `document.querySelector('[data-testid="workflow-jump-mix"]')?.getAttribute('aria-selected') === 'true'`
+      );
+      await ensureManualQaDetailsOpen(win, "master-polish-tools", "master-polish-toggle");
+      const automationActive = (await win.webContents.executeJavaScript(
+        `document.querySelector('[data-testid="master-automation-${spec.masterAutomation}"]')?.classList.contains('active') === true`
+      )) as boolean;
+      if (!automationActive) {
+        await clickAndWait(
+          `master-automation-${spec.masterAutomation}`,
+          `Master automation ${spec.masterAutomation}`,
+          `document.querySelector('[data-testid="master-automation-${spec.masterAutomation}"]')?.classList.contains('active') === true`
+        );
+      }
+      await captureZone("mix");
+    });
+
+    let wavDownload: ManualQaDownloadEvidence | undefined;
+    await runStep("deliver-export-save-and-reopen", async () => {
+      await clickAndWait(
+        "workflow-jump-deliver",
+        "Deliver functional tab",
+        `document.querySelector('[data-testid="workflow-jump-deliver"]')?.getAttribute('aria-selected') === 'true'`
+      );
+      await waitForManualQaCondition(
+        win,
+        "Deliver exact audio analysis",
+        `document.querySelector('main[data-audio-analysis-state]')?.getAttribute('data-audio-analysis-state') === 'ready' &&
+          document.querySelector('[data-testid="audio-analysis-status"]')?.textContent?.trim() === 'Audio meters ready'`,
+        180000
+      );
+      const downloadStartIndex = manualQaDownloads.length;
+      const exportInteractionStartedAt = Date.now();
+      await clickManualQaNativeTarget(win, "handoff-pack-action-wav");
+      const downloadDeadline = Date.now() + 180000;
+      while (
+        Date.now() < downloadDeadline &&
+        !manualQaDownloads.slice(downloadStartIndex).some((download) => download.state === "completed" && download.filePath.endsWith(".wav"))
+      ) {
+        await waitForManualQaDelay(100);
+      }
+      wavDownload = manualQaDownloads
+        .slice(downloadStartIndex)
+        .find((download) => download.state === "completed" && download.filePath.endsWith(".wav"));
+      if (!wavDownload) {
+        throw new Error(`Movement WAV download did not complete: ${JSON.stringify(manualQaDownloads.slice(downloadStartIndex))}.`);
+      }
+      finalizeManualQaNativeInteraction("handoff-pack-action-wav", exportInteractionStartedAt);
+
+      const saveInteractionStartedAt = Date.now();
+      await clickManualQaNativeTarget(win, "project-save");
+      await waitForManualQaCondition(
+        win,
+        "Movement Save completion",
+        `document.querySelector('[data-testid="project-status"]')?.textContent?.includes('Saved') === true`,
+        120000
+      );
+      const saveDeadline = Date.now() + 120000;
+      while (Date.now() < saveDeadline && !existsSync(activeConfiguration.savePath)) {
+        await waitForManualQaDelay(100);
+      }
+      if (!existsSync(activeConfiguration.savePath)) {
+        throw new Error("Movement Save did not create the isolated target project.");
+      }
+      finalizeManualQaNativeInteraction("project-save", saveInteractionStartedAt);
+
+      manualQaOpenPathOverride = activeConfiguration.savePath;
+      const reopenInteractionStartedAt = Date.now();
+      await clickManualQaNativeTarget(win, "project-open");
+      await waitForManualQaCondition(
+        win,
+        "Movement saved-project reopen completion",
+        `document.querySelector('[data-testid="project-title-input"]')?.value === ${JSON.stringify(spec.title)} &&
+          document.querySelector('[data-testid="project-status"]')?.textContent?.includes('Loaded') === true`,
+        120000
+      );
+      finalizeManualQaNativeInteraction("project-open", reopenInteractionStartedAt);
+      await captureZone("deliver");
+    });
+
+    const savedContents = await readFile(activeConfiguration.savePath, "utf8");
+    const savedProject = manualQaProjectPayload(savedContents);
+    const savedSessionBrief = manualQaObject(savedProject.sessionBrief);
+    const savedArrangement = Array.isArray(savedProject.arrangement) ? savedProject.arrangement : [];
+    const savedArrangementBars = savedArrangement.reduce((total, block) => {
+      const bars = manualQaObject(block).bars;
+      return total + (typeof bars === "number" ? bars : 0);
+    }, 0);
+    const expectedAutomation = manualQaExpectedMovementAutomation(spec.masterAutomation, expectedArrangementBars);
+    const preservedSourceCore =
+      manualQaMovementPreservedCoreSha256(savedProject) === activeConfiguration.movementSourceCoreSha256;
+    const contractMatches =
+      savedProject.title === spec.title &&
+      manualQaCanonicalJson(savedSessionBrief) === manualQaCanonicalJson(spec.sessionBrief) &&
+      manualQaCanonicalJson(savedArrangement) === manualQaCanonicalJson(spec.arrangement) &&
+      savedArrangementBars === expectedArrangementBars &&
+      manualQaCanonicalJson(savedProject.automation) === manualQaCanonicalJson(expectedAutomation) &&
+      preservedSourceCore;
+    if (!contractMatches) {
+      throw new Error(
+        `Saved movement contract mismatch: ${JSON.stringify({
+          arrangementBars: savedArrangementBars,
+          arrangementBlocks: savedArrangement.length,
+          automation: savedProject.automation,
+          preservedSourceCore,
+          sessionBrief: savedSessionBrief,
+          title: savedProject.title
+        })}.`
+      );
+    }
+    if (!wavDownload) {
+      throw new Error("Movement WAV evidence was unavailable after the deliver step.");
+    }
+    const wavContents = await readFile(wavDownload.filePath);
+    const wav = parseManualQaPcmWav(wavContents);
+    const savedBpm = typeof savedProject.bpm === "number" ? savedProject.bpm : Number.NaN;
+    if (!Number.isFinite(savedBpm) || savedBpm <= 0) {
+      throw new Error(`Saved movement BPM is invalid for WAV duration verification: ${String(savedProject.bpm)}.`);
+    }
+    const stepDurationSeconds = 60 / savedBpm / 4;
+    const expectedDurationSeconds =
+      expectedArrangementBars * 16 * stepDurationSeconds + Math.max(0.75, stepDurationSeconds * 6);
+    const expectedFrameCount = Math.ceil(expectedDurationSeconds * wav.sampleRate);
+    if (wav.frameCount !== expectedFrameCount) {
+      throw new Error(
+        `Movement WAV duration mismatch: ${JSON.stringify({ actualFrames: wav.frameCount, expectedFrames: expectedFrameCount, savedBpm })}.`
+      );
+    }
+    report.project = {
+      arrangementBars: savedArrangementBars,
+      arrangementBlocks: savedArrangement.length,
+      automation: savedProject.automation,
+      bpm: savedProject.bpm,
+      key: savedProject.key,
+      mode: savedProject.mode,
+      path: activeConfiguration.savePath,
+      preservedSourceCore,
+      sessionBrief: savedSessionBrief,
+      sha256: createHash("sha256").update(savedContents).digest("hex"),
+      styleId: savedProject.styleId,
+      title: savedProject.title
+    };
+    report.wav = {
+      bitDepth: wav.bitDepth,
+      bytes: wavContents.byteLength,
+      channels: wav.channels,
+      durationSeconds: wav.durationSeconds,
+      path: wavDownload.filePath,
+      sampleRate: wav.sampleRate,
+      sha256: createHash("sha256").update(wavContents).digest("hex")
+    };
+
+    const finalSourceContents = await readFile(activeConfiguration.openPath);
+    report.safety.sourceFixtureUnchanged =
+      createHash("sha256").update(finalSourceContents).digest("hex") === report.safety.sourceFixtureSha256;
+    if (!report.safety.sourceFixtureUnchanged) {
+      report.failures.push("The isolated movement source fixture changed during actual-app QA.");
+    }
+    Object.assign(report.safety, manualQaUserDataPosture(activeConfiguration));
+    if (!report.safety.userDataIsolated) {
+      report.failures.push(`Electron userData isolation changed during Movement QA: ${report.safety.userDataPath}.`);
+    }
+    report.ok = report.failures.length === 0 && report.performance.passed;
+    report.completedAt = new Date().toISOString();
+    await persistReport();
+    console.log(`${manualQaResultPrefix}${JSON.stringify({ ok: report.ok, phase: "auto-movement", reportPath, report })}`);
+    finished = true;
+    if (activeConfiguration.autoExit) {
+      await waitForManualQaDelay(250);
+      exitDesktopSmoke(report.ok ? 0 : 1);
+    }
+  }
+
+  const timeout = setTimeout(() => {
+    if (!finished) {
+      report.failures.push("Auto-movement QA timed out before completion.");
+      report.completedAt = new Date().toISOString();
+      void persistReport().finally(() => exitDesktopSmoke(1));
+    }
+  }, 1_200_000);
+  win.once("closed", () => clearTimeout(timeout));
+  win.webContents.once("did-finish-load", () => {
+    void run().catch(async (error: unknown) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      clearTimeout(timeout);
+      const message = error instanceof Error ? error.message : String(error);
+      try {
+        const finalSourceContents = await readFile(activeConfiguration.openPath);
+        report.safety.sourceFixtureUnchanged =
+          createHash("sha256").update(finalSourceContents).digest("hex") === report.safety.sourceFixtureSha256;
+      } catch {
+        report.safety.sourceFixtureUnchanged = false;
+      }
+      if (!report.failures.some((failure) => failure.includes(message))) {
+        report.failures.push(message);
+      }
+      report.completedAt = new Date().toISOString();
+      report.ok = false;
+      await persistReport();
+      console.error(`${manualQaResultPrefix}${JSON.stringify({ ok: false, phase: "auto-movement", reportPath, report })}`);
+      if (activeConfiguration.autoExit) {
+        await waitForManualQaDelay(250);
+        exitDesktopSmoke(1);
+      }
+    });
+  });
+}
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1440,
@@ -11553,7 +12551,7 @@ function createWindow(): void {
         : isCloseFlowSmoke
           ? `grooveforge-close-flow-smoke-${process.pid}`
         : isManualQa
-          ? `grooveforge-manual-qa-${isManualQaAutoSong ? "auto-song" : isManualQaAutoExit ? "auto" : "visible"}-${process.pid}`
+          ? `grooveforge-manual-qa-${isManualQaAutoMovement ? "auto-movement" : isManualQaAutoSong ? "auto-song" : isManualQaAutoExit ? "auto" : "visible"}-${process.pid}`
           : undefined,
       backgroundThrottling: !(isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke || isManualQa)
     }
@@ -11562,6 +12560,7 @@ function createWindow(): void {
   installManualQaDownloadRouting(win);
   installManualQaPassiveEvidence(win);
   installManualQaAutoSong(win);
+  installManualQaAutoMovement(win);
 
   if (isLaunchSmoke) {
     installLaunchSmoke(win);

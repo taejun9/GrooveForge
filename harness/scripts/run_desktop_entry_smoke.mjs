@@ -124,6 +124,11 @@ function checkPackageScripts() {
     "run_desktop_manual_qa.mjs",
     "package.json desktop:manual-qa script"
   );
+  checkIncludes(
+    packageJson.scripts?.["desktop:movement-qa"] ?? "",
+    "run_desktop_manual_qa.mjs --auto-movement-qa",
+    "package.json desktop:movement-qa script"
+  );
   checkIncludes(packageJson.scripts?.["desktop:smoke"] ?? "", "run_desktop_entry_smoke.mjs", "package.json desktop:smoke script");
   checkIncludes(
     packageJson.scripts?.["desktop:crash-report-regression-smoke"] ?? "",
@@ -271,6 +276,12 @@ function checkDesktopGuiLaunchGuardContract() {
   checkIncludes(manualQaSource, "visible-stable-manual-qa", "harness/scripts/run_desktop_manual_qa.mjs");
   checkIncludes(manualQaSource, 'args.has("--auto-song-qa")', "harness/scripts/run_desktop_manual_qa.mjs");
   checkIncludes(manualQaSource, 'GROOVEFORGE_DESKTOP_MANUAL_QA_AUTO_SONG: "1"', "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, 'args.has("--auto-movement-qa")', "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, 'GROOVEFORGE_DESKTOP_MANUAL_QA_AUTO_MOVEMENT: "1"', "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "parseMovementSpec", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "readExternalRegularFile", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "writeOwnedFixtureOrVerify", "harness/scripts/run_desktop_manual_qa.mjs");
+  checkIncludes(manualQaSource, "Movement QA Save target already exists", "harness/scripts/run_desktop_manual_qa.mjs");
   checkIncludes(manualQaSource, 'args.has("--safety-self-test")', "harness/scripts/run_desktop_manual_qa.mjs");
   checkIncludes(manualQaSource, 'const manualQaSentinelName = ".grooveforge-manual-qa-owned.json"', "harness/scripts/run_desktop_manual_qa.mjs");
   checkIncludes(manualQaSource, "manualQaAllowedBase", "harness/scripts/run_desktop_manual_qa.mjs");
@@ -600,10 +611,16 @@ function checkElectronMainContract() {
   checkIncludes(source, "manualQaUserDataPosture", label);
   checkIncludes(source, "userDataIsolated", label);
   check(!source.includes("userDataTouched"), `${label} should not claim hardcoded userDataTouched evidence`);
-  checkIncludes(source, 'grooveforge-manual-qa-${isManualQaAutoSong ? "auto-song" : isManualQaAutoExit ? "auto" : "visible"}-${process.pid}', label);
+  checkIncludes(source, 'grooveforge-manual-qa-${isManualQaAutoMovement ? "auto-movement" : isManualQaAutoSong ? "auto-song" : isManualQaAutoExit ? "auto" : "visible"}-${process.pid}', label);
   checkIncludes(source, "installManualQaDownloadRouting(win)", label);
   checkIncludes(source, "installManualQaAutoSong(win)", label);
+  checkIncludes(source, "installManualQaAutoMovement(win)", label);
   checkIncludes(source, 'process.argv.includes("--auto-song-qa")', label);
+  checkIncludes(source, 'process.argv.includes("--auto-movement-qa")', label);
+  checkIncludes(source, "selectManualQaNativeOption", label);
+  checkIncludes(source, "parseManualQaPcmWav", label);
+  checkIncludes(source, "Movement WAV duration mismatch", label);
+  checkIncludes(source, 'phase: "auto-movement"', label);
   checkIncludes(source, 'path.join(workspaceRoot, "exports")', label);
   checkIncludes(source, "Open and Save paths must differ", label);
   checkIncludes(source, 'void win.loadFile(path.join(__dirname, "../dist/index.html"))', label);
