@@ -210,8 +210,44 @@ function checkResult(result) {
     );
   }
   check(
-    functionalTabs?.states?.mix?.mixMixerVisible === true && functionalTabs?.states?.mix?.mixMasterVisible === true,
-    "live desktop Mix tab should visibly contain Mixer and Master"
+    functionalTabs?.states?.mix?.mixMixerVisible !== functionalTabs?.states?.mix?.mixMasterVisible,
+    "live desktop Mix tab should visibly contain exactly one selected Mixer or Master page"
+  );
+  const workspacePages = functionalTabs?.workspacePages;
+  check(
+    workspacePages?.composeTraversal?.map(({ input, page }) => `${input}:${page}`).join("|") ===
+      "initial:drums|native-click:notes|ArrowRight:instruments|Home:drums|ArrowLeft:instruments|ArrowRight:drums" &&
+      workspacePages?.mixTraversal?.map(({ input, page }) => `${input}:${page}`).join("|") ===
+        "initial:mixer|native-click:master|ArrowLeft:mixer|End:master|Home:mixer|ArrowRight:master",
+    "live desktop nested Compose and Mix pages should traverse with native click plus Arrow/Home/End input"
+  );
+  for (const [group, pages] of [
+    ["compose", ["drums", "notes", "instruments"]],
+    ["mix", ["mixer", "master"]]
+  ]) {
+    for (const page of pages) {
+      const state = workspacePages?.[`${group}States`]?.[page];
+      check(
+        state?.activePage === page &&
+          state?.tabCount === pages.length &&
+          state?.tabPanelCount === pages.length &&
+          state?.selectedTabCount === 1 &&
+          state?.tabStopCount === 1 &&
+          state?.visiblePanelCount === 1 &&
+          state?.ariaConnectionsReady === true &&
+          state?.fullWidthReady === true &&
+          state?.activePanelHorizontalOverflow <= 1 &&
+          state?.inactiveHiddenPanelCount === pages.length - 1 &&
+          state?.inactiveZeroRectPanelCount === pages.length - 1 &&
+          state?.inactiveFocusableControlCount === 0,
+        `live desktop ${group}/${page} page should be full-width, ARIA-connected, and isolate hidden peer controls`
+      );
+    }
+  }
+  check(
+    workspacePages?.pageStatePreservedAcrossOuterTabs?.compose === true &&
+      workspacePages?.pageStatePreservedAcrossOuterTabs?.mix === true,
+    "live desktop nested page selection should survive outer workspace tab round trips"
   );
   check(
     functionalTabs?.states?.deliver?.deliverHandoffVisible === true,
@@ -613,8 +649,8 @@ function checkResult(result) {
       evidence?.starterLanding?.beginner?.chordToolCount === 8 &&
       evidence?.starterLanding?.beginner?.chordToolReadableLabelCount === 8 &&
       evidence?.starterLanding?.beginner?.chordToolUniqueAccessibleNameCount === 8 &&
-      evidence?.starterLanding?.beginner?.chordToolColumnCount === 4 &&
-      evidence?.starterLanding?.beginner?.chordToolRowCount === 2 &&
+      evidence?.starterLanding?.beginner?.chordToolColumnCount === 8 &&
+      evidence?.starterLanding?.beginner?.chordToolRowCount === 1 &&
       evidence?.starterLanding?.beginner?.chordToolInternalOverflow === 0 &&
       evidence?.starterLanding?.beginner?.drumToolControlCount === 5 &&
       evidence?.starterLanding?.beginner?.drumToolReadableLabelCount === 5 &&
@@ -690,7 +726,7 @@ function checkResult(result) {
       evidence?.starterLanding?.beginner?.mixerTogglePressedStateCount === 10 &&
       evidence?.starterLanding?.beginner?.mixerToggleTitleCount === 10 &&
       evidence?.starterLanding?.beginner?.mixerToggleContainedCount === 10 &&
-      evidence?.starterLanding?.beginner?.mixerNarrowStripCount === 5 &&
+      evidence?.starterLanding?.beginner?.mixerNarrowStripCount === 0 &&
       evidence?.starterLanding?.beginner?.mixerToggleInternalOverflow === 0 &&
       evidence?.starterLanding?.beginner?.patternTabControlCount === 3 &&
       evidence?.starterLanding?.beginner?.patternTabReadableLabelCount === 3 &&
@@ -717,14 +753,14 @@ function checkResult(result) {
       evidence?.starterLanding?.producer?.reviewQueueFieldCount === 11 &&
       evidence?.starterLanding?.producer?.reviewQueueReadableFieldCount === 11 &&
       evidence?.starterLanding?.producer?.reviewQueueInternalOverflow === 0 &&
-      evidence?.starterLanding?.producer?.reviewQueueStackedRowCount === 3 &&
+      evidence?.starterLanding?.producer?.reviewQueueStackedRowCount === 0 &&
       evidence?.starterLanding?.producer?.noteToolControlCount === 10 &&
       evidence?.starterLanding?.producer?.noteToolReadableLabelCount === 10 &&
       evidence?.starterLanding?.producer?.noteToolUniqueAccessibleNameCount === 10 &&
       evidence?.starterLanding?.producer?.noteToolContainedCount === 10 &&
       evidence?.starterLanding?.producer?.noteToolInternalOverflow === 0 &&
-      evidence?.starterLanding?.producer?.noteToolColumnCount === 5 &&
-      evidence?.starterLanding?.producer?.noteToolRowCount === 2,
+      evidence?.starterLanding?.producer?.noteToolColumnCount === 10 &&
+      evidence?.starterLanding?.producer?.noteToolRowCount === 1,
     `live producer starter should open and focus a visible Review Queue while its selected-note tools remain readable, unique, and contained (${JSON.stringify(evidence?.starterLanding?.producer ?? null)})`
   );
   check(
@@ -815,10 +851,10 @@ function checkResult(result) {
   );
   check(evidence?.layout?.captureIdeasOpen === false, "live desktop Capture & Ideas should start collapsed");
   check(
-    evidence?.layout?.captureIdeasToggleVisible === true &&
+    evidence?.layout?.captureIdeasTogglePresent === true &&
       evidence?.layout?.noteLanesPresent === true &&
       evidence?.layout?.noteLanesAfterCaptureIdeas === true,
-    "live desktop note editor should expose a visible Capture & Ideas toggle followed by direct note grids"
+    `live desktop note editor should keep a Capture & Ideas toggle structurally before direct note grids (toggle ${evidence?.layout?.captureIdeasTogglePresent}, lanes ${evidence?.layout?.noteLanesPresent}, order ${evidence?.layout?.noteLanesAfterCaptureIdeas})`
   );
   check(
     evidence?.palette?.captureIdeas?.initialOpen === false &&
@@ -1741,7 +1777,7 @@ child.on("exit", (code, signal) => {
   console.log("- Note-grid keyboard: one 808 and one Synth Tab stop, native spatial navigation, Enter/Space toggles, playback guard, and Undo ready");
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
   console.log("- Arrangement move controls: 2/2 readable directional labels, unique selected-block names, and contained actions");
-  console.log("- Chord edit tools: 8/8 readable labels, eight unique accessible names, and a contained four-by-two narrow layout");
+  console.log("- Chord edit tools: 8/8 readable labels, eight unique accessible names, and a contained eight-column full-width layout");
   console.log("- Drum edit tools: 5/5 readable labels, five unique accessible names, and a contained five-column direct layout");
   console.log("- Pattern groove presets: 4/4 readable feel descriptions, four unique Pattern-scoped names/titles, direct Undo context, and a contained four-column layout");
   console.log("- Transport loop scope: 4/4 live targets and unique names, one pressed scope, corrected event grammar, and a contained four-column layout");
@@ -1750,9 +1786,9 @@ child.on("exit", (code, signal) => {
   console.log("- Tap Tempo: closed-summary discovery, complete direct name, live start/BPM detail, state-aware name/title, and contained focusable control");
   console.log("- Tempo Nudge pads: 4/4 complete actions, live target BPM details, unique current-to-target names/titles, and a contained focusable two-by-two layout");
   console.log("- Pattern tabs: 3/3 complete labels and unique state-aware names, one selected roving tab stop, and a contained three-column layout");
-  console.log("- Note edit tools: 10/10 readable labels, ten unique accessible names, and a contained five-by-two narrow layout");
-  console.log("- Mixer toggles: 10/10 readable Mute/Solo labels, unique channel names, pressed semantics, and five contained narrow strips");
-  console.log("- Review Queue readability: 11/11 decision fields wrapped and contained across three compact diagnostic rows");
+  console.log("- Note edit tools: 10/10 readable labels, ten unique accessible names, and a contained ten-column full-width layout");
+  console.log("- Mixer toggles: 10/10 readable Mute/Solo labels, unique channel names, pressed semantics, and five contained full-width strips");
+  console.log("- Review Queue readability: 11/11 decision fields wrapped and contained across three diagnostic rows");
   console.log("- Swing Feel pads: five dark-theme controls, pressed semantics ready, one selected target");
   console.log(
     `- Button theme foundation: ${result.evidence.layout.buttonThemeRepresentativeCount} representative inherited controls, ${result.evidence.layout.buttonThemeNativeSurfaceCount} native surfaces, disabled and specialist states preserved`

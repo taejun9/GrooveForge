@@ -1583,6 +1583,20 @@ function validateWorkspaceFunctionTabs(html) {
   const panelTags = Object.fromEntries(
     zones.map((zone) => [zone, openingTagById("section", `workspace-panel-${zone}`)])
   );
+  const composePageIds = ["drums", "notes", "instruments"];
+  const mixPageIds = ["mixer", "master"];
+  const composePageTabTags = Object.fromEntries(
+    composePageIds.map((page) => [page, openingTagById("button", `compose-page-tab-${page}`)])
+  );
+  const composePagePanelTags = Object.fromEntries(
+    composePageIds.map((page) => [page, openingTagById("section", `compose-page-panel-${page}`)])
+  );
+  const mixPageTabTags = Object.fromEntries(
+    mixPageIds.map((page) => [page, openingTagById("button", `mix-page-tab-${page}`)])
+  );
+  const mixPagePanelTags = Object.fromEntries(
+    mixPageIds.map((page) => [page, openingTagById("section", `mix-page-panel-${page}`)])
+  );
   check(
     zones.every(
       (zone) =>
@@ -1623,6 +1637,46 @@ function validateWorkspaceFunctionTabs(html) {
     "first render should expose only the Compose tabpanel and keep Arrange, Mix, and Deliver hidden and untabbable"
   );
   check(
+    html.includes('data-testid="compose-page-tabs"') &&
+      html.includes('aria-label="Compose editor pages"') &&
+      composePageIds.every(
+        (page) =>
+          composePageTabTags[page].includes('role="tab"') &&
+          composePageTabTags[page].includes(`aria-controls="compose-page-panel-${page}"`) &&
+          composePagePanelTags[page].includes('role="tabpanel"') &&
+          composePagePanelTags[page].includes(`aria-labelledby="compose-page-tab-${page}"`) &&
+          composePagePanelTags[page].includes(`data-workspace-page="${page}"`)
+      ) &&
+      composePageTabTags.drums.includes('aria-selected="true"') &&
+      composePageTabTags.drums.includes('tabindex="0"') &&
+      !composePagePanelTags.drums.includes('hidden=""') &&
+      ["notes", "instruments"].every(
+        (page) =>
+          composePageTabTags[page].includes('aria-selected="false"') &&
+          composePageTabTags[page].includes('tabindex="-1"') &&
+          composePagePanelTags[page].includes('hidden=""') &&
+          composePagePanelTags[page].includes('tabindex="-1"')
+      ),
+    "Compose should expose three labelled, roving, mutually exclusive full-width editor pages"
+  );
+  check(
+    html.includes('data-testid="mix-page-tabs"') &&
+      html.includes('aria-label="Mix editor pages"') &&
+      mixPageIds.every(
+        (page) =>
+          mixPageTabTags[page].includes('role="tab"') &&
+          mixPageTabTags[page].includes(`aria-controls="mix-page-panel-${page}"`) &&
+          mixPagePanelTags[page].includes('role="tabpanel"') &&
+          mixPagePanelTags[page].includes(`aria-labelledby="mix-page-tab-${page}"`) &&
+          mixPagePanelTags[page].includes(`data-workspace-page="${page}"`)
+      ) &&
+      mixPageTabTags.mixer.includes('aria-selected="true"') &&
+      mixPageTabTags.master.includes('aria-selected="false"') &&
+      !mixPagePanelTags.mixer.includes('hidden=""') &&
+      mixPagePanelTags.master.includes('hidden=""'),
+    "Mix should expose separate labelled Mixer and Master pages instead of compressing both side by side"
+  );
+  check(
     [
       "workflow-target-compose",
       "workflow-target-arrange",
@@ -1635,12 +1689,17 @@ function validateWorkspaceFunctionTabs(html) {
   );
 
   const hiddenRule = cssRuleBody('.workspace-zone-panel[hidden]');
+  const pageHiddenRule = cssRuleBody('.workspace-page-panel[hidden]');
+  const pageVisibleRule = cssRuleBody('.workspace-page-panel:not([hidden])');
+  const pageTabsRule = cssRuleBody('.workspace-page-tabs');
+  const pageTabSelectedRule = cssRuleBody('.workspace-page-tab[aria-selected="true"]');
   const selectedRule = cssRuleBody('.workflow-navigator-card[aria-selected="true"]');
   const selectedUnderlineRule = cssRuleBody('.workflow-navigator-card[aria-selected="true"]::after');
   const selectedBadgeRule = cssRuleBody('.workflow-navigator-card[aria-selected="true"] .workflow-tab-status');
   const appShellRule = cssRuleBody(".app-shell");
   const tabsSurfaceRule = cssRuleBody(".workspace-tabs-surface");
   const workspaceGridRule = cssRuleBody(".workspace-grid");
+  const composeRule = cssRuleBody(".workspace-compose-panel");
   const arrangeRule = cssRuleBody(".workspace-arrange-panel");
   const mixRule = cssRuleBody(".workspace-mix-panel");
   const mixMixerRule = cssRuleBody(".workspace-mix-panel > .mixer-panel");
@@ -1675,23 +1734,27 @@ function validateWorkspaceFunctionTabs(html) {
   );
   check(
     panelTags.compose.includes("workspace-grid workspace-zone-panel workspace-compose-panel") &&
-      workspaceGridRule.includes(
-        "grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.2fr) minmax(0, 0.92fr);"
-      ) &&
+      workspaceGridRule.includes("grid-template-columns:") &&
+      composeRule.includes("grid-template-columns: minmax(0, 1fr);") &&
+      pageHiddenRule.includes("display: none !important;") &&
+      pageVisibleRule.includes("min-height: clamp(540px, 64vh, 920px);") &&
+      pageVisibleRule.includes("padding: 20px;") &&
+      pageTabsRule.includes("grid-column: 1 / -1;") &&
+      pageTabSelectedRule.includes("border-color: rgba(120, 240, 200, 0.9);") &&
       panelTags.arrange.includes("workspace-grid workspace-zone-panel workspace-arrange-panel") &&
       arrangeRule.includes("grid-template-columns: minmax(0, 1fr);") &&
       panelTags.mix.includes("workspace-grid workspace-zone-panel workspace-mix-panel") &&
-      mixRule.includes("grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.85fr);") &&
+      mixRule.includes("grid-template-columns: minmax(0, 1fr);") &&
       mixMixerRule.includes("grid-column: 1;") &&
-      mixMasterRule.includes("grid-column: 2;") &&
+      mixMasterRule.includes("grid-column: 1;") &&
       panelTags.deliver.includes("workspace-zone-panel workspace-deliver-panel") &&
       deliverRule.includes("display: grid;") &&
       desktopDeliverHandoffRule.includes("grid-template-columns: 250px minmax(0, 1fr);"),
-    "Compose, Arrange, Mix, and Deliver should retain purpose-built zone layouts and a readable desktop Handoff summary after tab grouping"
+    "Compose and Mix should use full-width nested pages while Arrange and Deliver retain readable purpose-built layouts"
   );
   check(
     styles.includes("@media (max-width: 1600px) {") &&
-      styles.includes(".workspace-compose-panel {\n    grid-template-columns: repeat(2, minmax(0, 1fr));") &&
+      styles.includes(".workspace-compose-panel {\n    grid-template-columns: minmax(0, 1fr);") &&
       styles.includes(".workspace-compose-panel .pattern-stack-preview {\n    grid-template-columns: repeat(2, minmax(0, 1fr));") &&
       styles.includes(".workspace-compose-panel .pattern-stack-preview > * {\n    overflow: visible;\n    overflow-wrap: anywhere;\n    text-overflow: clip;\n    white-space: normal;") &&
       styles.includes(".workspace-mix-panel {\n    grid-template-columns: minmax(0, 1fr);") &&
@@ -2096,6 +2159,8 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
   const desktopShortcutSource = printNamedFunction(appSource, "App.tsx", "handleDesktopShortcut");
   const nativeMenuSource = printNamedFunction(appSource, "App.tsx", "handleNativeMenuCommand");
   const midiCaptureSource = printNamedFunction(appSource, "App.tsx", "captureMidiNoteEvent");
+  const deleteSelectedEventSource = printNamedFunction(appSource, "App.tsx", "deleteSelectedEvent");
+  const workspacePageActivationSource = printNamedFunction(appSource, "App.tsx", "activateWorkspacePageForTarget");
   const finishChecklistRouteSource = printNamedFunction(
     appSource,
     "App.tsx",
@@ -2132,7 +2197,9 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
   check(
     html.includes("Guided · opens the drum grid") &&
       html.includes("Studio · opens Review Queue") &&
-      html.includes('data-testid="workflow-target-compose" aria-label="Pattern editor" tabindex="-1"') &&
+      /<section(?=[^>]*id="compose-page-panel-drums")(?=[^>]*data-testid="workflow-target-compose")(?=[^>]*tabindex="0")[^>]*>/u.test(
+        html
+      ) &&
       html.includes('data-testid="review-queue" aria-label="Review queue" tabindex="-1"'),
     "first-run choices should name their direct destinations and keep both landing regions programmatically focusable"
   );
@@ -2177,13 +2244,16 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       workflowJumpSource.includes("routeWorkspaceTargetIntoView(zone)") &&
       workflowTabSelectionSource.includes("guidanceCenterRef.current?.open") &&
       workflowTabSelectionSource.includes("flushSync(() => setGuidanceCenterOpen(false))") &&
-      workflowTabSelectionSource.includes("jumpToWorkflowNavigatorItem(item)") &&
+      workflowTabSelectionSource.includes('document.getElementById(`workspace-panel-${item.id}`)') &&
+      workflowTabSelectionSource.includes('"start",') &&
+      workflowTabSelectionSource.includes("item.id") &&
+      !workflowTabSelectionSource.includes("jumpToWorkflowNavigatorItem(item)") &&
       appSource.includes("onJump={selectWorkflowNavigatorTab}") &&
       appSource.includes("onJumpWorkflowSpotlight={jumpToWorkflowNavigatorItem}") &&
       mixTabpanelIndex >= 0 &&
       reviewQueueIndex > mixTabpanelIndex &&
       reviewQueueIndex < deliverTabpanelIndex,
-    "direct functional-tab selection should collapse Guide Activity before revealing the workspace while internal Guide routes preserve their open context"
+    "direct functional-tab selection should collapse Guide Activity, preserve the active nested page, and reveal the workspace while internal Guide routes keep their exact-route behavior"
   );
   check(
     coldWorkspaceReadoutRoutes.every(({ route, source }) => source.includes(route)) &&
@@ -2218,14 +2288,22 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
   check(
     appSource.includes("const activeWorkspaceZoneRef = useRef<WorkflowZoneId>(activeWorkspaceZone);") &&
       appSource.includes("activeWorkspaceZoneRef.current = activeWorkspaceZone;") &&
-      desktopShortcutSource.includes(
-        'activeWorkspaceZoneRef.current === "compose" && keyboardCaptureEnabled && isKeyboardCaptureKey(key)'
+      appSource.includes(
+        "const activeComposeWorkspacePageRef = useRef<ComposeWorkspacePageId>(activeComposeWorkspacePage);"
       ) &&
+      desktopShortcutSource.includes('activeWorkspaceZoneRef.current === "compose"') &&
+      desktopShortcutSource.includes('activeComposeWorkspacePageRef.current === "notes"') &&
+      desktopShortcutSource.includes("keyboardCaptureEnabled") &&
+      desktopShortcutSource.includes("isKeyboardCaptureKey(key)") &&
       desktopShortcutSource.includes('activeWorkspaceZoneRef.current === "compose" && nextPattern') &&
       desktopShortcutSource.includes(
         'activeWorkspaceZoneRef.current === "compose" && (key === "backspace" || key === "delete")'
-      ),
-    "desktop capture, Pattern, and delete shortcuts should read the current functional tab ref and stay Compose-only"
+      ) &&
+      deleteSelectedEventSource.includes("switch (activeComposeWorkspacePageRef.current)") &&
+      deleteSelectedEventSource.includes('case "drums"') &&
+      deleteSelectedEventSource.includes('case "notes"') &&
+      deleteSelectedEventSource.includes('case "instruments"'),
+    "desktop capture and Delete should read the current nested page while shared Pattern shortcuts remain Compose-only"
   );
   check(
     /case "delete-selected-event":\s*if \(activeWorkspaceZoneRef\.current !== "compose"\) \{\s*setProjectStatus\("Delete Selected Event is available in Compose"\);\s*return;\s*\}\s*deleteSelectedEvent\(\);/u.test(
@@ -2245,10 +2323,11 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
     "Electron hidden Compose guards should compare project fingerprint and selected Pattern after every native key so mutations cannot cancel each other"
   );
   check(
-    midiCaptureSource.includes('activeWorkspaceZoneRef.current !== "compose" || !event.data') &&
-      midiCaptureSource.indexOf('activeWorkspaceZoneRef.current !== "compose" || !event.data') <
+    midiCaptureSource.includes('activeWorkspaceZoneRef.current !== "compose"') &&
+      midiCaptureSource.includes('activeComposeWorkspacePageRef.current !== "notes"') &&
+      midiCaptureSource.indexOf('activeComposeWorkspacePageRef.current !== "notes"') <
         midiCaptureSource.indexOf("midiNoteOnFromMessage(event.data)"),
-    "MIDI note capture should reject events outside Compose before decoding or mutating a note"
+    "MIDI note capture should reject events outside the open Compose Notes page before decoding or mutating a note"
   );
   check(
     workspaceScrollSource.includes(
@@ -2263,8 +2342,11 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
         "activeElement?.closest('[role=\"dialog\"], [data-testid=\"quick-actions\"]')"
       ) &&
       workspaceScrollSource.includes(
-        "dismissedModalFocus || (zone !== null && activeElementZone !== null && activeElementZone !== zone)"
+        "activeElementPage !== targetPage"
       ) &&
+      workspaceScrollSource.includes("activateWorkspacePageForTarget(initialTarget)") &&
+      workspacePageActivationSource.includes('target?.closest<HTMLElement>("[data-workspace-page]")') &&
+      workspacePageActivationSource.includes("flushSync") &&
       workspaceScrollSource.includes(
         "dismissedModalFocus && !target.matches('a[href], button, input, select, textarea, [tabindex]')"
       ) &&
@@ -2276,7 +2358,7 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       targetFocusIndex > focusTransferIndex &&
       panelFocusFallbackIndex > targetFocusIndex &&
       targetScrollIndex > panelFocusFallbackIndex,
-    "workspace reveal should activate functional zones, focus a visible target after modal dismissal even outside tabs, use panel fallback only for zones, then scroll"
+    "workspace reveal should activate functional zones and nested pages before focusing a visible target and scrolling"
   );
   check(
     finishChecklistRouteSource.includes("flushSync(() => setMasterReviewOpen(true))") &&

@@ -88,7 +88,7 @@ BPM/키/스타일 → 패턴 프로그래밍 → 드럼 → 808/베이스 → �
 - React 19
 - TypeScript 5.9
 - Vite 8 / Rolldown
-- Electron 39
+- Electron 43.5
 - Electron 내장 SQLite3 (`node:sqlite`)
 - Web Audio 기반 실시간 재생과 결정론적 오프라인 렌더
 - Node.js 22.12 이상
@@ -107,7 +107,10 @@ BPM/키/스타일 → 패턴 프로그래밍 → 드럼 → 808/베이스 → �
 
 ```sh
 npm install
+npx install-electron --no
 ```
+
+Electron 43은 npm 패키지 설치와 실행 바이너리 준비가 분리되어 있으므로 두 명령을 모두 실행합니다. `Electron binary is missing` 또는 `Electron.app template is missing`가 나오면 `npx install-electron --no`를 다시 실행합니다.
 
 개발용 웹 앱을 실행합니다.
 
@@ -127,6 +130,30 @@ Electron 데스크톱 앱을 실행합니다.
 npm run desktop
 ```
 
+Finder에서 실행할 수 있는 macOS 응용 프로그램 번들을 만듭니다.
+
+```sh
+npm run desktop:app
+```
+
+결과는 `build/desktop/GrooveForge-darwin-<arch>/GrooveForge.app`에 생성됩니다. 패키징 검사는 실행 파일 자체에서 Electron 43.5.0 / Node 24.19.0 / Chromium 150.0.7871.250 / 현재 CPU 아키텍처를 읽고, Electron Framework 버전과 macOS 12.0 이상 계약도 함께 확인합니다. 로컬 실행용 ad-hoc 서명 번들이며 Developer ID 서명이나 공증을 주장하지 않고, `/Applications`를 자동으로 변경하지 않습니다.
+
+같은 앱과 Applications 바로가기를 담은 로컬 DMG를 만듭니다.
+
+```sh
+npm run desktop:dmg
+```
+
+결과는 `build/desktop/GrooveForge-darwin-<arch>/GrooveForge-<version>-darwin-<arch>.dmg`에 생성됩니다. 이 DMG는 로컬 unsigned 산출물이므로 외부 배포용 공증 패키지가 아닙니다.
+
+여섯 대표 장르를 실제 production Electron 화면에서 각각 열고, native UI로 편곡·Mix/Deliver·WAV export·Save·reopen한 뒤 SoundCloud private-first 준비 패키지로 모읍니다.
+
+```sh
+npm run desktop:multigenre-qa
+```
+
+Ballad, Hip-Hop, Trap, R&B, House, Experimental을 다루며 각 결과 WAV는 90~150초, stereo 44.1kHz signed PCM 24-bit 계약을 검사합니다. 생성되는 ignored `build/desktop/plan-1528-multigenre-actual-app-qa-*/delivery/`에는 장르별 WAV, 재편집 프로젝트, 한글 업로드 시트, 실제 앱 화면 증거, 기술 QA, manifest와 SHA-256 checksums가 들어갑니다. 이 명령은 SoundCloud 로그인·업로드·공개를 수행하지 않습니다.
+
 ## 핵심 검증 명령
 
 | 명령 | 확인 범위 |
@@ -137,6 +164,9 @@ npm run desktop
 | `npm run workflow:smoke` | 초보자와 프로듀서의 전체 작업 흐름 |
 | `npm run persona:smoke` | 두 사용자층의 준비 상태와 전달 패키지 |
 | `npm run sample-audio:qa` | 실제 WAV 렌더, 포맷, 레벨, 꼬리, 결정성, 격리 |
+| `npm run desktop:app` | 빌드, branded `.app` 조립, ad-hoc 서명, 구조 검증 |
+| `npm run desktop:dmg` | 앱 생성과 로컬 unsigned DMG 검증 |
+| `npm run desktop:multigenre-qa` | 6장르 실제 앱 편집·WAV·Save/reopen과 SoundCloud 준비 패키지 |
 | `npm run desktop:smoke` | Electron entry, preload와 빌드 자산 |
 | `npm run desktop:launch-smoke` | 실제 프로덕션 Electron UI와 접근성 |
 | `npm run project-workspace:smoke` | 임시 사용자 홈의 SQLite3 schema·복구·catalog·원자 저장 |

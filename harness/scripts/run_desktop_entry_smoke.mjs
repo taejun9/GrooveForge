@@ -119,6 +119,19 @@ function checkPackageScripts() {
   checkIncludes(packageJson.description ?? "", "desktop beat workstation", "package.json description");
   checkIncludes(packageJson.scripts?.build ?? "", "tsc -p tsconfig.electron.json", "package.json build script");
   checkIncludes(packageJson.scripts?.desktop ?? "", "run_desktop_app.mjs", "package.json desktop script");
+  checkIncludes(packageJson.scripts?.["desktop:app"] ?? "", "npm run build", "package.json desktop:app script");
+  checkIncludes(
+    packageJson.scripts?.["desktop:app"] ?? "",
+    "run_desktop_package_smoke.mjs --package-only",
+    "package.json desktop:app script"
+  );
+  checkIncludes(packageJson.scripts?.["desktop:dmg"] ?? "", "npm run desktop:app", "package.json desktop:dmg script");
+  checkIncludes(packageJson.scripts?.["desktop:dmg"] ?? "", "npm run desktop:dmg-smoke", "package.json desktop:dmg script");
+  checkIncludes(
+    packageJson.scripts?.["desktop:multigenre-qa"] ?? "",
+    "run_desktop_multigenre_actual_app_qa.mjs",
+    "package.json desktop:multigenre-qa script"
+  );
   checkIncludes(
     packageJson.scripts?.["desktop:manual-qa"] ?? "",
     "run_desktop_manual_qa.mjs",
@@ -320,6 +333,20 @@ function checkDesktopGuiLaunchGuardContract() {
   checkIncludes(packageSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:package-smoke\"", "harness/scripts/run_desktop_package_smoke.mjs");
   checkIncludes(packageSmokeSource, "allRequiredDependenciesSignatureCompatible", "harness/scripts/run_desktop_package_smoke.mjs");
   checkIncludes(packageSmokeSource, "allRequiredDependenciesDyldLoadable", "harness/scripts/run_desktop_package_smoke.mjs");
+  checkIncludes(packageSmokeSource, 'electron: "43.5.0"', "harness/scripts/run_desktop_package_smoke.mjs exact Electron runtime");
+  checkIncludes(packageSmokeSource, 'node: "24.19.0"', "harness/scripts/run_desktop_package_smoke.mjs exact Node runtime");
+  checkIncludes(packageSmokeSource, 'ELECTRON_RUN_AS_NODE: "1"', "harness/scripts/run_desktop_package_smoke.mjs executable runtime inspection");
+  checkIncludes(packageSmokeSource, 'readPlistString(appPlist, "LSMinimumSystemVersion")', "harness/scripts/run_desktop_package_smoke.mjs minimum macOS inspection");
+  checkIncludes(packageSmokeSource, 'includes("--package-only")', "harness/scripts/run_desktop_package_smoke.mjs");
+  checkIncludes(
+    packageSmokeSource,
+    "await rm(packagedApp, { force: true, recursive: true });",
+    "harness/scripts/run_desktop_package_smoke.mjs"
+  );
+  check(
+    !packageSmokeSource.includes("await rm(outputRoot, { force: true, recursive: true });"),
+    "harness/scripts/run_desktop_package_smoke.mjs should preserve sibling build/desktop evidence"
+  );
   checkIncludes(
     packagedProjectIoSmokeSource,
     "macGuiLaunchBlockDetails(\"npm run desktop:packaged-project-io-smoke\")",
@@ -1132,9 +1159,14 @@ function checkElectronMainContract() {
     `${label} Audience Starter visible Review Queue settle`
   );
   checkIncludes(
-    launchSmokeStarterSurfaceHelpers,
-    "state.mixerNarrowStripCount === 5",
-    `${label} Audience Starter five responsive mixer strips settle`
+    launchSmokeStarterCollector,
+    "const mixerPageMeasurements =",
+    `${label} Audience Starter separate visible Mixer-page measurement`
+  );
+  checkIncludes(
+    launchSmokeStarterCollector,
+    `'[data-testid="workflow-target-master"]', '[data-testid="master-review-toggle"]'`,
+    `${label} Audience Starter separate visible Master-page activation`
   );
   checkIncludes(
     launchSmokeStarterSurfaceHelpers,
@@ -1143,8 +1175,8 @@ function checkElectronMainContract() {
   );
   checkIncludes(
     launchSmokeStarterSurfaceHelpers,
-    "state.reviewQueueStackedRowCount === 3",
-    `${label} Audience Starter three responsive Review Queue rows settle`
+    "state.reviewQueueStackedRowCount === 0",
+    `${label} Audience Starter full-width Review Queue rows settle`
   );
   checkIncludes(
     launchSmokeStarterCollector,

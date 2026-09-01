@@ -672,6 +672,14 @@ Install dependencies:
 npm install
 ```
 
+Electron 43 installs its npm package and runtime binary separately. Materialize the exact runtime before launching or packaging:
+
+```sh
+npx install-electron --no
+```
+
+If `Electron binary is missing` or `Electron.app template is missing` appears, rerun that command.
+
 Run the renderer dev server:
 
 ```sh
@@ -683,6 +691,30 @@ Build and open the desktop app:
 ```sh
 npm run desktop
 ```
+
+Build a branded macOS application bundle that can be opened from Finder:
+
+```sh
+npm run desktop:app
+```
+
+The result is `build/desktop/GrooveForge-darwin-<arch>/GrooveForge.app`. Packaging executes the bundled binary in Node mode and requires Electron 43.5.0, Node 24.19.0, Chromium 150.0.7871.250, the current CPU architecture, Electron Framework 43.5.0, and macOS 12.0 or newer metadata. It is ad-hoc signed for local launch, is not Developer ID signed or notarized, and does not modify `/Applications`.
+
+Build and validate a local unsigned DMG containing the app and an Applications shortcut:
+
+```sh
+npm run desktop:dmg
+```
+
+The result is `build/desktop/GrooveForge-darwin-<arch>/GrooveForge-<version>-darwin-<arch>.dmg`; it is not a notarized external-distribution artifact.
+
+Run six representative genres through the visible production Electron app with native UI arrangement, Mix/Deliver, WAV export, Save, and reopen, then assemble a SoundCloud private-first preparation package:
+
+```sh
+npm run desktop:multigenre-qa
+```
+
+Ballad, Hip-Hop, Trap, R&B, House, and Experimental each produce a checked 90–150 second stereo 44.1 kHz signed PCM 24-bit WAV. The ignored `build/desktop/plan-1528-multigenre-actual-app-qa-*/delivery/` tree contains each WAV, reopenable project, Korean upload sheet, actual-app screenshots, technical QA, manifest, and SHA-256 checksums. The command does not log in to, upload to, or publish on SoundCloud.
 
 Run a visible, isolated QA app without touching the normal user project database or recovery draft:
 

@@ -40,7 +40,7 @@ if (blockDetails) {
 
 const electronBin = resolveElectronBinary();
 if (!electronBin) {
-  fail("Electron binary is missing; run npm install first.");
+  fail("Electron binary is missing; run npx install-electron --no after npm install.");
 }
 
 const env = {

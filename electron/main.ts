@@ -1107,6 +1107,42 @@ type LaunchSmokeEvidence = {
 
 type LaunchSmokeFunctionalTabZone = "compose" | "arrange" | "mix" | "deliver";
 
+type LaunchSmokeWorkspacePageGroup = "compose" | "mix";
+type LaunchSmokeComposeWorkspacePage = "drums" | "notes" | "instruments";
+type LaunchSmokeMixWorkspacePage = "mixer" | "master";
+type LaunchSmokeWorkspacePageId = LaunchSmokeComposeWorkspacePage | LaunchSmokeMixWorkspacePage;
+
+type LaunchSmokeWorkspacePageStateEvidence = {
+  activePage: string;
+  activePanelHorizontalOverflow: number;
+  activePanelWidth: number;
+  ariaConnectionsReady: boolean;
+  fullWidthReady: boolean;
+  inactiveFocusableControlCount: number;
+  inactiveHiddenPanelCount: number;
+  inactiveZeroRectPanelCount: number;
+  selectedTabCount: number;
+  tabCount: number;
+  tabListHorizontalOverflow: number;
+  tabPanelCount: number;
+  tabStopCount: number;
+  visiblePanelCount: number;
+  zonePanelWidth: number;
+};
+
+type LaunchSmokeWorkspacePagesEvidence = {
+  composeInitial: LaunchSmokeWorkspacePageStateEvidence;
+  composeStates: Record<LaunchSmokeComposeWorkspacePage, LaunchSmokeWorkspacePageStateEvidence>;
+  composeTraversal: Array<{ input: string; page: string }>;
+  mixInitial: LaunchSmokeWorkspacePageStateEvidence;
+  mixStates: Record<LaunchSmokeMixWorkspacePage, LaunchSmokeWorkspacePageStateEvidence>;
+  mixTraversal: Array<{ input: string; page: string }>;
+  pageStatePreservedAcrossOuterTabs: {
+    compose: boolean;
+    mix: boolean;
+  };
+};
+
 type LaunchSmokeFunctionalTabStateEvidence = {
   activePanelHorizontalOverflow: number;
   activeZone: string;
@@ -1283,9 +1319,12 @@ type LaunchSmokeFunctionalTabsEvidence = {
     LaunchSmokeStickyNavigatorEvidence
   >;
   traversal: Array<{ input: string; zone: string }>;
+  workspacePages: LaunchSmokeWorkspacePagesEvidence;
 };
 
 type LaunchSmokeFunctionalTabInternalSnapshot = LaunchSmokeFunctionalTabStateEvidence & {
+  activeComposePage: string;
+  activeMixPage: string;
   composeDataFingerprint: string;
   dirtyPosture: string;
   disclosurePosture: string;
@@ -1324,7 +1363,7 @@ type LaunchSmokeLayoutEvidence = {
   chordSelectedEditorVisible: boolean;
   chordsBeforeSoundDesign: boolean;
   captureIdeasOpen: boolean;
-  captureIdeasToggleVisible: boolean;
+  captureIdeasTogglePresent: boolean;
   deliveryAuditOpen: boolean;
   deliveryAuditToggleVisible: boolean;
   deliveryDirectBeforeStatus: boolean;
@@ -2621,11 +2660,13 @@ function launchSmokeFailures(evidence: LaunchSmokeEvidence): string[] {
     failures.push("Quick Actions graph should finish its on-demand load before launch evidence is accepted");
   }
   if (
-    !evidence.layout.captureIdeasToggleVisible ||
+    !evidence.layout.captureIdeasTogglePresent ||
     !evidence.layout.noteLanesPresent ||
     !evidence.layout.noteLanesAfterCaptureIdeas
   ) {
-    failures.push("note editor should expose a visible Capture & Ideas toggle followed by direct 808 and Synth grids");
+    failures.push(
+      `note editor should keep a Capture & Ideas toggle structurally before direct 808 and Synth grids (toggle ${evidence.layout.captureIdeasTogglePresent}, lanes ${evidence.layout.noteLanesPresent}, order ${evidence.layout.noteLanesAfterCaptureIdeas})`
+    );
   }
   return failures;
 }
@@ -3101,11 +3142,70 @@ function launchSmokeFunctionalTabsFailures(evidence: LaunchSmokeFunctionalTabsEv
       failures.push(`functional tab ${zone} should expose one ARIA-connected active surface and fully contain three inactive panels`);
     }
   }
-  if (!evidence.states.mix.mixMixerVisible || !evidence.states.mix.mixMasterVisible) {
-    failures.push("Mix functional tab should visibly contain both Mixer and Master");
+  if (evidence.states.mix.mixMixerVisible === evidence.states.mix.mixMasterVisible) {
+    failures.push("Mix functional tab should visibly contain exactly one selected Mixer or Master page");
   }
   if (!evidence.states.deliver.deliverHandoffVisible) {
     failures.push("Deliver functional tab should visibly contain Handoff Pack");
+  }
+  const workspacePages = evidence.workspacePages;
+  const expectedComposeTraversal = [
+    "initial:drums",
+    "native-click:notes",
+    "ArrowRight:instruments",
+    "Home:drums",
+    "ArrowLeft:instruments",
+    "ArrowRight:drums"
+  ];
+  const expectedMixTraversal = [
+    "initial:mixer",
+    "native-click:master",
+    "ArrowLeft:mixer",
+    "End:master",
+    "Home:mixer",
+    "ArrowRight:master"
+  ];
+  if (
+    workspacePages.composeTraversal.map((entry) => `${entry.input}:${entry.page}`).join("|") !==
+      expectedComposeTraversal.join("|") ||
+    workspacePages.mixTraversal.map((entry) => `${entry.input}:${entry.page}`).join("|") !==
+      expectedMixTraversal.join("|")
+  ) {
+    failures.push("nested Compose and Mix pages should follow native click plus Arrow/Home/End traversal");
+  }
+  for (const [group, pageIds] of [
+    ["compose", ["drums", "notes", "instruments"]],
+    ["mix", ["mixer", "master"]]
+  ] as const) {
+    const states = group === "compose" ? workspacePages.composeStates : workspacePages.mixStates;
+    for (const page of pageIds) {
+      const state = states[page as keyof typeof states] as LaunchSmokeWorkspacePageStateEvidence;
+      const pageCount = pageIds.length;
+      if (
+        state.activePage !== page ||
+        state.tabCount !== pageCount ||
+        state.tabPanelCount !== pageCount ||
+        state.selectedTabCount !== 1 ||
+        state.tabStopCount !== 1 ||
+        state.visiblePanelCount !== 1 ||
+        !state.ariaConnectionsReady ||
+        !state.fullWidthReady ||
+        state.activePanelHorizontalOverflow > 1 ||
+        state.inactiveHiddenPanelCount !== pageCount - 1 ||
+        state.inactiveZeroRectPanelCount !== pageCount - 1 ||
+        state.inactiveFocusableControlCount !== 0
+      ) {
+        failures.push(
+          `workspace page ${group}/${page} should expose one full-width ARIA-connected surface and fully hide its peer pages`
+        );
+      }
+    }
+  }
+  if (
+    !workspacePages.pageStatePreservedAcrossOuterTabs.compose ||
+    !workspacePages.pageStatePreservedAcrossOuterTabs.mix
+  ) {
+    failures.push("selected nested Compose and Mix pages should survive outer workspace tab round trips");
   }
   if (
     !evidence.composeRoundTrip.editFingerprintPreserved ||
@@ -3536,6 +3636,12 @@ async function readLaunchSmokeFunctionalTabState(win: BrowserWindow): Promise<La
       const master = document.querySelector('[data-testid="workflow-target-master"]');
       const handoff = document.querySelector('[data-testid="handoff-pack"]');
       return {
+        activeComposePage:
+          document.querySelector('[role="tablist"][aria-label="Compose editor pages"] [role="tab"][aria-selected="true"]')
+            ?.id?.replace("compose-page-tab-", "") ?? "",
+        activeMixPage:
+          document.querySelector('[role="tablist"][aria-label="Mix editor pages"] [role="tab"][aria-selected="true"]')
+            ?.id?.replace("mix-page-tab-", "") ?? "",
         activePanelHorizontalOverflow: activePanel
           ? Math.max(0, activePanel.scrollWidth - activePanel.clientWidth)
           : -1,
@@ -3604,6 +3710,126 @@ async function clickLaunchSmokeFunctionalTabNativeTarget(win: BrowserWindow, tes
   win.webContents.sendInputEvent({ type: "mouseDown", x: point.x, y: point.y, button: "left", clickCount: 1 });
   win.webContents.sendInputEvent({ type: "mouseUp", x: point.x, y: point.y, button: "left", clickCount: 1 });
   await new Promise((resolve) => setTimeout(resolve, 140));
+}
+
+async function readLaunchSmokeWorkspacePageState(
+  win: BrowserWindow,
+  group: LaunchSmokeWorkspacePageGroup
+): Promise<LaunchSmokeWorkspacePageStateEvidence> {
+  return (await win.webContents.executeJavaScript(`
+    (() => {
+      const group = ${JSON.stringify(group)};
+      const pageIds = group === "compose" ? ["drums", "notes", "instruments"] : ["mixer", "master"];
+      const tabList = document.querySelector('[role="tablist"][aria-label="' +
+        (group === "compose" ? "Compose editor pages" : "Mix editor pages") + '"]');
+      const tabs = tabList ? Array.from(tabList.querySelectorAll('[role="tab"]')) : [];
+      const panels = pageIds.map((page) => document.getElementById(group + "-page-panel-" + page)).filter(Boolean);
+      const selectedTabs = tabs.filter((tab) => tab.getAttribute("aria-selected") === "true");
+      const tabStops = tabs.filter((tab) => tab.tabIndex === 0);
+      const activeTab = selectedTabs[0] ?? null;
+      const activePage = activeTab?.id?.replace(group + "-page-tab-", "") ?? "";
+      const activePanel = activeTab ? document.getElementById(activeTab.getAttribute("aria-controls") ?? "") : null;
+      const zonePanel = document.getElementById("workspace-panel-" + group);
+      const rendered = (element) => {
+        if (!(element instanceof HTMLElement)) return false;
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      };
+      const visiblePanels = panels.filter((panel) => !panel.hidden && rendered(panel));
+      const inactivePanels = panels.filter((panel) => panel !== activePanel);
+      const focusableSelector = 'a[href], button, input, select, textarea, [tabindex]';
+      const inactiveFocusableControlCount = inactivePanels.reduce(
+        (count, panel) =>
+          count +
+          Array.from(panel.querySelectorAll(focusableSelector)).filter(
+            (control) => !control.disabled && control.tabIndex >= 0 && rendered(control)
+          ).length,
+        0
+      );
+      const ariaConnectionsReady =
+        tabs.length === pageIds.length &&
+        panels.length === pageIds.length &&
+        tabs.every((tab) => {
+          const controlled = document.getElementById(tab.getAttribute("aria-controls") ?? "");
+          return Boolean(
+            controlled &&
+            controlled.getAttribute("role") === "tabpanel" &&
+            controlled.getAttribute("aria-labelledby") === tab.id
+          );
+        });
+      const activeRect = activePanel?.getBoundingClientRect() ?? null;
+      const zoneRect = zonePanel?.getBoundingClientRect() ?? null;
+      return {
+        activePage,
+        activePanelHorizontalOverflow: activePanel
+          ? Math.max(0, activePanel.scrollWidth - activePanel.clientWidth)
+          : -1,
+        activePanelWidth: activeRect?.width ?? 0,
+        ariaConnectionsReady,
+        fullWidthReady: Boolean(
+          activeRect &&
+          zoneRect &&
+          activeRect.width > 0 &&
+          zoneRect.width > 0 &&
+          activeRect.width >= zoneRect.width * 0.9
+        ),
+        inactiveFocusableControlCount,
+        inactiveHiddenPanelCount: inactivePanels.filter((panel) => panel.hidden).length,
+        inactiveZeroRectPanelCount: inactivePanels.filter((panel) => {
+          const rect = panel.getBoundingClientRect();
+          return rect.width === 0 && rect.height === 0 && panel.getClientRects().length === 0;
+        }).length,
+        selectedTabCount: selectedTabs.length,
+        tabCount: tabs.length,
+        tabListHorizontalOverflow: tabList ? Math.max(0, tabList.scrollWidth - tabList.clientWidth) : -1,
+        tabPanelCount: panels.length,
+        tabStopCount: tabStops.length,
+        visiblePanelCount: visiblePanels.length,
+        zonePanelWidth: zoneRect?.width ?? 0
+      };
+    })();
+  `)) as LaunchSmokeWorkspacePageStateEvidence;
+}
+
+async function activateLaunchSmokeWorkspacePage(
+  win: BrowserWindow,
+  group: LaunchSmokeWorkspacePageGroup,
+  page: LaunchSmokeWorkspacePageId
+): Promise<LaunchSmokeWorkspacePageStateEvidence> {
+  const outerZone = (await win.webContents.executeJavaScript(
+    `document.querySelector('[role="tablist"][aria-label="Workstation function tabs"] [role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? ""`
+  )) as string;
+  if (outerZone !== group) {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${group}`);
+  }
+  let state = await readLaunchSmokeWorkspacePageState(win, group);
+  if (state.activePage !== page) {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, `${group}-page-tab-${page}`);
+  }
+  const deadline = Date.now() + 30000;
+  state = await readLaunchSmokeWorkspacePageState(win, group);
+  while (
+    Date.now() < deadline &&
+    !(
+      state.activePage === page &&
+      state.selectedTabCount === 1 &&
+      state.tabStopCount === 1 &&
+      state.visiblePanelCount === 1
+    )
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    state = await readLaunchSmokeWorkspacePageState(win, group);
+  }
+  if (
+    state.activePage !== page ||
+    state.selectedTabCount !== 1 ||
+    state.tabStopCount !== 1 ||
+    state.visiblePanelCount !== 1
+  ) {
+    throw new Error(`Workspace ${group}/${page} page did not settle: ${JSON.stringify(state)}`);
+  }
+  return state;
 }
 
 async function collectLaunchSmokeStickyNavigatorAfterDeepScroll(
@@ -3711,26 +3937,58 @@ async function restoreLaunchSmokeFunctionalTabPosture(
   win: BrowserWindow,
   initial: LaunchSmokeFunctionalTabInternalSnapshot
 ): Promise<void> {
-  await win.webContents.executeJavaScript(`
-    (() => {
-      document.querySelector('[data-testid="workflow-jump-compose"]')?.click();
-      const selectedPattern = ${JSON.stringify(initial.selectedPattern)};
-      document.querySelector('[data-testid="pattern-tab-' + selectedPattern + '"]')?.click();
-      const keyboardCapture = JSON.parse(${JSON.stringify(initial.keyboardCapturePosture)});
-      const captureToggle = document.querySelector('[data-testid="keyboard-capture-toggle"]');
-      if (captureToggle && captureToggle.getAttribute("aria-pressed") !== keyboardCapture.pressed) {
-        captureToggle.click();
-      }
-      const disclosurePosture = JSON.parse(${JSON.stringify(initial.disclosurePosture)});
-      for (const expected of disclosurePosture) {
-        const details = document.querySelector('[data-testid="' + expected.testId + '"]');
-        if (details instanceof HTMLDetailsElement && details.open !== expected.open) {
-          details.querySelector(':scope > summary')?.click();
-        }
-      }
-      document.querySelector('[data-testid="workflow-jump-compose"]')?.focus();
-    })();
-  `);
+  const composePage = (
+    ["drums", "notes", "instruments"].includes(initial.activeComposePage)
+      ? initial.activeComposePage
+      : "drums"
+  ) as LaunchSmokeComposeWorkspacePage;
+  const mixPage = (["mixer", "master"].includes(initial.activeMixPage)
+    ? initial.activeMixPage
+    : "mixer") as LaunchSmokeMixWorkspacePage;
+  await activateLaunchSmokeWorkspacePage(win, "mix", mixPage);
+  await activateLaunchSmokeWorkspacePage(win, "compose", "drums");
+  const selectedPattern = (await win.webContents.executeJavaScript(
+    `document.querySelector('[data-testid^="pattern-tab-"][aria-selected="true"]')?.getAttribute("data-testid")?.replace("pattern-tab-", "") ?? ""`
+  )) as string;
+  if (selectedPattern !== initial.selectedPattern) {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, `pattern-tab-${initial.selectedPattern}`);
+  }
+
+  const expectedKeyboardCapture = JSON.parse(initial.keyboardCapturePosture) as { pressed?: string };
+  await activateLaunchSmokeWorkspacePage(win, "compose", "notes");
+  const keyboardCapturePressed = (await win.webContents.executeJavaScript(
+    `document.querySelector('[data-testid="keyboard-capture-toggle"]')?.getAttribute("aria-pressed") ?? "missing"`
+  )) as string;
+  if (keyboardCapturePressed !== expectedKeyboardCapture.pressed) {
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "keyboard-capture-toggle");
+  }
+
+  const disclosurePageAndToggle: Record<
+    string,
+    { page: LaunchSmokeComposeWorkspacePage; toggle: string }
+  > = {
+    "pattern-lab": { page: "drums", toggle: "pattern-lab-toggle" },
+    "capture-ideas": { page: "notes", toggle: "capture-ideas-toggle" },
+    "harmony-moves": { page: "instruments", toggle: "harmony-moves-toggle" },
+    "sound-design-tools": { page: "instruments", toggle: "sound-design-toggle" }
+  };
+  const disclosures = JSON.parse(initial.disclosurePosture) as Array<{ open: boolean; testId: string }>;
+  for (const disclosure of disclosures) {
+    const target = disclosurePageAndToggle[disclosure.testId];
+    if (!target) continue;
+    await activateLaunchSmokeWorkspacePage(win, "compose", target.page);
+    const isOpen = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid=${JSON.stringify(disclosure.testId)}]')?.open === true`
+    )) as boolean;
+    if (isOpen !== disclosure.open) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, target.toggle);
+    }
+  }
+
+  await activateLaunchSmokeWorkspacePage(win, "compose", composePage);
+  await win.webContents.executeJavaScript(
+    `document.querySelector('[data-testid="workflow-jump-compose"]')?.focus({ preventScroll: true })`
+  );
   await new Promise((resolve) => setTimeout(resolve, 140));
 }
 
@@ -3755,6 +4013,32 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     )) as boolean;
     await mkdir(evidenceDirectory, { recursive: true, mode: 0o700 });
 
+    onStep("traversing full-width Compose editor pages with native input");
+    const composeInitial = await readLaunchSmokeWorkspacePageState(win, "compose");
+    if (composeInitial.activePage !== "drums") {
+      await activateLaunchSmokeWorkspacePage(win, "compose", "drums");
+    }
+    const composeStates = {} as Record<LaunchSmokeComposeWorkspacePage, LaunchSmokeWorkspacePageStateEvidence>;
+    const composeTraversal: Array<{ input: string; page: string }> = [{
+      input: "initial",
+      page: composeInitial.activePage
+    }];
+    composeStates.drums = await readLaunchSmokeWorkspacePageState(win, "compose");
+    composeStates.notes = await activateLaunchSmokeWorkspacePage(win, "compose", "notes");
+    composeTraversal.push({ input: "native-click", page: composeStates.notes.activePage });
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Right");
+    composeStates.instruments = await readLaunchSmokeWorkspacePageState(win, "compose");
+    composeTraversal.push({ input: "ArrowRight", page: composeStates.instruments.activePage });
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Home");
+    let composePageState = await readLaunchSmokeWorkspacePageState(win, "compose");
+    composeTraversal.push({ input: "Home", page: composePageState.activePage });
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Left");
+    composePageState = await readLaunchSmokeWorkspacePageState(win, "compose");
+    composeTraversal.push({ input: "ArrowLeft", page: composePageState.activePage });
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Right");
+    composePageState = await readLaunchSmokeWorkspacePageState(win, "compose");
+    composeTraversal.push({ input: "ArrowRight", page: composePageState.activePage });
+
     onStep("preparing Compose Pattern and disclosure posture");
     const preservedPattern = initial.selectedPattern === "B" ? "C" : "B";
     await clickLaunchSmokeFunctionalTabNativeTarget(win, `pattern-tab-${preservedPattern}`);
@@ -3764,6 +4048,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     if (!patternLabOpen) {
       await clickLaunchSmokeFunctionalTabNativeTarget(win, "pattern-lab-toggle");
     }
+    await activateLaunchSmokeWorkspacePage(win, "compose", "notes");
     const captureIdeasOpen = await win.webContents.executeJavaScript(
       `document.querySelector('[data-testid="capture-ideas"]')?.open === true`
     );
@@ -3776,6 +4061,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     if (!keyboardCaptureEnabled) {
       await clickLaunchSmokeFunctionalTabNativeTarget(win, "keyboard-capture-toggle");
     }
+    await activateLaunchSmokeWorkspacePage(win, "compose", "drums");
     onStep("selecting an existing Compose drum without mutating it");
     const selectedDrumPreparation = (await win.webContents.executeJavaScript(`
       (() => {
@@ -3810,6 +4096,9 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     const captures = {} as Record<LaunchSmokeFunctionalTabZone, LaunchSmokeFunctionalTabCaptureEvidence>;
     const hiddenComposeGuards = {} as LaunchSmokeFunctionalTabsEvidence["hiddenComposeGuards"];
     const nativeMenuDeleteGuards = {} as Record<"mix" | "deliver", boolean>;
+    let mixInitial = {} as LaunchSmokeWorkspacePageStateEvidence;
+    const mixStates = {} as Record<LaunchSmokeMixWorkspacePage, LaunchSmokeWorkspacePageStateEvidence>;
+    const mixTraversal: Array<{ input: string; page: string }> = [];
     const stickyNavigatorAfterDeepScroll = {} as Record<
       Exclude<LaunchSmokeFunctionalTabZone, "compose">,
       LaunchSmokeStickyNavigatorEvidence
@@ -3845,6 +4134,27 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     await sendLaunchSmokeFunctionalTabNativeKey(win, "Right");
     current = await readLaunchSmokeFunctionalTabState(win);
     traversal.push({ input: "ArrowRight", zone: current.activeZone });
+    onStep("traversing full-width Mix editor pages with native input");
+    mixInitial = await readLaunchSmokeWorkspacePageState(win, "mix");
+    if (mixInitial.activePage !== "mixer") {
+      await activateLaunchSmokeWorkspacePage(win, "mix", "mixer");
+    }
+    mixTraversal.push({ input: "initial", page: mixInitial.activePage });
+    mixStates.mixer = await readLaunchSmokeWorkspacePageState(win, "mix");
+    mixStates.master = await activateLaunchSmokeWorkspacePage(win, "mix", "master");
+    mixTraversal.push({ input: "native-click", page: mixStates.master.activePage });
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Left");
+    let mixPageState = await readLaunchSmokeWorkspacePageState(win, "mix");
+    mixTraversal.push({ input: "ArrowLeft", page: mixPageState.activePage });
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "End");
+    mixPageState = await readLaunchSmokeWorkspacePageState(win, "mix");
+    mixTraversal.push({ input: "End", page: mixPageState.activePage });
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Home");
+    mixPageState = await readLaunchSmokeWorkspacePageState(win, "mix");
+    mixTraversal.push({ input: "Home", page: mixPageState.activePage });
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Right");
+    mixPageState = await readLaunchSmokeWorkspacePageState(win, "mix");
+    mixTraversal.push({ input: "ArrowRight", page: mixPageState.activePage });
     await sendHiddenComposeGuardKeys("mix");
     onStep("activating native Delete Selected Event menu command from Mix");
     activateNativeMenuCommandForSmoke(win, "delete-selected-event");
@@ -3854,6 +4164,9 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     onStep("deep scrolling Mix while keeping the functional tablist visible");
     stickyNavigatorAfterDeepScroll.mix = await collectLaunchSmokeStickyNavigatorAfterDeepScroll(win, "mix");
     captures.mix = await captureLaunchSmokeFunctionalTab(win, "mix", evidenceDirectory);
+    await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="workflow-jump-mix"]')?.focus({ preventScroll: true })`
+    );
 
     onStep("using End for Deliver and guarding hidden Compose shortcuts");
     await sendLaunchSmokeFunctionalTabNativeKey(win, "End");
@@ -3882,6 +4195,9 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
 
     onStep("transferring visible focus from a Mix Finish Checklist action to Compose");
     await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-mix");
+    const mixPagePreservedAcrossOuterTabs =
+      (await readLaunchSmokeWorkspacePageState(win, "mix")).activePage === mixPageState.activePage;
+    await activateLaunchSmokeWorkspacePage(win, "mix", "master");
     const masterReviewWasOpen = (await win.webContents.executeJavaScript(
       `document.querySelector('[data-testid="master-review-tools"]')?.open === true`
     )) as boolean;
@@ -3927,6 +4243,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
       })();
     `)) as LaunchSmokeFunctionalTabsEvidence["crossTabFocusTransfer"];
     await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-mix");
+    await activateLaunchSmokeWorkspacePage(win, "mix", "master");
     if (!masterReviewWasOpen) {
       await clickLaunchSmokeFunctionalTabNativeTarget(win, "master-review-toggle");
     }
@@ -4072,6 +4389,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
 
     onStep("closing both Mix Review Queue disclosures before native Quick Actions routing");
     await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-mix");
+    await activateLaunchSmokeWorkspacePage(win, "mix", "master");
     const reviewQueueWasOpenBeforeClose = (await win.webContents.executeJavaScript(
       `document.querySelector('[data-testid="master-review-queue-tools"]')?.open === true`
     )) as boolean;
@@ -4263,6 +4581,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     `);
     await new Promise((resolve) => setTimeout(resolve, 140));
     await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-mix");
+    await activateLaunchSmokeWorkspacePage(win, "mix", "master");
     const masterReviewQueueIsOpen = (await win.webContents.executeJavaScript(
       `document.querySelector('[data-testid="master-review-queue-tools"]')?.open === true`
     )) as boolean;
@@ -4647,7 +4966,19 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
       restoredCompose: false,
       states,
       stickyNavigatorAfterDeepScroll,
-      traversal
+      traversal,
+      workspacePages: {
+        composeInitial,
+        composeStates,
+        composeTraversal,
+        mixInitial,
+        mixStates,
+        mixTraversal,
+        pageStatePreservedAcrossOuterTabs: {
+          compose: returnedCompose.activeComposePage === preparedCompose.activeComposePage,
+          mix: mixPagePreservedAcrossOuterTabs
+        }
+      }
     };
 
     onStep("restoring Compose local posture");
@@ -4661,7 +4992,9 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
       restored.keyboardCapturePosture === initial.keyboardCapturePosture &&
       restored.undoRedoPosture === initial.undoRedoPosture &&
       restored.dirtyPosture === initial.dirtyPosture &&
-      restored.playbackPosture === initial.playbackPosture;
+      restored.playbackPosture === initial.playbackPosture &&
+      restored.activeComposePage === initial.activeComposePage &&
+      restored.activeMixPage === initial.activeMixPage;
     return evidence;
   } finally {
     if (initial && !cleanupComplete) {
@@ -5199,7 +5532,7 @@ async function prepareLaunchSmokeLazySurfaces(
 
 async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmokeEvidence> {
   const evidence = await win.webContents.executeJavaScript(`
-    (() => {
+    (async () => {
       const expectedTestIds = [
         "workflow-target-transport",
         "workflow-target-compose",
@@ -5604,13 +5937,18 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         targetHasAudienceTargets: false,
         targetText: ""
       };
-      const workflowNavigatorJumpEvidence = (() => {
+      const workflowNavigatorJumpEvidence = await (async () => {
         const arrangeButton = document.querySelector('[data-testid="workflow-jump-arrange"]');
         const mixButton = document.querySelector('[data-testid="workflow-jump-mix"]');
         const deliverButton = document.querySelector('[data-testid="workflow-jump-deliver"]');
         const deliverTarget = document.querySelector('[data-testid="handoff-pack"]');
         const composeButton = document.querySelector('[data-testid="workflow-jump-compose"]');
         const composeTarget = document.querySelector('[data-testid="workflow-target-compose"]');
+        const composeDrumsButton = document.querySelector('[data-testid="compose-page-tab-drums"]');
+        const composeNotesButton = document.querySelector('[data-testid="compose-page-tab-notes"]');
+        const composeInstrumentsButton = document.querySelector('[data-testid="compose-page-tab-instruments"]');
+        const mixMixerButton = document.querySelector('[data-testid="mix-page-tab-mixer"]');
+        const mixMasterButton = document.querySelector('[data-testid="mix-page-tab-master"]');
         const workflowNavigator = document.querySelector('[data-testid="workflow-navigator"]');
         const visible = (element) => Boolean(
           element &&
@@ -5618,7 +5956,11 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           element.getBoundingClientRect().height > 0 &&
           element.closest('[hidden]') === null
         );
+        const settle = () => new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve))
+        );
         arrangeButton?.click();
+        await settle();
         const arrangeVisibility = {
           arrangementPatternControlsVisible: visible(arrangementPatternControls),
           arrangementShapeControlsVisible: visible(arrangementShapeControls),
@@ -5627,14 +5969,24 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           blockMovesToggleVisible: visible(blockMovesToggle)
         };
         mixButton?.click();
-        const mixVisibility = {
-          masterPolishToggleVisible: visible(masterPolishToggle),
-          masterReviewToggleVisible: visible(masterReviewToggle),
+        await settle();
+        mixMixerButton?.click();
+        await settle();
+        const mixerVisibility = {
           mixerProcessingToggleVisible: visible(mixerProcessingToggle),
           mixMovesToggleVisible: visible(mixMovesToggle),
           mixReviewToggleVisible: visible(mixReviewToggle)
         };
+        mixMasterButton?.click();
+        await settle();
+        const masterVisibility = {
+          masterPolishToggleVisible: visible(masterPolishToggle),
+          masterReviewToggleVisible: visible(masterReviewToggle)
+        };
+        mixMixerButton?.click();
+        await settle();
         deliverButton?.click();
+        await settle();
         const deliverRect = deliverTarget?.getBoundingClientRect() ?? null;
         const deliverVisibility = {
           deliveryAuditToggleVisible: visible(deliveryAuditToggle),
@@ -5642,6 +5994,27 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           deliveryStatusToggleVisible: visible(deliveryStatusToggle)
         };
         composeButton?.click();
+        await settle();
+        composeNotesButton?.click();
+        await settle();
+        const notesVisibility = {
+          captureIdeasTogglePresent: Boolean(captureIdeasToggle)
+        };
+        composeInstrumentsButton?.click();
+        await settle();
+        if (!chordCards.some((card) => card.dataset.editorOpen === "true")) {
+          chordCards[0]?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+          await settle();
+        }
+        const instrumentsVisibility = {
+          chordSelectedEditorVisible: chordEditors.some(
+            (editor, index) => chordCards[index]?.dataset.editorOpen === "true" && visible(editor)
+          ),
+          harmonyMovesToggleVisible: visible(harmonyMovesToggle),
+          soundDesignToggleVisible: visible(soundDesignToggle)
+        };
+        composeDrumsButton?.click();
+        await settle();
         const composeRect = composeTarget?.getBoundingClientRect() ?? null;
         const workflowNavigatorRect = workflowNavigator?.getBoundingClientRect() ?? null;
         return {
@@ -5655,7 +6028,10 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           ),
           deliverReady: Boolean(deliverRect && deliverRect.top < window.innerHeight && deliverRect.bottom > 0),
           ...deliverVisibility,
-          ...mixVisibility
+          ...instrumentsVisibility,
+          ...masterVisibility,
+          ...mixerVisibility,
+          ...notesVisibility
         };
       })();
       const bridge = window.grooveforge;
@@ -5693,18 +6069,16 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           blockMovesOpen: Boolean(blockMoves?.open),
           blockMovesToggleVisible: workflowNavigatorJumpEvidence.blockMovesToggleVisible,
           chordCardCount: chordCards.length,
-          chordCompactCardCount: compactChordCards.length,
+          chordCompactCardCount: chordCards.filter((card) => card.dataset.editorOpen === "false").length,
           chordCompactEditorsHidden: chordEditors
             .filter((_editor, index) => chordCards[index]?.dataset.editorOpen === "false")
             .every((editor) => editor.getBoundingClientRect().height === 0),
           chordEventsBeforeHarmonyMoves: follows(chordEventGrid, harmonyMoves),
-          chordExpandedCardCount: expandedChordCards.length,
-          chordSelectedEditorVisible: chordEditors.some(
-            (editor, index) => chordCards[index]?.dataset.editorOpen === "true" && editor.getBoundingClientRect().height > 0
-          ),
+          chordExpandedCardCount: chordCards.filter((card) => card.dataset.editorOpen === "true").length,
+          chordSelectedEditorVisible: workflowNavigatorJumpEvidence.chordSelectedEditorVisible,
           chordsBeforeSoundDesign: follows(instrumentDirectChords, soundDesign),
           captureIdeasOpen: Boolean(captureIdeas?.open),
-          captureIdeasToggleVisible: Boolean(captureIdeasToggle && captureIdeasToggle.getBoundingClientRect().height > 0),
+          captureIdeasTogglePresent: workflowNavigatorJumpEvidence.captureIdeasTogglePresent,
           deliveryAuditOpen: Boolean(deliveryAudit?.open),
           deliveryAuditToggleVisible: workflowNavigatorJumpEvidence.deliveryAuditToggleVisible,
           deliveryDirectBeforeStatus: follows(deliveryDirect, deliveryStatus),
@@ -5731,7 +6105,7 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
             guideQuickStartDetailsToggle && guideQuickStartDetailsToggle.getBoundingClientRect().height > 0
           ),
           harmonyMovesOpen: Boolean(harmonyMoves?.open),
-          harmonyMovesToggleVisible: Boolean(harmonyMovesToggle && harmonyMovesToggle.getBoundingClientRect().height > 0),
+          harmonyMovesToggleVisible: workflowNavigatorJumpEvidence.harmonyMovesToggleVisible,
           instrumentDirectChordsPresent: Boolean(instrumentDirectChords),
           launchpadActionCount: document.querySelectorAll(
             '[data-testid="first-run-start-beat"], [data-testid="first-run-producer-pass"], [data-testid="first-run-open-project"]'
@@ -5819,7 +6193,7 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
           noteLanesAfterCaptureIdeas: follows(captureIdeas, noteLanes),
           noteLanesPresent: Boolean(noteLanes),
           soundDesignOpen: Boolean(soundDesign?.open),
-          soundDesignToggleVisible: Boolean(soundDesignToggle && soundDesignToggle.getBoundingClientRect().height > 0),
+          soundDesignToggleVisible: workflowNavigatorJumpEvidence.soundDesignToggleVisible,
           selectedBlockEditorPresent: Boolean(selectedBlockEditor),
           stepGridAfterPatternLab: follows(patternLab, stepGrid),
           stepGridPresent: Boolean(stepGrid),
@@ -6138,6 +6512,7 @@ type LaunchSmokeVisibleModeToolEvidence = {
 };
 
 type LaunchSmokeModeToolZoneState = {
+  activePage: string;
   activeZone: LaunchSmokeFunctionalTabZone | "";
   arrangementOpen: boolean;
   auditOpen: boolean;
@@ -6191,23 +6566,29 @@ async function readLaunchSmokeModeToolZoneState(win: BrowserWindow): Promise<Lau
         arrange: "workflow-target-arrange",
         compose: "workflow-target-sound",
         deliver: "handoff-pack",
-        mix: "workflow-target-mix"
+        mix: document.querySelector('[data-testid="mix-page-tab-master"]')?.getAttribute("aria-selected") === "true"
+          ? "workflow-target-master"
+          : "workflow-target-mix"
       };
       const zoneControlIds = {
         arrange: ["block-moves-toggle", "arrangement-tools-toggle"],
         compose: ["harmony-moves-toggle", "sound-design-toggle"],
         deliver: ["handoff-status-toggle", "handoff-audit-toggle"],
-        mix: [
-          "mixer-processing-toggle-drum_rack",
-          "mix-moves-toggle",
-          "mix-review-toggle",
-          "master-polish-toggle",
-          "master-review-toggle"
-        ]
+        mix: document.querySelector('[data-testid="mix-page-tab-master"]')?.getAttribute("aria-selected") === "true"
+          ? ["master-polish-toggle", "master-review-toggle"]
+          : ["mixer-processing-toggle-drum_rack", "mix-moves-toggle", "mix-review-toggle"]
       };
       const blockMoves = details("block-moves");
       const blockMovesStyle = blockMoves instanceof HTMLElement ? getComputedStyle(blockMoves) : null;
       return {
+        activePage:
+          activeZone === "compose"
+            ? document.querySelector('[role="tablist"][aria-label="Compose editor pages"] [role="tab"][aria-selected="true"]')
+                ?.id?.replace("compose-page-tab-", "") ?? ""
+            : activeZone === "mix"
+              ? document.querySelector('[role="tablist"][aria-label="Mix editor pages"] [role="tab"][aria-selected="true"]')
+                  ?.id?.replace("mix-page-tab-", "") ?? ""
+              : "",
         activeZone,
         arrangementOpen: open("arrangement-tools"),
         auditOpen: open("handoff-audit-tools"),
@@ -6239,17 +6620,30 @@ async function waitForLaunchSmokeModeToolZoneState(
   predicate: (state: LaunchSmokeModeToolZoneState) => boolean,
   expectedState: string
 ): Promise<LaunchSmokeModeToolZoneState> {
-  const expectedControlCount = zone === "mix" ? 5 : 2;
   const deadline = Date.now() + launchSmokePaletteUiSettleTimeoutMs;
   let state = await readLaunchSmokeModeToolZoneState(win);
+  const expectedControlCount = (current: LaunchSmokeModeToolZoneState): number =>
+    zone === "mix" ? (current.activePage === "master" ? 2 : 3) : 2;
   while (
     Date.now() < deadline &&
-    !(state.activeZone === zone && state.surfaceVisible && state.visibleControlCount >= expectedControlCount && predicate(state))
+    !(
+      state.activeZone === zone &&
+      state.surfaceVisible &&
+      state.visibleControlCount >= expectedControlCount(state) &&
+      predicate(state)
+    )
   ) {
     await new Promise((resolve) => setTimeout(resolve, 50));
     state = await readLaunchSmokeModeToolZoneState(win);
   }
-  if (!(state.activeZone === zone && state.surfaceVisible && state.visibleControlCount >= expectedControlCount && predicate(state))) {
+  if (
+    !(
+      state.activeZone === zone &&
+      state.surfaceVisible &&
+      state.visibleControlCount >= expectedControlCount(state) &&
+      predicate(state)
+    )
+  ) {
     throw new Error(`Mode-aware ${zone} surface did not reach ${expectedState}: ${JSON.stringify(state)}`);
   }
   return state;
@@ -6263,6 +6657,11 @@ async function activateLaunchSmokeModeToolZone(
   if (state.activeZone !== zone) {
     await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${zone}`);
   }
+  if (zone === "compose") {
+    await activateLaunchSmokeWorkspacePage(win, "compose", "instruments");
+  } else if (zone === "mix") {
+    await activateLaunchSmokeWorkspacePage(win, "mix", "mixer");
+  }
   return waitForLaunchSmokeModeToolZoneState(win, zone, () => true, "an active visible surface with its controls");
 }
 
@@ -6271,6 +6670,8 @@ async function collectLaunchSmokeVisibleModeToolEvidence(
 ): Promise<LaunchSmokeVisibleModeToolEvidence> {
   const initialState = await readLaunchSmokeModeToolZoneState(win);
   const originalZone = initialState.activeZone || "compose";
+  const originalComposePage = (await readLaunchSmokeWorkspacePageState(win, "compose")).activePage;
+  const originalMixPage = (await readLaunchSmokeWorkspacePageState(win, "mix")).activePage;
   try {
     await setLaunchSmokeVisibleModeToolPosture(win, "guided");
     await activateLaunchSmokeModeToolZone(win, "compose");
@@ -6300,6 +6701,18 @@ async function collectLaunchSmokeVisibleModeToolEvidence(
         !state.masterReviewQueueOpen &&
         !state.masterMixCoachOpen,
       "collapsed Guided mixer and master tools"
+    );
+    await activateLaunchSmokeWorkspacePage(win, "mix", "master");
+    const guidedMaster = await waitForLaunchSmokeModeToolZoneState(
+      win,
+      "mix",
+      (state) =>
+        state.activePage === "master" &&
+        !state.masterPolishOpen &&
+        !state.masterReviewOpen &&
+        !state.masterReviewQueueOpen &&
+        !state.masterMixCoachOpen,
+      "collapsed Guided master tools on the visible Master page"
     );
     await activateLaunchSmokeModeToolZone(win, "deliver");
     const guidedDeliver = await waitForLaunchSmokeModeToolZoneState(
@@ -6343,6 +6756,18 @@ async function collectLaunchSmokeVisibleModeToolEvidence(
         !state.masterMixCoachOpen,
       "expanded Studio mixer and master tools with compact nested diagnostics"
     );
+    await activateLaunchSmokeWorkspacePage(win, "mix", "master");
+    const studioMaster = await waitForLaunchSmokeModeToolZoneState(
+      win,
+      "mix",
+      (state) =>
+        state.activePage === "master" &&
+        state.masterPolishOpen &&
+        state.masterReviewOpen &&
+        !state.masterReviewQueueOpen &&
+        !state.masterMixCoachOpen,
+      "expanded Studio master tools with compact nested diagnostics on the visible Master page"
+    );
     await setLaunchSmokeVisibleModeToolPosture(win, "guided");
     await activateLaunchSmokeModeToolZone(win, "deliver");
     await setLaunchSmokeVisibleModeToolPosture(win, "studio");
@@ -6382,6 +6807,18 @@ async function collectLaunchSmokeVisibleModeToolEvidence(
         !state.masterMixCoachOpen,
       "reset Guided mixer and master tools"
     );
+    await activateLaunchSmokeWorkspacePage(win, "mix", "master");
+    const resetMaster = await waitForLaunchSmokeModeToolZoneState(
+      win,
+      "mix",
+      (state) =>
+        state.activePage === "master" &&
+        !state.masterPolishOpen &&
+        !state.masterReviewOpen &&
+        !state.masterReviewQueueOpen &&
+        !state.masterMixCoachOpen,
+      "reset Guided master tools on the visible Master page"
+    );
     await activateLaunchSmokeModeToolZone(win, "deliver");
     const resetDeliver = await waitForLaunchSmokeModeToolZoneState(
       win,
@@ -6417,18 +6854,18 @@ async function collectLaunchSmokeVisibleModeToolEvidence(
         studioSoundOpen: studioCompose.soundOpen
       },
       masterTools: {
-        guidedMasterMixCoachOpen: guidedMix.masterMixCoachOpen,
-        guidedMasterPolishOpen: guidedMix.masterPolishOpen,
-        guidedMasterReviewOpen: guidedMix.masterReviewOpen,
-        guidedMasterReviewQueueOpen: guidedMix.masterReviewQueueOpen,
-        resetMasterMixCoachOpen: resetMix.masterMixCoachOpen,
-        resetMasterPolishOpen: resetMix.masterPolishOpen,
-        resetMasterReviewOpen: resetMix.masterReviewOpen,
-        resetMasterReviewQueueOpen: resetMix.masterReviewQueueOpen,
-        studioMasterMixCoachOpen: studioMix.masterMixCoachOpen,
-        studioMasterPolishOpen: studioMix.masterPolishOpen,
-        studioMasterReviewOpen: studioMix.masterReviewOpen,
-        studioMasterReviewQueueOpen: studioMix.masterReviewQueueOpen
+        guidedMasterMixCoachOpen: guidedMaster.masterMixCoachOpen,
+        guidedMasterPolishOpen: guidedMaster.masterPolishOpen,
+        guidedMasterReviewOpen: guidedMaster.masterReviewOpen,
+        guidedMasterReviewQueueOpen: guidedMaster.masterReviewQueueOpen,
+        resetMasterMixCoachOpen: resetMaster.masterMixCoachOpen,
+        resetMasterPolishOpen: resetMaster.masterPolishOpen,
+        resetMasterReviewOpen: resetMaster.masterReviewOpen,
+        resetMasterReviewQueueOpen: resetMaster.masterReviewQueueOpen,
+        studioMasterMixCoachOpen: studioMaster.masterMixCoachOpen,
+        studioMasterPolishOpen: studioMaster.masterPolishOpen,
+        studioMasterReviewOpen: studioMaster.masterReviewOpen,
+        studioMasterReviewQueueOpen: studioMaster.masterReviewQueueOpen
       },
       mixerTools: {
         guidedMixMovesOpen: guidedMix.mixMovesOpen,
@@ -6452,20 +6889,32 @@ async function collectLaunchSmokeVisibleModeToolEvidence(
     };
   } finally {
     await setLaunchSmokeVisibleModeToolPosture(win, "guided").catch(() => undefined);
+    if (originalComposePage) {
+      await activateLaunchSmokeWorkspacePage(
+        win,
+        "compose",
+        originalComposePage as LaunchSmokeComposeWorkspacePage
+      ).catch(() => undefined);
+    }
+    if (originalMixPage) {
+      await activateLaunchSmokeWorkspacePage(win, "mix", originalMixPage as LaunchSmokeMixWorkspacePage).catch(
+        () => undefined
+      );
+    }
     const state = await readLaunchSmokeModeToolZoneState(win).catch(() => null);
     if (state && state.activeZone !== originalZone) {
       await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${originalZone}`).catch(() => undefined);
-      await waitForLaunchSmokeModeToolZoneState(
-        win,
-        originalZone,
-        () => true,
-        `the original ${originalZone} zone posture`
-      ).catch(() => undefined);
     }
   }
 }
 
 async function collectLaunchSmokeNativeChordCardEvidence(win: BrowserWindow): Promise<LaunchSmokeChordCardEvidence> {
+  const originalZone = (await win.webContents.executeJavaScript(
+    `document.querySelector('[role="tablist"][aria-label="Workstation function tabs"] [role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "compose"`
+  )) as LaunchSmokeFunctionalTabZone;
+  const originalComposePage = (await readLaunchSmokeWorkspacePageState(win, "compose")).activePage;
+  await activateLaunchSmokeWorkspacePage(win, "compose", "instruments");
+  try {
   const chordTargets = (await win.webContents.executeJavaScript(`
     (() => {
       const cards = Array.from(document.querySelectorAll('[data-testid^="chord-slot-"]'));
@@ -6524,9 +6973,26 @@ async function collectLaunchSmokeNativeChordCardEvidence(win: BrowserWindow): Pr
   await sendLaunchSmokeFunctionalTabNativeKey(win, "Space");
   const restoreReady = await waitForChordSelection(chordTargets.initialTestId);
   return { restoreReady, selectionReady };
+  } finally {
+    if (originalComposePage) {
+      await activateLaunchSmokeWorkspacePage(
+        win,
+        "compose",
+        originalComposePage as LaunchSmokeComposeWorkspacePage
+      ).catch(() => undefined);
+    }
+    const activeZone = (await win.webContents.executeJavaScript(
+      `document.querySelector('[role="tablist"][aria-label="Workstation function tabs"] [role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? ""`
+    ).catch(() => "")) as string;
+    if (activeZone !== originalZone) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${originalZone}`).catch(() => undefined);
+    }
+  }
 }
 
 async function readLaunchSmokePaletteSurfaceState(win: BrowserWindow): Promise<{
+  activeComposePage: string;
+  activeMixPage: string;
   activeZone: LaunchSmokeFunctionalTabZone | "";
   audienceStarterActionsVisible: boolean;
   captureIdeasVisible: boolean;
@@ -6544,6 +7010,12 @@ async function readLaunchSmokePaletteSurfaceState(win: BrowserWindow): Promise<{
       const activeTab = document.querySelector('[role="tab"][aria-selected="true"]');
       const guide = document.querySelector('[data-testid="guidance-center"]');
       return {
+        activeComposePage:
+          document.querySelector('[role="tablist"][aria-label="Compose editor pages"] [role="tab"][aria-selected="true"]')
+            ?.id?.replace("compose-page-tab-", "") ?? "",
+        activeMixPage:
+          document.querySelector('[role="tablist"][aria-label="Mix editor pages"] [role="tab"][aria-selected="true"]')
+            ?.id?.replace("mix-page-tab-", "") ?? "",
         activeZone: activeTab?.id?.replace("workspace-tab-", "") ?? "",
         audienceStarterActionsVisible:
           visible(document.querySelector('[data-testid="audience-starter-action-beginner"]')) &&
@@ -6554,6 +7026,8 @@ async function readLaunchSmokePaletteSurfaceState(win: BrowserWindow): Promise<{
       };
     })();
   `)) as {
+    activeComposePage: string;
+    activeMixPage: string;
     activeZone: LaunchSmokeFunctionalTabZone | "";
     audienceStarterActionsVisible: boolean;
     captureIdeasVisible: boolean;
@@ -6626,6 +7100,7 @@ async function refreshLaunchSmokeAudienceStarterAudio(
   const exact = await waitForLaunchSmokeExactAudioAnalysis(win);
   await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-compose");
   const restored = await waitForLaunchSmokeAudioAnalysisTabPosture(win, "compose");
+  await activateLaunchSmokeWorkspacePage(win, "compose", "notes");
   const composeState = await readLaunchSmokePaletteSurfaceState(win);
   if (!composeState.guideOpen) {
     await clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle");
@@ -6831,6 +7306,7 @@ async function collectLaunchSmokePaletteEvidence(
     if (initialState.activeZone !== "compose") {
       await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-compose");
     }
+    await activateLaunchSmokeWorkspacePage(win, "compose", "notes");
     await waitForLaunchSmokePaletteSurfaceState(
       win,
       (state) => state.activeZone === "compose" && state.captureIdeasVisible,
@@ -6997,6 +7473,29 @@ async function collectLaunchSmokePaletteEvidence(
       );
     }
 
+    if (initialState.activeComposePage) {
+      await activateLaunchSmokeWorkspacePage(
+        win,
+        "compose",
+        initialState.activeComposePage as LaunchSmokeComposeWorkspacePage
+      ).catch(() => undefined);
+    }
+    if (initialState.activeMixPage) {
+      await activateLaunchSmokeWorkspacePage(
+        win,
+        "mix",
+        initialState.activeMixPage as LaunchSmokeMixWorkspacePage
+      ).catch(() => undefined);
+    }
+    if (initialState.activeZone) {
+      const restoredOuter = await readLaunchSmokePaletteSurfaceState(win);
+      if (restoredOuter.activeZone !== initialState.activeZone) {
+        await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${initialState.activeZone}`).catch(
+          () => undefined
+        );
+      }
+    }
+
     const zoneRestoredState = await readLaunchSmokePaletteSurfaceState(win);
     if (zoneRestoredState.guideOpen !== initialState.guideOpen) {
       await clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle");
@@ -7081,6 +7580,32 @@ async function activateLaunchSmokeStarterZoneSurface(
   )) as string;
   if (activeZone !== zone) {
     await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${zone}`);
+  }
+  if (zone === "compose") {
+    const composePage = selectors.some((selector) => selector.includes("note-"))
+      ? "notes"
+      : selectors.some(
+            (selector) =>
+              selector.includes("chord-") ||
+              selector.includes("harmony-") ||
+              selector.includes("sound-") ||
+              selector.includes("workflow-target-sound")
+          )
+        ? "instruments"
+        : "drums";
+    await activateLaunchSmokeWorkspacePage(
+      win,
+      "compose",
+      composePage
+    );
+  } else if (zone === "mix") {
+    await activateLaunchSmokeWorkspacePage(
+      win,
+      "mix",
+      selectors.some((selector) => selector.includes("master-") || selector.includes("review-queue"))
+        ? "master"
+        : "mixer"
+    );
   }
   await waitForLaunchSmokeStarterZoneSurface(win, zone, selectors, expectedState);
 }
@@ -7202,8 +7727,6 @@ async function waitForLaunchSmokeStarterResponsiveMixSurface(win: BrowserWindow)
           masterReviewOpen: document.querySelector('[data-testid="master-review-tools"]')?.open === true,
           masterReviewQueueContentVisible: visible(document.querySelector('[data-testid="master-review-queue-content"]')),
           masterReviewQueueOpen: document.querySelector('[data-testid="master-review-queue-tools"]')?.open === true,
-          mixerNarrowStripCount,
-          mixerStripCount: mixerStrips.length,
           reviewQueueFieldCount: reviewQueueFields.length,
           reviewQueueReadableFieldCount,
           reviewQueueStackedRowCount,
@@ -7221,11 +7744,9 @@ async function waitForLaunchSmokeStarterResponsiveMixSurface(win: BrowserWindow)
       state.masterReviewContentVisible === true &&
       state.masterReviewQueueContentVisible === true &&
       state.reviewQueueVisible === true &&
-      state.mixerStripCount === 5 &&
-      state.mixerNarrowStripCount === 5 &&
       state.reviewQueueFieldCount === 11 &&
       state.reviewQueueReadableFieldCount === 11 &&
-      state.reviewQueueStackedRowCount === 3
+      state.reviewQueueStackedRowCount === 0
     ) {
       await win.webContents.executeJavaScript(
         `new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))`
@@ -7261,8 +7782,8 @@ async function restoreLaunchSmokeStarterMixDisclosurePosture(
   await activateLaunchSmokeStarterZoneSurface(
     win,
     "mix",
-    ['[data-testid="workflow-target-mix"]', '[data-testid="master-review-toggle"]'],
-    "the visible Mix disclosure controls"
+    ['[data-testid="workflow-target-master"]', '[data-testid="master-review-toggle"]'],
+    "the visible Master disclosure controls"
   );
   let posture = await readLaunchSmokeStarterMixDisclosurePosture(win);
   if (posture.masterReviewQueueOpen !== expected.masterReviewQueueOpen) {
@@ -7317,8 +7838,11 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
   const originalZone = (await win.webContents.executeJavaScript(
     `document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "compose"`
   )) as LaunchSmokeFunctionalTabZone;
+  const originalComposePage = (await readLaunchSmokeWorkspacePageState(win, "compose")).activePage;
+  const originalMixPage = (await readLaunchSmokeWorkspacePageState(win, "mix")).activePage;
   const originalMixDisclosurePosture = await readLaunchSmokeStarterMixDisclosurePosture(win);
   let arrangement: Record<string, number>;
+  let chordTools: Record<string, number>;
   let mixerAndReview: Record<string, number | boolean>;
   let noteTools: Record<string, number>;
   let mixDisclosurePostureRestored = false;
@@ -7371,12 +7895,69 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
     await activateLaunchSmokeStarterZoneSurface(
       win,
       "mix",
-      [
-        '[data-testid="workflow-target-mix"]',
-        '[data-testid^="mixer-strip-"]',
-        '[data-testid="master-review-toggle"]'
-      ],
-      "visible mixer strips and Master Review controls"
+      ['[data-testid="workflow-target-mix"]', '[data-testid^="mixer-strip-"]'],
+      "visible full-width mixer strips"
+    );
+    const mixerPageMeasurements = (await win.webContents.executeJavaScript(`
+      (() => {
+        const mixerToggleButtons = Array.from(
+          document.querySelectorAll('[data-testid^="mixer-mute-"], [data-testid^="mixer-solo-"]')
+        );
+        const mixerToggleAccessibleNames = mixerToggleButtons
+          .map((button) => button.getAttribute("aria-label")?.trim() ?? "")
+          .filter((label) => label.length > 0);
+        const mixerToggleReadableLabels = mixerToggleButtons.filter((button) => {
+          const label = button.querySelector("span");
+          return Boolean(label && label.clientWidth > 0 && label.scrollWidth <= label.clientWidth + 1);
+        });
+        const mixerToggleContainedButtons = mixerToggleButtons.filter((button) => {
+          const strip = button.closest('[data-testid^="mixer-strip-"]');
+          const stripRect = strip?.getBoundingClientRect() ?? null;
+          const buttonRect = button.getBoundingClientRect();
+          return Boolean(
+            stripRect &&
+            buttonRect.width >= 48 &&
+            buttonRect.left >= stripRect.left - 1 &&
+            buttonRect.right <= stripRect.right + 1
+          );
+        });
+        const mixerStrips = Array.from(document.querySelectorAll('[data-testid^="mixer-strip-"]'));
+        const mixerNarrowStrips = mixerStrips.filter((strip) => {
+          const stripTop = strip.querySelector(".strip-top");
+          const trackName = stripTop?.querySelector(":scope > span");
+          const toggles = stripTop?.querySelector(".strip-toggles");
+          const trackRect = trackName?.getBoundingClientRect() ?? null;
+          const togglesRect = toggles?.getBoundingClientRect() ?? null;
+          return Boolean(
+            stripTop &&
+            trackRect &&
+            togglesRect &&
+            getComputedStyle(stripTop).gridTemplateColumns.trim().split(/\\s+/).length === 1 &&
+            togglesRect.top >= trackRect.bottom
+          );
+        });
+        return {
+          mixerNarrowStripCount: mixerNarrowStrips.length,
+          mixerToggleContainedCount: mixerToggleContainedButtons.length,
+          mixerToggleCount: mixerToggleButtons.length,
+          mixerToggleInternalOverflow: mixerStrips.reduce(
+            (maximum, strip) => Math.max(maximum, strip.scrollWidth - strip.clientWidth),
+            0
+          ),
+          mixerTogglePressedStateCount: mixerToggleButtons.filter((button) => button.hasAttribute("aria-pressed")).length,
+          mixerToggleReadableLabelCount: mixerToggleReadableLabels.length,
+          mixerToggleTitleCount: mixerToggleButtons.filter(
+            (button) => (button.getAttribute("title")?.trim().length ?? 0) > 0
+          ).length,
+          mixerToggleUniqueAccessibleNameCount: new Set(mixerToggleAccessibleNames).size
+        };
+      })();
+    `)) as Record<string, number>;
+    await activateLaunchSmokeStarterZoneSurface(
+      win,
+      "mix",
+      ['[data-testid="workflow-target-master"]', '[data-testid="master-review-toggle"]'],
+      "visible full-width Master Review controls"
     );
     await openLaunchSmokeStarterMixDisclosures(win);
     await waitForLaunchSmokeStarterResponsiveMixSurface(win);
@@ -7489,6 +8070,7 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
       };
     })();
   `)) as Record<string, number | boolean>;
+    mixerAndReview = { ...mixerAndReview, ...mixerPageMeasurements };
 
     await restoreLaunchSmokeStarterMixDisclosurePosture(win, originalMixDisclosurePosture);
     mixDisclosurePostureRestored = true;
@@ -7503,7 +8085,55 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
     await activateLaunchSmokeStarterZoneSurface(
       win,
       "compose",
-      ['[data-testid="workflow-target-compose"]', ".note-action-row", ".note-action-row button"],
+      ['[data-testid="workflow-target-sound"]', '[data-testid="chord-edit-tools"]', '[data-testid="chord-edit-tools"] button'],
+      "a visible selected-chord tool layout"
+    );
+    chordTools = (await win.webContents.executeJavaScript(`
+      (() => {
+        const chordToolGroup = document.querySelector('[data-testid="chord-edit-tools"]');
+        const chordToolButtons = chordToolGroup ? Array.from(chordToolGroup.querySelectorAll("button")) : [];
+        const chordToolGroupRect = chordToolGroup?.getBoundingClientRect() ?? null;
+        const chordToolAccessibleNames = chordToolButtons
+          .map((button) => button.getAttribute("aria-label")?.trim() ?? "")
+          .filter((label) => label.length > 0);
+        const chordToolReadableLabels = chordToolButtons.filter((button) => {
+          const buttonRect = button.getBoundingClientRect();
+          const label = button.querySelector("span");
+          const labelStyle = label ? getComputedStyle(label) : null;
+          return Boolean(
+            chordToolGroupRect &&
+            label &&
+            labelStyle &&
+            buttonRect.height >= 48 &&
+            buttonRect.left >= chordToolGroupRect.left - 1 &&
+            buttonRect.right <= chordToolGroupRect.right + 1 &&
+            label.clientWidth > 0 &&
+            label.clientHeight > 0 &&
+            label.scrollWidth <= label.clientWidth + 1 &&
+            label.scrollHeight <= label.clientHeight + 1 &&
+            labelStyle.whiteSpace !== "nowrap" &&
+            labelStyle.textOverflow === "clip"
+          );
+        });
+        return {
+          chordToolColumnCount: chordToolGroup
+            ? getComputedStyle(chordToolGroup).gridTemplateColumns.trim().split(/\\s+/).length
+            : 0,
+          chordToolCount: chordToolButtons.length,
+          chordToolInternalOverflow: chordToolGroup
+            ? Math.max(0, chordToolGroup.scrollWidth - chordToolGroup.clientWidth)
+            : 0,
+          chordToolReadableLabelCount: chordToolReadableLabels.length,
+          chordToolRowCount: new Set(chordToolButtons.map((button) => Math.round(button.getBoundingClientRect().top))).size,
+          chordToolUniqueAccessibleNameCount: new Set(chordToolAccessibleNames).size
+        };
+      })();
+    `)) as Record<string, number>;
+
+    await activateLaunchSmokeStarterZoneSurface(
+      win,
+      "compose",
+      ['[data-testid="note-editor-panel"]', ".note-action-row", ".note-action-row button"],
       "a visible selected-note tool layout"
     );
     noteTools = (await win.webContents.executeJavaScript(`
@@ -7564,6 +8194,18 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
     if (!mixDisclosurePostureRestored) {
       await restoreLaunchSmokeStarterMixDisclosurePosture(win, originalMixDisclosurePosture).catch(() => undefined);
     }
+    if (originalComposePage) {
+      await activateLaunchSmokeWorkspacePage(
+        win,
+        "compose",
+        originalComposePage as LaunchSmokeComposeWorkspacePage
+      ).catch(() => undefined);
+    }
+    if (originalMixPage) {
+      await activateLaunchSmokeWorkspacePage(win, "mix", originalMixPage as LaunchSmokeMixWorkspacePage).catch(
+        () => undefined
+      );
+    }
     const activeZone = (await win.webContents.executeJavaScript(
       `document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? ""`
     ).catch(() => "")) as string;
@@ -7602,6 +8244,7 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
     beginner: {
       ...evidence.beginner,
       ...arrangement,
+      ...chordTools,
       ...mixerMeasurements
     },
     producer: {
@@ -7869,13 +8512,16 @@ async function collectLaunchSmokeClosedDetailsEvidence(
   const guideClosed = await toggleWithNativeEnter("guidance-center", false);
   onStep("opening and closing Pattern Lab");
   await activateWorkspaceZone("compose");
+  await activateLaunchSmokeWorkspacePage(win, "compose", "drums");
   const patternOpen = await toggleWithNativeEnter("pattern-lab", true);
   const patternClosed = await toggleWithNativeEnter("pattern-lab", false);
   onStep("opening and closing nested mixer processing");
   await activateWorkspaceZone("mix");
+  await activateLaunchSmokeWorkspacePage(win, "mix", "mixer");
   const mixerOpen = await toggleWithNativeEnter("mixer-processing-drum_rack", true);
   const mixerClosed = await toggleWithNativeEnter("mixer-processing-drum_rack", false);
   await activateWorkspaceZone("compose");
+  await activateLaunchSmokeWorkspacePage(win, "compose", "drums");
   const snapshots = [initial, guideOpen, guideClosed, patternOpen, patternClosed, mixerOpen, mixerClosed];
   const reclosedSnapshots = [guideClosed, patternClosed, mixerClosed];
 
@@ -7963,6 +8609,7 @@ async function collectLaunchSmokeDrumGridKeyboardEvidence(
     }
   };
   ipcMain.on(launchSmokeDrumGridSnapshotChannel, handleRecorderSnapshot);
+  await activateLaunchSmokeWorkspacePage(win, "compose", "drums");
   win.webContents.focus();
   onStep("installing renderer recorder");
   const initial = await runStep<DrumGridSnapshot>(`
@@ -8159,6 +8806,7 @@ async function collectLaunchSmokeNoteGridKeyboardEvidence(
 
   const runStep = async <T,>(script: string): Promise<T> => (await win.webContents.executeJavaScript(script)) as T;
   const recordedSteps: NoteGridSnapshot[] = [];
+  const originalComposePage = (await readLaunchSmokeWorkspacePageState(win, "compose")).activePage;
   let recorderBridgeReady = false;
   const handleRecorderSnapshot = (event: Electron.IpcMainEvent, payload: unknown): void => {
     if (event.sender !== win.webContents || typeof payload !== "object" || payload === null) {
@@ -8183,6 +8831,7 @@ async function collectLaunchSmokeNoteGridKeyboardEvidence(
   ipcMain.on(launchSmokeNoteGridSnapshotChannel, handleRecorderSnapshot);
 
   try {
+    await activateLaunchSmokeWorkspacePage(win, "compose", "notes");
     win.webContents.focus();
     onStep("installing renderer recorder");
     const initial = await runStep<NoteGridSnapshot>(`
@@ -8352,11 +9001,18 @@ async function collectLaunchSmokeNoteGridKeyboardEvidence(
         afterSpaceUndo.melodyActiveCount === initial.melodyActiveCount
     };
     onStep("restoring initial editor selection");
-    await runStep(`document.querySelector('[data-testid="chord-slot-0"]')?.focus();`);
+    await runStep(`document.querySelector('[data-testid="compose-page-tab-notes"]')?.focus();`);
     await new Promise((resolve) => setTimeout(resolve, 500));
     return evidence;
   } finally {
     ipcMain.removeListener(launchSmokeNoteGridSnapshotChannel, handleRecorderSnapshot);
+    if (originalComposePage) {
+      await activateLaunchSmokeWorkspacePage(
+        win,
+        "compose",
+        originalComposePage as LaunchSmokeComposeWorkspacePage
+      ).catch(() => undefined);
+    }
   }
 }
 
@@ -10907,9 +11563,18 @@ async function selectManualQaNativeOption(win: BrowserWindow, testId: string, va
       current: target.value,
       currentIndex: target.selectedIndex,
       optionIndex: Array.from(target.options).findIndex((option) => option.value === ${JSON.stringify(value)}),
-      options: Array.from(target.options).map((option) => option.value)
+      options: Array.from(target.options).map((option) => ({
+        disabled: option.disabled,
+        label: option.label || option.textContent || option.value,
+        value: option.value
+      }))
     };
-  })()`)) as { current: string; currentIndex: number; optionIndex: number; options: string[] } | null;
+  })()`)) as {
+    current: string;
+    currentIndex: number;
+    optionIndex: number;
+    options: Array<{ disabled: boolean; label: string; value: string }>;
+  } | null;
   if (!optionState || optionState.optionIndex < 0) {
     throw new Error(`${testId} does not expose option ${value}.`);
   }
@@ -10918,20 +11583,53 @@ async function selectManualQaNativeOption(win: BrowserWindow, testId: string, va
   }
   const interactionStartedAt = Date.now();
   await clickManualQaNativeTarget(win, testId);
-  const optionDelta = optionState.optionIndex - optionState.currentIndex;
-  const keyCode = optionDelta > 0 ? "Down" : "Up";
-  for (let index = 0; index < Math.abs(optionDelta); index += 1) {
-    await sendManualQaNativeKey(win, keyCode, [], 60);
+  // Electron 43 routes an open macOS native select popup outside webContents.
+  // Close that popup, then leave and re-enter the control through native Tab
+  // navigation. A unique printable type-ahead prefix changes the focused
+  // select without reopening AppKit's popup, producing trusted input/change
+  // events that React receives through the real user-input path.
+  await sendManualQaNativeKey(win, "Escape", [], 140);
+  await sendManualQaNativeKey(win, "Tab", [], 100);
+  await sendManualQaNativeKey(win, "Tab", ["shift"], 140);
+  const retainedFocus = (await win.webContents.executeJavaScript(
+    `document.activeElement === document.querySelector('[data-testid=${JSON.stringify(testId)}]')`
+  )) as boolean;
+  if (!retainedFocus) {
+    throw new Error(`${testId} did not regain native keyboard focus after closing its option popup.`);
   }
-  await sendManualQaNativeKey(win, "Enter", [], 180);
+  const normalizeLabel = (label: string): string => label.normalize("NFC").trim().toLocaleLowerCase();
+  const targetLabel = normalizeLabel(optionState.options[optionState.optionIndex]?.label ?? "");
+  const enabledLabels = optionState.options.filter((option) => !option.disabled).map((option) => normalizeLabel(option.label));
+  let uniquePrefix = "";
+  for (let length = 1; length <= targetLabel.length; length += 1) {
+    const candidate = targetLabel.slice(0, length);
+    if (enabledLabels.filter((label) => label.startsWith(candidate)).length === 1) {
+      uniquePrefix = candidate;
+      break;
+    }
+  }
+  if (!uniquePrefix) {
+    throw new Error(`${testId} option ${value} does not expose a unique native type-ahead prefix.`);
+  }
+  // Blink keeps a select type-ahead buffer for roughly one second. Separate
+  // consecutive selections so the next prefix cannot be appended to the last.
+  await waitForManualQaDelay(1050);
+  for (const character of uniquePrefix) {
+    win.webContents.sendInputEvent({ type: "char", keyCode: character });
+    await waitForManualQaDelay(40);
+  }
   await waitForManualQaCondition(
     win,
     `${testId} native option ${value}`,
-    `document.querySelector('[data-testid=${JSON.stringify(testId)}]')?.value === ${JSON.stringify(value)}`
+    `document.querySelector('[data-testid=${JSON.stringify(testId)}]')?.value === ${JSON.stringify(value)}`,
+    5000
   );
   const interaction = [...manualQaAutoSongInteractions].reverse().find((candidate) => candidate.testId === testId);
   if (interaction) {
-    interaction.after = { ...interaction.after, nativeOptionSelection: { before: optionState.current, value } };
+    interaction.after = {
+      ...interaction.after,
+      nativeOptionSelection: { before: optionState.current, method: "typeahead-char", prefix: uniquePrefix, value }
+    };
   }
   finalizeManualQaNativeInteraction(testId, interactionStartedAt);
 }
@@ -12432,6 +13130,12 @@ function installManualQaAutoMovement(win: BrowserWindow): void {
         "workflow-jump-mix",
         "Mix functional tab",
         `document.querySelector('[data-testid="workflow-jump-mix"]')?.getAttribute('aria-selected') === 'true'`
+      );
+      await clickAndWait(
+        "mix-page-tab-master",
+        "Master & Review workspace page",
+        `document.querySelector('[data-testid="mix-page-tab-master"]')?.getAttribute('aria-selected') === 'true' &&
+          document.getElementById('mix-page-panel-master')?.hidden === false`
       );
       await ensureManualQaDetailsOpen(win, "master-polish-tools", "master-polish-toggle");
       const automationActive = (await win.webContents.executeJavaScript(

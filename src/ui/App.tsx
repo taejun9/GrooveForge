@@ -804,6 +804,7 @@ import {
   SnapshotCompare,
   createCommandReferenceRouteReadoutSummary
 } from "./workstationShellPanels";
+import { WorkspacePageTabs } from "./WorkspacePageTabs";
 import {
   auditionSelectedChord as auditionSelectedChordEvent,
   auditionSelectedDrumHit as auditionSelectedDrumHitEvent,
@@ -1158,6 +1159,9 @@ function workspaceActivityMode(visible: boolean): "visible" | "hidden" {
   return typeof document === "undefined" || visible ? "visible" : "hidden";
 }
 
+type ComposeWorkspacePageId = "drums" | "notes" | "instruments";
+type MixWorkspacePageId = "mixer" | "master";
+
 type MetadataDraftSnapshot =
   | { kind: "title"; value: string }
   | { field: keyof SessionBrief; kind: "session-brief"; value: string };
@@ -1165,6 +1169,7 @@ type MetadataDraftSnapshot =
 type WorkspaceRouteTargetId =
   | "transport"
   | "compose"
+  | "notes"
   | "sound"
   | "arrange"
   | "mix"
@@ -1275,6 +1280,8 @@ export function App(): ReactElement {
   const modalReturnFocusRef = useRef<HTMLElement | null>(null);
   const [guidanceCenterOpen, setGuidanceCenterOpen] = useState(false);
   const [activeWorkspaceZone, setActiveWorkspaceZone] = useState<WorkflowZoneId>("compose");
+  const [activeComposeWorkspacePage, setActiveComposeWorkspacePage] = useState<ComposeWorkspacePageId>("drums");
+  const [activeMixWorkspacePage, setActiveMixWorkspacePage] = useState<MixWorkspacePageId>("mixer");
   const [launchpadOpen, setLaunchpadOpen] = useState(true);
   const [styleChangePreview, setStyleChangePreview] = useState<StyleChangePreview | null>(null);
   const [workspaceCommandDockVisible, setWorkspaceCommandDockVisible] = useState(false);
@@ -1432,6 +1439,8 @@ export function App(): ReactElement {
   const localDraftSkipNextWriteRef = useRef(false);
   const selectedEventDeleteSelectionGuardRef = useRef(false);
   const activeWorkspaceZoneRef = useRef<WorkflowZoneId>(activeWorkspaceZone);
+  const activeComposeWorkspacePageRef = useRef<ComposeWorkspacePageId>(activeComposeWorkspacePage);
+  const activeMixWorkspacePageRef = useRef<MixWorkspacePageId>(activeMixWorkspacePage);
   const modeAwareToolPanelsModeRef = useRef<ProjectState["mode"] | null>(null);
   const studioExpandedWorkspaceZonesRef = useRef<Set<WorkflowZoneId>>(new Set());
   const controllerRef = useRef<PlaybackController | null>(null);
@@ -1466,6 +1475,7 @@ export function App(): ReactElement {
   const workflowNavigatorPanelRef = useRef<HTMLElement | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
   const composePanelRef = useRef<HTMLElement | null>(null);
+  const notePanelRef = useRef<HTMLElement | null>(null);
   const patternTabRefs = useRef<Record<PatternSlot, HTMLButtonElement | null>>({ A: null, B: null, C: null });
   const soundPanelRef = useRef<HTMLElement | null>(null);
   const arrangePanelRef = useRef<HTMLElement | null>(null);
@@ -1478,6 +1488,8 @@ export function App(): ReactElement {
   const sessionBriefReferenceRef = useRef<HTMLInputElement | null>(null);
   const sessionBriefNotesRef = useRef<HTMLTextAreaElement | null>(null);
   activeWorkspaceZoneRef.current = activeWorkspaceZone;
+  activeComposeWorkspacePageRef.current = activeComposeWorkspacePage;
+  activeMixWorkspacePageRef.current = activeMixWorkspacePage;
   const style = getStyle(project);
   const deliveryTarget = activeDeliveryTarget(project);
   const currentPattern = activePattern(project);
@@ -2580,13 +2592,21 @@ export function App(): ReactElement {
 
     for (const input of inputs) {
       input.onmidimessage =
-        activeWorkspaceZone === "compose" && midiCaptureArmed && midiInputMatchesSelection(input, midiSelectedInputId)
+        activeWorkspaceZone === "compose" &&
+        activeComposeWorkspacePage === "notes" &&
+        midiCaptureArmed &&
+        midiInputMatchesSelection(input, midiSelectedInputId)
           ? handleMidiMessage
           : null;
     }
 
     setMidiCaptureStatus(
-      activeWorkspaceZone === "compose" && midiCaptureArmed && listeningInputs.length > 0 ? "listening" : "ready"
+      activeWorkspaceZone === "compose" &&
+        activeComposeWorkspacePage === "notes" &&
+        midiCaptureArmed &&
+        listeningInputs.length > 0
+        ? "listening"
+        : "ready"
     );
 
     return () => {
@@ -2602,6 +2622,7 @@ export function App(): ReactElement {
     midiCaptureArmed,
     midiSelectedInputId,
     activeWorkspaceZone,
+    activeComposeWorkspacePage,
     keyboardCaptureTarget,
     keyboardCaptureDefaults,
     keyboardCaptureStepMode,
@@ -2660,7 +2681,8 @@ export function App(): ReactElement {
     keyboardCaptureTarget,
     keyboardCaptureDefaults,
     keyboardCaptureStepMode,
-    activeWorkspaceZone
+    activeWorkspaceZone,
+    activeComposeWorkspacePage
   ]);
 
   useEffect(() => {
@@ -2790,7 +2812,12 @@ export function App(): ReactElement {
       return;
     }
 
-    if (activeWorkspaceZoneRef.current === "compose" && keyboardCaptureEnabled && isKeyboardCaptureKey(key)) {
+    if (
+      activeWorkspaceZoneRef.current === "compose" &&
+      activeComposeWorkspacePageRef.current === "notes" &&
+      keyboardCaptureEnabled &&
+      isKeyboardCaptureKey(key)
+    ) {
       event.preventDefault();
       if (!event.repeat) {
         captureKeyboardNote(key);
@@ -3996,7 +4023,11 @@ export function App(): ReactElement {
   }
 
   function captureMidiNoteEvent(event: MIDIMessageEvent): void {
-    if (activeWorkspaceZoneRef.current !== "compose" || !event.data) {
+    if (
+      activeWorkspaceZoneRef.current !== "compose" ||
+      activeComposeWorkspacePageRef.current !== "notes" ||
+      !event.data
+    ) {
       return;
     }
 
@@ -4423,17 +4454,27 @@ export function App(): ReactElement {
   }
 
   function deleteSelectedEvent(): void {
-    if (deleteSelectedNote()) {
-      return;
-    }
-    if (clearSelectedDrumStep()) {
-      return;
-    }
-    if (deleteSelectedChordEvent()) {
-      return;
+    switch (activeComposeWorkspacePageRef.current) {
+      case "drums":
+        if (clearSelectedDrumStep()) {
+          return;
+        }
+        setProjectStatus("Select a drum step on the open Drums page to delete");
+        break;
+      case "notes":
+        if (deleteSelectedNote()) {
+          return;
+        }
+        setProjectStatus("Select an 808 or Synth note on the open Bass / Melody page to delete");
+        break;
+      case "instruments":
+        if (deleteSelectedChordEvent()) {
+          return;
+        }
+        setProjectStatus("Select a chord on the open Instruments page to delete");
+        break;
     }
     setSelectedEventDeleteResult(null);
-    setProjectStatus("Select a step, note, or chord to delete");
   }
 
   function deleteSelectedNote(): boolean {
@@ -8675,6 +8716,51 @@ export function App(): ReactElement {
     return zone === "compose" || zone === "arrange" || zone === "mix" || zone === "deliver" ? zone : null;
   }
 
+  function workspacePageIdentityForTarget(target: HTMLElement | null): string | null {
+    const pageRoot = target?.closest<HTMLElement>("[data-workspace-page]");
+    const page = pageRoot?.dataset.workspacePage;
+    const zone = workspaceZoneForTarget(pageRoot ?? target);
+    return zone && page ? `${zone}:${page}` : null;
+  }
+
+  function activateComposeWorkspacePage(page: ComposeWorkspacePageId, announce = false): void {
+    if (activeComposeWorkspacePageRef.current === page) {
+      return;
+    }
+    activeComposeWorkspacePageRef.current = page;
+    setActiveComposeWorkspacePage(page);
+    if (announce) {
+      const label = page === "drums" ? "Drums" : page === "notes" ? "Bass / Melody" : "Instruments";
+      setProjectStatus(`Opened Compose / ${label} page`);
+    }
+  }
+
+  function activateMixWorkspacePage(page: MixWorkspacePageId, announce = false): void {
+    if (activeMixWorkspacePageRef.current === page) {
+      return;
+    }
+    activeMixWorkspacePageRef.current = page;
+    setActiveMixWorkspacePage(page);
+    if (announce) {
+      setProjectStatus(`Opened Mix / ${page === "mixer" ? "Mixer" : "Master"} page`);
+    }
+  }
+
+  function activateWorkspacePageForTarget(target: HTMLElement | null): void {
+    const pageRoot = target?.closest<HTMLElement>("[data-workspace-page]");
+    const page = pageRoot?.dataset.workspacePage;
+    const zone = workspaceZoneForTarget(pageRoot ?? target);
+    if (zone === "compose" && (page === "drums" || page === "notes" || page === "instruments")) {
+      if (activeComposeWorkspacePageRef.current !== page) {
+        flushSync(() => activateComposeWorkspacePage(page));
+      }
+      return;
+    }
+    if (zone === "mix" && (page === "mixer" || page === "master") && activeMixWorkspacePageRef.current !== page) {
+      flushSync(() => activateMixWorkspacePage(page));
+    }
+  }
+
   function activateWorkspaceZone(zone: WorkflowZoneId): void {
     if (activeWorkspaceZoneRef.current === zone) {
       return;
@@ -8726,6 +8812,7 @@ export function App(): ReactElement {
   function workspaceRouteZone(target: WorkspaceRouteTargetId): WorkflowZoneId | null {
     switch (target) {
       case "compose":
+      case "notes":
       case "sound":
         return "compose";
       case "arrange":
@@ -8746,6 +8833,8 @@ export function App(): ReactElement {
         return transportPanelRef.current;
       case "compose":
         return composePanelRef.current;
+      case "notes":
+        return notePanelRef.current;
       case "sound":
         return soundPanelRef.current;
       case "arrange":
@@ -8756,6 +8845,28 @@ export function App(): ReactElement {
         return masterPanelRef.current;
       case "deliver":
         return deliverPanelRef.current;
+    }
+  }
+
+  function activateWorkspaceRoutePage(target: WorkspaceRouteTargetId): void {
+    switch (target) {
+      case "compose":
+        activateComposeWorkspacePage("drums");
+        return;
+      case "notes":
+        activateComposeWorkspacePage("notes");
+        return;
+      case "sound":
+        activateComposeWorkspacePage("instruments");
+        return;
+      case "mix":
+        activateMixWorkspacePage("mixer");
+        return;
+      case "master":
+        activateMixWorkspacePage("master");
+        return;
+      default:
+        return;
     }
   }
 
@@ -8777,6 +8888,7 @@ export function App(): ReactElement {
     block: ScrollLogicalPosition = "start"
   ): void {
     const zone = workspaceRouteZone(target);
+    flushSync(() => activateWorkspaceRoutePage(target));
     if (target === "sound" && !soundDesignOpen) {
       flushSync(() => setSoundDesignOpen(true));
     }
@@ -8791,15 +8903,20 @@ export function App(): ReactElement {
     const initialTarget = resolveScrollTarget(targetResolver);
     const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const activeElementZone = workspaceZoneForTarget(activeElement);
+    const activeElementPage = workspacePageIdentityForTarget(activeElement);
     const zone = zoneHint ?? workspaceZoneForTarget(initialTarget);
+    const targetPage = workspacePageIdentityForTarget(initialTarget);
     const dismissedModalFocus =
       activeElement === document.body ||
       Boolean(activeElement?.closest('[role="dialog"], [data-testid="quick-actions"]'));
     const shouldTransferFocus =
-      dismissedModalFocus || (zone !== null && activeElementZone !== null && activeElementZone !== zone);
+      dismissedModalFocus ||
+      (zone !== null && activeElementZone !== null && activeElementZone !== zone) ||
+      (targetPage !== null && activeElementPage !== null && activeElementPage !== targetPage);
     if (zone) {
       activateWorkspaceZone(zone);
     }
+    activateWorkspacePageForTarget(initialTarget);
 
     const target =
       resolveScrollTarget(targetResolver) ??
@@ -8893,6 +9010,7 @@ export function App(): ReactElement {
           setMasterReviewOpen(true);
           setMasterReviewQueueOpen(true);
         });
+        routeWorkspaceTargetIntoView("master", "start");
         scrollWorkspaceTargetIntoView(() => reviewQueuePanelRef.current, "start", "mix");
         reviewQueuePanelRef.current?.focus({ preventScroll: true });
         return;
@@ -9509,7 +9627,16 @@ export function App(): ReactElement {
     if (guidanceCenterRef.current?.open) {
       flushSync(() => setGuidanceCenterOpen(false));
     }
-    jumpToWorkflowNavigatorItem(item);
+    // A user returning through the outer Compose/Mix tab keeps the inner page
+    // they were editing. Intentional routes use compose/notes/sound or
+    // mix/master targets and can still reveal an exact destination page.
+    scrollWorkspaceTargetIntoView(
+      () => document.getElementById(`workspace-panel-${item.id}`),
+      "start",
+      item.id
+    );
+    setWorkflowNavigatorResult(createWorkflowNavigatorJumpResult(item, workflowNavigatorItems));
+    setProjectStatus(`Workflow ${item.label}: ${item.value}`);
   }
 
   function focusWorkflowNavigatorRouteReadout(): void {
@@ -10003,7 +10130,9 @@ export function App(): ReactElement {
     }
     flushSync(() => setMasterReviewOpen(true));
     const card = activeFinishChecklistQuickActionCard(finishChecklistSummary);
+    routeWorkspaceTargetIntoView("master", "start");
     scrollWorkspaceTargetIntoView(() => finishChecklistPanelRef.current, "start", "mix");
+    finishChecklistPanelRef.current?.focus({ preventScroll: true });
     setProjectStatus(
       card
         ? `Finish Checklist Route Readout Pattern ${project.selectedPattern}: ${finishChecklistRouteLabel(card)} / ${card.status} / direct finish-checklist-card-${card.id} unchanged / ${card.focusLabel} panel`
@@ -10200,7 +10329,9 @@ export function App(): ReactElement {
       setMasterReviewQueueOpen(true);
     });
     const item = reviewQueueSummary.items[0] ?? null;
+    routeWorkspaceTargetIntoView("master", "start");
     scrollWorkspaceTargetIntoView(() => reviewQueuePanelRef.current, "start", "mix");
+    reviewQueuePanelRef.current?.focus({ preventScroll: true });
     setProjectStatus(
       item
         ? `Review Queue Route Readout Pattern ${project.selectedPattern}: ${reviewQueueRouteLabel(item)} / ${item.status} / direct review-queue-item-${item.id} unchanged / review-fix unchanged / ${item.focusLabel} panel`
@@ -10740,7 +10871,7 @@ export function App(): ReactElement {
           ? "Bass Glide route"
           : "Bass Contour route"
       : "no Bass route";
-    routeWorkspaceTargetIntoView("compose", "start");
+    routeWorkspaceTargetIntoView("notes", "start");
     setProjectStatus(
       target
         ? `Bass Move Route Readout Pattern ${project.selectedPattern}: route ${routeLabel} / target ${target.label} ${target.kind} / direct command 808-move / ${bassMovePreviewSummary.moveLabel} / direct Bass move unchanged`
@@ -10757,7 +10888,7 @@ export function App(): ReactElement {
           ? "Melody Accent route"
           : "Melody Contour route"
       : "no melody route";
-    routeWorkspaceTargetIntoView("compose", "start");
+    routeWorkspaceTargetIntoView("notes", "start");
     setProjectStatus(
       target
         ? `Melody Move Route Readout Pattern ${project.selectedPattern}: route ${routeLabel} / target ${target.label} ${target.kind} / direct command melody-move / ${melodyMovePreviewSummary.moveLabel} / direct melody move unchanged`
@@ -10774,7 +10905,7 @@ export function App(): ReactElement {
           ? "Chord Rhythm route"
           : "Chord Voicing route"
       : "no chord route";
-    routeWorkspaceTargetIntoView("compose", "start");
+    routeWorkspaceTargetIntoView("sound", "start");
     setProjectStatus(
       target
         ? `Chord Move Route Readout Pattern ${project.selectedPattern}: route ${routeLabel} / target ${target.label} ${target.kind} / direct command chord-move / ${chordMovePreviewSummary.moveLabel} / direct chord move unchanged`
@@ -10888,7 +11019,7 @@ export function App(): ReactElement {
   }
 
   function focusKeyboardCaptureReadout(): void {
-    routeWorkspaceTargetIntoView("compose", "start");
+    routeWorkspaceTargetIntoView("notes", "start");
     setProjectStatus(
       `Keyboard Capture ${keyboardCaptureEnabled ? "Armed" : "Off"}: ${
         keyboardCaptureTarget === "bass" ? "808" : "Synth"
@@ -10904,7 +11035,7 @@ export function App(): ReactElement {
     const selectedLabel = selectedNote
       ? `${selectedCaptureNoteLabel}${selectedCaptureNoteActive ? "" : " inactive"}`
       : "No selected note";
-    routeWorkspaceTargetIntoView("compose", "start");
+    routeWorkspaceTargetIntoView("notes", "start");
     setProjectStatus(
       `Capture Step Mode ${quickActionCaptureStepModeLabel(
         keyboardCaptureStepMode
@@ -10913,7 +11044,7 @@ export function App(): ReactElement {
   }
 
   function focusMidiInputReadout(): void {
-    routeWorkspaceTargetIntoView("compose", "start");
+    routeWorkspaceTargetIntoView("notes", "start");
     setProjectStatus(
       `MIDI Input ${midiCaptureSummary.statusLabel}: ${midiCaptureArmed ? "Armed" : "Disarmed"} / ${
         keyboardCaptureTarget === "bass" ? "808" : "Synth"
@@ -12872,10 +13003,20 @@ export function App(): ReactElement {
         flushSync(() => updateModeAwareToolPanels(mode));
       },
       collectChordCardKeyboardEvidence: () => {
-        const cards = [...document.querySelectorAll<HTMLElement>('[data-testid^="chord-slot-"]')];
-        const initial = cards.find((card) => card.dataset.editorOpen === "true");
-        const target = cards.find((card) => card.dataset.editorOpen === "false");
+        const previousPage = activeComposeWorkspacePageRef.current;
+        flushSync(() => activateComposeWorkspacePage("instruments"));
+        let cards = [...document.querySelectorAll<HTMLElement>('[data-testid^="chord-slot-"]')];
+        let initial = cards.find((card) => card.dataset.editorOpen === "true");
+        if (!initial && cards[0]) {
+          flushSync(() => {
+            cards[0]?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+          });
+          cards = [...document.querySelectorAll<HTMLElement>('[data-testid^="chord-slot-"]')];
+          initial = cards.find((card) => card.dataset.editorOpen === "true");
+        }
+        const target = cards.find((card) => card !== initial && card.dataset.editorOpen === "false");
         if (!initial || !target) {
+          flushSync(() => activateComposeWorkspacePage(previousPage));
           return { restoreReady: false, selectionReady: false };
         }
         const initialTestId = initial.dataset.testid;
@@ -12895,11 +13036,13 @@ export function App(): ReactElement {
             .querySelector<HTMLElement>('[data-testid="' + initialTestId + '"]')
             ?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: " " }));
         });
-        return {
+        const evidence = {
           restoreReady:
             document.querySelector<HTMLElement>('[data-testid="' + initialTestId + '"]')?.dataset.editorOpen === "true",
           selectionReady
         };
+        flushSync(() => activateComposeWorkspacePage(previousPage));
+        return evidence;
       },
       collectAudienceSessionQuickActionEvidence: (options = {}) => {
         const chordCards = window.__grooveforgeLaunchSmoke?.collectChordCardKeyboardEvidence?.() ?? {
@@ -14322,12 +14465,47 @@ export function App(): ReactElement {
         tabIndex={activeWorkspaceZone === "compose" ? 0 : -1}
       >
         <Activity mode={workspaceActivityMode(activeWorkspaceZone === "compose")} name="workspace-compose">
+        <WorkspacePageTabs
+          activePage={activeComposeWorkspacePage}
+          ariaLabel="Compose editor pages"
+          idPrefix="compose"
+          items={[
+            {
+              id: "drums",
+              label: "Drums",
+              detail: "16-step patterns and groove",
+              meta: "Pattern grid",
+              icon: <Drum size={18} />
+            },
+            {
+              id: "notes",
+              label: "Bass / Melody",
+              detail: "Scale-locked 808 and Synth notes",
+              meta: "Note lanes",
+              icon: <KeyboardMusic size={18} />
+            },
+            {
+              id: "instruments",
+              label: "Chords & Sound",
+              detail: "Harmony, instruments, and tone design",
+              meta: "Sound tools",
+              icon: <Sparkles size={18} />
+            }
+          ]}
+          onSelect={(page) => activateComposeWorkspacePage(page, true)}
+          title="Compose editor"
+        />
         <section
-          className="panel pattern-panel"
+          aria-labelledby="compose-page-tab-drums"
+          className="panel pattern-panel workspace-page-panel"
+          data-workspace-page="drums"
           data-testid="workflow-target-compose"
+          hidden={activeComposeWorkspacePage !== "drums"}
+          id="compose-page-panel-drums"
           aria-label="Pattern editor"
           ref={composePanelRef}
-          tabIndex={-1}
+          role="tabpanel"
+          tabIndex={activeComposeWorkspacePage === "drums" ? 0 : -1}
         >
           <PanelTitle icon={<Drum size={18} />} title="Drums" meta="16 step rack" />
           <div
@@ -14730,7 +14908,18 @@ export function App(): ReactElement {
           </div>
         </section>
 
-        <section className="panel piano-panel" data-testid="note-editor-panel" aria-label="Bass and melody editor">
+        <section
+          aria-label="Bass and melody editor"
+          aria-labelledby="compose-page-tab-notes"
+          className="panel piano-panel workspace-page-panel"
+          data-workspace-page="notes"
+          data-testid="note-editor-panel"
+          hidden={activeComposeWorkspacePage !== "notes"}
+          id="compose-page-panel-notes"
+          ref={notePanelRef}
+          role="tabpanel"
+          tabIndex={activeComposeWorkspacePage === "notes" ? 0 : -1}
+        >
           <PanelTitle icon={<KeyboardMusic size={18} />} title="Bass / Melody" meta={`${bassStyleLabel(style.bassStyle)} voice · scale locked grid`} />
           <details
             className="capture-ideas"
@@ -14853,7 +15042,18 @@ export function App(): ReactElement {
           {selectedEventDeleteResult?.kind === "note" && <SelectedEventDeleteResultStrip result={selectedEventDeleteResult} />}
         </section>
 
-        <section className="panel instrument-panel" data-testid="workflow-target-sound" aria-label="Instrument panel" ref={soundPanelRef}>
+        <section
+          aria-label="Instrument panel"
+          aria-labelledby="compose-page-tab-instruments"
+          className="panel instrument-panel workspace-page-panel"
+          data-workspace-page="instruments"
+          data-testid="workflow-target-sound"
+          hidden={activeComposeWorkspacePage !== "instruments"}
+          id="compose-page-panel-instruments"
+          ref={soundPanelRef}
+          role="tabpanel"
+          tabIndex={activeComposeWorkspacePage === "instruments" ? 0 : -1}
+        >
           <PanelTitle icon={<Sparkles size={18} />} title="Instruments" meta={project.mode === "guided" ? "curated" : "editable"} />
           <div className="instrument-direct-chords" data-testid="instrument-direct-chords">
             <ChordEditor
@@ -15495,7 +15695,41 @@ export function App(): ReactElement {
         tabIndex={activeWorkspaceZone === "mix" ? 0 : -1}
       >
         <Activity mode={workspaceActivityMode(activeWorkspaceZone === "mix")} name="workspace-mix">
-        <section className="panel mixer-panel" data-testid="workflow-target-mix" aria-label="Mixer" ref={mixPanelRef}>
+        <WorkspacePageTabs
+          activePage={activeMixWorkspacePage}
+          ariaLabel="Mix editor pages"
+          idPrefix="mix"
+          items={[
+            {
+              id: "mixer",
+              label: "Mixer",
+              detail: "Channel balance, processing, and space",
+              meta: `${activeChannels} audible`,
+              icon: <SlidersHorizontal size={18} />
+            },
+            {
+              id: "master",
+              label: "Master & Review",
+              detail: "Finish, automation, meters, and checks",
+              meta: project.masterPreset,
+              icon: <Gauge size={18} />
+            }
+          ]}
+          onSelect={(page) => activateMixWorkspacePage(page, true)}
+          title="Mix editor"
+        />
+        <section
+          aria-label="Mixer"
+          aria-labelledby="mix-page-tab-mixer"
+          className="panel mixer-panel workspace-page-panel"
+          data-workspace-page="mixer"
+          data-testid="workflow-target-mix"
+          hidden={activeMixWorkspacePage !== "mixer"}
+          id="mix-page-panel-mixer"
+          ref={mixPanelRef}
+          role="tabpanel"
+          tabIndex={activeMixWorkspacePage === "mixer" ? 0 : -1}
+        >
           <PanelTitle icon={<SlidersHorizontal size={18} />} title="Mixer" meta={`${activeChannels} audible`} />
           {!exactProjectAudioAnalysisReady && (
             <ProjectAudioAnalysisGate
@@ -15876,7 +16110,18 @@ export function App(): ReactElement {
           </details>
         </section>
 
-        <section className="panel master-panel" data-testid="workflow-target-master" aria-label="Master" ref={masterPanelRef}>
+        <section
+          aria-label="Master"
+          aria-labelledby="mix-page-tab-master"
+          className="panel master-panel workspace-page-panel"
+          data-workspace-page="master"
+          data-testid="workflow-target-master"
+          hidden={activeMixWorkspacePage !== "master"}
+          id="mix-page-panel-master"
+          ref={masterPanelRef}
+          role="tabpanel"
+          tabIndex={activeMixWorkspacePage === "master" ? 0 : -1}
+        >
           <PanelTitle
             icon={<Gauge size={18} />}
             title="Master"

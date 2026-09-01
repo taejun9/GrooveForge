@@ -14,6 +14,14 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const require = createRequire(import.meta.url);
 const appName = "GrooveForge";
 const bundleId = "app.grooveforge.desktop";
+const expectedElectronRuntime = Object.freeze({
+  arch: process.arch,
+  chrome: "150.0.7871.250",
+  electron: "43.5.0",
+  minimumMacOs: "12.0",
+  node: "24.19.0",
+  platform: "darwin"
+});
 const iconFileName = `${appName}.icns`;
 const iconSource = path.join(root, "assets", "brand", "grooveforge-icon.svg");
 const entitlementsPath = path.join(root, "harness", "fixtures", "macos-hardened-runtime-entitlements.plist");
@@ -24,6 +32,7 @@ const progressPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_PROGRESS ";
 const timeoutMs = 1820000;
 const outputRoot = path.join(root, "build", "desktop", `${appName}-${process.platform}-${process.arch}`);
 const packagedApp = path.join(outputRoot, `${appName}.app`);
+const packageOnly = process.argv.slice(2).includes("--package-only");
 const failures = [];
 const crcTable = new Uint32Array(256);
 
@@ -463,6 +472,16 @@ function resolveElectronAppTemplate() {
   return null;
 }
 
+function resolveInstalledElectronVersion() {
+  try {
+    const electronPackagePath = require.resolve("electron/package.json");
+    const electronPackage = JSON.parse(readFileSync(electronPackagePath, "utf8"));
+    return typeof electronPackage.version === "string" ? electronPackage.version : null;
+  } catch {
+    return null;
+  }
+}
+
 function checkBuiltArtifacts() {
   check(existsSync(path.join(root, "dist", "index.html")), "dist/index.html is missing; run npm run build before desktop package smoke");
   check(
@@ -493,6 +512,10 @@ function setPlistString(plist, key, value) {
     return plist;
   }
   return plist.replace(pattern, `$1${value}$3`);
+}
+
+function readPlistString(plist, key) {
+  return plist.match(new RegExp(`<key>${key}</key>\\s*<string>([^<]+)</string>`))?.[1] ?? null;
 }
 
 function removePlistStringKey(plist, key) {
@@ -570,14 +593,28 @@ async function packageMacApp() {
     return null;
   }
 
-  const electronApp = resolveElectronAppTemplate();
-  if (!electronApp) {
-    failures.push("Electron.app template is missing; run npm install first");
+  const declaredElectronVersion = packageJson.dependencies?.electron;
+  check(
+    declaredElectronVersion === expectedElectronRuntime.electron,
+    `package.json should pin Electron exactly to ${expectedElectronRuntime.electron}, got ${String(declaredElectronVersion)}`
+  );
+  const installedElectronVersion = resolveInstalledElectronVersion();
+  check(
+    installedElectronVersion === expectedElectronRuntime.electron,
+    `installed Electron package should be ${expectedElectronRuntime.electron}, got ${String(installedElectronVersion)}`
+  );
+  if (failures.length > 0) {
     return null;
   }
 
-  await rm(outputRoot, { force: true, recursive: true });
+  const electronApp = resolveElectronAppTemplate();
+  if (!electronApp) {
+    failures.push("Electron.app template is missing; run npx install-electron --no after npm install");
+    return null;
+  }
+
   await mkdir(outputRoot, { recursive: true });
+  await rm(packagedApp, { force: true, recursive: true });
   await cp(electronApp, packagedApp, { recursive: true, verbatimSymlinks: true });
 
   const contentsDir = path.join(packagedApp, "Contents");
@@ -606,7 +643,67 @@ async function packageMacApp() {
     executable: grooveForgeExecutable,
     icon,
     infoPlist: path.join(contentsDir, "Info.plist"),
-    packagedApp
+    packagedApp,
+    declaredElectronVersion,
+    installedElectronVersion
+  };
+}
+
+async function inspectPackagedRuntime(paths) {
+  const runtimeExpression =
+    'JSON.stringify({electron:process.versions.electron,node:process.versions.node,chrome:process.versions.chrome,arch:process.arch,platform:process.platform})';
+  const runtimeResult = await runCommand(paths.executable, ["-p", runtimeExpression], {
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: "1",
+      NO_COLOR: "1"
+    }
+  });
+  const runtimeLine = runtimeResult.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .findLast((line) => line.startsWith("{") && line.endsWith("}"));
+  let runtime = null;
+  try {
+    runtime = runtimeLine ? JSON.parse(runtimeLine) : null;
+  } catch {
+    runtime = null;
+  }
+
+  check(runtime !== null, "packaged executable should report its embedded runtime through ELECTRON_RUN_AS_NODE");
+  for (const key of ["electron", "node", "chrome", "arch", "platform"]) {
+    check(
+      runtime?.[key] === expectedElectronRuntime[key],
+      `packaged runtime ${key} should be ${expectedElectronRuntime[key]}, got ${String(runtime?.[key])}`
+    );
+  }
+
+  const frameworkPlistPath = path.join(
+    paths.packagedApp,
+    "Contents",
+    "Frameworks",
+    "Electron Framework.framework",
+    "Resources",
+    "Info.plist"
+  );
+  const frameworkPlist = await readFile(frameworkPlistPath, "utf8");
+  const frameworkVersion = readPlistString(frameworkPlist, "CFBundleVersion");
+  check(
+    frameworkVersion === expectedElectronRuntime.electron,
+    `packaged Electron Framework CFBundleVersion should be ${expectedElectronRuntime.electron}, got ${String(frameworkVersion)}`
+  );
+
+  const appPlist = await readFile(paths.infoPlist, "utf8");
+  const minimumMacOs = readPlistString(appPlist, "LSMinimumSystemVersion");
+  check(
+    minimumMacOs === expectedElectronRuntime.minimumMacOs,
+    `packaged app LSMinimumSystemVersion should be ${expectedElectronRuntime.minimumMacOs}, got ${String(minimumMacOs)}`
+  );
+
+  return {
+    ...runtime,
+    frameworkVersion,
+    minimumMacOs
   };
 }
 
@@ -716,6 +813,7 @@ async function checkPackagedApp(paths) {
     "packaged app Electron runtime framework dependencies should be dyld-loadable through @rpath before launch"
   );
   paths.frameworkDependencies = frameworkDependencies;
+  paths.runtime = await inspectPackagedRuntime(paths);
 }
 
 function checkLaunchResult(result) {
@@ -854,6 +952,28 @@ if (failures.length > 0) {
   fail("Packaged app structure validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
 }
 
+if (packageOnly) {
+  console.log("GrooveForge desktop app build passed.");
+  console.log("- Scope: branded macOS GrooveForge.app assembly, local ad-hoc signing, and bundle validation");
+  console.log(`- App: ${path.relative(root, paths.packagedApp)}`);
+  console.log(`- Entry: ${path.relative(root, path.join(paths.appRoot, "dist-electron", "main.js"))} -> packaged dist/index.html`);
+  console.log(`- Icon: ${path.basename(paths.icon.iconPath)}, ${paths.icon.iconBytes} bytes, GrooveForge bundle metadata`);
+  console.log(
+    `- Runtime: Electron ${paths.runtime.electron} / Node ${paths.runtime.node} / Chromium ${paths.runtime.chrome} / ${paths.runtime.arch} / macOS ${paths.runtime.minimumMacOs}+`
+  );
+  console.log(
+    `- Framework dependencies: ${paths.frameworkDependencies.presentDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} present, ${paths.frameworkDependencies.signatureVerifiedDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} code-signed, ${paths.frameworkDependencies.signatureCompatibleDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} signature-compatible`
+  );
+  console.log(
+    `- Dyld framework loadability: ${paths.frameworkDependencies.dyldLoadableDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} loadable via ${paths.frameworkDependencies.rpathCount} dyld rpaths`
+  );
+  console.log(
+    `- Launch signature: local ad-hoc ${paths.localLaunchSignature.verified ? "verified" : "not verified"} with ${paths.localLaunchSignature.verifyCommand}; Developer ID not claimed`
+  );
+  console.log("- Launch smoke: skipped; run npm run desktop:package-smoke for the packaged GUI launch check");
+  process.exit(0);
+}
+
 const result = await launchPackagedApp(paths);
 checkLaunchResult(result);
 if (failures.length > 0) {
@@ -865,6 +985,9 @@ console.log("- Scope: macOS portable GrooveForge.app assembly, bundle contract, 
 console.log(`- App: ${path.relative(root, paths.packagedApp)}`);
 console.log(`- Entry: ${path.relative(root, path.join(paths.appRoot, "dist-electron", "main.js"))} -> packaged dist/index.html`);
 console.log(`- Icon: ${path.basename(paths.icon.iconPath)}, ${paths.icon.iconBytes} bytes, GrooveForge bundle metadata`);
+console.log(
+  `- Runtime: Electron ${paths.runtime.electron} / Node ${paths.runtime.node} / Chromium ${paths.runtime.chrome} / ${paths.runtime.arch} / macOS ${paths.runtime.minimumMacOs}+`
+);
 console.log(
   `- Framework dependencies: ${paths.frameworkDependencies.presentDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} present, ${paths.frameworkDependencies.signatureVerifiedDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} code-signed, ${paths.frameworkDependencies.signatureCompatibleDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} signature-compatible`
 );
