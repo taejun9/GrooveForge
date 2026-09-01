@@ -17,6 +17,9 @@ Record official documentation, platform docs, standards, laws, policies, or vend
 | MDN IndexedDB API | https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API | Browser local structured data and blob storage | 2026-06-15 | Local project and asset cache |
 | Electron Docs | https://www.electronjs.org/docs/latest/ | Cross-platform desktop app shell using JavaScript, HTML, and CSS | 2026-06-15 | Desktop MVP shell |
 | Electron 39.0 release | https://www.electronjs.org/blog/electron-39-0 | Electron 39 Chromium/V8/Node runtime versions | 2026-07-24 | Confirm Node 22 runtime basis for built-in SQLite3 |
+| Electron 43.5.0 release | https://releases.electronjs.org/release/v43.5.0 | Supported Electron 43 patch and runtime identity | 2026-08-31 | Current desktop runtime and macOS 12-compatible security upgrade |
+| Electron release schedule | https://releases.electronjs.org/schedule | Supported release lines and EOL dates | 2026-08-31 | Electron 43 support-window boundary |
+| GHSA-jmr9-qjv8-65gv | https://github.com/advisories/GHSA-jmr9-qjv8-65gv | `extract-zip` symlink path traversal advisory | 2026-08-31 | Replace the affected Electron 39 installation dependency and restore zero-vulnerability audit |
 | Node.js SQLite API | https://nodejs.org/api/sqlite.html | Built-in SQLite DatabaseSync, prepared statements, transactions, and backup API | 2026-07-24 | Main-process SQLite3 project-library adapter |
 | SQLite Write-Ahead Logging | https://www.sqlite.org/wal.html | WAL durability, checkpoint, sidecar, concurrency, and persistence behavior | 2026-07-24 | Local project-library journal and shutdown policy |
 | SQLite PRAGMA Reference | https://www.sqlite.org/pragma.html | user_version, application_id, synchronous, foreign_keys, trusted_schema, secure_delete, integrity, and busy timeout behavior | 2026-07-24 | SQLite schema identity, safety settings, and QA |

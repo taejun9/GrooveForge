@@ -10,8 +10,11 @@
     "build": "tsc -p tsconfig.json && vite build && tsc -p tsconfig.electron.json",
     "quick-actions:bundle-smoke": "node harness/scripts/run_quick_actions_bundle_smoke.mjs",
     "desktop": "npm run build && node harness/scripts/run_desktop_app.mjs",
+    "desktop:app": "npm run build && node harness/scripts/run_desktop_package_smoke.mjs --package-only",
+    "desktop:dmg": "npm run desktop:app && npm run desktop:dmg-smoke",
     "desktop:manual-qa": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_manual_qa.mjs",
     "desktop:movement-qa": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_manual_qa.mjs --auto-movement-qa",
+    "desktop:multigenre-qa": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_multigenre_actual_app_qa.mjs",
     "desktop:smoke": "node harness/scripts/run_desktop_entry_smoke.mjs",
     "desktop:crash-report-regression-smoke": "node harness/scripts/run_desktop_crash_report_regression_smoke.mjs",
     "desktop:launch-smoke": "node harness/scripts/run_desktop_launch_smoke.mjs",
@@ -149,12 +152,12 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.1.2",
-    "vite": "^8.0.16",
-    "typescript": "^5.9.3",
+    "electron": "43.5.0",
+    "lucide-react": "^0.561.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "electron": "^39.2.7",
-    "lucide-react": "^0.561.0"
+    "typescript": "^5.9.3",
+    "vite": "^8.0.16"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",

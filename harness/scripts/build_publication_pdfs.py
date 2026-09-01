@@ -1148,7 +1148,7 @@ def build_portfolio_story() -> list[Flowable]:
             "GrooveForge",
             "샘플 없이 시작해 전달 가능한 비트까지 완성하는 local-first 올장르 미니 DAW",
             [
-                "React 19 · TypeScript 5.9 · Vite 8 · Electron 39 · Web Audio · SQLite3",
+                "React 19 · TypeScript 5.9 · Vite 8 · Electron 43.5 · Web Audio · SQLite3",
                 "제품 버전 0.1.0 · 기준일 2026-08-05 · commit 0ebd6ebe",
                 "Team Forge product, architecture, audio, desktop, QA portfolio",
             ],

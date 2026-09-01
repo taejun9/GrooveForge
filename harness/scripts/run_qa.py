@@ -6186,7 +6186,7 @@ TEXT_EXPECTATIONS = {
         "macGuiLaunchAbortDetails(\"npm run desktop\"",
         "macGuiLaunchBlockDetails(\"npm run desktop\")",
         "Refusing to start Electron in a restricted macOS GUI context.",
-        "Electron binary is missing; run npm install first.",
+        "Electron binary is missing; run npx install-electron --no after npm install.",
         "Electron aborted during macOS AppKit registration.",
         "Could not start Electron",
         "delete env.ELECTRON_RUN_AS_NODE",
