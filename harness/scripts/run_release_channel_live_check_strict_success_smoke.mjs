@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: release channel live check의 엄격한 성공 판정이 모든 endpoint 증거를 요구하는지 검사한다.
+ * 흐름: 로컬 mock 서버와 완전한 fixture를 구성해 live check를 실행하고 요청·응답·proof·종료 코드를 검증한다.
+ * 안전 경계: loopback fixture만 사용하고 외부 운영 URL이나 비밀은 쓰지 않으며 부분 성공은 전체 성공으로 승격하지 않는다.
+ */
+
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import path from "node:path";

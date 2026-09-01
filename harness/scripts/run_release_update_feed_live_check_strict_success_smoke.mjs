@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: update feed live check가 모든 URL·digest·응답 계약을 만족해야만 엄격 성공하는지 검사한다.
+ * 흐름: loopback 서버와 완전한 metadata fixture를 만들고 요청 기록, proof, 종료 코드, cleanup을 검증한다.
+ * 안전 경계: 로컬 mock만 사용하고 실제 공개 feed나 자격 증명에는 접근하지 않으며 부분 성공은 실패로 남긴다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 데스크톱 배포 번들 매니페스트가 실제 파일 집합·크기·해시·채널 메타데이터와 일치하는지 검사한다.
+ * 흐름: 격리된 번들 fixture와 매니페스트를 만들고 생성/검증 명령을 실행해 누락·변조 사례까지 확인한다.
+ * 안전 경계: 불일치나 예기치 않은 파일은 실패로 처리하며, 외부 저장소 업로드 없이 로컬 fixture만 사용한다.
+ */
+
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";

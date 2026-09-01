@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 명시된 Developer ID 설정으로 데스크톱 번들을 서명하고 서명·entitlement·의존성 계약을 검증한다.
+ * 흐름: 사전 준비 상태를 확인하고 제한된 번들 복사본에 서명을 적용한 뒤 codesign 검증 결과와 매니페스트를 대조한다.
+ * 안전 경계: 승인된 신원과 빌드 경로가 없으면 즉시 중단하며, notarization·업로드·원본 사용자 앱 변경은 수행하지 않는다.
+ */
+
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";

@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 외부 배포 운영자가 따를 runbook이 명령 순서·입력 경계·복구 절차를 완전하게 안내하는지 검증한다.
+ * 흐름: 로컬 fixture에서 runbook을 생성하고 필수 단계, 차단 조건, 증거 경로, 재개 지점을 검사한다.
+ * 안전 경계: 문서 검증만 수행하고 운영 명령을 대신 실행하지 않으며 민감한 값은 placeholder로만 다룬다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

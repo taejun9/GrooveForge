@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 배포 전 수동 QA 체크리스트가 앱 실행·설치·업데이트·프로젝트 보존 증거를 올바르게 요구하는지 검사한다.
+ * 흐름: 승인/미승인 fixture로 QA 보고서를 생성하고 필수 항목, 상태 전이, 후속 명령을 비교한다.
+ * 안전 경계: 사람이 확인하지 않은 항목은 자동 승인하지 않으며 GUI·배포 서비스·실사용 프로젝트를 직접 조작하지 않는다.
+ */
+
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

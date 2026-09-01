@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: Electron 앱의 hardened runtime·entitlement·서명 옵션이 공증 가능한 구성인지 검사한다.
+ * 흐름: 패키지 설정과 번들 서명 정보를 읽고 필수 플래그, 금지 entitlement, 중첩 코드 상태를 확인한다.
+ * 안전 경계: 정책 위반은 허용하지 않으며 서명이나 entitlement를 자동 수정하거나 외부 공증을 요청하지 않는다.
+ */
+
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";

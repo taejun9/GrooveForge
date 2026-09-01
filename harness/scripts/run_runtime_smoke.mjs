@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: GrooveForge domain/audio/runtime 모듈이 Node 환경에서 핵심 프로젝트 생성·편집·렌더 계약을 지키는지 검사한다.
+ * 흐름: TypeScript 로더로 모듈을 불러와 대표 프로젝트 연산을 실행하고 결정론·불변식·오류 처리를 대조한다.
+ * 안전 경계: 메모리와 임시 로컬 데이터만 사용하고 네트워크·계정·사용자 파일에는 접근하지 않으며 오류를 숨기지 않는다.
+ */
+
 const failures = [];
 
 function check(condition, message) {

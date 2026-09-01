@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 데스크톱 배포 담당자에게 넘기는 handoff 문서와 증거 묶음이 재현 가능한지 검증한다.
+ * 흐름: 로컬 릴리스 fixture에서 handoff 생성기를 실행하고 필수 체크, 경로, 해시, 다음 행동을 확인한다.
+ * 안전 경계: 누락·오래된 증거는 전달 완료로 인정하지 않으며 실제 업로드나 담당자 통지는 수행하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

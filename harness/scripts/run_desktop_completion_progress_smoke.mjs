@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 데스크톱 릴리스 완료 진행률 집계가 개별 체크포인트와 정확히 대응하는지 회귀 검사한다.
+ * 흐름: 격리된 릴리스 fixture를 만들고 진행 보고 명령을 실행한 뒤 완료 수·차단 사유·신선도 표기를 비교한다.
+ * 안전 경계: 증거 없는 항목은 완료로 세지 않으며, 테스트는 임시 로컬 상태만 사용하고 외부 릴리스 상태를 쓰지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

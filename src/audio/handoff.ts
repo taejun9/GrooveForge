@@ -1,3 +1,8 @@
+/**
+ * 프로젝트와 로컬 렌더 분석값을 사람이 검토할 수 있는 인수인계 텍스트로 직렬화한다.
+ * 편곡·믹스·스템 상태를 요약할 뿐 업로드나 네트워크 요청은 수행하지 않으며,
+ * SoundCloud 공개 여부와 권리 확인은 명시적으로 사용자 검토 항목으로 남긴다.
+ */
 import {
   activeDeliveryTarget,
   arrangementMuteTrackLabel,
@@ -45,6 +50,7 @@ function usedPatternSlots(project: ProjectState): PatternSlot[] {
 }
 
 export function exportDynamicsDb(analysis: ExportAnalysis): number {
+  // 무음의 -Infinity 같은 비유한 미터값은 문서 계산으로 전파하지 않고 0 dB 차이로 표시한다.
   if (!Number.isFinite(analysis.peakDb) || !Number.isFinite(analysis.rmsDb)) {
     return 0;
   }
@@ -56,6 +62,7 @@ export function createHandoffSheet(
   analysis: ExportAnalysis,
   stemAnalyses: StemExportAnalyses
 ): string {
+  // 파일에 기록하기 전에 편곡을 정규화하여 비정상 bar 값이나 누적 길이가 문서에 그대로 노출되지 않게 한다.
   const arrangement = projectArrangement(project);
   const handoffProject = { ...project, arrangement };
   const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
@@ -69,6 +76,7 @@ export function createHandoffSheet(
   );
   const stemLines = stemTrackIds.map((track) => {
     const stem = stemAnalyses[track];
+    // RMS가 -Infinity인 스템은 숫자 포맷보다 작업자가 이해하기 쉬운 Silent 상태로 구분한다.
     const audible = Number.isFinite(stem.rmsDb);
     return `${stemTrackLabel(track)}: ${audible ? "Audible" : "Silent"} / Peak ${formatDb(stem.peakDb)} / RMS ${formatDb(stem.rmsDb)} / Headroom ${formatDb(stem.headroomDb)}`;
   });
@@ -125,6 +133,7 @@ export function createHandoffSheet(
     "This sheet is generated from local project data and does not include audio media."
   ];
 
+  // 줄 끝 개행을 보장해 셸·텍스트 편집기에서 다른 문서를 이어 붙일 때 마지막 줄이 합쳐지지 않게 한다.
   return `${sections.join("\n")}\n`;
 }
 

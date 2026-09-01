@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: Developer ID 운영자에게 전달할 서명 packet이 입력·명령·검증·복구 절차를 완전하게 담는지 검사한다.
+ * 흐름: 로컬 readiness fixture로 packet을 생성해 identity placeholder, 대상 해시, 실행 순서, proof 경로를 검증한다.
+ * 개인정보 경계: 인증서·키체인 비밀을 포함하지 않고 실제 서명을 수행하거나 packet을 외부로 전송하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";

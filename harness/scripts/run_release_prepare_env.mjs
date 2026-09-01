@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 릴리스 명령들이 공통으로 사용할 로컬 환경 디렉터리·템플릿·기본 증거를 준비한다.
+ * 흐름: 저장소와 출력 경로의 소유권을 확인하고 필요한 디렉터리와 placeholder 파일을 멱등하게 만든 뒤 상태를 보고한다.
+ * 안전 경계: 기존 비밀 값을 덮어쓰지 않고 허용 root 밖 경로를 거부하며 외부 서비스나 계정은 변경하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

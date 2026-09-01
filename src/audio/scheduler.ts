@@ -1,3 +1,8 @@
+/**
+ * Web Audio API로 편곡/Pattern을 짧게 선행 예약해 실시간 재생하고, 편집기 단일 이벤트 미리듣기를 제공한다.
+ * UI 타이머의 흔들림을 줄이기 위해 AudioContext 시간축에 노드를 미리 스케줄하며 현재 프로젝트 변경을 매 tick 반영한다.
+ * 생성한 AudioContext·interval·feedback timeout은 controller.stop에서 정리하는 것이 중요한 생명주기 경계다.
+ */
 import {
   dbToGain,
   arrangementEnergyGain,
@@ -99,6 +104,7 @@ type ScheduledToneOptions = {
 
 const scheduleAheadSeconds = 0.12;
 const scheduleAheadMs = scheduleAheadSeconds * 1000;
+// 25ms마다 120ms 앞까지 예약해 UI 스레드의 짧은 지연은 흡수하되 편집 반영 지연은 작게 유지한다.
 const schedulerTickMs = 25;
 const metronomeMix: TrackMix = { gain: 1, pan: 0, lowCut: 0, air: 0.16, drive: 0, glue: 0, send: 0 };
 
@@ -108,6 +114,7 @@ type PlaybackDestination = {
 };
 
 function createAudioContext(): AudioContext {
+  // 사용자 제스처로 진입하는 공개 함수 안에서만 Context를 만들며, 지원되지 않는 런타임은 즉시 명시적으로 실패한다.
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass) {
     throw new Error("AudioContext is not available in this runtime.");
@@ -125,6 +132,7 @@ function channelMix(project: ProjectState, id: string): TrackMix {
   const channel = project.mixer.find((track) => track.id === id);
   const soloActive = hasSolo(project);
   if (!channel || channel.muted || (id !== "master" && soloActive && !channel.solo)) {
+    // 뮤트/솔로 판정은 gain 0으로 통합해 이후 예약 함수가 불필요한 AudioNode 생성을 빠르게 건너뛰게 한다.
     return { gain: 0, pan: 0, lowCut: 0, air: 0, drive: 0, glue: 0, send: 0 };
   }
   return {
@@ -160,6 +168,7 @@ function connectChannelGlue(context: AudioContext, source: AudioNode, mix: Track
   }
 
   const compressor = context.createDynamicsCompressor();
+  // 0..1 glue를 Web Audio compressor의 제한된 안전 범위로 매핑하고 소량의 makeup gain은 호출부에서 적용한다.
   compressor.threshold.setValueAtTime(-18 - mix.glue * 24, time);
   compressor.knee.setValueAtTime(8 + mix.glue * 18, time);
   compressor.ratio.setValueAtTime(1.2 + mix.glue * 5.2, time);
@@ -170,6 +179,7 @@ function connectChannelGlue(context: AudioContext, source: AudioNode, mix: Track
 }
 
 function createSpaceBus(context: AudioContext, destination: AudioNode): GainNode {
+  // 한 재생 세션이 공유하는 feedback delay 버스다. 각 음원은 send 양만큼 이 input에 연결된다.
   const input = context.createGain();
   const delay = context.createDelay(0.8);
   const feedback = context.createGain();
@@ -222,6 +232,7 @@ type PlaybackStepContext = {
 };
 
 function arrangementContextForBar(project: ProjectState, bar: number): PlaybackStepContext {
+  // 가변 길이 편곡 블록을 누적 bar 좌표로 탐색해 현재 Pattern과 음소거/에너지 문맥을 만든다.
   let cursor = 0;
   for (const [index, block] of project.arrangement.entries()) {
     const blockBars = normalizeArrangementBars(block.bars);
@@ -273,6 +284,7 @@ function snapshotForStep(
   const loopStep = step % loopSteps;
   const playbackContext = playbackContextForStep(project, mode, loopStep, startBar);
   return {
+    // 콜백에는 무한 증가 absoluteStep과 루프 내부 loopStep을 모두 제공해 UI와 확률 게이트가 각 목적에 맞게 쓴다.
     absoluteStep: step,
     loopStep,
     bar: Math.floor(loopStep / 16) + 1,
@@ -311,6 +323,7 @@ function scheduleKick(
   drive.curve = driveCurve(mix.drive * 0.42);
   drive.oversample = "2x";
   osc.frequency.setValueAtTime(78 + sound.kickPunch * 42, time);
+  // 짧은 지수 피치 하강과 gain envelope를 결합해 샘플 없이 킥의 트랜지언트와 바디를 만든다.
   osc.frequency.exponentialRampToValueAtTime(42 + sound.kickPunch * 10, time + 0.09 + sound.kickPunch * 0.05);
   gain.gain.setValueAtTime(0.0001, time);
   gain.gain.exponentialRampToValueAtTime((0.72 + sound.kickPunch * 0.3) * gainValue * channelAirGain(mix, 0.06) * channelGlueMakeup(mix), time + 0.006);
@@ -338,6 +351,7 @@ function scheduleNoise(
   const frames = Math.max(1, Math.floor(context.sampleRate * duration));
   const buffer = context.createBuffer(1, frames, context.sampleRate);
   const data = buffer.getChannelData(0);
+  // 실시간 미리듣기 노이즈는 즉시 생성한다. 결정적 파일/미터는 별도 오프라인 렌더러의 seeded noise를 사용한다.
   for (let index = 0; index < frames; index += 1) {
     data[index] = Math.random() * 2 - 1;
   }
@@ -387,6 +401,7 @@ function scheduleTone(
   osc.type = type;
   osc.frequency.setValueAtTime(tone.startFrequency ?? frequency, time);
   if (tone.startFrequency !== undefined && (tone.glideDuration ?? 0) > 0) {
+    // AudioParam의 선형 램프를 사용하므로 별도 프레임 루프 없이 샘플 정밀도의 글라이드를 예약한다.
     osc.frequency.linearRampToValueAtTime(frequency, time + Math.min(duration, tone.glideDuration ?? 0));
   }
   highpass.type = "highpass";
@@ -409,6 +424,7 @@ function scheduleTone(
 }
 
 function driveCurve(amount: number): Float32Array<ArrayBuffer> {
+  // WaveShaper용 tanh 곡선을 -1..1 범위에 미리 샘플링한다. amount가 커질수록 중앙 기울기와 포화가 강해진다.
   const curve = new Float32Array(128);
   const drive = 1 + amount * 18;
   for (let index = 0; index < curve.length; index += 1) {
@@ -443,6 +459,7 @@ function scheduleBassTone(
   };
   scheduleTone(context, destination, time, duration, frequency, gainValue, bassOscillator(voice.waveform), mix, mix.pan, tone);
   if (voice.detuneRatio) {
+    // Reese 보이스의 두 번째 오실레이터는 주파수와 글라이드 시작점 모두 같은 비율로 이동해야 음정 이동이 평행하다.
     scheduleTone(
       context,
       destination,
@@ -500,6 +517,7 @@ function scheduleStep(
   energyGain = 1,
   mutedTracks: ArrangementMuteTrack[] = []
 ): void {
+  // 한 스텝에서 시작하는 이벤트만 예약한다. 길게 유지되는 음은 AudioNode의 stop 시각으로 스텝 경계를 넘어간다.
   const patternStep = step % 16;
   const drumMix = arrangementTrackMix(project, "drum_rack", mutedTracks);
   const bassMix = arrangementTrackMix(project, "bass_808", mutedTracks);
@@ -636,6 +654,7 @@ function scheduleStep(
 }
 
 export function playEditorAudition(project: ProjectState, target: EditorAuditionTarget): PlaybackController {
+  // 미리듣기는 전체 transport와 분리된 짧은 Context를 사용해 재생 상태나 편곡 커서를 바꾸지 않는다.
   const normalizedMixer = normalizeMixerChannelTopology(project.mixer);
   const mixerProject = normalizedMixer === project.mixer ? project : { ...project, mixer: normalizedMixer };
   const context = createAudioContext();
@@ -653,6 +672,7 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
   let stopAt = time + 0.42;
 
   const extendStop = (durationSeconds: number): void => {
+    // release와 delay tail이 잘리지 않도록 이벤트 종류별 예상 길이에 안전 여유를 더한다.
     stopAt = Math.max(stopAt, time + Math.max(0.08, durationSeconds) + 0.28);
   };
 
@@ -794,6 +814,7 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
     }
     stopped = true;
     window.clearTimeout(closeTimeout);
+    // 갑자기 Context를 닫으면 클릭이 생길 수 있어 master를 짧게 감쇠한 뒤 닫는다.
     masterGain.gain.cancelScheduledValues(context.currentTime);
     masterGain.gain.setTargetAtTime(0.0001, context.currentTime, 0.015);
     window.setTimeout(() => {
@@ -820,6 +841,7 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
   let intervalId: number | undefined;
   const feedbackTimeouts = new Set<number>();
   const normalizedPatternCache = new WeakMap<PatternData, PatternData>();
+  // 객체 참조가 바뀔 때만 정규화해 25ms tick마다 같은 배열을 다시 복제하는 비용을 피한다.
   let mixerSource: ProjectState["mixer"] | null = null;
   let normalizedMixer = normalizeMixerChannelTopology([]);
   let soundSource: ProjectState["sound"] | null = null;
@@ -840,6 +862,7 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
   };
 
   const normalizedProjectForPlayback = (currentProject: ProjectState): ProjectState => {
+    // 편집 중 getProject가 최신 상태를 돌려주므로 mixer/sound 참조별 캐시도 함께 무효화해야 한다.
     if (currentProject.mixer !== mixerSource) {
       mixerSource = currentProject.mixer;
       normalizedMixer = normalizeMixerChannelTopology(currentProject.mixer);
@@ -867,6 +890,7 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
   };
 
   const normalizedAutomationForPlayback = (events: ProjectState["automation"]): ProjectState["automation"] => {
+    // 자동화 정규화도 원본 배열 참조가 바뀐 경우에만 수행한다.
     if (events !== automationSource) {
       automationSource = events;
       automationEvents = normalizeProjectAutomationEvents(events);
@@ -875,6 +899,7 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
   };
 
   const queueStepFeedback = (snapshot: PlaybackSnapshot, stepAtMs: number): void => {
+    // 소리는 미리 예약하지만 UI playhead 콜백은 실제 청취 시각에 맞춰 별도 timeout으로 지연한다.
     const delayMs = Math.max(0, stepAtMs - performance.now());
     const timeoutId = window.setTimeout(() => {
       feedbackTimeouts.delete(timeoutId);
@@ -891,6 +916,7 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
     }
 
     const nowMs = performance.now();
+    // 현재 선행 예약 창 안에 들어온 모든 스텝을 한 tick에서 채워 timer 지연으로 생기는 오디오 공백을 방지한다.
     while (nextStepAtMs < nowMs + scheduleAheadMs) {
       const currentProject = normalizedProjectForPlayback(getProject());
       const requestedBars = options.bars ?? (mode === "arrangement" ? arrangementTotalBars(currentProject) : 2);
@@ -913,6 +939,7 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
       masterGain.gain.setTargetAtTime(masterOutputGain(currentProject) * Math.min(1, ceiling) * automationGain, context.currentTime, 0.01);
       const playbackContext = playbackContextForStep(currentProject, mode, snapshot.loopStep, startBar);
       const audibleStepAtMs = nextStepAtMs + projectSwingOffsetSeconds(currentProject, nextStep) * 1000;
+      // 이미 지난 시각은 최소 15ms 뒤로 보정해 Web Audio가 과거 노드를 즉시 터뜨리는 현상을 피한다.
       const scheduleDelaySeconds = Math.max(0.015, (audibleStepAtMs - nowMs) / 1000);
       scheduleStep(
         currentProject,
@@ -944,6 +971,7 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
         window.clearInterval(intervalId);
       }
       for (const timeoutId of feedbackTimeouts) {
+        // stop 뒤 늦게 도착한 playhead 콜백이 UI를 다시 움직이지 않도록 예약된 피드백을 모두 취소한다.
         window.clearTimeout(timeoutId);
       }
       feedbackTimeouts.clear();

@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 첫 React 화면의 서버 렌더 결과와 UI 소스 계약이 제품·접근성·보안 경계를 지키는지 검사한다.
+ * 흐름: CSS·TSX 소스를 읽고 Vite `ssrLoadModule`로 모듈을 불러 `renderToStaticMarkup`한 뒤 필수 UI와 금지 패턴을 대조한다.
+ * 안전 경계: 브라우저·Electron·production bundle·네트워크·파일 저장 없이 로컬 소스만 검사하고 모든 위반을 실패로 모은다.
+ */
+
 import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -1926,7 +1932,7 @@ function validateProjectAudioAnalysisPerformance(html, helpers) {
   check(
     projectAudioAnalysisHookSource.includes("workerRef.current?.terminate();") &&
       projectAudioAnalysisHookSource.includes("inFlightRequestRef.current") &&
-      projectAudioAnalysisHookSource.includes("An idle") &&
+      projectAudioAnalysisHookSource.includes("유휴 Worker는 재사용") &&
       projectAudioAnalysisHookSource.includes("deferredResponseRef.current = response") &&
       projectAudioAnalysisHookSource.includes("commitEnabledRef.current = commitEnabled") &&
       projectAudioAnalysisHookSource.includes("!commitEnabledRef.current || shouldHoldProjectAudioAnalysisCommit(activeTestId)") &&

@@ -1,3 +1,8 @@
+/**
+ * 패턴 생성·복제·변형·채우기 결과를 일관된 상태 스트립으로 표시하는 작은 프레젠테이션 모음이다.
+ * 이미 계산된 결과 모델만 받아 변경 범위, 전후 지표, 오디션 단서와 다음 점검을 aria-live로 노출한다.
+ * 프로젝트를 변경하거나 결과를 재계산하지 않아 실행 로직과 사용자 피드백의 책임을 분리한다.
+ */
 import { Layers, ListChecks, Sparkles } from "lucide-react";
 import type { ReactElement } from "react";
 import type {

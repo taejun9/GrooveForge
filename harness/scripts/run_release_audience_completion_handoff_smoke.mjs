@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 초보/프로듀서 audience 완료 상태가 최종 handoff의 설치·검수·지원 단계로 정확히 이어지는지 검사한다.
+ * 흐름: persona 완료 fixture를 handoff 생성기에 넣고 route, blocker, next action, 증거 인용을 검증한다.
+ * 안전 경계: 미완료 persona는 전달 완료로 승격하지 않으며 실제 사용자 통지나 배포 게시를 수행하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";

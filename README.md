@@ -159,6 +159,7 @@ Ballad, Hip-Hop, Trap, R&B, House, Experimental을 다루며 각 결과 WAV는 9
 | 명령 | 확인 범위 |
 |---|---|
 | `npm run qa` | 저장소 구조, 문서, 정적 계약 |
+| `npm run comments:ko:check` | 1차 관리 코드 전체의 상세 한글 선두 주석 커버리지 |
 | `npm run typecheck` | 웹과 Electron TypeScript |
 | `npm run renderer:smoke` | 첫 화면과 주요 UI의 서버 렌더 |
 | `npm run workflow:smoke` | 초보자와 프로듀서의 전체 작업 흐름 |
@@ -179,6 +180,7 @@ Ballad, Hip-Hop, Trap, R&B, House, Experimental을 다루며 각 결과 WAV는 9
 
 ```sh
 npm run qa
+npm run comments:ko:check
 npm run typecheck
 npm run renderer:smoke
 npm run workflow:smoke

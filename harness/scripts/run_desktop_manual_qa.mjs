@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 사람이 실제 데스크톱 화면을 검수할 수 있도록 안전한 프로젝트·viewport·증거 캡처 세션을 오케스트레이션한다.
+ * 흐름: 명령행 QA 구성을 검증하고 production 빌드를 Electron으로 실행해 상태·스크린샷·저장 결과를 수집한 뒤 보고서를 작성한다.
+ * 안전 경계: 허용된 절대 경로와 소유권 표식만 쓰며 자동 외부 업로드 없이 사람의 명시적 검수를 기다린다.
+ */
+
 import { createHash, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -120,6 +126,8 @@ async function assertSafeWorkspaceTarget(
   { expectedType = null, mustExist = false } = {},
   targetWorkspaceRoot = workspaceRoot
 ) {
+  // 문자열 prefix만 확인하지 않고 기존 경로 구성요소를 lstat/realpath로 다시 걷는다. 중간 symlink로
+  // 검사 이후 작업 위치가 workspace 밖으로 바뀌는 우회를 막기 위한 공통 쓰기 전 검사다.
   const resolved = path.resolve(candidate);
   if (!pathIsInsideRoot(targetWorkspaceRoot, resolved)) {
     throw new Error(`Manual QA target escaped its workspace root: ${resolved}`);
@@ -218,6 +226,8 @@ async function prepareOwnedWorkspace(candidate) {
     throw new Error("Manual QA workspace real path escaped its allowed base.");
   }
 
+  // 새 workspace에는 예측 불가능한 ownership token을 기록하고, 재사용 시 sentinel의 경로·owner를
+  // 검증한다. 이 소유권 계약이 없는 임의 디렉터리는 자동 QA 산출물 대상으로 인정하지 않는다.
   const sentinelPath = path.join(resolved, manualQaSentinelName);
   let ownershipToken;
   if (fresh) {
@@ -439,6 +449,8 @@ async function readExternalRegularFile(filePath, { label, maxBytes }) {
 }
 
 async function collectExternalSourcePostflight(initialEvidence) {
+  // 실제 앱이 외부 원본을 읽은 뒤에도 byte 수와 SHA-256을 다시 구해, QA 과정이 원본을 수정하거나
+  // 파일이 중간에 교체된 경우 최종 보고서를 실패 상태로 되돌린다.
   try {
     const finalFile = await readExternalRegularFile(initialEvidence.externalSourcePath, {
       label: "Movement source project postflight",
@@ -559,6 +571,8 @@ async function buildProvenanceFileManifest(baseRoot, rootEntries) {
     await collectProvenanceSourceFiles(path.join(baseRoot, entry), files);
   }
   files.sort((left, right) => (left.filePath < right.filePath ? -1 : left.filePath > right.filePath ? 1 : 0));
+  // 경로·크기·mtime·내용 해시를 정렬된 순서로 묶어, 오래된 dist가 현재 소스에서 빌드된 것처럼
+  // 보이는 것을 막는다. 절대 경로 자체는 최종 provenance digest 입력에 넣지 않는다.
   const digest = createHash("sha256");
   digest.update(`${manualQaProvenanceMarker}\0built-bundle\0`);
   const manifestFiles = [];
@@ -1017,6 +1031,7 @@ console.log(
 );
 
 if (prepareOnly) {
+  // prepare-only는 소유 workspace와 fixture/manifest만 만든다. GUI 실행·네트워크·업로드는 시작하지 않는다.
   process.exit(0);
 }
 
@@ -1063,6 +1078,7 @@ const env = {
   GROOVEFORGE_DESKTOP_WORKSPACE_ROOT: workspaceRoot,
   NO_COLOR: "1"
 };
+// 부모 프로세스에서 우연히 상속된 자동 모드는 명시적으로 선택한 QA 종류와 일치할 때만 남긴다.
 delete env.ELECTRON_RUN_AS_NODE;
 if (!autoQa) {
   delete env.GROOVEFORGE_DESKTOP_MANUAL_QA_AUTO_EXIT;
@@ -1091,6 +1107,8 @@ child.on("exit", async (code, signal) => {
   if (autoQaParentTimeout) {
     clearTimeout(autoQaParentTimeout);
   }
+  // 자식 성공만으로 완료 처리하지 않는다. movement 원본의 postflight를 보고서에 영구 반영하고
+  // 원본 불변성 증거가 없으면 마지막 단계에서 전체 실행을 실패시킨다.
   let postflightFailure = "";
   if (autoMovementQa) {
     if (!externalSourceEvidence) {

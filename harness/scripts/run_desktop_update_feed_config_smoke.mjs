@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 데스크톱 auto-update feed 설정의 채널·URL·서명·버전 정책이 앱 구성과 일치하는지 검사한다.
+ * 흐름: package와 로컬 배포 환경을 파싱하고 유효/placeholder fixture의 설정 보고서와 blocker를 검증한다.
+ * 개인정보 경계: 실제 feed를 조회·게시하지 않고 비공개 URL은 마스킹하며 미승인 설정은 준비 실패로 유지한다.
+ */
+
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

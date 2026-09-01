@@ -1,3 +1,8 @@
+/**
+ * 저장된 프로젝트 스냅샷 여러 개의 오디오 분석을 순차 Worker 작업으로 준비하는 React 훅이다.
+ * 정체성별 LRU 캐시와 요청 id를 사용해 중복 계산을 줄이고 현재 스냅샷 집합에 속한 응답만 상태에 반영한다.
+ * 훅 정리 시 활성 Worker를 종료하며, 일부 분석 실패는 다른 스냅샷 결과를 폐기하지 않고 항목별 오류로 격리한다.
+ */
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import type { ProjectSnapshot, ProjectState } from "../domain/workstation";
 import {
@@ -89,13 +94,10 @@ export function shouldAcceptSavedSnapshotAudioAnalysisResponse(
 }
 
 /**
- * Analyzes saved Project Snapshot PCM away from React's renderer thread.
- *
- * Snapshot slots are grouped and cached by the same audio identity as the
- * current-project meter worker, so names, dates, delivery notes, selected
- * Pattern posture, and other metadata never enqueue duplicate PCM work. The
- * queue is deliberately sequential and only active while Snapshot Compare is
- * visible; closing the Guide terminates the current worker immediately.
+ * 저장된 Project Snapshot의 PCM 분석을 React 렌더러 스레드 밖에서 수행한다.
+ * 스냅샷은 현재 프로젝트 미터와 같은 오디오 정체성으로 묶고 캐시하므로 이름·날짜·전달 메모·선택 Pattern 같은
+ * 메타데이터 차이는 중복 PCM 작업을 만들지 않는다. 큐는 의도적으로 직렬 실행되며 Snapshot Compare가 보일 때만
+ * 활성화되고 Guide를 닫으면 현재 Worker를 즉시 종료한다.
  */
 export function useSavedSnapshotAudioAnalyses(
   snapshots: readonly ProjectSnapshot[],
@@ -144,6 +146,7 @@ export function useSavedSnapshotAudioAnalyses(
   }, [enabled, entries, seed, tasks]);
 
   useEffect(() => {
+    // 스냅샷 집합이나 표시 상태가 바뀌면 이전 실행 세대를 무효화하고 남은 Worker부터 종료한다.
     const runId = ++runIdRef.current;
     requestIdRef.current += 1;
     workerRef.current?.terminate();
@@ -198,6 +201,7 @@ export function useSavedSnapshotAudioAnalyses(
         return;
       }
 
+      // 한 번에 Worker 하나만 실행해 여러 장편 오프라인 렌더가 CPU와 메모리를 동시에 점유하지 않게 한다.
       const task = queuedTasks[taskIndex];
       const requestId = ++requestIdRef.current;
       let worker: Worker;
@@ -228,6 +232,7 @@ export function useSavedSnapshotAudioAnalyses(
         analysis: ProjectAudioAnalysis | null,
         error: string | null
       ): void => {
+        // message/error/messageerror 중 먼저 끝난 경로만 상태를 커밋하고 반드시 Worker를 종료한다.
         if (settled) {
           return;
         }

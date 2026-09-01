@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 데스크톱 release manifest가 앱·DMG·PKG·문서 산출물의 해시와 배포 메타데이터를 완전하게 기록하는지 검사한다.
+ * 흐름: 로컬 fixture manifest를 생성하고 파일 집합·버전·크기·SHA-256·채널 값을 실제 산출물과 대조한다.
+ * 안전 경계: 누락·중복·변조는 실패하며 manifest 생성은 로컬 증거만 다루고 원격 release를 생성하지 않는다.
+ */
+
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createReadStream, existsSync, readdirSync, statSync } from "node:fs";

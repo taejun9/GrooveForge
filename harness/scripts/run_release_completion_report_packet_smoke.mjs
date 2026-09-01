@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 릴리스 완료 보고 packet이 최종 상태·증거 링크·잔여 위험·운영 handoff를 완전하게 묶는지 검사한다.
+ * 흐름: 완료/차단 fixture에서 packet을 생성해 스키마, 인용, 파일 목록, redaction과 재현성을 검증한다.
+ * 안전 경계: 근거 없는 완료 문구나 민감정보 포함은 실패하며 packet을 외부 수신자에게 전송하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";

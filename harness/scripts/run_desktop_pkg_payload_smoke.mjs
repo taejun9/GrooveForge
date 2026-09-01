@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 생성된 macOS PKG의 payload 구조·설치 위치·앱 권한·해시가 배포 계약과 일치하는지 검사한다.
+ * 흐름: 설치 없이 PKG를 로컬에 확장하고 파일 목록과 번들 메타데이터를 release manifest와 대조한다.
+ * 안전 경계: 임시 추출 경로만 생성·정리하고 시스템 볼륨이나 기존 앱을 변경하지 않으며 누락은 실패로 처리한다.
+ */
+
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { constants, createReadStream, existsSync, readdirSync, readFileSync } from "node:fs";

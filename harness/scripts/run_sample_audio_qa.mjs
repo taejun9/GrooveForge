@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 여러 style 프로젝트의 WAV·stem·MIDI·delivery bundle을 실제 렌더해 오디오 품질과 파일 계약을 검증한다.
+ * 흐름: 결정론적 프로젝트를 렌더링하고 PCM24 header·길이·peak·DC·무음·tail·해시를 분석해 JSON/Markdown 보고서를 만든다.
+ * 안전 경계: 로컬 합성 음원만 사용하고 실패가 있으면 QA를 비정상 종료하며 샘플 다운로드·외부 업로드·사용자 음원 수집은 하지 않는다.
+ */
+
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -50,6 +56,8 @@ function readInt24Le(bytes, offset) {
 }
 
 function parseCanonicalPcmWav(bytes, label, musicalDurationSeconds) {
+  // renderer가 함께 반환한 분석값을 그대로 믿지 않고, 직렬화된 WAV header와 PCM sample을 독립 해독한다.
+  // 24-bit의 실제 하위 byte 활동까지 세어 16-bit 데이터를 0-padding한 가짜 PCM24도 차단한다.
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const ascii = (start, length) => bytes.subarray(start, start + length).toString("ascii");
 
@@ -159,6 +167,8 @@ function validateDecodedAudio(decoded, analysis, expectedTailDurationSeconds, re
 }
 
 async function renderArtifact({ blobFactory, analysis, fileName, label, caseRoot, project, requireTailContent = false }) {
+  // 디스크에 쓰기 전에 같은 입력을 두 번 렌더해 byte 결정론과 decode 품질을 먼저 확인한다.
+  // 실패 artifact도 보고서 진단에는 남길 수 있지만 성공 조건으로 집계되지는 않는다.
   const firstBytes = await blobToBuffer(blobFactory());
   const secondBytes = await blobToBuffer(blobFactory());
   const deterministic = firstBytes.equals(secondBytes);
@@ -1306,6 +1316,7 @@ function markdownReport(report) {
     `Checks: canonical stereo PCM WAV, 44.1kHz, 24-bit, complete frames, real lower-byte activity, audible decoded PCM, musical-boundary tail preservation, terminal digital zero, analysis agreement, ceiling safety, no digital full-scale samples, unique stems, and byte-identical immediate rerender.\n`;
 }
 
+// 재생성 정리는 package/version/platform으로 고정된 build/desktop QA 경로에만 한정된다.
 await rm(outputRoot, { recursive: true, force: true });
 await mkdir(outputRoot, { recursive: true });
 const cases = [];
@@ -1372,6 +1383,8 @@ const report = {
   renderIsolation,
   failures
 };
+// 모든 case를 실행해 오류를 누적한 뒤에도 보고서를 먼저 기록한다. 보고서가 생성됐다는 사실과
+// QA 통과를 혼동하지 않도록 failures가 하나라도 있으면 즉시 비정상 종료한다.
 await writeFile(reportJsonPath, `${JSON.stringify(report, null, 2)}\n`);
 await writeFile(reportMarkdownPath, markdownReport(report));
 

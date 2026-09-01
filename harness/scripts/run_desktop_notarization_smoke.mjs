@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: macOS 공증 제출·대기·staple 결과를 fixture와 로컬 산출물 기준으로 검증한다.
+ * 흐름: 공증 입력을 사전 점검하고 통제된 notary 결과를 해석해 request ID, 상태, ticket 증거를 대조한다.
+ * 개인정보 경계: Apple 자격 증명은 원문 출력하지 않고 명시적 준비 없이는 제출하지 않으며, 불확실한 상태는 성공으로 간주하지 않는다.
+ */
+
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";

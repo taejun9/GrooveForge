@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: release channel blocker 해소 후 clearance 상태 전이가 새 증거에 근거하는지 검사한다.
+ * 흐름: blocked/cleared fixture를 평가해 blocker 제거, proof 신선도, 다음 checkpoint, 상태 코드를 비교한다.
+ * 안전 경계: 오래되거나 부분적인 증거는 clearance로 인정하지 않으며 외부 채널 상태를 직접 갱신하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";

@@ -1,3 +1,8 @@
+/**
+ * GrooveForge 데스크톱 앱의 권한 있는 main 프로세스 진입점이다. 창·네이티브 메뉴·파일 대화상자·SQLite·업데이트와 실제 앱 QA를 조정한다.
+ * 렌더러 요청은 IPC에서 형식·크기를 검증한다. 앱 소유 SQLite/recovery는 workspace에 제한하고 사용자 프로젝트는 선택 경로에 크기 검증 후 원자 저장한다.
+ * 단일 인스턴스, 창 닫기 확인, 격리된 BrowserWindow, 테스트 전용 경로/다운로드 제한과 종료 시 저장소 정리가 핵심 수명주기·보안 경계다.
+ */
 import { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import type { DownloadItem, MenuItemConstructorOptions, OpenDialogOptions, SaveDialogOptions, Session } from "electron";
 import { createHash } from "node:crypto";
@@ -39,6 +44,7 @@ const isManualQaAutoExit =
   isManualQa &&
   (process.env.GROOVEFORGE_DESKTOP_MANUAL_QA_AUTO_EXIT === "1" || isManualQaAutoSong || isManualQaAutoMovement);
 const isDesktopSmoke = isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke || isManualQa;
+// 실제 사용자 실행만 단일 인스턴스로 제한한다. 격리 파티션을 쓰는 병렬 smoke는 각자 독립된 창을 가져야 한다.
 const ownsSingleInstanceLock = isDesktopSmoke || app.requestSingleInstanceLock();
 if (!ownsSingleInstanceLock) {
   app.quit();
@@ -52,16 +58,15 @@ const closeFlowSmokeResultPrefix = "GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE_RESULT 
 const manualQaResultPrefix = "GROOVEFORGE_DESKTOP_MANUAL_QA_RESULT ";
 const launchSmokeTimeoutMs = 1800000;
 const launchSmokePaletteUiSettleTimeoutMs = 10_000;
-// Sequential upper bound after skipping the hook's duplicate starter routes:
-// mode-tool settles 250 s, two native starter analysis/result/follow-up paths
-// 270 s, chord/palette settles 40 s, and hook/IPC/native-click margin 140 s.
-// Keep the parent strictly above 700 s and below the global 30 minute budget.
+// 훅의 중복 스타터 경로를 제외한 직렬 실행 상한은 mode-tool 안정화 250초,
+// 두 네이티브 스타터의 분석/결과/후속 경로 270초, 코드/팔레트 안정화 40초,
+// 훅·IPC·네이티브 클릭 여유 140초다. 상위 제한은 700초보다 크고 전체 30분 예산보다 작게 둔다.
 const launchSmokePaletteBoundedChildBudgetMs = 700_000;
 const launchSmokePaletteTimeoutMs = 900_000;
 const projectIoSmokeTimeoutMs = 180000;
 const closeFlowSmokeTimeoutMs = 240000;
 const closeFlowSmokeExpectedTitle = "Close Flow Smoke Beat";
-// Mirrors the renderer/domain 1,500,000-character contract at the native IPC boundary.
+// 렌더러/도메인의 1,500,000자 계약을 권한 있는 네이티브 IPC 경계에서도 동일하게 적용한다.
 const maxNativeProjectFileCharacters = 1_500_000;
 const maxNativeProjectFileBytes = maxNativeProjectFileCharacters * 4;
 const manualQaSentinelName = ".grooveforge-manual-qa-owned.json";
@@ -471,6 +476,7 @@ function manualQaAllowedWorkspaceBase(workspaceRoot: string): string {
 }
 
 function assertManualQaNoSymlinkComponentsSync(root: string, candidate: string, label: string): void {
+  // 문자열상 root 내부여도 중간 심볼릭 링크가 외부를 가리킬 수 있으므로 존재하는 각 구성 요소를 직접 검사한다.
   if (!pathIsInsideOrEqual(root, candidate)) {
     throw new Error(`${label} escaped its workspace root.`);
   }
@@ -2059,6 +2065,7 @@ let projectLibraryInstance: ProjectLibrary | null = null;
 let generatedSmokeWorkspaceRoot: string | null = null;
 
 function closeProjectStorage(): void {
+  // 정상 종료와 smoke 강제 종료가 겹쳐도 저장소 close와 테스트 작업 공간 정리를 한 번의 멱등 경로로 모은다.
   projectLibraryInstance?.close();
   projectLibraryInstance = null;
   if (!generatedSmokeWorkspaceRoot) {
@@ -2104,6 +2111,7 @@ function isRecoveryProjectPayload(value: unknown): value is string {
 }
 
 async function assertManualQaPathSafety(filePath: string, existingFile: boolean): Promise<void> {
+  // 자동 QA가 사용자 파일에 닿지 않도록 허용된 작업 공간, 심볼릭 링크, 파일 종류를 쓰기 직전에 다시 확인한다.
   const configuration = manualQaConfiguration;
   if (!configuration) {
     return;
@@ -2328,7 +2336,7 @@ function createRendererCommandMenuItem(label: string, accelerator: string, comma
     id: `renderer-command-${command}`,
     label,
     accelerator,
-    // Renderer keydown handling owns focused-input guards; Electron only displays the shortcut here.
+    // 포커스된 입력 요소의 단축키 차단은 렌더러 keydown이 담당하고 Electron 메뉴는 단축키 표시와 전달만 맡는다.
     registerAccelerator: false,
     click: () => sendMenuCommand(command)
   };
@@ -2448,6 +2456,7 @@ function createNativeCommandMenu(): Menu {
 }
 
 function registerProjectFileHandlers(): void {
+  // preload가 전달한 unknown 값은 권한 있는 파일 API를 호출하기 전에 각 IPC 핸들러에서 다시 검증한다.
   const workspace = desktopProjectWorkspace();
 
   ipcMain.on(closeWindowChannel, (event) => {
@@ -2493,6 +2502,7 @@ function registerProjectFileHandlers(): void {
       closeFlowSmokeState.nativeSavePath = result.filePath;
       closeFlowSmokeState.events.push("native-save-started");
     }
+    // 선택된 경로에도 직접 덮어쓰지 않고 임시 파일+fsync+rename으로 완결된 JSON만 교체한다.
     await atomicWriteUtf8File(result.filePath, payload.contents, maxNativeProjectFileCharacters);
     if (isManualQa) {
       await assertManualQaPathSafety(result.filePath, true);
@@ -2539,6 +2549,7 @@ function registerProjectFileHandlers(): void {
     if (fileStats.size > maxNativeProjectFileBytes) {
       throw new Error(`GrooveForge project file exceeds the ${maxNativeProjectFileBytes.toLocaleString("en-US")} byte native read safety limit.`);
     }
+    // main은 크기 제한 뒤 텍스트만 반환하고, 프로젝트 스키마 해석은 도메인 검증을 가진 렌더러가 담당한다.
     const contents = await readFile(filePath, "utf8");
     return { canceled: false, filePath, contents };
   });
@@ -11100,6 +11111,7 @@ function installCloseFlowSmoke(win: BrowserWindow): void {
 const manualQaDownloadExtensions = new Set([".mid", ".midi", ".txt", ".wav", ".zip"]);
 
 function uniqueManualQaDownloadPath(item: DownloadItem, configuration: ManualQaConfiguration): string {
+  // 테스트 다운로드는 허용 확장자와 basename만 사용하고 기존 파일을 덮지 않는 고유 경로로 강제한다.
   const fileName = path.basename(item.getFilename());
   const extension = path.extname(fileName).toLowerCase();
   if (!fileName || fileName === "." || fileName === ".." || !manualQaDownloadExtensions.has(extension)) {
@@ -11159,6 +11171,7 @@ function installManualQaDownloadRouting(win: BrowserWindow): void {
       console.error(error);
       return;
     }
+    // 브라우저가 제안한 원래 경로를 무시하고 검증된 QA exports 디렉터리로만 저장한다.
     item.setSavePath(filePath);
     item.once("done", (_doneEvent, state) => {
       evidence.state = state;
@@ -11583,11 +11596,9 @@ async function selectManualQaNativeOption(win: BrowserWindow, testId: string, va
   }
   const interactionStartedAt = Date.now();
   await clickManualQaNativeTarget(win, testId);
-  // Electron 43 routes an open macOS native select popup outside webContents.
-  // Close that popup, then leave and re-enter the control through native Tab
-  // navigation. A unique printable type-ahead prefix changes the focused
-  // select without reopening AppKit's popup, producing trusted input/change
-  // events that React receives through the real user-input path.
+  // Electron 43의 macOS 네이티브 select 팝업은 webContents 밖에서 열린다. 팝업을 닫고 네이티브 Tab으로
+  // 컨트롤을 나갔다 다시 들어온 뒤, 고유한 인쇄 가능 type-ahead 접두사로 AppKit 팝업을 재개방하지 않고 값을 바꾼다.
+  // 이 방식은 React가 실제 사용자 입력 경로에서 받는 신뢰된 input/change 이벤트를 만든다.
   await sendManualQaNativeKey(win, "Escape", [], 140);
   await sendManualQaNativeKey(win, "Tab", [], 100);
   await sendManualQaNativeKey(win, "Tab", ["shift"], 140);
@@ -11611,8 +11622,7 @@ async function selectManualQaNativeOption(win: BrowserWindow, testId: string, va
   if (!uniquePrefix) {
     throw new Error(`${testId} option ${value} does not expose a unique native type-ahead prefix.`);
   }
-  // Blink keeps a select type-ahead buffer for roughly one second. Separate
-  // consecutive selections so the next prefix cannot be appended to the last.
+  // Blink는 select type-ahead 버퍼를 약 1초 유지하므로 연속 선택 사이를 띄워 다음 접두사가 이전 값에 붙지 않게 한다.
   await waitForManualQaDelay(1050);
   for (const character of uniquePrefix) {
     win.webContents.sendInputEvent({ type: "char", keyCode: character });
@@ -13369,6 +13379,7 @@ function createWindow(): void {
     paintWhenInitiallyHidden: true,
     show: isProjectIoSmoke || isManualQa,
     webPreferences: {
+      // 렌더러는 Node 권한을 받지 않으며 sandbox+contextIsolation 상태에서 preload의 좁은 API만 사용한다.
       preload: path.join(__dirname, "preload.cjs"),
       nodeIntegration: false,
       contextIsolation: true,
@@ -13404,6 +13415,7 @@ function createWindow(): void {
   }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
+    // 새 웹 콘텐츠 창은 만들지 않고 링크만 운영체제 기본 처리기로 넘겨 앱 권한을 가진 탐색 컨텍스트를 늘리지 않는다.
     void shell.openExternal(url);
     return { action: "deny" };
   });
@@ -13432,10 +13444,12 @@ function createWindow(): void {
     }
     const action = resolveUnsavedCloseAction(choice);
     if (action === "close-without-project-file") {
+      // Electron에서는 preventDefault가 beforeunload 차단을 무시하고 실제 닫기를 계속하라는 의미다.
       event.preventDefault();
       return;
     }
     if (action === "save-and-close") {
+      // 저장 성공 여부는 최신 프로젝트 스냅샷을 아는 렌더러가 판정하고 성공한 경우에만 close IPC를 다시 보낸다.
       win.webContents.send(menuCommandChannel, "save-project-and-close");
     }
   });
@@ -13450,6 +13464,7 @@ function createWindow(): void {
 if (ownsSingleInstanceLock) {
   if (!isDesktopSmoke) {
     app.on("second-instance", () => {
+      // 두 번째 실행은 새 상태를 만들지 않고 기존 창을 복원해 로컬 프로젝트 저장소의 단일 소유권을 유지한다.
       const existingWindow = BrowserWindow.getAllWindows()[0];
       if (!existingWindow) {
         if (app.isReady()) {
@@ -13466,6 +13481,7 @@ if (ownsSingleInstanceLock) {
   }
 
   void app.whenReady().then(async () => {
+    // QA 경로는 창 생성 전에 실경로/종류까지 검증해 로딩 직후 자동 동작이 허용 범위 밖에 쓰지 못하게 한다.
     if (manualQaConfiguration) {
       await ensureDesktopProjectWorkspace(desktopProjectWorkspace());
       assertManualQaWorkspaceTargetSync(
@@ -13494,11 +13510,13 @@ if (ownsSingleInstanceLock) {
 }
 
 app.on("window-all-closed", () => {
+  // macOS 일반 실행은 관례대로 메뉴바 프로세스를 유지하고, 자동 QA는 종료해 하네스가 결과 코드를 받을 수 있게 한다.
   if ((process.platform !== "darwin" || isManualQa) && !isCloseFlowSmoke) {
     app.quit();
   }
 });
 
 app.on("will-quit", () => {
+  // 마지막 창보다 프로세스 수명이 긴 macOS에서도 실제 앱 종료 시 WAL 체크포인트와 DB close를 보장한다.
   closeProjectStorage();
 });

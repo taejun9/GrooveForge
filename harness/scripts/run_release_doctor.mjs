@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 현재 릴리스 환경의 도구·산출물·비공개 입력·증거 상태를 모으는 로컬 진단 오케스트레이터다.
+ * 흐름: 개별 npm readiness 검사를 순차 실행하고 결과를 정규화해 blocker와 다음 명령을 build JSON·Markdown으로 기록한다.
+ * 개인정보/외부 경계: 로컬 검사·보고서 생성 부수효과는 있지만 비밀은 redaction하며 자동 설치·서명·업로드·환경 수정은 하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

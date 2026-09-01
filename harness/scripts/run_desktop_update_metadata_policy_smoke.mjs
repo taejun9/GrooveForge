@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 데스크톱 업데이트 metadata가 downgrade 방지·채널 격리·서명 요구 정책을 준수하는지 검사한다.
+ * 흐름: 정상/위반 fixture를 policy evaluator에 넣고 허용 판정, blocker, 진단 문구를 대조한다.
+ * 안전 경계: 모호한 버전·채널·서명 정보는 기본 거부하며 실제 업데이트 설치나 feed 변경은 수행하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

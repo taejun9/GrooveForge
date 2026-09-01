@@ -1,3 +1,8 @@
+/**
+ * 현재 프로젝트와 저장된 테이크의 구성·길이·준비도·스템·마스터 상태를 비교하는 순수 모델을 만든다.
+ * 각 스냅샷을 동일한 프로필 함수로 평가한 뒤 가장 약한 지표를 우선 점검 대상으로 선택한다.
+ * 저장본이 없거나 일부 지표가 부족할 때는 빈/경고 상태를 유지해 근거 없는 우열 판정을 만들지 않는다.
+ */
 import type { ProjectSnapshot, ProjectState } from "../domain/workstation";
 import { maxProjectSnapshots } from "../domain/workstation";
 import type {

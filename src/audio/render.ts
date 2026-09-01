@@ -1,3 +1,8 @@
+/**
+ * 편곡·패턴·믹서 상태를 결정적인 스테레오 PCM으로 오프라인 렌더링하고 WAV/미터 결과를 만든다.
+ * 실시간 AudioContext 경로와 독립적으로 같은 음악 규칙을 적용하며, 전체 믹스와 스템 분석은 메모리 상한에 따라
+ * 단일 패스 또는 버퍼 재사용 경로를 선택한다. 브라우저 다운로드는 명시적인 export 함수에서만 발생한다.
+ */
 import {
   arrangementBlockMutesTrack,
   arrangementEnergyGain,
@@ -33,6 +38,7 @@ import type { BassGlideProfile, BassVoiceProfile } from "./bassVoice";
 export const wavSampleRate = 44100;
 export const wavChannels = 2;
 export const wavBitDepth = 24;
+// WAV 형식 상수는 전달 문서·QA와 공유되며, 내부 합성 루프도 같은 샘플레이트/채널 수를 사용한다.
 const sampleRate = wavSampleRate;
 const channels = wavChannels;
 const renderNoiseSeedSalt = 0x47524647;
@@ -89,7 +95,7 @@ function stepDuration(project: ProjectState): number {
 }
 
 export function exportTailDurationSeconds(project: ProjectState): number {
-  // Six tempo-scaled steps cover the longest current event overhang; the floor keeps fast projects safe for Space feedback.
+  // 템포에 비례한 6스텝은 현재 가장 긴 음의 잔향을 덮고, 최소값은 빠른 프로젝트의 Space 피드백도 잘리지 않게 한다.
   return Math.max(minimumExportTailSeconds, stepDuration(project) * exportTailSteps);
 }
 
@@ -102,6 +108,7 @@ function hasSolo(project: ProjectState): boolean {
 function channelMix(project: ProjectState, id: TrackType, stemTarget?: StemTrackId): ChannelMix {
   const channel = project.mixer.find((track) => track.id === id);
   if (stemTarget && id !== stemTarget) {
+    // 스템 렌더에서는 대상 트랙 외 모든 채널을 0 gain으로 만들되 대상 트랙 자체의 믹서 처리는 유지한다.
     return { gain: 0, left: 0, right: 0, lowCut: 0, air: 0, drive: 0, glue: 0, send: 0 };
   }
   const soloActive = hasSolo(project);
@@ -110,6 +117,7 @@ function channelMix(project: ProjectState, id: TrackType, stemTarget?: StemTrack
   }
 
   const normalizedPan = Math.max(-1, Math.min(1, channel.pan / 100));
+  // 단순 선형 팬을 사용하며 중앙은 좌우 1, 양 끝은 반대 채널 0이다.
   return {
     gain: dbToGain(channel.volumeDb),
     left: normalizedPan <= 0 ? 1 : 1 - normalizedPan,
@@ -157,6 +165,8 @@ function channelHighpassHz(mix: ChannelMix): number {
 }
 
 function toneEqFactor(frequency: number, mix: ChannelMix): number {
+  // 오프라인 렌더의 저역 컷/air를 저비용 진폭 모델로 근사한다. 실시간 Biquad와 동일한 DSP 구현은 아니지만
+  // 사용자 컨트롤의 방향성과 안정적인 내보내기 결과를 유지하도록 값의 하한을 둔다.
   const highpassHz = channelHighpassHz(mix);
   const lowCutFactor = frequency < highpassHz ? Math.max(0.16, frequency / highpassHz) : 1;
   const airFactor = 1 + mix.air * (frequency > 700 ? 0.22 : frequency > 180 ? 0.08 : -0.04);
@@ -181,6 +191,7 @@ function channelGlueSample(sample: number, mix: ChannelMix): number {
   const sign = sample < 0 ? -1 : 1;
   const absolute = Math.abs(sample);
   const threshold = 0.22 - mix.glue * 0.08;
+  // 임계점 위의 초과분만 ratio로 줄이는 소프트한 정적 컴프레서 모델이다.
   const ratio = 1 + mix.glue * 5.2;
   const compressed = absolute <= threshold ? absolute : threshold + (absolute - threshold) / ratio;
   return sign * compressed * (1 + mix.glue * 0.1);
@@ -228,6 +239,8 @@ function addTone(
     const envelope = Math.exp(-decay * t / Math.max(0.01, duration));
     const startFrequency = tone.startFrequency ?? frequency;
     const glideDuration = Math.max(0, Math.min(duration, tone.glideDuration ?? 0));
+    // 글라이드 구간의 선형 주파수 변화는 위상을 적분한 이차식으로 계산한다.
+    // 구간 뒤에는 누적 위상을 이어 받아 경계에서 파형이 갑자기 뛰지 않게 한다.
     const phase = glideDuration > 0 && t < glideDuration
       ? 2 * Math.PI * (startFrequency * t + ((frequency - startFrequency) * t * t) / (2 * glideDuration))
       : 2 * Math.PI * (((startFrequency + frequency) * glideDuration) / 2 + frequency * (t - glideDuration));
@@ -257,6 +270,7 @@ function addToneWithSend(
   mirrorBuffer?: AudioChannels,
   mirrorSendBuffer?: AudioChannels
 ): void {
+  // dry와 send를 같은 이벤트 파라미터로 별도 버퍼에 합성한다. send 쪽은 더 긴 감쇠와 낮은 gain으로 공간감을 만든다.
   addTone(buffer, start, duration, frequency, mix, gainScale, shape, tone, mirrorBuffer);
   addTone(sendBuffer, start, duration * 1.08, frequency, spaceSendMix(mix), gainScale * 0.82, shape, {
     ...tone,
@@ -299,6 +313,7 @@ function addBassToneWithSend(
     mirrorSendBuffer
   );
   if (voice.detuneRatio) {
+    // Reese 계열은 미세하게 디튠한 두 번째 보이스를 좌우 비대칭으로 더해 폭을 만든다.
     const detunedMix = {
       ...mix,
       left: Math.max(0, Math.min(1, mix.left * 0.94)),
@@ -358,6 +373,7 @@ function addNoise(
   for (let index = 0; index < frames && startFrame + index < buffer[0].length; index += 1) {
     const t = index / sampleRate;
     const envelope = Math.exp((-6 - airBrightness * 5) * t / duration);
+    // 전역 비결정 난수 함수 대신 이벤트 seed를 사용해 같은 프로젝트의 WAV와 분석 결과가 매번 동일하게 재현되게 한다.
     const raw = seededNoiseSample(noiseSeed, index);
     const saturated = channelDriveSample(raw * airBrightness + previous * (1 - airBrightness), mix);
     const value = channelGlueSample(saturated * mix.gain * gainScale * envelope * channelGain, mix);
@@ -397,6 +413,8 @@ function addNoiseWithSend(
 }
 
 function applySpaceReturn(buffer: AudioChannels, sendBuffer: AudioChannels): void {
+  // 좌우 지연 시간을 다르게 하고 교차 피드백을 걸어 짧은 스테레오 공간계 효과를 만든다.
+  // sendBuffer 자체에 미래 피드백을 누적하므로 버퍼 끝에는 별도 export tail이 필요하다.
   const delayLeft = Math.floor(sampleRate * 0.17);
   const delayRight = Math.floor(sampleRate * 0.23);
   const feedback = 0.34;
@@ -424,7 +442,7 @@ function applySpaceReturn(buffer: AudioChannels, sendBuffer: AudioChannels): voi
 }
 
 function createRenderNoiseSeed(): RenderNoiseSeed {
-  // Event-local inputs keep an unchanged noise source stable across unrelated project and mixer edits.
+  // 이벤트 로컬 입력을 seed로 사용해 관련 없는 프로젝트·믹서 편집 전후에도 같은 노이즈 이벤트를 유지한다.
   let eventIndex = 0;
 
   return (start: number, duration: number, brightness: number) => {
@@ -445,6 +463,7 @@ function seededNoiseSample(seed: number, index: number): number {
 }
 
 function hashNumbers(...values: number[]): number {
+  // 작은 정수 입력을 32비트로 혼합한다. 암호학 용도가 아니라 결정적 노이즈 분포를 위한 해시다.
   let hash = 2166136261;
   for (const value of values) {
     hash ^= value >>> 0;
@@ -466,6 +485,7 @@ function synthShape(sound: SoundDesign): ToneShape {
 }
 
 function terminalFadeGain(frame: number, frameCount: number): number {
+  // 마지막 샘플을 정확히 0으로 보내 파일 경계의 불연속과 클릭을 막는다.
   const fadeFrames = Math.max(2, Math.floor(terminalFadeSeconds * sampleRate));
   const fadeStart = Math.max(0, frameCount - fadeFrames);
   if (frame < fadeStart) {
@@ -495,6 +515,7 @@ function finalizeRenderedBuffer(
       terminalFadeGain(index, buffer[0].length);
     for (let channel = 0; channel < channels; channel += 1) {
       const value = buffer[channel][index] * finalGain;
+      // 제한 전 초과 샘플 수를 세고, 실제 저장 PCM은 설정 ceiling 안으로 하드 클램프한다.
       if (Math.abs(value) > ceiling) {
         limitedSamples += 1;
       }
@@ -507,6 +528,7 @@ function finalizeRenderedBuffer(
   }
 
   const peakDb = amplitudeToDb(peak);
+  // RMS는 모든 프레임·채널의 제곱 평균 제곱근이다. LUFS나 true-peak 측정으로 해석하면 안 된다.
   const rmsDb = amplitudeToDb(Math.sqrt(squareSum / Math.max(1, totalSamples)));
   const headroomDb = Number.isFinite(peakDb) ? ceilingDb - peakDb : 99;
   const limitedPercent = (limitedSamples / Math.max(1, totalSamples)) * 100;
@@ -544,6 +566,8 @@ function renderProject(
   const buffer: AudioChannels = workspace?.buffer ?? [new Float32Array(frames), new Float32Array(frames)];
   const sendBuffer: AudioChannels = workspace?.sendBuffer ?? [new Float32Array(frames), new Float32Array(frames)];
   if (workspace) {
+    // bounded 분석 경로에서는 같은 네 Float32Array를 대상별로 비워 재사용한다.
+    // 프레임 수가 다르면 이전 프로젝트 버퍼를 오용한 것이므로 조용히 잘라 쓰지 않고 실패시킨다.
     for (const channel of [...buffer, ...sendBuffer]) {
       if (channel.length !== frames) {
         throw new RangeError("Project export analysis workspace frame count mismatch");
@@ -567,6 +591,7 @@ function renderProject(
   const nextNoiseSeed = createRenderNoiseSeed();
 
   for (let bar = 0; bar < bars; bar += 1) {
+    // 편곡 블록이 선택한 Pattern·에너지·뮤트 상태를 해당 마디의 모든 이벤트에 동일하게 적용한다.
     const barOffset = bar * 16;
     const arrangementBlock = arrangementBlockForBar(project, bar);
     const pattern = normalizedPatterns[arrangementBlock?.pattern ?? project.selectedPattern];
@@ -674,6 +699,7 @@ function renderProject(
       }
       const pitches = chordPitches(chord);
       for (const [voiceIndex, pitch] of pitches.entries()) {
+        // 코드 구성음을 -1..1 위치에 고르게 펼치고 chordWidth만큼 기존 채널 팬에서 확장한다.
         const spread = pitches.length <= 1 ? 0 : (voiceIndex / (pitches.length - 1)) * 2 - 1;
         const voiceMix = {
           ...chordMix,
@@ -712,9 +738,9 @@ type ProjectExportAnalyses = {
 export type ProjectExportAnalysisStrategy = "combined" | "bounded-sequential";
 
 /**
- * PCM working-set ceiling for project meter analysis. The current valid
- * 64-bar/60 BPM maximum needs 181,692,000 bytes in the bounded path, leaving
- * headroom below this cap while preventing the 908,460,000-byte combined path.
+ * 프로젝트 미터 분석의 PCM 작업 메모리 상한이다.
+ * 현재 허용 최대치인 64마디/60 BPM은 bounded 경로에서 181,692,000바이트가 필요하므로
+ * 이 상한 아래 여유를 남기면서 약 908,460,000바이트가 필요한 combined 경로는 차단한다.
  */
 export const projectExportAnalysisPeakByteCap = 192 * 1024 * 1024;
 
@@ -732,14 +758,14 @@ function analysisStrategyPeakBytes(project: ProjectState, strategy: ProjectExpor
   return projectExportAnalysisFrameCount(project) * Float32Array.BYTES_PER_ELEMENT * float32ArrayCount;
 }
 
-/** Returns the automatic analysis path without allocating any PCM buffers. */
+/** PCM 버퍼를 할당하지 않고 프로젝트 길이만으로 자동 분석 경로를 선택한다. */
 export function projectExportAnalysisStrategy(project: ProjectState): ProjectExportAnalysisStrategy {
   return analysisStrategyPeakBytes(project, "combined") <= projectExportAnalysisPeakByteCap
     ? "combined"
     : "bounded-sequential";
 }
 
-/** Returns the estimated concurrently reachable PCM bytes for the selected path. */
+/** 선택 경로에서 동시에 도달 가능한 PCM 버퍼의 예상 바이트 수를 반환한다. */
 export function estimatedPeakBytes(
   project: ProjectState,
   strategy: ProjectExportAnalysisStrategy = projectExportAnalysisStrategy(project)
@@ -754,11 +780,10 @@ type StemAnalysisTarget = {
 };
 
 /**
- * Computes the full-mix and four exact stem meters in one musical-event pass.
- * A track's full-mix contribution is identical to its stem contribution unless
- * mute/solo excludes it, so waveform samples can be mirrored without running
- * the oscillator/noise loop twice. Export/WAV render entry points intentionally
- * remain on the established single-target renderer below.
+ * 음악 이벤트를 한 번 순회해 전체 믹스와 네 스템의 정확한 미터를 함께 계산한다.
+ * mute/solo로 제외되지 않는 한 한 트랙이 전체 믹스에 더하는 샘플은 스템 샘플과 같으므로,
+ * 오실레이터·노이즈 루프를 두 번 실행하지 않고 mirror 버퍼로 복사한다.
+ * WAV 내보내기 진입점은 메모리 예측을 단순하게 유지하기 위해 기존 단일 대상 렌더러를 계속 사용한다.
  */
 function analyzeProjectExportsCombined(project: ProjectState): ProjectExportAnalyses {
   const bars = arrangementBarCount(project);
@@ -813,6 +838,7 @@ function analyzeProjectExportsCombined(project: ProjectState): ProjectExportAnal
     const synthMix = arrangementChannelMix(synthTarget.baseMix, arrangementBlock, "synth");
     const chordMix = arrangementChannelMix(chordTarget.baseMix, arrangementBlock, "chord");
     const mirrorFor = (track: StemTrackId): AudioChannels | undefined =>
+      // 전체 믹스에서 실제로 들리는 트랙만 mirror한다. 스템은 solo/mute와 무관하게 해당 트랙 자체를 보존한다.
       arrangementChannelMix(fullBaseMixes[track], arrangementBlock, track).gain > 0 ? mixBuffer : undefined;
     const mirrorSendFor = (track: StemTrackId): AudioChannels | undefined =>
       arrangementChannelMix(fullBaseMixes[track], arrangementBlock, track).gain > 0 ? mixSendBuffer : undefined;
@@ -1019,8 +1045,8 @@ function analyzeProjectExportTarget(
 ): ExportAnalysis {
   let rendered: RenderedAudio | null = renderProject(project, arrangementBarCount(project), stemTarget, workspace);
   const analysis = rendered.analysis;
-  // Keep only the scalar analysis; the same four PCM arrays are cleared and
-  // reused for the next target instead of retaining or reallocating its audio.
+  // 스칼라 분석값만 보존한다. 같은 네 PCM 배열은 다음 대상에서 비워 재사용하므로
+  // 오디오 참조를 유지하거나 대상마다 새로 할당하지 않는다.
   rendered = null;
   return analysis;
 }
@@ -1038,7 +1064,7 @@ function analyzeProjectExportsBounded(project: ProjectState): ProjectExportAnaly
 }
 
 type ProjectExportAnalysisOptions = {
-  /** A safe test/diagnostic override; callers cannot force the high-memory path. */
+  /** 테스트·진단에서 저메모리 경로만 강제할 수 있다. 호출자가 고메모리 경로를 강제하지는 못한다. */
   forceBoundedSequential?: boolean;
 };
 
@@ -1054,6 +1080,7 @@ function amplitudeToDb(value: number): number {
   if (value <= 0) {
     return Number.NEGATIVE_INFINITY;
   }
+  // PCM 값은 진폭 비이므로 전력비의 10이 아니라 20 log10을 사용한다.
   return 20 * Math.log10(value);
 }
 
@@ -1081,6 +1108,7 @@ function encodeWav(buffer: AudioChannels): Blob {
   const arrayBuffer = new ArrayBuffer(44 + dataSize);
   const view = new DataView(arrayBuffer);
   writeString(view, 0, "RIFF");
+  // RIFF/WAVE PCM 헤더의 모든 다중 바이트 수치는 little-endian으로 기록한다.
   view.setUint32(4, 36 + dataSize, true);
   writeString(view, 8, "WAVE");
   writeString(view, 12, "fmt ");
@@ -1098,6 +1126,7 @@ function encodeWav(buffer: AudioChannels): Blob {
   for (let frame = 0; frame < frameCount; frame += 1) {
     for (let channel = 0; channel < channels; channel += 1) {
       const sample = Math.max(-1, Math.min(1, buffer[channel][frame]));
+      // 부호 있는 24비트 PCM의 음수/양수 비대칭 범위를 사용하고 2의 보수 3바이트로 직렬화한다.
       const signed = Math.round(sample < 0 ? sample * 0x800000 : sample * 0x7fffff);
       const encoded = signed < 0 ? signed + 0x1000000 : signed;
       view.setUint8(offset, encoded & 0xff);
@@ -1144,6 +1173,7 @@ export function exportStems(project: ProjectState): string[] {
   const fileNames = stemWavFileNames(project);
   fileNames.forEach((fileName, index) => {
     const track = stemTrackIds[index];
+    // 파일명과 stemTrackIds의 고정 순서를 함께 사용해 각 다운로드가 올바른 트랙과 대응되게 한다.
     downloadWavBlob(createStemWavBlob(project, track), fileName);
   });
   return fileNames;

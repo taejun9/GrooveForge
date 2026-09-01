@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 비공개 환경 적용 명령이 지정한 release target에만 값을 반영하는지 검사한다.
+ * 흐름: 복수 대상 fixture에서 하나를 선택해 적용하고 선택/비선택 파일의 diff와 receipt를 대조한다.
+ * 안전 경계: 대상이 모호하거나 범위를 벗어난 변경이 생기면 실패하며 실제 운영 채널은 사용하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";

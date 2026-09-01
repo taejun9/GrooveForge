@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 비공개 환경 적용 proof가 성공·불일치·누출 사례를 올바르게 판정하는지 검사한다.
+ * 흐름: 격리 receipt와 설정 fixture를 proof 생성기에 넣고 해시, 상태, blocker, redaction을 대조한다.
+ * 개인정보 경계: fixture 비밀 원문 노출은 즉시 실패하며 실제 채널 설정이나 외부 서비스를 건드리지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";

@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 검증된 비공개 배포 환경 값을 release channel 설정에 제한적으로 적용하는 운영 명령이다.
+ * 흐름: 입력 파일·대상·승인 플래그를 사전 검증하고 허용 키만 적용한 뒤 redacted receipt와 다음 검증 명령을 남긴다.
+ * 개인정보/외부 경계: 비밀 원문은 출력하지 않고 preflight 실패 시 아무것도 적용하지 않으며 명시된 대상 밖의 상태를 변경하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

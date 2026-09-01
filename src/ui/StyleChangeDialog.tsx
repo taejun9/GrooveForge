@@ -1,3 +1,8 @@
+/**
+ * 스타일 변경 전에 BPM·스윙·사운드·패턴 차이를 보여 주고 적용 여부를 확인하는 모달이다.
+ * preview가 있을 때만 렌더링하며 적용/취소는 상위 상태를 변경하는 콜백으로 위임한다.
+ * 포커스 트랩, Escape, 배경 클릭을 한 취소 경로로 모아 키보드 사용자가 모달 뒤 UI를 조작하지 못하게 한다.
+ */
 import { Check, RefreshCcw, X } from "lucide-react";
 import { useRef, type ReactElement } from "react";
 import type { StyleChangePreview } from "./styleChangePreview";

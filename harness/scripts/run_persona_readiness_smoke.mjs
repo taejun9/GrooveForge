@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 초보 작곡가와 프로듀서 persona별 첫 실행·작업 흐름·완료 신호가 제품 계약을 충족하는지 검사한다.
+ * 흐름: domain fixture와 readiness 계산을 실행해 persona별 action, blocker, next check, handoff 결과를 비교한다.
+ * 안전 경계: 정적 로컬 데이터만 사용하고 사용자 분석·계정·원격 AI 호출은 하지 않으며 누락 신호는 실패로 모은다.
+ */
+
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";

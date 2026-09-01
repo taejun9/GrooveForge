@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 새 증거 이후 final handoff refresh가 상태·해시·다음 행동을 정확히 갱신하는지 검사한다.
+ * 흐름: 이전 handoff와 최신 proof fixture를 입력해 refresh 결과의 diff, 인용 신선도, 재현성을 대조한다.
+ * 안전 경계: 오래되거나 불일치한 proof는 완료로 반영하지 않으며 실제 handoff 전송이나 배포를 하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

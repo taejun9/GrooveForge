@@ -1,3 +1,8 @@
+/**
+ * App과 패널에서 공통으로 쓰는 편집·내보내기·포맷·퀵 액션 보조 함수 및 일부 재사용 UI를 제공한다.
+ * 도메인 프로젝트를 파생 모델과 다운로드 요청으로 연결하되, 실제 React 상태 소유권과 네이티브 파일 대화상자는 호출자에 둔다.
+ * 브라우저/데스크톱 런타임 차이와 비동기 작업 실패를 명시적인 결과로 돌려 상위 화면이 안전하게 안내할 수 있게 한다.
+ */
 import {
   ArrowDown,
   ArrowLeft,
@@ -11144,9 +11149,9 @@ export function createSnapshotCompareDeferredProjectProfile(
 }
 
 /**
- * Exact fallback for saved snapshot profiles and non-interactive callers.
- * App render paths inject the worker-owned exact analysis above so React
- * reconciliation never performs a multi-bar PCM render on the main thread.
+ * 저장 스냅샷 프로필과 비대화형 호출자를 위한 정확 분석 대체 경로다.
+ * App 렌더 경로는 위에서 Worker가 소유한 정확 분석을 주입하므로 React 재조정 중 메인 스레드에서
+ * 여러 마디 PCM 렌더를 실행하지 않는다.
  */
 export function createSnapshotCompareProjectProfile(project: ProjectState): SnapshotCompareProjectProfile {
   return createSnapshotCompareProjectProfileFromAnalysis(

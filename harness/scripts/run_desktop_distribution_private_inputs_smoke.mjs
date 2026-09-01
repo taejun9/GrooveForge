@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 데스크톱 배포에 필요한 비공개 URL·승인·서명 입력의 로딩과 redaction 계약을 검사한다.
+ * 흐름: 유효·누락·placeholder fixture를 파싱해 준비 상태와 공개 증거를 비교하고 원문 누출 여부를 감사한다.
+ * 개인정보 경계: 비밀 값은 출력·산출물에 남기지 않고 불완전한 입력은 실패 폐쇄하며 실제 외부 요청은 보내지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

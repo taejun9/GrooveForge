@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 작은 비공개 release 설정 편집 뒤 빠른 proof 경로가 핵심 변경과 redaction을 검증하는지 검사한다.
+ * 흐름: 격리 fixture에 제한된 편집을 적용하고 quick proof의 키 집합·해시·receipt·종료 코드를 비교한다.
+ * 개인정보 경계: 합성 값만 사용하고 빠른 검사가 비밀 원문이나 범위 밖 변경을 놓치면 실패한다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

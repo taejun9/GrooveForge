@@ -1,3 +1,8 @@
+/**
+ * 배포 환경변수에서 자동 업데이트 피드와 릴리스 채널을 읽고 안전하게 사용할 수 있는지 판정한다.
+ * 우선순위가 정해진 키 중 첫 값을 선택한 뒤 HTTPS·호스트·자격증명·채널 형식을 검증해 blocker 목록을 만든다.
+ * 진단 기록에는 실제 URL/채널 값을 제거한 구조만 제공해 배포 경로나 비밀이 로그에 남지 않게 한다.
+ */
 export const updateFeedUrlKeys = ["GROOVEFORGE_UPDATE_FEED_URL", "ELECTRON_UPDATE_FEED_URL", "UPDATE_FEED_URL"] as const;
 export const updateChannelKeys = ["GROOVEFORGE_UPDATE_CHANNEL", "ELECTRON_UPDATE_CHANNEL", "UPDATE_CHANNEL"] as const;
 
@@ -50,6 +55,7 @@ function validateFeedUrl(value: string): string[] {
   }
 
   const blockers: string[] = [];
+  // 자동 업데이트는 네트워크 신뢰 경계이므로 평문·내장 자격증명·fragment가 있는 주소를 준비 완료로 보지 않는다.
   if (parsed.protocol !== "https:") {
     blockers.push("Update feed URL must use HTTPS for release checks.");
   }
@@ -104,6 +110,7 @@ export function resolveUpdateFeedConfig(env: EnvLike = process.env): UpdateFeedC
 }
 
 export function redactUpdateFeedConfig(config: UpdateFeedConfig): RedactedUpdateFeedConfig {
+  // 구조 분해로 민감한 원문을 확실히 버리고 존재/유효성 같은 운영 진단 정보만 남긴다.
   const { feedUrl, releaseChannel, ...redacted } = config;
   void feedUrl;
   void releaseChannel;

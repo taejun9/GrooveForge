@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 완전한 비공개 환경 fixture가 허용 키만 적용하고 검증 가능한 receipt를 남기는 성공 경로를 검사한다.
+ * 흐름: 격리 대상에 적용 명령을 실행해 변경 집합·exit code·proof 연결·redaction을 확인하고 fixture를 정리한다.
+ * 개인정보 경계: 실제 자격 증명 대신 합성 값을 사용하며 허용 밖 변경이나 원문 누출은 실패로 처리한다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

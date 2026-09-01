@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: release channel 운영자가 채울 비공개 환경 템플릿을 안전한 placeholder와 설명으로 생성한다.
+ * 흐름: 허용 키 목록을 정렬해 예제 파일과 입력 안내를 쓰고 기존 실제 값이 섞이지 않았는지 검사한다.
+ * 개인정보 경계: 자격 증명을 생성·복사하지 않고 기존 파일 덮어쓰기는 명시적 조건에서만 허용하며 외부 요청은 하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

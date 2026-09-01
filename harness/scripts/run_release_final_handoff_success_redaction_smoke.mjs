@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 성공한 final handoff가 충분한 증거를 유지하면서 비공개 값과 로컬 경로를 제거하는지 검사한다.
+ * 흐름: 합성 비밀을 포함한 성공 fixture로 handoff를 만들고 필수 문구·해시와 금지 문자열 부재를 검증한다.
+ * 개인정보 경계: 비밀 또는 사용자 경로가 한 글자라도 남으면 실패하며 외부 수신자에게 문서를 전송하지 않는다.
+ */
+
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import path from "node:path";

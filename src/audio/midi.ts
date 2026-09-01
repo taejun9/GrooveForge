@@ -1,3 +1,8 @@
+/**
+ * 편곡된 음악 이벤트를 표준 MIDI 파일(Type 1) 바이트로 변환한다.
+ * 드럼·베이스·신스·코드를 별도 트랙에 기록하고 스윙, 미세 타이밍, 확률 게이트, 뮤트, 에너지를 반영하며,
+ * 파일 생성은 순수 계산으로 끝내고 사용자가 내보내기를 요청한 경우에만 다운로드 부작용을 일으킨다.
+ */
 import {
   arrangementBlockMutesTrack,
   arrangementEnergyGain,
@@ -25,7 +30,9 @@ import type { ArrangementBlock, ArrangementMuteTrack, DrumLane, ProjectState } f
 import { downloadBlob } from "../platform/downloads";
 
 const ticksPerQuarter = 480;
+// GrooveForge의 한 스텝은 16분음표이므로 4분음표 tick의 1/4을 사용한다.
 const ticksPerStep = ticksPerQuarter / 4;
+// General MIDI에서 채널 번호는 0부터 세므로 9가 일반적으로 쓰이는 10번 드럼 채널이다.
 const drumChannel = 9;
 
 type MidiTrackEvent = {
@@ -81,6 +88,7 @@ function midiVelocity(value: number): number {
 }
 
 function timingMsToTicks(project: ProjectState, timingMs: number): number {
+  // 프로젝트 BPM에 따라 같은 밀리초 오프셋이 차지하는 MIDI tick 수가 달라진다.
   const secondsPerTick = projectStepDurationSeconds(project) / ticksPerStep;
   return Math.round((timingMs / 1000) / secondsPerTick);
 }
@@ -90,11 +98,13 @@ function addNote(track: MidiTrack, tick: number, durationTicks: number, midiNote
   const end = Math.max(start + 1, Math.round(start + durationTicks));
   const note = clampMidiNote(midiNote);
   const channel = track.channel & 0x0f;
+  // 같은 tick에서 기존 음의 Note Off(order 0)가 새 Note On(order 1)보다 먼저 정렬되어 겹친 음이 붙지 않게 한다.
   track.events.push({ tick: start, order: 1, bytes: [0x90 + channel, note, midiVelocity(velocity)] });
   track.events.push({ tick: end, order: 0, bytes: [0x80 + channel, note, 0] });
 }
 
 function writeVarLength(value: number): number[] {
+  // MIDI delta time은 7비트 단위 가변 길이 값이며 마지막 바이트를 제외한 앞 바이트에 continuation bit를 세운다.
   let buffer = Math.max(0, Math.round(value)) & 0x7f;
   const bytes = [buffer];
   let remaining = Math.max(0, Math.round(value)) >> 7;
@@ -129,6 +139,7 @@ function metaTextEvent(text: string): number[] {
 }
 
 function encodeTrack(name: string, events: MidiTrackEvent[], endTick: number, program?: number, channel = 0): number[] {
+  // 절대 tick으로 수집한 이벤트를 정렬한 뒤 앞 이벤트와의 차이(delta time)로 변환한다.
   const ordered = [
     { tick: 0, order: -2, bytes: trackNameEvent(name) },
     ...(program === undefined ? [] : [{ tick: 0, order: -1, bytes: [0xc0 + (channel & 0x0f), program] }]),
@@ -147,6 +158,7 @@ function encodeTrack(name: string, events: MidiTrackEvent[], endTick: number, pr
 }
 
 function encodeTempoTrack(project: ProjectState, endTick: number): number[] {
+  // MIDI 템포 메타 이벤트는 4분음표당 마이크로초 단위다. 4/4 박자와 키는 별도 메타 이벤트로 남긴다.
   const tempo = Math.round(60_000_000 / projectBpm(project));
   const events: MidiTrackEvent[] = [
     { tick: 0, order: -1, bytes: [0xff, 0x51, 0x03, ...numberToBytes(tempo, 3)] },
@@ -176,6 +188,7 @@ export function createMidiFile(project: ProjectState): Uint8Array {
   };
 
   for (let bar = 0; bar < bars; bar += 1) {
+    // 각 마디가 속한 편곡 블록을 찾아 Pattern, 에너지, 트랙 뮤트를 그 마디의 모든 MIDI 이벤트에 적용한다.
     const block = arrangementBlockForBar(project, bar);
     const pattern = normalizedPatterns[block?.pattern ?? project.selectedPattern];
     const energy = block ? arrangementEnergyGain(block.energy) : 1;
@@ -196,6 +209,7 @@ export function createMidiFile(project: ProjectState): Uint8Array {
             projectSwingOffsetSteps(project, absoluteStep) * ticksPerStep +
             timingMsToTicks(project, drumStepTimingMs(pattern, lane, step));
           const velocity = drumStepVelocity(pattern, lane, step) * energy;
+          // 하이햇 롤은 한 스텝 안을 균등 분할하고 후속 타격을 낮춰 한 번의 강한 타격처럼 들리지 않게 한다.
           for (let repeat = 0; repeat < repeatCount; repeat += 1) {
             addNote(
               tracks.drums,
@@ -273,6 +287,7 @@ export function createMidiFile(project: ProjectState): Uint8Array {
     encodeTrack(tracks.chords.name, tracks.chords.events, totalTicks, tracks.chords.program, tracks.chords.channel)
   ];
   const header = [
+    // Type 1은 템포 트랙과 악기 트랙을 독립 청크로 유지해 DAW에서 편집하기 쉽다.
     ...stringBytes("MThd"),
     ...numberToBytes(6, 4),
     ...numberToBytes(1, 2),
@@ -292,6 +307,7 @@ export function exportMidi(project: ProjectState): string {
   new Uint8Array(payload).set(bytes);
   const blob = new Blob([payload], { type: "audio/midi" });
   const fileName = midiFileName(project);
+  // 생성과 다운로드를 분리해 테스트에서는 createMidiFile의 바이트만 검증할 수 있다.
   downloadBlob(blob, fileName);
   return fileName;
 }

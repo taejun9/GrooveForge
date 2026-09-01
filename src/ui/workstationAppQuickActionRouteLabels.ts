@@ -1,3 +1,8 @@
+/**
+ * 퀵 액션 결과가 이동할 작업 페이지·패널·검토 지점을 일관된 사용자 문구로 표현한다.
+ * 분석 카드와 변경 전후 상태를 받아 목적지를 설명할 뿐 프로젝트나 라우팅 상태를 직접 변경하지 않는다.
+ * 동작 그래프와 별도인 표시 계층으로 두어 같은 명령이 검색·최근·고정 UI에서 동일한 목적지를 말하게 한다.
+ */
 import type { MixerChannel, SoundDesign } from "../domain/workstation";
 import type {
   BeatPassportMetric,

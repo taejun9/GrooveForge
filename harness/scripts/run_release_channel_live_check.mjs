@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 명시된 release channel URL과 지원 endpoint의 실제 접근성·응답 계약을 확인하는 운영 live check다.
+ * 흐름: 로컬 비공개 환경을 사전 검증하고 제한된 HTTP 요청을 보내 상태·redirect·content type을 증거로 기록한다.
+ * 개인정보/외부 경계: 승인 플래그와 유효 URL이 없으면 요청하지 않고 자격 증명을 로그에 남기지 않으며 읽기 요청만 수행한다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

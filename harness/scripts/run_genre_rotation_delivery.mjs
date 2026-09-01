@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 16개 장르 스타일을 순환해 원본 beat WAV·MIDI·전달 metadata와 SoundCloud 준비 증거를 생성한다.
+ * 흐름: 각 style profile로 프로젝트를 렌더링하고 PCM·길이·peak·구간·해시를 검증한 뒤 장르별 bundle과 보고서를 조립한다.
+ * 안전 경계: 사용자 지정 출력 경로를 거부하고 로컬 합성물만 만들며 샘플 다운로드·저작물 수집·SoundCloud 업로드는 수행하지 않는다.
+ */
+
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -17,6 +23,7 @@ const outputRoot = defaultOutputRoot;
 const failures = [];
 
 if (process.argv.length > 2) {
+  // 임의 경로 삭제·덮어쓰기를 막기 위해 생성 위치는 version/platform별 build 산출물로 고정한다.
   throw new Error("genre rotation delivery does not accept a custom output path; copy the verified build artifact after generation");
 }
 
@@ -174,6 +181,7 @@ ${table}
 `;
 }
 
+// 이전 회전 결과 정리는 위에서 고정한 전용 outputRoot에만 적용되며 사용자 프로젝트에는 닿지 않는다.
 await rm(outputRoot, { recursive: true, force: true });
 await mkdir(outputRoot, { recursive: true });
 
@@ -200,6 +208,8 @@ for (const [index, styleId] of rotationStyleIds.entries()) {
   const styleRoot = path.join(outputRoot, directoryName);
   await mkdir(styleRoot, { recursive: true });
 
+  // 각 장르는 serialize/reopen을 거친 프로젝트에서 두 번 오프라인 렌더한다. UI 임시 상태나
+  // 비결정적 합성 결과가 delivery 파일에 스며들면 해시 일치 검사에서 실패한다.
   const projectContents = workstation.serializeProjectFile(project);
   const reopenedProject = workstation.parseProjectFile(projectContents);
   const analysis = render.analyzeExport(reopenedProject);
@@ -285,6 +295,7 @@ await writeArtifact(artifacts, path.join(outputRoot, "00-README.md"), readmeByte
 manifest.artifactCount = finalArtifactCount;
 const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 await writeArtifact(artifacts, path.join(outputRoot, "manifest.json"), manifestBytes);
+// checksum 파일 자신은 순환 참조를 피하려고 목록에서 제외하고, 그 직전까지 기록한 모든 전달 artifact를 포함한다.
 const checksumContents = `${artifacts.map((artifact) => `${artifact.sha256}  ${artifact.path}`).join("\n")}\n`;
 await writeFile(path.join(outputRoot, "checksums.sha256"), checksumContents, "utf8");
 

@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 올바른 update feed 편집이 post-edit proof 성공으로 이어지는 대표 경로를 검사한다.
+ * 흐름: 격리 설정을 편집하고 proof 생성기를 실행해 변경 필드·digest·receipt·next check를 대조한다.
+ * 안전 경계: 합성 loopback 값만 사용하며 범위 밖 변경이나 민감 값 누출은 실패로 처리하고 외부 요청은 하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";

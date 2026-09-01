@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 데스크톱 자동 업데이트에 필요한 feed URL, 앱 식별자, 서명·배포 입력이 준비됐는지 정적 smoke로 확인한다.
+ * 흐름: package 설정과 로컬 배포 환경을 읽고 업데이트 계약을 계산한 뒤 격리된 fixture의 성공·차단 사례를 검증한다.
+ * 개인정보 경계: 비공개 환경 값은 마스킹된 상태만 증거화하며, 실제 feed 게시나 네트워크 업데이트는 수행하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

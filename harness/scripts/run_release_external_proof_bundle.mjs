@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 외부 release check의 redacted 응답·해시·receipt를 하나의 검증 가능한 proof bundle로 조립한다.
+ * 흐름: 사전 검증된 증거 파일을 읽어 매니페스트와 요약을 만들고 파일 해시·누락·신선도를 재검사한다.
+ * 개인정보 경계: 비밀과 과도한 응답 본문은 제외하며 로컬 증거만 묶고 외부 업로드나 상태 변경은 하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";

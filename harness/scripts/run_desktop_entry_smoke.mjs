@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: Electron main/preload/renderer 진입 파일과 패키지 설정이 production 데스크톱 실행 계약에 맞는지 정적으로 검사한다.
+ * 흐름: 빌드 산출물과 package metadata를 읽고 import·보안 옵션·smoke hook·필수 문자열을 상호 대조한다.
+ * 안전 경계: 하나라도 누락되면 실패 목록을 반환하며 앱 실행·서명·네트워크 연결 없이 읽기 전용으로 동작한다.
+ */
+
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

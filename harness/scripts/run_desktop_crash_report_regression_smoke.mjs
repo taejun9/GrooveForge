@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 패키지 앱의 crash/launch 실패 보고가 민감정보 없이 충분한 진단과 종료 상태를 남기는지 회귀 검사한다.
+ * 흐름: 통제된 실패 fixture를 실행하고 생성된 보고서·stderr·종료 코드를 읽어 필수 필드와 redaction을 검증한다.
+ * 개인정보 경계: 홈 경로·토큰·환경 비밀 유출을 실패로 처리하며, 실제 사용자 crash 보고를 전송하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

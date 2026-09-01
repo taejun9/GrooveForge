@@ -737,6 +737,7 @@ Validation:
 ```sh
 python3 harness/scripts/run_qa.py
 python3 harness/scripts/run_quality_gate.py
+npm run comments:ko:check
 npm run renderer:smoke
 npm run workflow:smoke
 npm run persona:smoke

@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 비공개 환경 적용 명령이 명시적 input file을 안전하게 읽고 기본 환경과 구분하는지 검사한다.
+ * 흐름: 유효·누락·권한 오류 fixture로 적용 명령을 실행해 대상 선택, receipt, redaction, 종료 코드를 검증한다.
+ * 개인정보 경계: fixture 비밀이 로그에 나타나면 실패하며 실제 배포 채널이나 운영 환경은 변경하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";

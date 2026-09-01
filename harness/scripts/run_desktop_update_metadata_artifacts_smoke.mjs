@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 업데이트 metadata 산출물의 버전·파일 URL·크기·해시가 release manifest와 일치하는지 검사한다.
+ * 흐름: 격리 fixture에서 metadata 파일을 생성해 스키마와 정렬, artifact 참조, 재현 가능한 내용을 검증한다.
+ * 안전 경계: 불완전한 값은 게시 가능으로 간주하지 않으며 외부 feed나 저장소에는 아무것도 업로드하지 않는다.
+ */
+
 import { createHash } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";

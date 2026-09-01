@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 로컬 데스크톱 앱을 ad-hoc 서명한 뒤 번들 의존성·서명 상태·실행 가능성을 회귀 검사한다.
+ * 흐름: 기존 패키지를 확인하고 codesign 및 번들 의존성 진단을 순서대로 실행한 뒤 예상 증거를 비교한다.
+ * 안전 경계: 지정된 빌드 앱만 대상으로 하며, Developer ID·notary·배포 서비스는 사용하지 않고 GUI 제한 환경에서는 실행을 차단한다.
+ */
+
 import { spawn } from "node:child_process";
 import { constants, existsSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";

@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 실제 Electron 앱 화면에서 여러 장르 프로젝트를 순차 검수하고 90~150초 SoundCloud 전달용 WAV·보고서를 조립한다.
+ * 흐름: 장르별 fixture를 준비해 visible UI QA를 실행하고 PCM24·길이·peak·스크린샷·재열기 증거를 검증한 뒤 전달 묶음을 만든다.
+ * 안전 경계: 생성 음원은 로컬 원본 합성만 사용하고 외부 업로드는 하지 않으며, 경로·해시·신호 검증 실패 시 패키징을 중단한다.
+ */
+
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
@@ -259,6 +265,8 @@ function defaultOutputRoot() {
 }
 
 function assertPlanOutputRoot(outputRoot) {
+  // 정리·조립이 닿는 범위를 plan 전용 build/desktop 하위로 고정한다. 절대 경로를 받더라도
+  // 저장소나 홈 디렉터리를 산출물 root로 사용할 수 없다.
   check(path.isAbsolute(outputRoot), "Multi-genre output root must be absolute.");
   check(isInside(desktopBuildRoot, outputRoot), `Output root must remain below ${desktopBuildRoot}.`);
   check(path.basename(outputRoot).startsWith("plan-1528-"), "Output root basename must start with plan-1528-.");
@@ -433,6 +441,8 @@ async function prepareOutput(outputRoot) {
   await assertNoSymlinkComponents(desktopBuildRoot, outputRoot);
   check(!(await lstatOrNull(outputRoot)), `Output root already exists; choose a fresh plan-owned root: ${outputRoot}`);
   await mkdir(outputRoot, { recursive: true, mode: 0o700 });
+  // 새 디렉터리만 허용하고 ownership sentinel을 먼저 기록한다. --from-existing 경로는 이 sentinel과
+  // 결정론적 input 해시가 모두 일치해야만 이후 실제 앱 증거 감사에 들어갈 수 있다.
   const sentinel = {
     owner: ownerMarker,
     outputRoot,
@@ -534,6 +544,8 @@ async function runActualAppSequence(outputRoot, skipBuild) {
     const build = await runCommand(npmCommand(), ["run", "build"]);
     check(build.code === 0 && build.signal === null, `npm run build failed (${build.code ?? "no code"}/${build.signal ?? "no signal"}).`);
   }
+  // 장르별 workspace를 분리해 순차 실행한다. 하나의 Electron 프로세스나 userData가 다음 장르에
+  // 상태를 누출하지 않게 하면서, 가능한 모든 장르의 종료 결과를 모은 뒤 한 번에 실패한다.
   const failures = [];
   for (const config of genreCases) {
     const workspaceRoot = workspacePath(outputRoot, config);
@@ -712,6 +724,8 @@ async function auditScreenshot(zoneEvidence, expectedPath, zone) {
 async function auditGenre(outputRoot, config) {
   const workspaceRoot = workspacePath(outputRoot, config);
   await assertNoSymlinkComponents(outputRoot, workspaceRoot);
+  // 앱이 작성한 보고서만 신뢰하지 않고 원본·복사본·저장본을 각각 제한 크기로 다시 읽어 해시와
+  // 보존된 음악 core를 독립 비교한다.
   const reportPath = path.join(workspaceRoot, "evidence", "auto-movement-qa-report.json");
   const reportBytes = await readRegularFile(reportPath, 8 * 1024 * 1024);
   const report = JSON.parse(reportBytes.toString("utf8"));
@@ -804,6 +818,8 @@ async function auditGenre(outputRoot, config) {
   );
   const wavBytes = await readRegularFile(wavPath, maximumSoundCloudBytes);
   check(report.wav.bytes === wavBytes.byteLength && report.wav.sha256 === sha256(wavBytes), `${config.id}: report WAV bytes/hash mismatch.`);
+  // export 영수증과 별개로 실제 PCM을 다시 해독해 형식·길이·무음·ceiling·tail·click 위험을 검증한다.
+  // 같은 저장 프로젝트의 즉시 재렌더까지 byte 단위로 일치해야 delivery 후보가 된다.
   const decoded = decodeCanonicalPcm24Wav(wavBytes);
   const tail = musicalBoundaryTailEvidence(wavBytes, config);
   const durationTolerance = 1 / expectedWav.sampleRate + Number.EPSILON;
@@ -842,6 +858,7 @@ async function auditGenre(outputRoot, config) {
 }
 
 function sanitizeForDelivery(value, outputRoot) {
+  // 내부 원본 보고서는 그대로 보존하되, 전달본에서는 실행 root와 저장소 절대 경로를 안정된 토큰으로 치환한다.
   if (Array.isArray(value)) return value.map((entry) => sanitizeForDelivery(entry, outputRoot));
   if (value && typeof value === "object") {
     return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, sanitizeForDelivery(entry, outputRoot)]));
@@ -861,6 +878,7 @@ const forbiddenLocalPathPatterns = [
 ];
 
 function assertDeliveryTextPrivacy(contents, label) {
+  // 알려진 두 root 치환만으로 충분하다고 가정하지 않고, 다른 사용자 홈·임시 경로와 private key 표식도 차단한다.
   for (const pattern of forbiddenLocalPathPatterns) {
     check(!pattern.test(contents), `${label} retained a local absolute path matching ${pattern}.`);
   }
@@ -933,6 +951,7 @@ async function collectFiles(directory) {
 
 async function assembleDelivery(outputRoot, audits) {
   const deliveryRoot = path.join(outputRoot, "delivery");
+  // 기존 delivery를 덮어쓰지 않으며, 원본과 복사본의 해시를 즉시 비교한 뒤 공개용 보고서만 sanitize한다.
   check(!(await lstatOrNull(deliveryRoot)), `Delivery root already exists: ${deliveryRoot}`);
   await mkdir(deliveryRoot, { recursive: true, mode: 0o700 });
   const manifestRows = [];
@@ -1235,6 +1254,8 @@ async function main() {
     printPreparedCommands(outputRoot);
     return;
   }
+  // --from-existing은 실제 앱을 다시 실행하지 않고 이미 준비된 증거를 재감사한다. 정상 경로에서만
+  // build와 여섯 번의 visible native QA를 수행하며, 어떤 경로도 SoundCloud 외부 작업을 호출하지 않는다.
   if (!args.fromExisting) await runActualAppSequence(outputRoot, args.skipBuild);
   const audits = [];
   for (const config of genreCases) {

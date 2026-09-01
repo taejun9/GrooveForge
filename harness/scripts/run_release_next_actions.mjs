@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 현재 릴리스 상태에서 실행해야 할 다음 행동을 blocker 우선순위와 의존 관계에 따라 계산한다.
+ * 흐름: readiness·progress·proof를 읽어 중복을 제거한 명령 목록과 이유, 완료 조건을 출력한다.
+ * 안전 경계: 추천 행동 자체는 실행하지 않지만 로컬 진단 child check를 실행하고 build 보고서를 기록하며, 증거가 모호하면 안전한 검증 단계를 먼저 제시한다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

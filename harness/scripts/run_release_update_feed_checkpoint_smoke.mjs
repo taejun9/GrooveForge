@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 자동 업데이트 feed checkpoint가 metadata·artifact·서명·live proof를 모두 갖춘 경우에만 완료되는지 검사한다.
+ * 흐름: 준비/차단 fixture의 checkpoint 요약을 생성해 상태, blocker, 해시, 후속 명령을 대조한다.
+ * 안전 경계: 부분 증거는 완료로 승격하지 않으며 실제 feed 게시나 네트워크 쓰기 요청은 수행하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";

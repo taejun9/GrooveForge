@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 로컬 데스크톱 전달 패키지를 ZIP으로 보관했을 때 구조·권한·해시가 보존되는지 검사한다.
+ * 흐름: 검증된 전달 디렉터리를 압축하고 다시 목록화·해제해 앱 번들과 매니페스트의 일치를 확인한다.
+ * 안전 경계: 지정 build 경로와 임시 해제 경로만 사용하며 외부 전송이나 운영 배포물을 덮어쓰지 않는다.
+ */
+
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";

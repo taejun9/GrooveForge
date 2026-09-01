@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 데스크톱 배포 완료 상태 요약이 준비·차단·완료 증거를 올바른 우선순위로 표시하는지 검사한다.
+ * 흐름: 여러 상태 fixture를 생성해 요약 스크립트를 실행하고 상태 코드, 설명, 다음 행동의 계약을 대조한다.
+ * 안전 경계: 모호하거나 불완전한 입력은 실패/차단 상태로 유지하며 외부 배포 시스템에는 쓰기 작업을 하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

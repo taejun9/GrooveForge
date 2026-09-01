@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 공증·staple된 앱/DMG가 macOS Gatekeeper 평가를 통과하는지 최종 로컬 계약으로 확인한다.
+ * 흐름: ticket과 서명 상태를 검사하고 spctl 평가 결과, 번들 ID, 해시를 매니페스트와 비교한다.
+ * 안전 경계: 공증 증거가 없거나 평가가 모호하면 실패하며 시스템 보안 정책이나 운영 배포 상태는 변경하지 않는다.
+ */
+
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";

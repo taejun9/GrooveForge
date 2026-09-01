@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Build the Korean GrooveForge user guide and project portfolio PDFs."""
+"""GrooveForge 한국어 사용자 안내서와 프로젝트 포트폴리오 PDF를 만든다.
+
+로컬 문서·이미지를 읽어 페이지 구성 요소를 조립하고 PDF를 렌더링한 뒤 필수 페이지와 산출 경로를 확인한다.
+필수 자산이 없거나 레이아웃 입력이 유효하지 않으면 실패하며, 네트워크 전송 없이 지정된 빌드 디렉터리에만 결과를 쓴다.
+"""
 
 from __future__ import annotations
 

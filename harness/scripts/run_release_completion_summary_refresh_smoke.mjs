@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 새로운 릴리스 증거가 들어온 뒤 completion summary refresh가 상태와 인용을 최신화하는지 검사한다.
+ * 흐름: 오래된 fixture에 새 proof를 추가해 refresh 명령을 실행하고 변경된 상태·timestamp·blocker를 비교한다.
+ * 안전 경계: 신선도 기준을 만족하지 못한 증거는 반영하지 않으며 외부 release 상태를 자동 갱신하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

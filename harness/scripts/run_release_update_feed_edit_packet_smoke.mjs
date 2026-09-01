@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: update feed 설정을 사람이 편집할 packet이 정확한 대상·placeholder·검증 절차를 제공하는지 검사한다.
+ * 흐름: 로컬 fixture에서 packet을 생성해 metadata 경로, URL 키, diff 범위, post-edit proof 명령을 검증한다.
+ * 개인정보 경계: 운영 URL·비밀 원문을 포함하지 않고 편집을 자동 실행하거나 feed를 게시하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";

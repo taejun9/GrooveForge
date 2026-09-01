@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: release channel의 비공개 입력 준비부터 적용·proof까지 운영자가 순서대로 진행하도록 안내하는 wizard다.
+ * 흐름: 현재 readiness를 읽고 필요한 단계만 선택해 명령/입력 파일을 검증하며 각 단계 receipt와 다음 행동을 갱신한다.
+ * 개인정보/외부 경계: 비밀은 화면에 재출력하지 않고 사전 검증 실패 시 적용하지 않으며 외부 요청은 명시적 live 단계로 제한한다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

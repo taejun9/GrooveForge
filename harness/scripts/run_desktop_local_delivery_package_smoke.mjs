@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 로컬 전달용 데스크톱 패키지가 앱·문서·매니페스트·해시를 완전하게 포함하는지 검사한다.
+ * 흐름: 현재 빌드에서 전달 디렉터리를 조립하고 파일 목록과 소유권 표시를 재검증해 보고서를 남긴다.
+ * 안전 경계: 로컬 build 산출물만 생성하며 서명·공증·원격 업로드나 사용자 다운로드 폴더 변경은 하지 않는다.
+ */
+
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";

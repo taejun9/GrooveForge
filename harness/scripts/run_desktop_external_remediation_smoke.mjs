@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 외부 배포 차단 사유별 remediation 안내가 실행 가능한 명령과 재검증 절차를 제공하는지 검사한다.
+ * 흐름: 대표 blocker fixture를 생성하고 remediation 결과의 우선순위·명령·증거 갱신 경로를 비교한다.
+ * 안전 경계: 안내만 검증하고 수정 명령을 자동 실행하지 않으며 비밀·계정 값은 출력하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

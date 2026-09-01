@@ -1,3 +1,8 @@
+/**
+ * 로컬 SQLite에 최신 복구 초안과 파일로 저장한 프로젝트 기록을 보관하는 영속성 계층이다.
+ * 데이터베이스 소유권·스키마·무결성을 시작 시 확인하고 쓰기는 즉시 트랜잭션과 재조회 검증을 거친다.
+ * WAL 체크포인트와 명시적 close를 통해 종료 순서를 관리하며, 다른 앱/버전의 DB는 수정하지 않고 즉시 거부한다.
+ */
 import { randomUUID } from "node:crypto";
 import { chmodSync, closeSync, openSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
@@ -35,6 +40,7 @@ export class ProjectLibrary {
   #closed = false;
 
   constructor(databasePath: string) {
+    // 새 파일은 처음부터 소유자 전용으로 만들고, 이미 있으면 덮어쓰지 않은 채 SQLite가 검증하도록 넘긴다.
     let createdDatabaseFile = false;
     try {
       const descriptor = openSync(databasePath, "wx", 0o600);
@@ -172,6 +178,7 @@ export class ProjectLibrary {
   }
 
   #initialize(): void {
+    // application_id와 user_version을 함께 검사해 우연히 같은 경로에 있는 타 DB를 마이그레이션하지 않는다.
     const currentVersion = this.schemaVersion;
     if (currentVersion !== 0 && currentVersion !== projectLibrarySchemaVersion) {
       throw new Error(`Unsupported GrooveForge SQLite schema version: ${currentVersion}.`);
@@ -252,6 +259,7 @@ export class ProjectLibrary {
   }
 
   #transaction(operation: () => void): void {
+    // BEGIN IMMEDIATE로 경쟁 쓰기를 초기에 직렬화하고 어느 예외에서도 전체 변경을 롤백한다.
     this.#database.exec("BEGIN IMMEDIATE");
     try {
       operation();

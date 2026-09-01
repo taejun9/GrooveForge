@@ -1,3 +1,8 @@
+/**
+ * 베이스/멜로디 피아노롤의 키보드 진입 셀과 2차원 이동 대상을 계산한다.
+ * 렌더된 음높이 목록을 기준으로 현재 선택을 보정하며, 실제 선택 상태와 DOM 포커스 반영은 호출자에게 맡긴다.
+ * 빈 음역이나 가장자리에서도 유효한 셀만 반환해 접근성 포커스가 그리드 밖으로 새지 않게 한다.
+ */
 import { steps, type NoteTrack } from "../domain/workstation";
 import type { SelectedNote } from "./workstationUiModel";
 
@@ -20,6 +25,7 @@ export function noteGridEntryCell(
   renderedPitches: string[],
   selectedNote: SelectedNote | null
 ): SelectedNote {
+  // 같은 트랙에서 아직 화면에 보이는 선택만 재사용하고, 그렇지 않으면 첫 셀로 안전하게 진입한다.
   if (selectedNote?.track === track && renderedPitches.includes(selectedNote.pitch)) {
     return selectedNote;
   }

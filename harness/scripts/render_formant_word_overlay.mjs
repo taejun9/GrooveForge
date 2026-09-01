@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 
 /**
+ * 역할: 정규 PCM24 반주 위에 결정론적 비인간 포먼트 단어 레이어를 렌더링해 믹스·보컬 stem과 보고서를 만든다.
+ * 흐름: 엄격한 JSON 사양과 WAV 형식을 검증하고 고정 시드로 이벤트를 합성한 뒤 peak·길이·해시를 재검사한다.
+ * 안전 경계: 사양 밖 필드나 경로 충돌은 즉시 거부하며, 사람 음성·원격 AI·외부 업로드 없이 로컬 파일만 생성한다.
+ */
+
+/**
  * Render a deterministic, non-human formant word layer over one canonical
  * GrooveForge PCM24 WAV.
  *
@@ -432,6 +438,8 @@ async function assertRegularNonSymlink(filePath, label, maxBytes = MAX_INPUT_BYT
 }
 
 async function readBoundedCanonicalPcm24(filePath, label) {
+  // lstat 뒤 같은 file handle에서 크기를 다시 확인하고 제한 크기만 chunk로 읽는다. 경로 교체나
+  // 읽는 도중 파일 성장으로 대용량 할당·부분 입력이 승인되는 TOCTOU 경로를 차단한다.
   const pathStats = await assertRegularNonSymlink(filePath, label, MAX_INPUT_BYTES);
   assertBoundedInputByteLength(pathStats.size, label);
   const handle = await open(filePath, "r");
@@ -476,6 +484,7 @@ async function assertOutputPath(filePath, label) {
 }
 
 function parseSpec(value) {
+  // exact-key schema로 알 수 없는 작업 지시를 거부하고, 입력과 세 출력 경로가 겹쳐 원본을 덮는 경우도 차단한다.
   assertExactKeys(value, [
     "schemaVersion", "instrumentalPath", "outputMixPath", "outputVocalPath", "reportPath", "word", "bpm",
     "targetPeakDbfs", "ditherSeed", "events"
@@ -510,6 +519,7 @@ function eventStartFrame(event, bpm) {
 }
 
 async function writeNew(filePath, bytes) {
+  // 모든 렌더·postflight·QA가 끝난 뒤에도 wx로 생성해 동시 실행이나 기존 사용자 파일을 덮어쓰지 않는다.
   const handle = await open(filePath, "wx", 0o600);
   try {
     await handle.writeFile(bytes);
@@ -667,6 +677,7 @@ async function main() {
   check(vocalAnalysis.rmsDbfs > -80, "vocal: stem is unexpectedly silent");
   check(Object.values(formantChecks).every((value) => Number.isFinite(value) && value > 0), "formant: expected spectral bands are absent");
 
+  // 출력 직전 원본을 다시 읽어 렌더 중 교체·변경이 없었음을 확인한다. 이 검사가 실패하면 어떤 출력도 쓰지 않는다.
   const sourceFinalBytes = (await readBoundedCanonicalPcm24(spec.instrumentalPath, "Instrumental WAV postflight")).bytes;
   const sourceFinalSha256 = sha256(sourceFinalBytes);
   check(sourceFinalSha256 === instrumentalSha256 && sourceFinalBytes.equals(instrumentalBytes), "instrumental source changed during render");
@@ -729,6 +740,7 @@ async function main() {
     }
   };
 
+  // 자동 스펙트럼 검사는 발음 인식이나 사람의 청취 승인을 대신하지 않으며, 보고서에도 그 한계를 명시한다.
   await writeNew(spec.outputMixPath, mixBytes);
   await writeNew(spec.outputVocalPath, vocalBytes);
   await writeNew(spec.reportPath, Buffer.from(`${JSON.stringify(report, null, 2)}\n`, "utf8"));
