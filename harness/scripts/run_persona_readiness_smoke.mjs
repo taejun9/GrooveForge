@@ -978,7 +978,7 @@ const renderedSignalRows = [
     "First Beat Path",
     "Beat Spine",
     "Composer Guide",
-    "Workflow navigator",
+    "MAIN TABS",
     "Guided Focus",
     "Guided Session Pass"
   ]),

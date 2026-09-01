@@ -4,7 +4,7 @@
  * 단일 인스턴스, 창 닫기 확인, 격리된 BrowserWindow, 테스트 전용 경로/다운로드 제한과 종료 시 저장소 정리가 핵심 수명주기·보안 경계다.
  */
 import { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
-import type { DownloadItem, MenuItemConstructorOptions, OpenDialogOptions, SaveDialogOptions, Session } from "electron";
+import type { DownloadItem, MenuItemConstructorOptions, Session } from "electron";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -13,13 +13,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ProjectLibrary } from "./projectLibrary.js";
 import {
+  createNativeOpenProjectDialogOptions,
+  createNativeSaveProjectDialogOptions,
+  createNativeUnsavedCloseDialogOptions,
+  type NativeDialogLocale
+} from "./nativeDialogOptions.js";
+import {
   atomicWriteUtf8File,
   ensureProjectWorkspace,
   resolveProjectWorkspacePaths,
   type ProjectWorkspacePaths
 } from "./projectWorkspace.js";
 import {
-  keepEditingChoiceId,
   resolveUnsavedCloseAction,
   saveAndCloseChoiceId
 } from "./unsavedCloseDialog.js";
@@ -29,8 +34,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
 const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
 const menuCommandChannel = "grooveforge:menu-command";
+const localeChannel = "grooveforge:set-locale";
 const closeWindowChannel = "grooveforge:close-window";
 const isLaunchSmoke = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1";
+let allowLaunchSmokeRendererReload = false;
 const isProjectIoSmoke = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE === "1";
 const isCloseFlowSmoke = process.env.GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE === "1";
 const isManualQa = process.env.GROOVEFORGE_DESKTOP_MANUAL_QA === "1";
@@ -1080,6 +1087,87 @@ type NativeMenuCommand =
   | "toggle-playback"
   | "delete-selected-event";
 
+type NativeMenuLocale = NativeDialogLocale;
+
+let nativeMenuLocale: NativeMenuLocale = "en";
+
+const nativeMenuLabels = {
+  en: {
+    about: "About GrooveForge",
+    checkUpdates: "Check for Updates...",
+    commandReference: "Command Reference",
+    copy: "Copy",
+    cut: "Cut",
+    deleteSelectedEvent: "Delete Selected Event",
+    edit: "Edit",
+    file: "File",
+    forceReload: "Force Reload",
+    front: "Bring All to Front",
+    help: "Help",
+    hide: "Hide GrooveForge",
+    hideOthers: "Hide Others",
+    localWorkstation: "GrooveForge Local Workstation",
+    minimize: "Minimize",
+    openProject: "Open Project...",
+    paste: "Paste",
+    playStop: "Play / Stop",
+    quickActions: "Quick Actions",
+    quit: "Quit GrooveForge",
+    redo: "Redo",
+    reload: "Reload",
+    resetZoom: "Actual Size",
+    saveProject: "Save Project",
+    services: "Services",
+    showAll: "Show All",
+    toggleDevTools: "Toggle Developer Tools",
+    toggleFullscreen: "Toggle Full Screen",
+    transport: "Transport",
+    undo: "Undo",
+    view: "View",
+    window: "Window",
+    windowZoom: "Zoom",
+    zoomIn: "Zoom In",
+    zoomOut: "Zoom Out"
+  },
+  ko: {
+    about: "GrooveForge 정보",
+    checkUpdates: "업데이트 확인...",
+    commandReference: "명령 도움말",
+    copy: "복사",
+    cut: "오려두기",
+    deleteSelectedEvent: "선택한 이벤트 삭제",
+    edit: "편집",
+    file: "파일",
+    forceReload: "강제로 새로고침",
+    front: "모두 앞으로 가져오기",
+    help: "도움말",
+    hide: "GrooveForge 가리기",
+    hideOthers: "다른 앱 가리기",
+    localWorkstation: "GrooveForge 로컬 워크스테이션",
+    minimize: "최소화",
+    openProject: "프로젝트 열기...",
+    paste: "붙여넣기",
+    playStop: "재생 / 정지",
+    quickActions: "빠른 작업",
+    quit: "GrooveForge 종료",
+    redo: "다시 실행",
+    reload: "새로고침",
+    resetZoom: "실제 크기",
+    saveProject: "프로젝트 저장",
+    services: "서비스",
+    showAll: "모두 보기",
+    toggleDevTools: "개발자 도구 전환",
+    toggleFullscreen: "전체 화면 전환",
+    transport: "재생",
+    undo: "실행 취소",
+    view: "보기",
+    window: "윈도우",
+    windowZoom: "확대/축소",
+    zoomIn: "확대",
+    zoomOut: "축소"
+  }
+} as const;
+
 type SaveProjectPayload = {
   contents: string;
   defaultName: string;
@@ -1113,10 +1201,14 @@ type LaunchSmokeEvidence = {
 
 type LaunchSmokeFunctionalTabZone = "compose" | "arrange" | "mix" | "deliver";
 
-type LaunchSmokeWorkspacePageGroup = "compose" | "mix";
+type LaunchSmokeWorkspacePageGroup = "compose" | "arrange" | "mix";
 type LaunchSmokeComposeWorkspacePage = "drums" | "notes" | "instruments";
+type LaunchSmokeArrangeWorkspacePage = "timeline" | "structure";
 type LaunchSmokeMixWorkspacePage = "mixer" | "master";
-type LaunchSmokeWorkspacePageId = LaunchSmokeComposeWorkspacePage | LaunchSmokeMixWorkspacePage;
+type LaunchSmokeWorkspacePageId =
+  | LaunchSmokeComposeWorkspacePage
+  | LaunchSmokeArrangeWorkspacePage
+  | LaunchSmokeMixWorkspacePage;
 
 type LaunchSmokeWorkspacePageStateEvidence = {
   activePage: string;
@@ -1137,6 +1229,9 @@ type LaunchSmokeWorkspacePageStateEvidence = {
 };
 
 type LaunchSmokeWorkspacePagesEvidence = {
+  arrangeInitial: LaunchSmokeWorkspacePageStateEvidence;
+  arrangeStates: Record<LaunchSmokeArrangeWorkspacePage, LaunchSmokeWorkspacePageStateEvidence>;
+  arrangeTraversal: Array<{ input: string; page: string }>;
   composeInitial: LaunchSmokeWorkspacePageStateEvidence;
   composeStates: Record<LaunchSmokeComposeWorkspacePage, LaunchSmokeWorkspacePageStateEvidence>;
   composeTraversal: Array<{ input: string; page: string }>;
@@ -1144,6 +1239,7 @@ type LaunchSmokeWorkspacePagesEvidence = {
   mixStates: Record<LaunchSmokeMixWorkspacePage, LaunchSmokeWorkspacePageStateEvidence>;
   mixTraversal: Array<{ input: string; page: string }>;
   pageStatePreservedAcrossOuterTabs: {
+    arrange: boolean;
     compose: boolean;
     mix: boolean;
   };
@@ -1198,6 +1294,24 @@ type LaunchSmokeStickyNavigatorEvidence = {
 };
 
 type LaunchSmokeFunctionalTabsEvidence = {
+  arrangeStructureRoute: {
+    activePage: string;
+    activeZone: string;
+    arrangementToolsOpen: boolean;
+    coldRouteResultAbsent: boolean;
+    coldRouteSettled: boolean;
+    historyDepthReady: boolean;
+    historyDepthPreserved: boolean;
+    muteMapRouteFocused: boolean;
+    muteMapRouteVisible: boolean;
+    priorityFocusMatched: boolean;
+    priorityResultLaneMatched: boolean;
+    projectFingerprintPreserved: boolean;
+    resultInViewport: boolean;
+    resultVisible: boolean;
+    structurePanelVisible: boolean;
+    timelinePanelHidden: boolean;
+  };
   captures: Record<LaunchSmokeFunctionalTabZone, LaunchSmokeFunctionalTabCaptureEvidence>;
   composeRoundTrip: {
     dirtyPosturePreserved: boolean;
@@ -1329,14 +1443,20 @@ type LaunchSmokeFunctionalTabsEvidence = {
 };
 
 type LaunchSmokeFunctionalTabInternalSnapshot = LaunchSmokeFunctionalTabStateEvidence & {
+  activeArrangePage: string;
   activeComposePage: string;
   activeMixPage: string;
+  arrangeDisclosurePosture: string;
+  arrangeEditorPosture: string;
   composeDataFingerprint: string;
   dirtyPosture: string;
   disclosurePosture: string;
   keyboardCapturePosture: string;
   playbackPosture: string;
+  projectDataFingerprint: string;
   selectedPattern: string;
+  historyDepthReady: boolean;
+  historyDepthPosture: string;
   undoRedoPosture: string;
 };
 
@@ -1698,6 +1818,36 @@ type LaunchSmokeClosedDetailsEvidence = {
   undoPostureUnchanged: boolean;
 };
 
+type LaunchSmokeNativeMenuTree = Array<{
+  items: string[];
+  label: string;
+}>;
+
+type LaunchSmokeLocalizedLayoutSnapshot = {
+  appOverflowX: number;
+  documentOverflowX: number;
+  mainSelectedFullyVisible: boolean;
+  mainTabCount: number;
+  mainTabListContained: boolean;
+  mainTabListOverflowX: string;
+  mainTabListScrollOverflow: number;
+  mainTabMinimumHeight: number;
+  mainTabMinimumLabelFontSize: number;
+  settingsColumnCount: number;
+  settingsContained: boolean;
+  settingsHorizontalOverflow: number;
+  settingsMinimumOptionHeight: number;
+  settingsOptionCount: number;
+  subSelectedFullyVisible: boolean;
+  subTabCount: number;
+  subTabListContained: boolean;
+  subTabListOverflowX: string;
+  subTabListScrollOverflow: number;
+  subTabMinimumHeight: number;
+  subTabMinimumLabelFontSize: number;
+  viewportWidth: number;
+};
+
 type LaunchSmokeModalFocusEvidence = {
   closedDetails: LaunchSmokeClosedDetailsEvidence;
   commandShortcutFromEditable: boolean;
@@ -1746,6 +1896,44 @@ type LaunchSmokeModalFocusEvidence = {
   quickKeyboardResultTitle: string;
   quickKeyboardSelectedTitle: string;
   quickShortcutFromEditable: boolean;
+  settingsLocalization: {
+    backdropClosed: boolean;
+    backdropFocusRestored: boolean;
+    corruptFallbackReady: boolean;
+    englishImmediateReady: boolean;
+    englishMenuReady: boolean;
+    englishMenuRestored: boolean;
+    englishMenuTree: LaunchSmokeNativeMenuTree;
+    escapeClosed: boolean;
+    focusRestored: boolean;
+    initialFocusReady: boolean;
+    koreanImmediateReady: boolean;
+    koreanLabelsReady: boolean;
+    koreanLayout: {
+      minimum: LaunchSmokeLocalizedLayoutSnapshot;
+      narrow: LaunchSmokeLocalizedLayoutSnapshot;
+    };
+    koreanMenuReady: boolean;
+    koreanMenuTree: LaunchSmokeNativeMenuTree;
+    historyDepthReady: boolean;
+    nativeMenuShortcutBlocked: boolean;
+    projectFingerprintPreserved: boolean;
+    reloadMenuReady: boolean;
+    reloadPersisted: boolean;
+    shortcutBlocked: boolean;
+    secondKoreanLabelsReady: boolean;
+    storagePersisted: boolean;
+    undoPosturePreserved: boolean;
+    workspaceGuardCheckpoints: Array<{
+      activeElementTestId: string;
+      dialogOpen: boolean;
+      historyDepthPosture: string;
+      label: string;
+      playbackPosture: string;
+      projectFingerprintSha256: string;
+    }>;
+    writeFailureSessionReady: boolean;
+  };
   switchFocusRestored: boolean;
   switchInitialFocus: string;
 };
@@ -2057,7 +2245,6 @@ const closeFlowSmokeState: CloseFlowSmokeState = {
   willPreventUnloadCount: 0
 };
 
-const projectFilters = [{ name: "GrooveForge Project", extensions: ["json"] }];
 let updateHandlersRegistered = false;
 let updateCheckInProgress = false;
 let recoveryOperationQueue: Promise<void> = Promise.resolve();
@@ -2352,29 +2539,30 @@ function activateNativeMenuCommandForSmoke(win: BrowserWindow, command: NativeMe
   menuItem.click({}, win, win.webContents);
 }
 
-function createNativeCommandMenu(): Menu {
+function createNativeCommandMenu(locale: NativeMenuLocale = nativeMenuLocale): Menu {
   const isMac = process.platform === "darwin";
+  const label = nativeMenuLabels[locale];
   const fileSubmenu: MenuItemConstructorOptions[] = [
-    createRendererCommandMenuItem("Open Project...", "CmdOrCtrl+O", "open-project"),
-    createRendererCommandMenuItem("Save Project", "CmdOrCtrl+S", "save-project"),
+    createRendererCommandMenuItem(label.openProject, "CmdOrCtrl+O", "open-project"),
+    createRendererCommandMenuItem(label.saveProject, "CmdOrCtrl+S", "save-project"),
     { type: "separator" }
   ];
   const viewSubmenu: MenuItemConstructorOptions[] = [
-    { role: "reload" },
-    { role: "forceReload" },
+    { label: label.reload, role: "reload" },
+    { label: label.forceReload, role: "forceReload" },
     { type: "separator" },
-    { role: "resetZoom" },
-    { role: "zoomIn" },
-    { role: "zoomOut" },
+    { label: label.resetZoom, role: "resetZoom" },
+    { label: label.zoomIn, role: "zoomIn" },
+    { label: label.zoomOut, role: "zoomOut" },
     { type: "separator" },
-    { role: "togglefullscreen" }
+    { label: label.toggleFullscreen, role: "togglefullscreen" }
   ];
 
   if (!isMac) {
-    fileSubmenu.push({ role: "quit" });
+    fileSubmenu.push({ label: label.quit, role: "quit" });
   }
   if (isDev) {
-    viewSubmenu.splice(2, 0, { role: "toggleDevTools" });
+    viewSubmenu.splice(2, 0, { label: label.toggleDevTools, role: "toggleDevTools" });
   }
 
   const template: MenuItemConstructorOptions[] = [
@@ -2383,67 +2571,68 @@ function createNativeCommandMenu(): Menu {
           {
             label: "GrooveForge",
             submenu: [
-              { role: "about" },
+              { label: label.about, role: "about" },
               { type: "separator" },
-              { role: "services" },
+              { label: label.services, role: "services" },
               { type: "separator" },
-              { role: "hide" },
-              { role: "hideOthers" },
-              { role: "unhide" },
+              { label: label.hide, role: "hide" },
+              { label: label.hideOthers, role: "hideOthers" },
+              { label: label.showAll, role: "unhide" },
               { type: "separator" },
-              { role: "quit" }
+              { label: label.quit, role: "quit" }
             ]
           } satisfies MenuItemConstructorOptions
         ]
       : []),
     {
-      label: "File",
+      label: label.file,
       submenu: fileSubmenu
     },
     {
-      label: "Edit",
+      label: label.edit,
       submenu: [
-        createRendererCommandMenuItem("Undo", "CmdOrCtrl+Z", "undo"),
-        createRendererCommandMenuItem("Redo", "Shift+CmdOrCtrl+Z", "redo"),
+        createRendererCommandMenuItem(label.undo, "CmdOrCtrl+Z", "undo"),
+        createRendererCommandMenuItem(label.redo, "Shift+CmdOrCtrl+Z", "redo"),
         { type: "separator" },
-        { role: "cut" },
-        { role: "copy" },
-        { role: "paste" },
+        { label: label.cut, role: "cut" },
+        { label: label.copy, role: "copy" },
+        { label: label.paste, role: "paste" },
         { type: "separator" },
-        createRendererCommandMenuItem("Delete Selected Event", "Backspace", "delete-selected-event")
+        createRendererCommandMenuItem(label.deleteSelectedEvent, "Backspace", "delete-selected-event")
       ]
     },
     {
-      label: "Transport",
+      label: label.transport,
       submenu: [
-        createRendererCommandMenuItem("Play / Stop", "Space", "toggle-playback"),
-        createRendererCommandMenuItem("Quick Actions", "CmdOrCtrl+K", "quick-actions")
+        createRendererCommandMenuItem(label.playStop, "Space", "toggle-playback"),
+        createRendererCommandMenuItem(label.quickActions, "CmdOrCtrl+K", "quick-actions")
       ]
     },
     {
-      label: "View",
+      label: label.view,
       submenu: viewSubmenu
     },
     {
+      label: label.window,
       role: "window",
       submenu: [
-        { role: "minimize" },
-        { role: "zoom" },
-        ...(isMac ? [{ type: "separator" as const }, { role: "front" as const }] : [])
+        { label: label.minimize, role: "minimize" },
+        { label: label.windowZoom, role: "zoom" },
+        ...(isMac ? [{ type: "separator" as const }, { label: label.front, role: "front" as const }] : [])
       ]
     },
     {
-      label: "Help",
+      label: label.help,
       submenu: [
         {
-          label: "Check for Updates...",
+          label: label.checkUpdates,
           click: () => checkForUpdates()
         },
         { type: "separator" },
-        createRendererCommandMenuItem("Command Reference", "CmdOrCtrl+/", "command-reference"),
+        createRendererCommandMenuItem(label.commandReference, "CmdOrCtrl+/", "command-reference"),
         { type: "separator" },
         {
-          label: "GrooveForge Local Workstation",
+          label: label.localWorkstation,
           click: () => {
             void shell.openExternal("https://github.com/taejun9/GrooveForge");
           }
@@ -2467,6 +2656,14 @@ function registerProjectFileHandlers(): void {
     BrowserWindow.fromWebContents(event.sender)?.close();
   });
 
+  ipcMain.on(localeChannel, (event, locale: unknown) => {
+    if (!BrowserWindow.fromWebContents(event.sender) || (locale !== "en" && locale !== "ko")) {
+      return;
+    }
+    nativeMenuLocale = locale;
+    Menu.setApplicationMenu(createNativeCommandMenu());
+  });
+
   ipcMain.handle("grooveforge:save-project", async (event, payload: unknown) => {
     if (!isSaveProjectPayload(payload)) {
       throw new Error("Invalid save project payload.");
@@ -2474,11 +2671,11 @@ function registerProjectFileHandlers(): void {
 
     await ensureDesktopProjectWorkspace(workspace);
     const browserWindow = BrowserWindow.fromWebContents(event.sender);
-    const options: SaveDialogOptions = {
-      title: "Save GrooveForge Project",
-      defaultPath: path.join(workspace.projects, payload.defaultName),
-      filters: projectFilters
-    };
+    const options = createNativeSaveProjectDialogOptions(
+      nativeMenuLocale,
+      workspace.projects,
+      payload.defaultName
+    );
     const smokeFilePath = projectIoSmokePath() ?? closeFlowSmokePath() ?? manualQaSavePath();
     if (isManualQa && smokeFilePath) {
       await assertManualQaPathSafety(smokeFilePath, false);
@@ -2525,12 +2722,7 @@ function registerProjectFileHandlers(): void {
   ipcMain.handle("grooveforge:open-project", async (event) => {
     await ensureDesktopProjectWorkspace(workspace);
     const browserWindow = BrowserWindow.fromWebContents(event.sender);
-    const options: OpenDialogOptions = {
-      title: "Open GrooveForge Project",
-      defaultPath: workspace.projects,
-      filters: projectFilters,
-      properties: ["openFile"]
-    };
+    const options = createNativeOpenProjectDialogOptions(nativeMenuLocale, workspace.projects);
     const smokeFilePath = projectIoSmokePath() ?? manualQaOpenPath();
     if (isManualQa && smokeFilePath) {
       await assertManualQaPathSafety(smokeFilePath, true);
@@ -3108,6 +3300,101 @@ function launchSmokeModalFocusFailures(evidence: LaunchSmokeModalFocusEvidence):
   if (!evidence.dockActionsOpened || !evidence.dockActionsFocusRestored) {
     failures.push("workspace command dock native pointer/Escape input should open Quick Actions and restore dock focus");
   }
+  const minimumLayout = evidence.settingsLocalization.koreanLayout.minimum;
+  const narrowLayout = evidence.settingsLocalization.koreanLayout.narrow;
+  const koreanLayoutReady =
+    minimumLayout.viewportWidth === 1180 &&
+    minimumLayout.documentOverflowX <= 1 &&
+    minimumLayout.appOverflowX <= 1 &&
+    minimumLayout.mainTabCount === 4 &&
+    minimumLayout.subTabCount === 3 &&
+    minimumLayout.mainTabListContained &&
+    minimumLayout.subTabListContained &&
+    minimumLayout.mainTabListScrollOverflow <= 1 &&
+    minimumLayout.subTabListScrollOverflow <= 1 &&
+    minimumLayout.mainSelectedFullyVisible &&
+    minimumLayout.subSelectedFullyVisible &&
+    minimumLayout.mainTabMinimumHeight >= 64 &&
+    minimumLayout.subTabMinimumHeight >= 64 &&
+    minimumLayout.mainTabMinimumLabelFontSize >= 14 &&
+    minimumLayout.subTabMinimumLabelFontSize >= 14 &&
+    minimumLayout.settingsContained &&
+    minimumLayout.settingsHorizontalOverflow <= 1 &&
+    minimumLayout.settingsOptionCount === 2 &&
+    minimumLayout.settingsColumnCount === 2 &&
+    minimumLayout.settingsMinimumOptionHeight >= 78 &&
+    narrowLayout.viewportWidth === 390 &&
+    narrowLayout.documentOverflowX <= 1 &&
+    narrowLayout.appOverflowX <= 1 &&
+    narrowLayout.mainTabCount === 4 &&
+    narrowLayout.subTabCount === 3 &&
+    narrowLayout.mainTabListContained &&
+    narrowLayout.subTabListContained &&
+    narrowLayout.mainTabListOverflowX === "auto" &&
+    narrowLayout.subTabListOverflowX === "auto" &&
+    narrowLayout.mainTabListScrollOverflow > 0 &&
+    narrowLayout.subTabListScrollOverflow > 0 &&
+    narrowLayout.mainSelectedFullyVisible &&
+    narrowLayout.subSelectedFullyVisible &&
+    narrowLayout.mainTabMinimumHeight >= 68 &&
+    narrowLayout.subTabMinimumHeight >= 68 &&
+    narrowLayout.mainTabMinimumLabelFontSize >= 14 &&
+    narrowLayout.subTabMinimumLabelFontSize >= 14 &&
+    narrowLayout.settingsContained &&
+    narrowLayout.settingsHorizontalOverflow <= 1 &&
+    narrowLayout.settingsOptionCount === 2 &&
+    narrowLayout.settingsColumnCount === 1 &&
+    narrowLayout.settingsMinimumOptionHeight >= 78;
+  const expectedWorkspaceGuardLabels = [
+    "baseline",
+    "keyboard-space",
+    "keyboard-undo",
+    "native-menu-playback",
+    "native-menu-undo"
+  ];
+  const workspaceGuardBaseline = evidence.settingsLocalization.workspaceGuardCheckpoints[0];
+  const settingsWorkspaceGuardsReady =
+    workspaceGuardBaseline !== undefined &&
+    evidence.settingsLocalization.workspaceGuardCheckpoints.length === expectedWorkspaceGuardLabels.length &&
+    evidence.settingsLocalization.workspaceGuardCheckpoints.every(
+      (checkpoint, index) =>
+        checkpoint.label === expectedWorkspaceGuardLabels[index] &&
+        checkpoint.activeElementTestId === "settings-dialog" &&
+        checkpoint.dialogOpen &&
+        checkpoint.historyDepthPosture === workspaceGuardBaseline.historyDepthPosture &&
+        checkpoint.playbackPosture === workspaceGuardBaseline.playbackPosture &&
+        checkpoint.projectFingerprintSha256 === workspaceGuardBaseline.projectFingerprintSha256
+    );
+  if (
+    !evidence.settingsLocalization.backdropClosed ||
+    !evidence.settingsLocalization.backdropFocusRestored ||
+    !evidence.settingsLocalization.initialFocusReady ||
+    !evidence.settingsLocalization.englishImmediateReady ||
+    !evidence.settingsLocalization.englishMenuReady ||
+    !evidence.settingsLocalization.koreanImmediateReady ||
+    !evidence.settingsLocalization.koreanLabelsReady ||
+    !evidence.settingsLocalization.koreanMenuReady ||
+    !evidence.settingsLocalization.historyDepthReady ||
+    !evidence.settingsLocalization.nativeMenuShortcutBlocked ||
+    !evidence.settingsLocalization.storagePersisted ||
+    !evidence.settingsLocalization.shortcutBlocked ||
+    !evidence.settingsLocalization.projectFingerprintPreserved ||
+    !evidence.settingsLocalization.undoPosturePreserved ||
+    !settingsWorkspaceGuardsReady ||
+    !evidence.settingsLocalization.writeFailureSessionReady ||
+    !evidence.settingsLocalization.escapeClosed ||
+    !evidence.settingsLocalization.focusRestored ||
+    !evidence.settingsLocalization.reloadPersisted ||
+    !evidence.settingsLocalization.reloadMenuReady ||
+    !evidence.settingsLocalization.secondKoreanLabelsReady ||
+    !koreanLayoutReady ||
+    !evidence.settingsLocalization.corruptFallbackReady ||
+    !evidence.settingsLocalization.englishMenuRestored
+  ) {
+    failures.push(
+      `Settings should switch English/Korean UI and native menus immediately, keep Korean tabs and Settings readable at 1180px/390px, persist safely, restore focus, block shortcuts, preserve project/history, and recover corrupt storage, got ${JSON.stringify(evidence.settingsLocalization)}`
+    );
+  }
   return failures;
 }
 
@@ -3176,19 +3463,35 @@ function launchSmokeFunctionalTabsFailures(evidence: LaunchSmokeFunctionalTabsEv
     "Home:mixer",
     "ArrowRight:master"
   ];
+  const expectedArrangeTraversal = [
+    "initial:timeline",
+    "native-click:structure",
+    "ArrowLeft:timeline",
+    "End:structure",
+    "Home:timeline",
+    "ArrowRight:structure"
+  ];
   if (
     workspacePages.composeTraversal.map((entry) => `${entry.input}:${entry.page}`).join("|") !==
       expectedComposeTraversal.join("|") ||
+    workspacePages.arrangeTraversal.map((entry) => `${entry.input}:${entry.page}`).join("|") !==
+      expectedArrangeTraversal.join("|") ||
     workspacePages.mixTraversal.map((entry) => `${entry.input}:${entry.page}`).join("|") !==
       expectedMixTraversal.join("|")
   ) {
-    failures.push("nested Compose and Mix pages should follow native click plus Arrow/Home/End traversal");
+    failures.push("nested Compose, Arrange, and Mix pages should follow native click plus Arrow/Home/End traversal");
   }
   for (const [group, pageIds] of [
     ["compose", ["drums", "notes", "instruments"]],
+    ["arrange", ["timeline", "structure"]],
     ["mix", ["mixer", "master"]]
   ] as const) {
-    const states = group === "compose" ? workspacePages.composeStates : workspacePages.mixStates;
+    const states =
+      group === "compose"
+        ? workspacePages.composeStates
+        : group === "arrange"
+          ? workspacePages.arrangeStates
+          : workspacePages.mixStates;
     for (const page of pageIds) {
       const state = states[page as keyof typeof states] as LaunchSmokeWorkspacePageStateEvidence;
       const pageCount = pageIds.length;
@@ -3213,10 +3516,33 @@ function launchSmokeFunctionalTabsFailures(evidence: LaunchSmokeFunctionalTabsEv
     }
   }
   if (
+    !workspacePages.pageStatePreservedAcrossOuterTabs.arrange ||
     !workspacePages.pageStatePreservedAcrossOuterTabs.compose ||
     !workspacePages.pageStatePreservedAcrossOuterTabs.mix
   ) {
-    failures.push("selected nested Compose and Mix pages should survive outer workspace tab round trips");
+    failures.push("selected nested Compose, Arrange, and Mix pages should survive outer workspace tab round trips");
+  }
+  if (
+    evidence.arrangeStructureRoute.activeZone !== "arrange" ||
+    evidence.arrangeStructureRoute.activePage !== "structure" ||
+    !evidence.arrangeStructureRoute.arrangementToolsOpen ||
+    !evidence.arrangeStructureRoute.coldRouteResultAbsent ||
+    !evidence.arrangeStructureRoute.coldRouteSettled ||
+    !evidence.arrangeStructureRoute.historyDepthReady ||
+    !evidence.arrangeStructureRoute.historyDepthPreserved ||
+    !evidence.arrangeStructureRoute.muteMapRouteFocused ||
+    !evidence.arrangeStructureRoute.muteMapRouteVisible ||
+    !evidence.arrangeStructureRoute.priorityFocusMatched ||
+    !evidence.arrangeStructureRoute.priorityResultLaneMatched ||
+    !evidence.arrangeStructureRoute.resultInViewport ||
+    !evidence.arrangeStructureRoute.resultVisible ||
+    !evidence.arrangeStructureRoute.structurePanelVisible ||
+    !evidence.arrangeStructureRoute.timelinePanelHidden ||
+    !evidence.arrangeStructureRoute.projectFingerprintPreserved
+  ) {
+    failures.push(
+      `the Arrangement Mute Map readout Quick Action should cold-route from Timeline into its untouched visible Structure surface, then its native priority action should create the matching visible result without mutating project data or edit history, got ${JSON.stringify(evidence.arrangeStructureRoute)}`
+    );
   }
   if (
     !evidence.composeRoundTrip.editFingerprintPreserved ||
@@ -3558,7 +3884,7 @@ function publicFunctionalTabState(
 async function readLaunchSmokeFunctionalTabState(win: BrowserWindow): Promise<LaunchSmokeFunctionalTabInternalSnapshot> {
   return (await win.webContents.executeJavaScript(`
     (() => {
-      const tabList = document.querySelector('[role="tablist"][aria-label="Workstation function tabs"]');
+      const tabList = document.querySelector('[data-testid="workflow-navigator"] [role="tablist"]');
       const tabs = tabList ? Array.from(tabList.querySelectorAll('[role="tab"]')) : [];
       const panels = ["compose", "arrange", "mix", "deliver"]
         .map((zone) => document.getElementById("workspace-panel-" + zone))
@@ -3617,18 +3943,62 @@ async function readLaunchSmokeFunctionalTabState(win: BrowserWindow): Promise<La
           text: card.textContent?.trim().replace(/\\s+/g, " ") ?? ""
         }))
       });
+      const projectDataFingerprint = JSON.stringify({
+        formControls: Array.from(
+          document.querySelectorAll('main.app-shell input, main.app-shell select, main.app-shell textarea')
+        ).map((control) => ({
+          checked:
+            control instanceof HTMLInputElement && (control.type === 'checkbox' || control.type === 'radio')
+              ? control.checked
+              : null,
+          id: control.getAttribute('data-testid') ?? control.id ?? control.getAttribute('name') ?? control.tagName,
+          value:
+            control instanceof HTMLInputElement ||
+            control instanceof HTMLSelectElement ||
+            control instanceof HTMLTextAreaElement
+              ? control.value
+              : ''
+        })),
+        pressedProjectControls: activePressedIds(
+          'button[data-testid^="drum-step-"], button[data-testid^="note-step-"], button[data-testid^="arrangement-track-mute-"], button[data-testid^="mixer-mute-"], button[data-testid^="mixer-solo-"]'
+        ),
+        selectedPattern
+      });
       const disclosurePosture = JSON.stringify(
         ["pattern-lab", "capture-ideas", "harmony-moves", "sound-design-tools"].map((testId) => ({
           open: document.querySelector('[data-testid="' + testId + '"]')?.open === true,
           testId
         }))
       );
+      const arrangeDisclosurePosture = JSON.stringify(
+        ["block-moves", "arrangement-tools"].map((testId) => ({
+          open: document.querySelector('[data-testid="' + testId + '"]')?.open === true,
+          testId
+        }))
+      );
+      const arrangeEditorPosture = JSON.stringify({
+        disclosures: JSON.parse(arrangeDisclosurePosture),
+        focusedMuteMapLane:
+          document.querySelector('[data-testid^="arrangement-mute-map-lane-"] button[aria-pressed="true"]')
+            ?.closest('[data-testid^="arrangement-mute-map-lane-"]')?.getAttribute('data-testid') ?? '',
+        muteMapResultLane:
+          document.querySelector('[data-testid="arrangement-mute-map-result"]')
+            ?.getAttribute('data-result-arrangement-mute-map') ?? '',
+        selectedArrangementBlock:
+          document.querySelector('button[data-testid^="arrangement-block-"].selected')?.getAttribute('data-testid') ?? ''
+      });
       const undoRedoPosture = JSON.stringify({
         redoDisabled: document.querySelector('[data-testid="redo-button"]')?.disabled === true,
         redoTitle: document.querySelector('[data-testid="redo-button"]')?.getAttribute("title") ?? "",
         undoDisabled: document.querySelector('[data-testid="undo-button"]')?.disabled === true,
         undoTitle: document.querySelector('[data-testid="undo-button"]')?.getAttribute("title") ?? ""
       });
+      const historyReadout = document.querySelector('[data-testid="edit-history-readout"]');
+      const redoDepth = historyReadout?.getAttribute('data-redo-depth') ?? '';
+      const undoDepth = historyReadout?.getAttribute('data-undo-depth') ?? '';
+      const historyDepthPosture = JSON.stringify({ redoDepth, undoDepth });
+      const historyDepthReady =
+        historyReadout instanceof HTMLElement && /^\\d+$/.test(redoDepth) && /^\\d+$/.test(undoDepth);
       const dirtyPosture = JSON.stringify({
         detail: document.querySelector('[data-testid="project-safety-detail"]')?.textContent?.trim() ?? "",
         label: document.querySelector('[data-testid="project-safety-label"]')?.textContent?.trim() ?? "",
@@ -3647,17 +4017,22 @@ async function readLaunchSmokeFunctionalTabState(win: BrowserWindow): Promise<La
       const master = document.querySelector('[data-testid="workflow-target-master"]');
       const handoff = document.querySelector('[data-testid="handoff-pack"]');
       return {
+        activeArrangePage:
+          document.querySelector('[data-testid="arrange-page-tabs"] [role="tab"][aria-selected="true"]')
+            ?.id?.replace("arrange-page-tab-", "") ?? "",
         activeComposePage:
-          document.querySelector('[role="tablist"][aria-label="Compose editor pages"] [role="tab"][aria-selected="true"]')
+          document.querySelector('[data-testid="compose-page-tabs"] [role="tab"][aria-selected="true"]')
             ?.id?.replace("compose-page-tab-", "") ?? "",
         activeMixPage:
-          document.querySelector('[role="tablist"][aria-label="Mix editor pages"] [role="tab"][aria-selected="true"]')
+          document.querySelector('[data-testid="mix-page-tabs"] [role="tab"][aria-selected="true"]')
             ?.id?.replace("mix-page-tab-", "") ?? "",
         activePanelHorizontalOverflow: activePanel
           ? Math.max(0, activePanel.scrollWidth - activePanel.clientWidth)
           : -1,
         activeZone,
         ariaConnectionsReady,
+        arrangeDisclosurePosture,
+        arrangeEditorPosture,
         composeDataFingerprint,
         deliverHandoffVisible: activeZone === "deliver" && rendered(handoff),
         dirtyPosture,
@@ -3673,9 +4048,12 @@ async function readLaunchSmokeFunctionalTabState(win: BrowserWindow): Promise<La
           return rect.width === 0 && rect.height === 0 && panel.getClientRects().length === 0;
         }).length,
         keyboardCapturePosture,
+        historyDepthReady,
+        historyDepthPosture,
         mixMasterVisible: activeZone === "mix" && rendered(master),
         mixMixerVisible: activeZone === "mix" && rendered(mixer),
         playbackPosture,
+        projectDataFingerprint,
         selectedPattern,
         selectedTabCount: selectedTabs.length,
         tabCount: tabs.length,
@@ -3701,26 +4079,123 @@ async function sendLaunchSmokeFunctionalTabNativeKey(
   await new Promise((resolve) => setTimeout(resolve, 100));
 }
 
-async function clickLaunchSmokeFunctionalTabNativeTarget(win: BrowserWindow, testId: string): Promise<void> {
-  const point = (await win.webContents.executeJavaScript(`
-    (() => {
+async function clickLaunchSmokeFunctionalTabNativeTarget(
+  win: BrowserWindow,
+  testId: string,
+  options: { requireFocus?: boolean } = {}
+): Promise<void> {
+  const targetHit = (await win.webContents.executeJavaScript(`
+    (async () => {
       const testId = ${JSON.stringify(testId)};
       const target = document.querySelector('[data-testid="' + testId + '"]');
       if (!(target instanceof HTMLElement)) return null;
       target.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const rect = target.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return null;
-      return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
+      let visibleLeft = Math.max(0, rect.left);
+      let visibleRight = Math.min(window.innerWidth, rect.right);
+      let visibleTop = Math.max(0, rect.top);
+      let visibleBottom = Math.min(window.innerHeight, rect.bottom);
+      for (let ancestor = target.parentElement; ancestor instanceof HTMLElement; ancestor = ancestor.parentElement) {
+        const style = getComputedStyle(ancestor);
+        if (/(auto|scroll|hidden|clip)/.test(style.overflowX + style.overflowY)) {
+          const ancestorRect = ancestor.getBoundingClientRect();
+          visibleLeft = Math.max(visibleLeft, ancestorRect.left);
+          visibleRight = Math.min(visibleRight, ancestorRect.right);
+          visibleTop = Math.max(visibleTop, ancestorRect.top);
+          visibleBottom = Math.min(visibleBottom, ancestorRect.bottom);
+        }
+      }
+      let x = Math.round((visibleLeft + visibleRight) / 2);
+      let y = Math.round((visibleTop + visibleBottom) / 2);
+      let hit = visibleRight > visibleLeft && visibleBottom > visibleTop ? document.elementFromPoint(x, y) : null;
+      const hitFractions = [0.5, 0.2, 0.8, 0.35, 0.65, 0.1, 0.9];
+      for (const yFraction of hitFractions) {
+        for (const xFraction of hitFractions) {
+          const candidateX = Math.round(visibleLeft + (visibleRight - visibleLeft) * xFraction);
+          const candidateY = Math.round(visibleTop + (visibleBottom - visibleTop) * yFraction);
+          const candidate = document.elementFromPoint(candidateX, candidateY);
+          if (candidate === target || (candidate instanceof Node && target.contains(candidate))) {
+            x = candidateX;
+            y = candidateY;
+            hit = candidate;
+            break;
+          }
+        }
+        if (hit === target || (hit instanceof Node && target.contains(hit))) {
+          break;
+        }
+      }
+      return {
+        disabled: target instanceof HTMLButtonElement && target.disabled,
+        hitMatches: hit === target || (hit instanceof Node && target.contains(hit)),
+        hitTestId: hit instanceof HTMLElement ? hit.closest('[data-testid]')?.getAttribute('data-testid') ?? '' : '',
+        panelRect: (() => {
+          const panel = target.closest('[data-testid="quick-actions-dialog"]');
+          const panelRect = panel?.getBoundingClientRect();
+          return panelRect
+            ? { bottom: panelRect.bottom, left: panelRect.left, right: panelRect.right, top: panelRect.top }
+            : null;
+        })(),
+        rect: { bottom: rect.bottom, left: rect.left, right: rect.right, top: rect.top },
+        style: {
+          display: getComputedStyle(target).display,
+          pointerEvents: getComputedStyle(target).pointerEvents,
+          visibility: getComputedStyle(target).visibility
+        },
+        visibleRect: { bottom: visibleBottom, left: visibleLeft, right: visibleRight, top: visibleTop },
+        viewport: { height: window.innerHeight, width: window.innerWidth },
+        x,
+        y
+      };
     })();
-  `)) as { x: number; y: number } | null;
-  if (!point) {
+  `)) as {
+    disabled: boolean;
+    hitMatches: boolean;
+    hitTestId: string;
+    panelRect: { bottom: number; left: number; right: number; top: number } | null;
+    rect: { bottom: number; left: number; right: number; top: number };
+    style: { display: string; pointerEvents: string; visibility: string };
+    visibleRect: { bottom: number; left: number; right: number; top: number };
+    viewport: { height: number; width: number };
+    x: number;
+    y: number;
+  } | null;
+  if (!targetHit) {
     throw new Error(`Could not locate native functional-tab target ${testId}.`);
   }
+  if (targetHit.disabled || !targetHit.hitMatches) {
+    throw new Error(`Native functional-tab target ${testId} was not safely hittable: ${JSON.stringify(targetHit)}`);
+  }
   win.webContents.focus();
-  win.webContents.sendInputEvent({ type: "mouseMove", x: point.x, y: point.y });
-  win.webContents.sendInputEvent({ type: "mouseDown", x: point.x, y: point.y, button: "left", clickCount: 1 });
-  win.webContents.sendInputEvent({ type: "mouseUp", x: point.x, y: point.y, button: "left", clickCount: 1 });
+  win.webContents.sendInputEvent({ type: "mouseMove", x: targetHit.x, y: targetHit.y });
+  win.webContents.sendInputEvent({ type: "mouseDown", x: targetHit.x, y: targetHit.y, button: "left", clickCount: 1 });
+  win.webContents.sendInputEvent({ type: "mouseUp", x: targetHit.x, y: targetHit.y, button: "left", clickCount: 1 });
   await new Promise((resolve) => setTimeout(resolve, 140));
+  if (options.requireFocus) {
+    const nativeFocusTestId = (await win.webContents.executeJavaScript(
+      `document.activeElement instanceof HTMLElement ? document.activeElement.closest('[data-testid]')?.getAttribute('data-testid') ?? '' : ''`
+    )) as string;
+    if (nativeFocusTestId !== testId) {
+      throw new Error(`Native functional-tab click should retain focus on ${testId}, got ${nativeFocusTestId || "none"}.`);
+    }
+  }
+}
+
+async function clickLaunchSmokeFunctionalTabSetupTarget(win: BrowserWindow, testId: string): Promise<void> {
+  const clicked = (await win.webContents.executeJavaScript(`
+    (() => {
+      const target = document.querySelector('[data-testid=${JSON.stringify(testId)}]');
+      if (!(target instanceof HTMLButtonElement) || target.disabled) return false;
+      target.click();
+      return true;
+    })();
+  `)) as boolean;
+  if (!clicked) {
+    throw new Error(`Could not run deterministic setup click for functional-tab target ${testId}.`);
+  }
+  await new Promise((resolve) => setTimeout(resolve, 80));
 }
 
 async function readLaunchSmokeWorkspacePageState(
@@ -3730,9 +4205,12 @@ async function readLaunchSmokeWorkspacePageState(
   return (await win.webContents.executeJavaScript(`
     (() => {
       const group = ${JSON.stringify(group)};
-      const pageIds = group === "compose" ? ["drums", "notes", "instruments"] : ["mixer", "master"];
-      const tabList = document.querySelector('[role="tablist"][aria-label="' +
-        (group === "compose" ? "Compose editor pages" : "Mix editor pages") + '"]');
+      const pageIds = group === "compose"
+        ? ["drums", "notes", "instruments"]
+        : group === "arrange"
+          ? ["timeline", "structure"]
+          : ["mixer", "master"];
+      const tabList = document.querySelector('[data-testid="' + group + '-page-tabs"] [role="tablist"]');
       const tabs = tabList ? Array.from(tabList.querySelectorAll('[role="tab"]')) : [];
       const panels = pageIds.map((page) => document.getElementById(group + "-page-panel-" + page)).filter(Boolean);
       const selectedTabs = tabs.filter((tab) => tab.getAttribute("aria-selected") === "true");
@@ -3806,17 +4284,28 @@ async function readLaunchSmokeWorkspacePageState(
 async function activateLaunchSmokeWorkspacePage(
   win: BrowserWindow,
   group: LaunchSmokeWorkspacePageGroup,
-  page: LaunchSmokeWorkspacePageId
+  page: LaunchSmokeWorkspacePageId,
+  options: { requireNativeTabFocus?: boolean } = {}
 ): Promise<LaunchSmokeWorkspacePageStateEvidence> {
+  let activatedByNativeClick = false;
   const outerZone = (await win.webContents.executeJavaScript(
-    `document.querySelector('[role="tablist"][aria-label="Workstation function tabs"] [role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? ""`
+    `document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? ""`
   )) as string;
   if (outerZone !== group) {
-    await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${group}`);
+    if (options.requireNativeTabFocus) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${group}`);
+    } else {
+      await clickLaunchSmokeFunctionalTabSetupTarget(win, `workflow-jump-${group}`);
+    }
   }
   let state = await readLaunchSmokeWorkspacePageState(win, group);
   if (state.activePage !== page) {
-    await clickLaunchSmokeFunctionalTabNativeTarget(win, `${group}-page-tab-${page}`);
+    if (options.requireNativeTabFocus) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, `${group}-page-tab-${page}`, { requireFocus: true });
+      activatedByNativeClick = true;
+    } else {
+      await clickLaunchSmokeFunctionalTabSetupTarget(win, `${group}-page-tab-${page}`);
+    }
   }
   const deadline = Date.now() + 30000;
   state = await readLaunchSmokeWorkspacePageState(win, group);
@@ -3839,6 +4328,18 @@ async function activateLaunchSmokeWorkspacePage(
     state.visiblePanelCount !== 1
   ) {
     throw new Error(`Workspace ${group}/${page} page did not settle: ${JSON.stringify(state)}`);
+  }
+  const targetTestId = `${group}-page-tab-${page}`;
+  if (options.requireNativeTabFocus) {
+    if (!activatedByNativeClick) {
+      throw new Error(`Workspace tab ${targetTestId} was already active, so native click focus was not exercised.`);
+    }
+    const focusedTestId = (await win.webContents.executeJavaScript(
+      `document.activeElement instanceof HTMLElement ? document.activeElement.closest('[data-testid]')?.getAttribute('data-testid') ?? '' : ''`
+    )) as string;
+    if (focusedTestId !== targetTestId) {
+      throw new Error(`Native-clicked workspace tab ${targetTestId} should own focus, got ${focusedTestId || "none"}.`);
+    }
   }
   return state;
 }
@@ -3953,9 +4454,13 @@ async function restoreLaunchSmokeFunctionalTabPosture(
       ? initial.activeComposePage
       : "drums"
   ) as LaunchSmokeComposeWorkspacePage;
+  const arrangePage = (["timeline", "structure"].includes(initial.activeArrangePage)
+    ? initial.activeArrangePage
+    : "timeline") as LaunchSmokeArrangeWorkspacePage;
   const mixPage = (["mixer", "master"].includes(initial.activeMixPage)
     ? initial.activeMixPage
     : "mixer") as LaunchSmokeMixWorkspacePage;
+  await activateLaunchSmokeWorkspacePage(win, "arrange", arrangePage);
   await activateLaunchSmokeWorkspacePage(win, "mix", mixPage);
   await activateLaunchSmokeWorkspacePage(win, "compose", "drums");
   const selectedPattern = (await win.webContents.executeJavaScript(
@@ -3996,6 +4501,30 @@ async function restoreLaunchSmokeFunctionalTabPosture(
     }
   }
 
+  const arrangeDisclosurePageAndToggle: Record<
+    string,
+    { page: LaunchSmokeArrangeWorkspacePage; toggle: string }
+  > = {
+    "block-moves": { page: "timeline", toggle: "block-moves-toggle" },
+    "arrangement-tools": { page: "structure", toggle: "arrangement-tools-toggle" }
+  };
+  const arrangeDisclosures = JSON.parse(initial.arrangeDisclosurePosture) as Array<{
+    open: boolean;
+    testId: string;
+  }>;
+  for (const disclosure of arrangeDisclosures) {
+    const target = arrangeDisclosurePageAndToggle[disclosure.testId];
+    if (!target) continue;
+    await activateLaunchSmokeWorkspacePage(win, "arrange", target.page);
+    const isOpen = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid=${JSON.stringify(disclosure.testId)}]')?.open === true`
+    )) as boolean;
+    if (isOpen !== disclosure.open) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, target.toggle);
+    }
+  }
+
+  await activateLaunchSmokeWorkspacePage(win, "arrange", arrangePage);
   await activateLaunchSmokeWorkspacePage(win, "compose", composePage);
   await win.webContents.executeJavaScript(
     `document.querySelector('[data-testid="workflow-jump-compose"]')?.focus({ preventScroll: true })`
@@ -4035,7 +4564,9 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
       page: composeInitial.activePage
     }];
     composeStates.drums = await readLaunchSmokeWorkspacePageState(win, "compose");
-    composeStates.notes = await activateLaunchSmokeWorkspacePage(win, "compose", "notes");
+    composeStates.notes = await activateLaunchSmokeWorkspacePage(win, "compose", "notes", {
+      requireNativeTabFocus: true
+    });
     composeTraversal.push({ input: "native-click", page: composeStates.notes.activePage });
     await sendLaunchSmokeFunctionalTabNativeKey(win, "Right");
     composeStates.instruments = await readLaunchSmokeWorkspacePageState(win, "compose");
@@ -4107,6 +4638,9 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     const captures = {} as Record<LaunchSmokeFunctionalTabZone, LaunchSmokeFunctionalTabCaptureEvidence>;
     const hiddenComposeGuards = {} as LaunchSmokeFunctionalTabsEvidence["hiddenComposeGuards"];
     const nativeMenuDeleteGuards = {} as Record<"mix" | "deliver", boolean>;
+    let arrangeInitial = {} as LaunchSmokeWorkspacePageStateEvidence;
+    const arrangeStates = {} as Record<LaunchSmokeArrangeWorkspacePage, LaunchSmokeWorkspacePageStateEvidence>;
+    const arrangeTraversal: Array<{ input: string; page: string }> = [];
     let mixInitial = {} as LaunchSmokeWorkspacePageStateEvidence;
     const mixStates = {} as Record<LaunchSmokeMixWorkspacePage, LaunchSmokeWorkspacePageStateEvidence>;
     const mixTraversal: Array<{ input: string; page: string }> = [];
@@ -4133,13 +4667,308 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     };
 
     onStep("native clicking Arrange and guarding hidden Compose shortcuts");
-    await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-arrange");
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-arrange", { requireFocus: true });
     let current = await readLaunchSmokeFunctionalTabState(win);
     traversal.push({ input: "native-click", zone: current.activeZone });
+    onStep("traversing full-width Arrange editor pages with native input");
+    arrangeInitial = await readLaunchSmokeWorkspacePageState(win, "arrange");
+    if (arrangeInitial.activePage !== "timeline") {
+      arrangeInitial = await activateLaunchSmokeWorkspacePage(win, "arrange", "timeline");
+    }
+    arrangeTraversal.push({ input: "initial", page: arrangeInitial.activePage });
+    arrangeStates.timeline = await readLaunchSmokeWorkspacePageState(win, "arrange");
+    arrangeStates.structure = await activateLaunchSmokeWorkspacePage(win, "arrange", "structure", {
+      requireNativeTabFocus: true
+    });
+    arrangeTraversal.push({ input: "native-click", page: arrangeStates.structure.activePage });
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Left");
+    let arrangePageState = await readLaunchSmokeWorkspacePageState(win, "arrange");
+    arrangeTraversal.push({ input: "ArrowLeft", page: arrangePageState.activePage });
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "End");
+    arrangePageState = await readLaunchSmokeWorkspacePageState(win, "arrange");
+    arrangeTraversal.push({ input: "End", page: arrangePageState.activePage });
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Home");
+    arrangePageState = await readLaunchSmokeWorkspacePageState(win, "arrange");
+    arrangeTraversal.push({ input: "Home", page: arrangePageState.activePage });
+    await sendLaunchSmokeFunctionalTabNativeKey(win, "Right");
+    arrangePageState = await readLaunchSmokeWorkspacePageState(win, "arrange");
+    arrangeTraversal.push({ input: "ArrowRight", page: arrangePageState.activePage });
+    const arrangementToolsWasOpen = (await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="arrangement-tools"]')?.open === true`
+    )) as boolean;
+    if (arrangementToolsWasOpen) {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "arrangement-tools-toggle");
+    }
+    await activateLaunchSmokeWorkspacePage(win, "arrange", "timeline");
+    const arrangeRouteStartReady = (await win.webContents.executeJavaScript(`
+      document.querySelector('[data-testid="arrange-page-tabs"] [role="tab"][aria-selected="true"]')?.id ===
+          'arrange-page-tab-timeline' &&
+        document.querySelector('[data-testid="arrangement-tools"]')?.open === false
+    `)) as boolean;
+    if (!arrangeRouteStartReady) {
+      throw new Error("Arrangement Mute Map Quick Action did not start from Timeline with Structure tools closed.");
+    }
+    const beforeArrangeStructureRoute = await readLaunchSmokeFunctionalTabState(win);
+    onStep("routing from Timeline with closed Structure tools through the Mute Map Quick Action");
+    activateNativeMenuCommandForSmoke(win, "quick-actions");
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    await win.webContents.executeJavaScript(`
+      (() => {
+        const input = document.querySelector('[data-testid="quick-actions-search"]');
+        const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+        valueSetter?.call(input, "review arrangement mute map");
+        input?.dispatchEvent(new Event("input", { bubbles: true }));
+      })();
+    `);
+    let arrangementMuteMapActionVisible = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      arrangementMuteMapActionVisible = (await win.webContents.executeJavaScript(`
+        document.querySelector('[data-testid="quick-action-arrangement-mute-map-readout-action"]') !== null
+      `)) as boolean;
+      if (arrangementMuteMapActionVisible) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!arrangementMuteMapActionVisible) {
+      throw new Error("Arrangement Mute Map Quick Action did not become visible from Timeline.");
+    }
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "quick-action-arrangement-mute-map-readout-action");
+    let arrangementMuteMapActionRan = false;
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      arrangementMuteMapActionRan = (await win.webContents.executeJavaScript(`
+        document.querySelector('[data-testid="project-status"]')?.textContent?.trim().startsWith('Arrangement Mute Map') === true
+      `)) as boolean;
+      if (arrangementMuteMapActionRan) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!arrangementMuteMapActionRan) {
+      const actionPosture = await win.webContents.executeJavaScript(`({
+        quickActionsOpen: document.querySelector('[data-testid="quick-actions"]') !== null,
+        status: document.querySelector('[data-testid="project-status"]')?.textContent?.trim() ?? ''
+      })`);
+      throw new Error(`Arrangement Mute Map native Quick Action did not execute: ${JSON.stringify(actionPosture)}`);
+    }
+    let arrangementMuteMapRouteSettled = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const settled = (await win.webContents.executeJavaScript(`
+        (() => {
+          const outerPanel = document.querySelector('#workspace-panel-arrange');
+          const structurePanel = document.querySelector('[data-testid="arrange-structure-page"]');
+          const tools = document.querySelector('[data-testid="arrangement-tools"]');
+          const content = document.querySelector('[data-testid="arrangement-tools-content"]');
+          return document.querySelector('[data-testid="quick-actions"]') === null &&
+            document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id ===
+              'workspace-tab-arrange' &&
+            outerPanel instanceof HTMLElement && !outerPanel.hidden && outerPanel.getBoundingClientRect().height > 0 &&
+            document.querySelector('[data-testid="arrange-page-tabs"] [role="tab"][aria-selected="true"]')?.id ===
+              'arrange-page-tab-structure' &&
+            structurePanel instanceof HTMLElement && !structurePanel.hidden &&
+              structurePanel.getBoundingClientRect().height > 0 &&
+            tools instanceof HTMLDetailsElement && tools.open === true &&
+            content instanceof HTMLElement && content.getBoundingClientRect().height > 0 &&
+            document.querySelector('[data-testid="arrangement-mute-map-result"]') === null;
+        })()
+      `)) as boolean;
+      if (settled) {
+        arrangementMuteMapRouteSettled = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const coldMuteMapRoute = (await win.webContents.executeJavaScript(`
+      (() => {
+        const map = document.querySelector('[data-testid="arrangement-mute-map"]');
+        const navigator = document.querySelector('[data-testid="workflow-navigator"]');
+        const mapRect = map?.getBoundingClientRect() ?? null;
+        const navigatorRect = navigator?.getBoundingClientRect() ?? null;
+        const outerPanel = document.querySelector('#workspace-panel-arrange');
+        const structurePanel = document.querySelector('[data-testid="arrange-structure-page"]');
+        const tools = document.querySelector('[data-testid="arrangement-tools"]');
+        const content = document.querySelector('[data-testid="arrangement-tools-content"]');
+        const routeTarget = document.querySelector('[data-arrangement-mute-map-route-target="true"]');
+        const priority = document.querySelector('[data-testid="arrangement-mute-map-priority"]');
+        const priorityId = priority?.getAttribute('data-arrangement-mute-map-priority') ?? '';
+        const priorityButton = document.querySelector('[data-testid="arrangement-mute-map-priority-run"]');
+        const posture = (element) => {
+          if (!(element instanceof HTMLElement)) return null;
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return {
+            display: style.display,
+            height: rect.height,
+            hidden: element.hidden,
+            visibility: style.visibility
+          };
+        };
+        const ancestors = [];
+        for (let current = map; current instanceof HTMLElement && current !== document.body; current = current.parentElement) {
+          const rect = current.getBoundingClientRect();
+          const style = getComputedStyle(current);
+          ancestors.push({
+            display: style.display,
+            height: rect.height,
+            hidden: current.hidden,
+            id: current.id,
+            tag: current.tagName,
+            testId: current.dataset.testid ?? '',
+            visibility: style.visibility
+          });
+        }
+        return {
+          activeZone: document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id ?? '',
+          ancestors,
+          content: posture(content),
+          quickActionsOpen: document.querySelector('[data-testid="quick-actions"]') !== null,
+          mapHeight: mapRect?.height ?? 0,
+          mapTop: mapRect?.top ?? -1,
+          mapVisible: Boolean(
+            mapRect &&
+              mapRect.width > 0 &&
+              mapRect.height > 0 &&
+              mapRect.top >= (navigatorRect?.bottom ?? 0) &&
+              mapRect.top < window.innerHeight
+          ),
+          priorityActionEnabled: priorityId !== '' && priorityId !== 'none' &&
+            priorityButton instanceof HTMLButtonElement && !priorityButton.disabled,
+          priorityId,
+          projectStatus: document.querySelector('[data-testid="project-status"]')?.textContent?.trim() ?? '',
+          resultAbsent: document.querySelector('[data-testid="arrangement-mute-map-result"]') === null,
+          routeFocusMatched: document.activeElement === routeTarget,
+          routeSettled: ${arrangementMuteMapRouteSettled ? "true" : "false"},
+          routeTargetInViewport: Boolean(
+            routeTarget instanceof HTMLElement &&
+              routeTarget.getBoundingClientRect().width > 0 &&
+              routeTarget.getBoundingClientRect().height > 0 &&
+              routeTarget.getBoundingClientRect().top >= (navigatorRect?.bottom ?? 0) &&
+              routeTarget.getBoundingClientRect().top < window.innerHeight
+          ),
+          routeTargetLabel: routeTarget?.getAttribute('aria-label') ?? '',
+          routeTargetRole: routeTarget?.getAttribute('role') ?? '',
+          routeTarget: posture(routeTarget),
+          structurePanel: posture(structurePanel),
+          tools: posture(tools),
+          toolsOpen: tools instanceof HTMLDetailsElement && tools.open,
+          outerPanel: posture(outerPanel),
+          navigatorBottom: navigatorRect?.bottom ?? -1,
+          viewportHeight: window.innerHeight
+        };
+      })();
+    `)) as {
+      activeZone: string;
+      ancestors: Array<{
+        display: string;
+        height: number;
+        hidden: boolean;
+        id: string;
+        tag: string;
+        testId: string;
+        visibility: string;
+      }>;
+      content: { display: string; height: number; hidden: boolean; visibility: string } | null;
+      quickActionsOpen: boolean;
+      mapHeight: number;
+      mapTop: number;
+      mapVisible: boolean;
+      navigatorBottom: number;
+      priorityActionEnabled: boolean;
+      priorityId: string;
+      projectStatus: string;
+      resultAbsent: boolean;
+      routeFocusMatched: boolean;
+      routeSettled: boolean;
+      routeTargetInViewport: boolean;
+      routeTargetLabel: string;
+      routeTargetRole: string;
+      routeTarget: { display: string; height: number; hidden: boolean; visibility: string } | null;
+      structurePanel: { display: string; height: number; hidden: boolean; visibility: string } | null;
+      tools: { display: string; height: number; hidden: boolean; visibility: string } | null;
+      toolsOpen: boolean;
+      outerPanel: { display: string; height: number; hidden: boolean; visibility: string } | null;
+      viewportHeight: number;
+    };
+    if (
+      !coldMuteMapRoute.mapVisible ||
+      !coldMuteMapRoute.priorityActionEnabled ||
+      !coldMuteMapRoute.resultAbsent ||
+      !coldMuteMapRoute.routeSettled ||
+      !coldMuteMapRoute.routeFocusMatched ||
+      !coldMuteMapRoute.routeTargetInViewport ||
+      coldMuteMapRoute.routeTargetRole !== "region" ||
+      coldMuteMapRoute.routeTargetLabel.length === 0
+    ) {
+      throw new Error(`Arrangement Mute Map cold route did not reveal an untouched priority surface: ${JSON.stringify(coldMuteMapRoute)}`);
+    }
+    onStep("native clicking the visible Mute Map priority action after the cold Quick Action route");
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "arrangement-mute-map-priority-run");
+    const afterArrangeStructureRoute = await readLaunchSmokeFunctionalTabState(win);
+    const arrangeStructureRoute = (await win.webContents.executeJavaScript(`
+      (() => {
+        const visible = (element) => {
+          if (!(element instanceof HTMLElement)) return false;
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+        };
+        const structurePanel = document.querySelector('[data-testid="arrange-structure-page"]');
+        const timelinePanel = document.querySelector('[data-testid="workflow-target-arrange"]');
+        const navigator = document.querySelector('[data-testid="workflow-navigator"]');
+        const navigatorRect = navigator?.getBoundingClientRect() ?? null;
+        const result = document.querySelector('[data-testid="arrangement-mute-map-result"]');
+        const resultRect = result?.getBoundingClientRect() ?? null;
+        return {
+          activePage:
+            document.querySelector('[data-testid="arrange-page-tabs"] [role="tab"][aria-selected="true"]')
+              ?.id?.replace("arrange-page-tab-", "") ?? "",
+          activeZone:
+            document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')
+              ?.id?.replace("workspace-tab-", "") ?? "",
+          arrangementToolsOpen: document.querySelector('[data-testid="arrangement-tools"]')?.open === true,
+          coldRouteResultAbsent: ${JSON.stringify(coldMuteMapRoute.resultAbsent)},
+          coldRouteSettled: ${JSON.stringify(coldMuteMapRoute.routeSettled)},
+          muteMapRouteFocused: ${JSON.stringify(coldMuteMapRoute.routeFocusMatched)},
+          muteMapRouteVisible: ${JSON.stringify(coldMuteMapRoute.mapVisible)},
+          priorityFocusMatched:
+            document.querySelector(
+              '[data-testid="arrangement-mute-map-lane-${coldMuteMapRoute.priorityId}"] button'
+            )?.getAttribute('aria-pressed') === 'true',
+          priorityResultLaneMatched:
+            result?.getAttribute('data-result-arrangement-mute-map') === ${JSON.stringify(coldMuteMapRoute.priorityId)},
+          resultInViewport: Boolean(
+            resultRect &&
+              resultRect.top >= (navigatorRect?.bottom ?? 0) &&
+              resultRect.bottom <= window.innerHeight &&
+              resultRect.left >= 0 &&
+              resultRect.right <= window.innerWidth
+          ),
+          resultVisible: visible(result),
+          structurePanelVisible:
+            structurePanel instanceof HTMLElement && visible(structurePanel) && structurePanel.hidden === false,
+          timelinePanelHidden: timelinePanel instanceof HTMLElement && timelinePanel.hidden === true
+        };
+      })();
+    `)) as Omit<
+      LaunchSmokeFunctionalTabsEvidence["arrangeStructureRoute"],
+      "historyDepthPreserved" | "historyDepthReady" | "projectFingerprintPreserved"
+    >;
+    const arrangeStructureRouteEvidence: LaunchSmokeFunctionalTabsEvidence["arrangeStructureRoute"] = {
+      ...arrangeStructureRoute,
+      historyDepthReady: beforeArrangeStructureRoute.historyDepthReady && afterArrangeStructureRoute.historyDepthReady,
+      historyDepthPreserved:
+        afterArrangeStructureRoute.historyDepthPosture === beforeArrangeStructureRoute.historyDepthPosture,
+      projectFingerprintPreserved:
+        afterArrangeStructureRoute.projectDataFingerprint === beforeArrangeStructureRoute.projectDataFingerprint
+    };
+    await win.webContents.executeJavaScript(
+      `document.querySelector('[data-testid="workflow-jump-arrange"]')?.focus({ preventScroll: true })`
+    );
     await sendHiddenComposeGuardKeys("arrange");
     onStep("deep scrolling Arrange while keeping the functional tablist visible");
     stickyNavigatorAfterDeepScroll.arrange = await collectLaunchSmokeStickyNavigatorAfterDeepScroll(win, "arrange");
     captures.arrange = await captureLaunchSmokeFunctionalTab(win, "arrange", evidenceDirectory);
+    const arrangePostureBeforeOuterTab = await readLaunchSmokeFunctionalTabState(win);
 
     onStep("using ArrowRight for Mix and guarding hidden Compose shortcuts");
     await sendLaunchSmokeFunctionalTabNativeKey(win, "Right");
@@ -4152,7 +4981,9 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     }
     mixTraversal.push({ input: "initial", page: mixInitial.activePage });
     mixStates.mixer = await readLaunchSmokeWorkspacePageState(win, "mix");
-    mixStates.master = await activateLaunchSmokeWorkspacePage(win, "mix", "master");
+    mixStates.master = await activateLaunchSmokeWorkspacePage(win, "mix", "master", {
+      requireNativeTabFocus: true
+    });
     mixTraversal.push({ input: "native-click", page: mixStates.master.activePage });
     await sendLaunchSmokeFunctionalTabNativeKey(win, "Left");
     let mixPageState = await readLaunchSmokeWorkspacePageState(win, "mix");
@@ -4205,6 +5036,11 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     traversal.push({ input: "ArrowRight", zone: returnedCompose.activeZone });
 
     onStep("transferring visible focus from a Mix Finish Checklist action to Compose");
+    await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-arrange");
+    const returnedArrange = await readLaunchSmokeFunctionalTabState(win);
+    const arrangePagePreservedAcrossOuterTabs =
+      returnedArrange.activeArrangePage === arrangePostureBeforeOuterTab.activeArrangePage &&
+      returnedArrange.arrangeEditorPosture === arrangePostureBeforeOuterTab.arrangeEditorPosture;
     await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-mix");
     const mixPagePreservedAcrossOuterTabs =
       (await readLaunchSmokeWorkspacePageState(win, "mix")).activePage === mixPageState.activePage;
@@ -4222,7 +5058,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     await clickLaunchSmokeFunctionalTabNativeTarget(win, focusTriggerTestId);
     const crossTabFocusTransfer = (await win.webContents.executeJavaScript(`
       (() => {
-        const activeTab = document.querySelector('[role="tab"][aria-selected="true"]');
+        const activeTab = document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]');
         const activePanel = activeTab
           ? document.getElementById(activeTab.getAttribute("aria-controls") ?? "")
           : null;
@@ -4329,7 +5165,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     for (let attempt = 0; attempt < 100; attempt += 1) {
       finishChecklistQuickActionSettled = (await win.webContents.executeJavaScript(`
         (() => {
-          const activeTab = document.querySelector('[role="tab"][aria-selected="true"]');
+          const activeTab = document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]');
           return (
             document.querySelector('[data-testid="quick-actions"]') === null &&
             activeTab?.id === "workspace-tab-mix" &&
@@ -4347,7 +5183,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     }
     const finishChecklistQuickActionReveal = (await win.webContents.executeJavaScript(`
       (() => {
-        const activeTab = document.querySelector('[role="tab"][aria-selected="true"]');
+        const activeTab = document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]');
         const activePanel = activeTab ? document.getElementById(activeTab.getAttribute('aria-controls') ?? '') : null;
         const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         const activeElementRect = activeElement?.getBoundingClientRect() ?? null;
@@ -4415,7 +5251,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     }
     const reviewQueueClosedPosture = (await win.webContents.executeJavaScript(`
       (() => ({
-        activeZone: document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace('workspace-tab-', '') ?? '',
+        activeZone: document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id?.replace('workspace-tab-', '') ?? '',
         masterReviewClosed: document.querySelector('[data-testid="master-review-tools"]')?.open === false,
         masterReviewQueueClosed: document.querySelector('[data-testid="master-review-queue-tools"]')?.open === false
       }))();
@@ -4501,7 +5337,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
           const rect = queue?.getBoundingClientRect();
           return (
             document.querySelector('[data-testid="quick-actions"]') === null &&
-            document.querySelector('[role="tab"][aria-selected="true"]')?.id === 'workspace-tab-mix' &&
+            document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id === 'workspace-tab-mix' &&
             document.querySelector('[data-testid="master-review-tools"]')?.open === true &&
             document.querySelector('[data-testid="master-review-queue-tools"]')?.open === true &&
             Boolean(rect && rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight && rect.bottom > 0)
@@ -4519,7 +5355,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
 
     const reviewQueueQuickActionReveal = (await win.webContents.executeJavaScript(`
       (() => {
-        const activeTab = document.querySelector('[role="tab"][aria-selected="true"]');
+        const activeTab = document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]');
         const activePanel = activeTab ? document.getElementById(activeTab.getAttribute('aria-controls') ?? '') : null;
         const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         const activeElementRect = activeElement?.getBoundingClientRect() ?? null;
@@ -4620,7 +5456,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     }
     const guidanceBeatPassportClosedPosture = (await win.webContents.executeJavaScript(`
       (() => ({
-        activeZone: document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace('workspace-tab-', '') ?? '',
+        activeZone: document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id?.replace('workspace-tab-', '') ?? '',
         guidanceCenterClosed: document.querySelector('[data-testid="guidance-center"]')?.open === false
       }))();
     `)) as { activeZone: string; guidanceCenterClosed: boolean };
@@ -4703,7 +5539,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
           const rect = passport?.getBoundingClientRect();
           return (
             document.querySelector('[data-testid="quick-actions"]') === null &&
-            document.querySelector('[role="tab"][aria-selected="true"]')?.id === 'workspace-tab-compose' &&
+            document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id === 'workspace-tab-compose' &&
             document.querySelector('[data-testid="guidance-center"]')?.open === true &&
             document.activeElement === passport &&
             Boolean(rect && rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight && rect.bottom > 0)
@@ -4721,7 +5557,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
 
     const guidanceBeatPassportQuickActionReveal = (await win.webContents.executeJavaScript(`
       (() => {
-        const activeTab = document.querySelector('[role="tab"][aria-selected="true"]');
+        const activeTab = document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]');
         const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         const activeElementRect = activeElement?.getBoundingClientRect() ?? null;
         const activeElementStyle = activeElement ? getComputedStyle(activeElement) : null;
@@ -4861,7 +5697,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
           const rect = transport?.getBoundingClientRect();
           return (
             document.querySelector('[data-testid="quick-actions"]') === null &&
-            document.querySelector('[role="tab"][aria-selected="true"]')?.id === 'workspace-tab-compose' &&
+            document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id === 'workspace-tab-compose' &&
             document.activeElement === transport &&
             Boolean(rect && rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight && rect.bottom > 0)
           );
@@ -4878,7 +5714,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
 
     const firstBeatPathTransportQuickActionReveal = (await win.webContents.executeJavaScript(`
       (() => {
-        const activeTab = document.querySelector('[role="tab"][aria-selected="true"]');
+        const activeTab = document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]');
         const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         const activeElementRect = activeElement?.getBoundingClientRect() ?? null;
         const activeElementStyle = activeElement ? getComputedStyle(activeElement) : null;
@@ -4946,6 +5782,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     const viewportWidth = (await win.webContents.executeJavaScript(`window.innerWidth`)) as number;
     const stateValues = Object.values(states);
     const evidence: LaunchSmokeFunctionalTabsEvidence = {
+      arrangeStructureRoute: arrangeStructureRouteEvidence,
       captures,
       composeRoundTrip: {
         dirtyPosturePreserved: returnedCompose.dirtyPosture === preparedCompose.dirtyPosture,
@@ -4979,6 +5816,9 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
       stickyNavigatorAfterDeepScroll,
       traversal,
       workspacePages: {
+        arrangeInitial,
+        arrangeStates,
+        arrangeTraversal,
         composeInitial,
         composeStates,
         composeTraversal,
@@ -4986,6 +5826,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
         mixStates,
         mixTraversal,
         pageStatePreservedAcrossOuterTabs: {
+          arrange: arrangePagePreservedAcrossOuterTabs,
           compose: returnedCompose.activeComposePage === preparedCompose.activeComposePage,
           mix: mixPagePreservedAcrossOuterTabs
         }
@@ -5004,6 +5845,8 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
       restored.undoRedoPosture === initial.undoRedoPosture &&
       restored.dirtyPosture === initial.dirtyPosture &&
       restored.playbackPosture === initial.playbackPosture &&
+      restored.arrangeDisclosurePosture === initial.arrangeDisclosurePosture &&
+      restored.activeArrangePage === initial.activeArrangePage &&
       restored.activeComposePage === initial.activeComposePage &&
       restored.activeMixPage === initial.activeMixPage;
     return evidence;
@@ -5294,7 +6137,7 @@ async function readLaunchSmokeAudioAnalysisTabPosture(
         return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
       };
       const tabs = Array.from(
-        document.querySelectorAll('[role="tablist"][aria-label="Workstation function tabs"] [role="tab"]')
+        document.querySelectorAll('[data-testid="workflow-navigator"] [role="tablist"] [role="tab"]')
       );
       const selectedTabs = tabs.filter((tab) => tab.getAttribute("aria-selected") === "true");
       const selectedTab = selectedTabs[0] ?? null;
@@ -5958,6 +6801,8 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         const composeDrumsButton = document.querySelector('[data-testid="compose-page-tab-drums"]');
         const composeNotesButton = document.querySelector('[data-testid="compose-page-tab-notes"]');
         const composeInstrumentsButton = document.querySelector('[data-testid="compose-page-tab-instruments"]');
+        const arrangeTimelineButton = document.querySelector('[data-testid="arrange-page-tab-timeline"]');
+        const arrangeStructureButton = document.querySelector('[data-testid="arrange-page-tab-structure"]');
         const mixMixerButton = document.querySelector('[data-testid="mix-page-tab-mixer"]');
         const mixMasterButton = document.querySelector('[data-testid="mix-page-tab-master"]');
         const workflowNavigator = document.querySelector('[data-testid="workflow-navigator"]');
@@ -5972,13 +6817,27 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         );
         arrangeButton?.click();
         await settle();
-        const arrangeVisibility = {
+        arrangeTimelineButton?.click();
+        await settle();
+        const arrangeTimelineVisibility = {
           arrangementPatternControlsVisible: visible(arrangementPatternControls),
           arrangementShapeControlsVisible: visible(arrangementShapeControls),
-          arrangementToolsToggleVisible: visible(arrangementToolsToggle),
           arrangementTrackStateControlsVisible: visible(arrangementTrackStateControls),
           blockMovesToggleVisible: visible(blockMovesToggle)
         };
+        const arrangementToolsInitiallyOpen = Boolean(arrangementTools?.open);
+        arrangeStructureButton?.click();
+        await settle();
+        const arrangeStructureVisibility = {
+          arrangementToolsToggleVisible: visible(arrangementToolsToggle)
+        };
+        if (Boolean(arrangementTools?.open) !== arrangementToolsInitiallyOpen) {
+          arrangementToolsToggle?.click();
+          await settle();
+        }
+        arrangeTimelineButton?.click();
+        await settle();
+        const arrangeVisibility = { ...arrangeTimelineVisibility, ...arrangeStructureVisibility };
         mixButton?.click();
         await settle();
         mixMixerButton?.click();
@@ -6467,7 +7326,7 @@ async function prepareLaunchSmokeBaseDomReadyPosture(win: BrowserWindow): Promis
           return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
         };
         const tabs = Array.from(document.querySelectorAll(
-          '[role="tablist"][aria-label="Workstation function tabs"] [role="tab"]'
+          '[data-testid="workflow-navigator"] [role="tablist"] [role="tab"]'
         ));
         const panels = ["compose", "arrange", "mix", "deliver"]
           .map((zone) => document.getElementById("workspace-panel-" + zone))
@@ -6564,7 +7423,8 @@ async function readLaunchSmokeModeToolZoneState(win: BrowserWindow): Promise<Lau
   return (await win.webContents.executeJavaScript(`
     (() => {
       const activeZone =
-        document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "";
+        document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')
+          ?.id?.replace("workspace-tab-", "") ?? "";
       const visible = (target) => {
         if (!(target instanceof HTMLElement)) return false;
         const rect = target.getBoundingClientRect();
@@ -6573,8 +7433,10 @@ async function readLaunchSmokeModeToolZoneState(win: BrowserWindow): Promise<Lau
       };
       const details = (testId) => document.querySelector('[data-testid="' + testId + '"]');
       const open = (testId) => details(testId) instanceof HTMLDetailsElement && details(testId).open;
+      const arrangeStructureSelected =
+        document.querySelector('[data-testid="arrange-page-tab-structure"]')?.getAttribute("aria-selected") === "true";
       const zoneSurfaceIds = {
-        arrange: "workflow-target-arrange",
+        arrange: arrangeStructureSelected ? "arrange-structure-page" : "workflow-target-arrange",
         compose: "workflow-target-sound",
         deliver: "handoff-pack",
         mix: document.querySelector('[data-testid="mix-page-tab-master"]')?.getAttribute("aria-selected") === "true"
@@ -6582,7 +7444,7 @@ async function readLaunchSmokeModeToolZoneState(win: BrowserWindow): Promise<Lau
           : "workflow-target-mix"
       };
       const zoneControlIds = {
-        arrange: ["block-moves-toggle", "arrangement-tools-toggle"],
+        arrange: arrangeStructureSelected ? ["arrangement-tools-toggle"] : ["block-moves-toggle"],
         compose: ["harmony-moves-toggle", "sound-design-toggle"],
         deliver: ["handoff-status-toggle", "handoff-audit-toggle"],
         mix: document.querySelector('[data-testid="mix-page-tab-master"]')?.getAttribute("aria-selected") === "true"
@@ -6594,10 +7456,13 @@ async function readLaunchSmokeModeToolZoneState(win: BrowserWindow): Promise<Lau
       return {
         activePage:
           activeZone === "compose"
-            ? document.querySelector('[role="tablist"][aria-label="Compose editor pages"] [role="tab"][aria-selected="true"]')
+            ? document.querySelector('[data-testid="compose-page-tabs"] [role="tab"][aria-selected="true"]')
                 ?.id?.replace("compose-page-tab-", "") ?? ""
+            : activeZone === "arrange"
+              ? document.querySelector('[data-testid="arrange-page-tabs"] [role="tab"][aria-selected="true"]')
+                  ?.id?.replace("arrange-page-tab-", "") ?? ""
             : activeZone === "mix"
-              ? document.querySelector('[role="tablist"][aria-label="Mix editor pages"] [role="tab"][aria-selected="true"]')
+              ? document.querySelector('[data-testid="mix-page-tabs"] [role="tab"][aria-selected="true"]')
                   ?.id?.replace("mix-page-tab-", "") ?? ""
               : "",
         activeZone,
@@ -6634,7 +7499,7 @@ async function waitForLaunchSmokeModeToolZoneState(
   const deadline = Date.now() + launchSmokePaletteUiSettleTimeoutMs;
   let state = await readLaunchSmokeModeToolZoneState(win);
   const expectedControlCount = (current: LaunchSmokeModeToolZoneState): number =>
-    zone === "mix" ? (current.activePage === "master" ? 2 : 3) : 2;
+    zone === "arrange" ? 1 : zone === "mix" ? (current.activePage === "master" ? 2 : 3) : 2;
   while (
     Date.now() < deadline &&
     !(
@@ -6670,6 +7535,8 @@ async function activateLaunchSmokeModeToolZone(
   }
   if (zone === "compose") {
     await activateLaunchSmokeWorkspacePage(win, "compose", "instruments");
+  } else if (zone === "arrange") {
+    await activateLaunchSmokeWorkspacePage(win, "arrange", "timeline");
   } else if (zone === "mix") {
     await activateLaunchSmokeWorkspacePage(win, "mix", "mixer");
   }
@@ -6682,6 +7549,7 @@ async function collectLaunchSmokeVisibleModeToolEvidence(
   const initialState = await readLaunchSmokeModeToolZoneState(win);
   const originalZone = initialState.activeZone || "compose";
   const originalComposePage = (await readLaunchSmokeWorkspacePageState(win, "compose")).activePage;
+  const originalArrangePage = (await readLaunchSmokeWorkspacePageState(win, "arrange")).activePage;
   const originalMixPage = (await readLaunchSmokeWorkspacePageState(win, "mix")).activePage;
   try {
     await setLaunchSmokeVisibleModeToolPosture(win, "guided");
@@ -6907,6 +7775,13 @@ async function collectLaunchSmokeVisibleModeToolEvidence(
         originalComposePage as LaunchSmokeComposeWorkspacePage
       ).catch(() => undefined);
     }
+    if (originalArrangePage) {
+      await activateLaunchSmokeWorkspacePage(
+        win,
+        "arrange",
+        originalArrangePage as LaunchSmokeArrangeWorkspacePage
+      ).catch(() => undefined);
+    }
     if (originalMixPage) {
       await activateLaunchSmokeWorkspacePage(win, "mix", originalMixPage as LaunchSmokeMixWorkspacePage).catch(
         () => undefined
@@ -6921,7 +7796,7 @@ async function collectLaunchSmokeVisibleModeToolEvidence(
 
 async function collectLaunchSmokeNativeChordCardEvidence(win: BrowserWindow): Promise<LaunchSmokeChordCardEvidence> {
   const originalZone = (await win.webContents.executeJavaScript(
-    `document.querySelector('[role="tablist"][aria-label="Workstation function tabs"] [role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "compose"`
+    `document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "compose"`
   )) as LaunchSmokeFunctionalTabZone;
   const originalComposePage = (await readLaunchSmokeWorkspacePageState(win, "compose")).activePage;
   await activateLaunchSmokeWorkspacePage(win, "compose", "instruments");
@@ -6993,7 +7868,7 @@ async function collectLaunchSmokeNativeChordCardEvidence(win: BrowserWindow): Pr
       ).catch(() => undefined);
     }
     const activeZone = (await win.webContents.executeJavaScript(
-      `document.querySelector('[role="tablist"][aria-label="Workstation function tabs"] [role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? ""`
+      `document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? ""`
     ).catch(() => "")) as string;
     if (activeZone !== originalZone) {
       await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${originalZone}`).catch(() => undefined);
@@ -7018,14 +7893,14 @@ async function readLaunchSmokePaletteSurfaceState(win: BrowserWindow): Promise<{
         const style = getComputedStyle(target);
         return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
       };
-      const activeTab = document.querySelector('[role="tab"][aria-selected="true"]');
+      const activeTab = document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]');
       const guide = document.querySelector('[data-testid="guidance-center"]');
       return {
         activeComposePage:
-          document.querySelector('[role="tablist"][aria-label="Compose editor pages"] [role="tab"][aria-selected="true"]')
+          document.querySelector('[data-testid="compose-page-tabs"] [role="tab"][aria-selected="true"]')
             ?.id?.replace("compose-page-tab-", "") ?? "",
         activeMixPage:
-          document.querySelector('[role="tablist"][aria-label="Mix editor pages"] [role="tab"][aria-selected="true"]')
+          document.querySelector('[data-testid="mix-page-tabs"] [role="tab"][aria-selected="true"]')
             ?.id?.replace("mix-page-tab-", "") ?? "",
         activeZone: activeTab?.id?.replace("workspace-tab-", "") ?? "",
         audienceStarterActionsVisible:
@@ -7564,7 +8439,7 @@ async function waitForLaunchSmokeStarterZoneSurface(
         const selectors = ${JSON.stringify(selectors)};
         return {
           activeZone:
-            document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "",
+            document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "",
           visibleTargetCount: selectors.filter((selector) => visible(document.querySelector(selector))).length
         };
       })();
@@ -7587,7 +8462,7 @@ async function activateLaunchSmokeStarterZoneSurface(
   expectedState: string
 ): Promise<void> {
   const activeZone = (await win.webContents.executeJavaScript(
-    `document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? ""`
+    `document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? ""`
   )) as string;
   if (activeZone !== zone) {
     await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${zone}`);
@@ -7732,7 +8607,7 @@ async function waitForLaunchSmokeStarterResponsiveMixSurface(win: BrowserWindow)
         }).length;
         return {
           activeZone:
-            document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "",
+            document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "",
           innerWidth: window.innerWidth,
           masterReviewContentVisible: visible(document.querySelector('[data-testid="master-review-content"]')),
           masterReviewOpen: document.querySelector('[data-testid="master-review-tools"]')?.open === true,
@@ -7847,7 +8722,7 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
   const originalSize = win.getSize();
   const originalViewportWidth = (await win.webContents.executeJavaScript(`window.innerWidth`)) as number;
   const originalZone = (await win.webContents.executeJavaScript(
-    `document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "compose"`
+    `document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "compose"`
   )) as LaunchSmokeFunctionalTabZone;
   const originalComposePage = (await readLaunchSmokeWorkspacePageState(win, "compose")).activePage;
   const originalMixPage = (await readLaunchSmokeWorkspacePageState(win, "mix")).activePage;
@@ -8218,7 +9093,7 @@ async function collectLaunchSmokeStarterLandingEvidence(win: BrowserWindow): Pro
       );
     }
     const activeZone = (await win.webContents.executeJavaScript(
-      `document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? ""`
+      `document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? ""`
     ).catch(() => "")) as string;
     if (activeZone !== originalZone) {
       await clickLaunchSmokeFunctionalTabNativeTarget(win, `workflow-jump-${originalZone}`).catch(() => undefined);
@@ -9109,6 +9984,91 @@ async function collectLaunchSmokeModalFocusEvidence(
         };
       })();
     `);
+  const settingsIsolationSnapshot = (): Promise<{
+    historyDepthPosture: string;
+    historyDepthReady: boolean;
+    projectFingerprint: string;
+  }> =>
+    runStep<{ historyDepthPosture: string; historyDepthReady: boolean; projectFingerprint: string }>(`
+      (() => {
+        const outsideSettings = (element) => !element.closest('[data-testid="settings-overlay"]');
+        const identity = (element) => element.getAttribute('data-testid') ?? element.id ?? element.getAttribute('name') ?? element.tagName;
+        const formControls = Array.from(document.querySelectorAll('main.app-shell input, main.app-shell select, main.app-shell textarea'))
+          .filter(outsideSettings)
+          .map((element) => ({
+            checked: element instanceof HTMLInputElement && (element.type === 'checkbox' || element.type === 'radio')
+              ? element.checked
+              : null,
+            id: identity(element),
+            value: element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement
+              ? element.value
+              : ''
+          }));
+        const pressedControls = Array.from(document.querySelectorAll('main.app-shell [aria-pressed]'))
+          .filter(outsideSettings)
+          .map((element) => ({ id: identity(element), pressed: element.getAttribute('aria-pressed') }));
+        const disclosurePosture = Array.from(document.querySelectorAll('main.app-shell details'))
+          .filter(outsideSettings)
+          .map((element) => ({ id: identity(element), open: element instanceof HTMLDetailsElement && element.open }));
+        const historyReadout = document.querySelector('[data-testid="edit-history-readout"]');
+        const redoDepth = historyReadout?.getAttribute('data-redo-depth') ?? '';
+        const undoDepth = historyReadout?.getAttribute('data-undo-depth') ?? '';
+        return {
+          historyDepthPosture: JSON.stringify({
+            redoDepth,
+            redoDisabled: document.querySelector('[data-testid="redo-button"]')?.disabled === true,
+            undoDepth,
+            undoDisabled: document.querySelector('[data-testid="undo-button"]')?.disabled === true
+          }),
+          historyDepthReady:
+            historyReadout instanceof HTMLElement && /^\\d+$/.test(redoDepth) && /^\\d+$/.test(undoDepth),
+          projectFingerprint: JSON.stringify({ disclosurePosture, formControls, pressedControls }),
+        };
+      })();
+    `);
+  const settingsWorkspaceGuardCheckpoint = async (
+    label: string
+  ): Promise<LaunchSmokeModalFocusEvidence["settingsLocalization"]["workspaceGuardCheckpoints"][number]> => {
+    const isolation = await settingsIsolationSnapshot();
+    const rendererPosture = await runStep<{
+      activeElementTestId: string;
+      dialogOpen: boolean;
+      playbackPosture: string;
+    }>(`
+      (() => ({
+        activeElementTestId:
+          document.activeElement instanceof HTMLElement
+            ? document.activeElement.getAttribute('data-testid') ?? ''
+            : '',
+        dialogOpen: document.querySelector('[data-testid="settings-dialog"]') !== null,
+        playbackPosture: JSON.stringify({
+          dock: document.querySelector('[data-testid="workspace-command-dock-play"]')?.getAttribute('aria-pressed') ?? 'missing',
+          transport: document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') ?? 'missing'
+        })
+      }))();
+    `);
+    return {
+      activeElementTestId: rendererPosture.activeElementTestId,
+      dialogOpen: rendererPosture.dialogOpen,
+      historyDepthPosture: isolation.historyDepthPosture,
+      label,
+      playbackPosture: rendererPosture.playbackPosture,
+      projectFingerprintSha256: createHash("sha256").update(isolation.projectFingerprint).digest("hex")
+    };
+  };
+  const focusSettingsWorkspaceGuardTarget = async (): Promise<void> => {
+    const focused = await runStep<boolean>(`
+      (() => {
+        const dialog = document.querySelector('[data-testid="settings-dialog"]');
+        if (!(dialog instanceof HTMLElement)) return false;
+        dialog.focus({ preventScroll: true });
+        return document.activeElement === dialog && dialog.getAttribute('data-testid') === 'settings-dialog';
+      })();
+    `);
+    if (!focused) {
+      throw new Error("Could not focus the non-editable Settings dialog guard target.");
+    }
+  };
   const waitFor = async (condition: string, timeoutMs = 30000): Promise<void> => {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() <= deadline) {
@@ -9156,6 +10116,234 @@ async function collectLaunchSmokeModalFocusEvidence(
     win.webContents.sendInputEvent({ type: "mouseUp", x: point.x, y: point.y, button: "left", clickCount: 1 });
     await new Promise((resolve) => setTimeout(resolve, 80));
   };
+  const reloadRenderer = async (): Promise<void> => {
+    allowLaunchSmokeRendererReload = true;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        let timeout: NodeJS.Timeout;
+        const handleLoad = (): void => {
+          clearTimeout(timeout);
+          resolve();
+        };
+        timeout = setTimeout(() => {
+          win.webContents.removeListener("did-finish-load", handleLoad);
+          reject(new Error("Timed out reloading the renderer during Settings localization smoke."));
+        }, 60000);
+        win.webContents.once("did-finish-load", handleLoad);
+        win.webContents.reload();
+      });
+    } finally {
+      allowLaunchSmokeRendererReload = false;
+    }
+    await waitFor(`document.querySelector('main.app-shell') !== null`, 60000);
+  };
+  const readNativeMenuLabelTree = (): LaunchSmokeNativeMenuTree => {
+    const menu = Menu.getApplicationMenu();
+    if (!menu) {
+      return [];
+    }
+
+    return menu.items.map((item) => ({
+      items: (item.submenu?.items ?? [])
+        .filter((subitem) => subitem.type !== "separator")
+        .map((subitem) => subitem.label),
+      label: item.label
+    }));
+  };
+  const expectedNativeMenuLabelTree = (locale: NativeMenuLocale): LaunchSmokeNativeMenuTree => {
+    const expected = {
+      en: {
+        app: [
+          "About GrooveForge",
+          "Services",
+          "Hide GrooveForge",
+          "Hide Others",
+          "Show All",
+          "Quit GrooveForge"
+        ],
+        edit: ["Undo", "Redo", "Cut", "Copy", "Paste", "Delete Selected Event"],
+        file: ["Open Project...", "Save Project"],
+        help: ["Check for Updates...", "Command Reference", "GrooveForge Local Workstation"],
+        topLevel: ["File", "Edit", "Transport", "View", "Window", "Help"],
+        transport: ["Play / Stop", "Quick Actions"],
+        view: ["Reload", "Force Reload", "Actual Size", "Zoom In", "Zoom Out", "Toggle Full Screen"],
+        window: ["Minimize", "Zoom", "Bring All to Front"]
+      },
+      ko: {
+        app: [
+          "GrooveForge 정보",
+          "서비스",
+          "GrooveForge 가리기",
+          "다른 앱 가리기",
+          "모두 보기",
+          "GrooveForge 종료"
+        ],
+        edit: ["실행 취소", "다시 실행", "오려두기", "복사", "붙여넣기", "선택한 이벤트 삭제"],
+        file: ["프로젝트 열기...", "프로젝트 저장"],
+        help: ["업데이트 확인...", "명령 도움말", "GrooveForge 로컬 워크스테이션"],
+        topLevel: ["파일", "편집", "재생", "보기", "윈도우", "도움말"],
+        transport: ["재생 / 정지", "빠른 작업"],
+        view: ["새로고침", "강제로 새로고침", "실제 크기", "확대", "축소", "전체 화면 전환"],
+        window: ["최소화", "확대/축소", "모두 앞으로 가져오기"]
+      }
+    } as const;
+    const localeOracle = expected[locale];
+    const submenuOracles = [
+      localeOracle.file,
+      localeOracle.edit,
+      localeOracle.transport,
+      localeOracle.view,
+      localeOracle.window,
+      localeOracle.help
+    ] as const;
+    const tree: LaunchSmokeNativeMenuTree = localeOracle.topLevel.map((label, index) => ({
+      items: [...submenuOracles[index]],
+      label
+    }));
+    if (process.platform === "darwin") {
+      tree.unshift({ items: [...localeOracle.app], label: "GrooveForge" });
+    } else {
+      tree[0]?.items.push(locale === "ko" ? "GrooveForge 종료" : "Quit GrooveForge");
+      tree[4] = { items: tree[4]?.items.slice(0, 2) ?? [], label: tree[4]?.label ?? "" };
+    }
+    return tree;
+  };
+  const nativeMenuMatchesLocale = (locale: NativeMenuLocale): boolean => {
+    return JSON.stringify(readNativeMenuLabelTree()) === JSON.stringify(expectedNativeMenuLabelTree(locale));
+  };
+  const waitForNativeMenuLocale = async (locale: NativeMenuLocale): Promise<boolean> => {
+    const deadline = Date.now() + 30000;
+    while (Date.now() <= deadline) {
+      if (nativeMenuMatchesLocale(locale)) {
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    return false;
+  };
+  const readLocalizedLayoutSnapshot = (): Promise<LaunchSmokeLocalizedLayoutSnapshot> =>
+    runStep<LaunchSmokeLocalizedLayoutSnapshot>(`
+      (() => {
+        const appShell = document.querySelector('main.app-shell');
+        const mainTabList = document.querySelector('.workflow-navigator-grid');
+        const mainTabs = Array.from(mainTabList?.querySelectorAll('.workflow-navigator-card') ?? []);
+        const mainSelected = mainTabs.find((tab) => tab.getAttribute('aria-selected') === 'true') ?? null;
+        const subTabList = document.querySelector('[data-testid="compose-page-tabs"] .workspace-page-tablist');
+        const subTabs = Array.from(subTabList?.querySelectorAll('.workspace-page-tab') ?? []);
+        const subSelected = subTabs.find((tab) => tab.getAttribute('aria-selected') === 'true') ?? null;
+        const settings = document.querySelector('[data-testid="settings-dialog"]');
+        const settingsOptions = document.querySelector('.settings-language-options');
+        const optionCards = Array.from(document.querySelectorAll('.settings-language-option'));
+        const rect = (element) => element?.getBoundingClientRect() ?? null;
+        const contained = (elementRect) => Boolean(
+          elementRect &&
+          elementRect.left >= -0.5 &&
+          elementRect.right <= innerWidth + 0.5 &&
+          elementRect.top >= -0.5 &&
+          elementRect.bottom <= innerHeight + 0.5
+        );
+        const horizontallyContained = (elementRect) => Boolean(
+          elementRect && elementRect.left >= -0.5 && elementRect.right <= innerWidth + 0.5
+        );
+        const selectedContained = (selected, list) => {
+          const selectedRect = rect(selected);
+          const listRect = rect(list);
+          return Boolean(
+            selectedRect &&
+            listRect &&
+            selectedRect.left >= listRect.left - 0.5 &&
+            selectedRect.right <= listRect.right + 0.5
+          );
+        };
+        const minimum = (values) => values.length > 0 ? Math.min(...values) : 0;
+        const horizontalOverflow = (element) => element
+          ? Math.max(0, Math.round(element.scrollWidth - element.clientWidth))
+          : -1;
+        const appRect = rect(appShell);
+        const optionColumns = new Set(optionCards.map((option) => Math.round(option.getBoundingClientRect().left)));
+        return {
+          appOverflowX: appRect
+            ? Math.max(0, Math.round(-appRect.left), Math.round(appRect.right - innerWidth))
+            : -1,
+          documentOverflowX: Math.max(0, Math.round(document.documentElement.scrollWidth - document.documentElement.clientWidth)),
+          mainSelectedFullyVisible: selectedContained(mainSelected, mainTabList),
+          mainTabCount: mainTabs.length,
+          mainTabListContained: horizontallyContained(rect(mainTabList)),
+          mainTabListOverflowX: mainTabList ? getComputedStyle(mainTabList).overflowX : '',
+          mainTabListScrollOverflow: horizontalOverflow(mainTabList),
+          mainTabMinimumHeight: minimum(mainTabs.map((tab) => tab.getBoundingClientRect().height)),
+          mainTabMinimumLabelFontSize: minimum(mainTabs.map((tab) => {
+            const label = tab.querySelector('strong');
+            return label ? Number.parseFloat(getComputedStyle(label).fontSize) : 0;
+          })),
+          settingsColumnCount: optionColumns.size,
+          settingsContained: contained(rect(settings)),
+          settingsHorizontalOverflow: horizontalOverflow(settings),
+          settingsMinimumOptionHeight: minimum(optionCards.map((option) => option.getBoundingClientRect().height)),
+          settingsOptionCount: optionCards.length,
+          subSelectedFullyVisible: selectedContained(subSelected, subTabList),
+          subTabCount: subTabs.length,
+          subTabListContained: horizontallyContained(rect(subTabList)),
+          subTabListOverflowX: subTabList ? getComputedStyle(subTabList).overflowX : '',
+          subTabListScrollOverflow: horizontalOverflow(subTabList),
+          subTabMinimumHeight: minimum(subTabs.map((tab) => tab.getBoundingClientRect().height)),
+          subTabMinimumLabelFontSize: minimum(subTabs.map((tab) => {
+            const label = tab.querySelector('.workspace-page-tab-copy strong');
+            return label ? Number.parseFloat(getComputedStyle(label).fontSize) : 0;
+          })),
+          viewportWidth: innerWidth
+        };
+      })();
+    `);
+  const captureKoreanLocalizedLayouts = async (): Promise<{
+    minimum: LaunchSmokeLocalizedLayoutSnapshot;
+    narrow: LaunchSmokeLocalizedLayoutSnapshot;
+  }> => {
+    const originalContentSize = win.getContentSize();
+    const originalMinimumSize = win.getMinimumSize();
+    const settleAtWidth = async (width: number): Promise<void> => {
+      await waitFor(`innerWidth === ${width}`);
+      await runStep(`new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+      await runStep(`
+        (() => {
+          for (const selector of [
+            '.workflow-navigator-grid',
+            '[data-testid="compose-page-tabs"] .workspace-page-tablist'
+          ]) {
+            const list = document.querySelector(selector);
+            const selected = list?.querySelector('[aria-selected="true"]');
+            if (!list || !selected) continue;
+            const listRect = list.getBoundingClientRect();
+            const selectedRect = selected.getBoundingClientRect();
+            if (selectedRect.left < listRect.left) {
+              list.scrollLeft -= listRect.left - selectedRect.left;
+            } else if (selectedRect.right > listRect.right) {
+              list.scrollLeft += selectedRect.right - listRect.right;
+            }
+          }
+        })();
+      `);
+      await runStep(`new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+    };
+
+    try {
+      onStep("capturing Korean Settings and tabs at the 1180px minimum width");
+      win.setContentSize(1180, 800);
+      await settleAtWidth(1180);
+      const minimum = await readLocalizedLayoutSnapshot();
+
+      onStep("capturing Korean Settings and tabs at a 390px narrow width");
+      win.setMinimumSize(390, 760);
+      win.setContentSize(390, 800);
+      await settleAtWidth(390);
+      const narrow = await readLocalizedLayoutSnapshot();
+      return { minimum, narrow };
+    } finally {
+      win.setContentSize(originalContentSize[0], originalContentSize[1]);
+      win.setMinimumSize(originalMinimumSize[0], originalMinimumSize[1]);
+      await settleAtWidth(originalContentSize[0]);
+    }
+  };
   const readDockPlayPosture = (): Promise<LaunchSmokeDockPlayPostureEvidence> =>
     runStep<LaunchSmokeDockPlayPostureEvidence>(`
       (() => {
@@ -9176,7 +10364,7 @@ async function collectLaunchSmokeModalFocusEvidence(
         return {
           activeTestId: document.activeElement instanceof HTMLElement ? document.activeElement.dataset.testid ?? "" : "",
           activeZone:
-            document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "",
+            document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id?.replace("workspace-tab-", "") ?? "",
           disabled: dockPlay instanceof HTMLButtonElement ? dockPlay.disabled : true,
           dockPressed: dockPlay?.getAttribute("aria-pressed") ?? "missing",
           dockText: dockPlay?.textContent?.trim() ?? "",
@@ -9488,6 +10676,268 @@ async function collectLaunchSmokeModalFocusEvidence(
     await waitFor(`document.activeElement?.dataset?.testid === ${JSON.stringify(dockPlayOriginal.activeTestId)}`);
   }
 
+  onStep("preparing the visible Compose tab hierarchy for localized layout evidence");
+  await runStep(`
+    (() => {
+      document.querySelector('[data-testid="workflow-jump-compose"]')?.click();
+      document.querySelector('[data-testid="compose-page-tab-drums"]')?.click();
+      window.scrollTo(0, 0);
+    })();
+  `);
+  await waitFor(`
+    document.querySelector('[data-testid="workflow-jump-compose"]')?.getAttribute('aria-selected') === 'true' &&
+      document.querySelector('[data-testid="compose-page-tab-drums"]')?.getAttribute('aria-selected') === 'true'
+  `);
+
+  onStep("switching Settings to Korean with native input");
+  const settingsProjectBefore = await settingsIsolationSnapshot();
+  await sendClick("settings-open");
+  await waitFor(
+    `document.querySelector('[data-testid="settings-dialog"]') !== null && document.activeElement?.dataset?.testid === 'settings-language-en'`
+  );
+  const settingsInitialFocusReady = await runStep<boolean>(`
+    document.activeElement?.dataset?.testid === "settings-language-en" &&
+      document.querySelector('[data-testid="settings-language-en"]')?.checked === true
+  `);
+  await runStep(`
+    (() => {
+      window.__grooveforgeLaunchSmokeOriginalSetItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = () => { throw new Error('launch-smoke blocked locale write'); };
+    })();
+  `);
+  await sendClick("settings-language-ko");
+  await waitFor(`
+    document.querySelector('main.app-shell')?.getAttribute('data-locale') === 'ko' &&
+      document.querySelector('[data-testid="settings-persistence"]')?.getAttribute('data-persistence') === 'session' &&
+      document.querySelector('[data-testid="settings-persistence"]')?.textContent?.includes('이번 실행에서만 적용') === true
+  `);
+  const writeFailureSessionReady = await runStep<boolean>(`
+    document.querySelector('[data-testid="settings-language-ko"]')?.checked === true &&
+      document.querySelector('[data-testid="settings-persistence"]')?.getAttribute('data-persistence') === 'session' &&
+      document.querySelector('[data-testid="settings-persistence"]')?.textContent?.includes('기기 저장소를 사용할 수 없습니다.') === true
+  `);
+  await runStep(`
+    (() => {
+      const original = window.__grooveforgeLaunchSmokeOriginalSetItem;
+      if (typeof original === 'function') Storage.prototype.setItem = original;
+      delete window.__grooveforgeLaunchSmokeOriginalSetItem;
+    })();
+  `);
+  await sendClick("settings-language-en");
+  await waitFor(`
+    document.querySelector('main.app-shell')?.getAttribute('data-locale') === 'en' &&
+      document.querySelector('[data-testid="settings-persistence"]')?.getAttribute('data-persistence') === 'device' &&
+      localStorage.getItem('grooveforge.ui.locale.v1') === 'en'
+  `);
+  await sendClick("settings-language-ko");
+  await waitFor(`
+    document.querySelector('main.app-shell')?.getAttribute('data-locale') === 'ko' &&
+      document.documentElement.lang === 'ko' &&
+      localStorage.getItem('grooveforge.ui.locale.v1') === 'ko'
+  `);
+  const koreanState = await runStep<{
+    immediateReady: boolean;
+    labelsReady: boolean;
+    storagePersisted: boolean;
+  }>(`
+    (() => ({
+      immediateReady:
+        document.querySelector('main.app-shell')?.getAttribute('data-locale') === 'ko' &&
+        document.documentElement.lang === 'ko' &&
+        document.querySelector('[data-testid="settings-language-ko"]')?.checked === true,
+      labelsReady:
+        document.querySelector('#settings-title')?.textContent?.trim() === '설정' &&
+        document.querySelector('[data-testid="workflow-navigator"]')?.textContent?.includes('메인 탭') === true &&
+        document.querySelector('[data-testid="compose-page-tabs"]')?.textContent?.includes('서브 탭') === true,
+      storagePersisted: localStorage.getItem('grooveforge.ui.locale.v1') === 'ko'
+    }))();
+  `);
+  const firstKoreanMenuReady = await waitForNativeMenuLocale("ko");
+  await sendClick("settings-language-en");
+  await waitFor(`
+    document.querySelector('main.app-shell')?.getAttribute('data-locale') === 'en' &&
+      document.documentElement.lang === 'en' &&
+      document.querySelector('[data-testid="settings-language-en"]')?.checked === true &&
+      localStorage.getItem('grooveforge.ui.locale.v1') === 'en'
+  `);
+  const englishImmediateReady = await runStep<boolean>(`
+    document.querySelector('main.app-shell')?.getAttribute('data-locale') === 'en' &&
+      document.documentElement.lang === 'en' &&
+      document.querySelector('[data-testid="settings-language-en"]')?.checked === true &&
+      document.querySelector('[data-testid="settings-language-ko"]')?.checked === false &&
+      document.querySelector('#settings-title')?.textContent?.trim() === 'Settings'
+  `);
+  const englishMenuReady = await waitForNativeMenuLocale("en");
+  const englishMenuTree = readNativeMenuLabelTree();
+  await sendClick("settings-language-ko");
+  await waitFor(`
+    document.querySelector('main.app-shell')?.getAttribute('data-locale') === 'ko' &&
+      document.documentElement.lang === 'ko' &&
+      document.querySelector('[data-testid="settings-language-ko"]')?.checked === true &&
+      localStorage.getItem('grooveforge.ui.locale.v1') === 'ko'
+  `);
+  const koreanMenuReady = firstKoreanMenuReady && (await waitForNativeMenuLocale("ko"));
+  const koreanMenuTree = readNativeMenuLabelTree();
+  const secondKoreanLabelsReady = await runStep<boolean>(`
+    document.querySelector('#settings-title')?.textContent?.trim() === '설정' &&
+      document.querySelector('[data-testid="workflow-navigator"]')?.textContent?.includes('메인 탭') === true &&
+      document.querySelector('[data-testid="compose-page-tabs"]')?.textContent?.includes('서브 탭') === true
+  `);
+  const koreanLayout = await captureKoreanLocalizedLayouts();
+  const settingsBackdropHit = await runStep<{ x: number; y: number } | null>(`
+    (() => {
+      const overlay = document.querySelector('[data-testid="settings-overlay"]');
+      const dialog = document.querySelector('[data-testid="settings-dialog"]');
+      if (!(overlay instanceof HTMLElement) || !(dialog instanceof HTMLElement)) return null;
+      const overlayRect = overlay.getBoundingClientRect();
+      const dialogRect = dialog.getBoundingClientRect();
+      const outsideDialog = (x, y) =>
+        x < dialogRect.left || x > dialogRect.right || y < dialogRect.top || y > dialogRect.bottom;
+      for (const yFraction of [0.5, 0.75, 0.25, 0.9, 0.1]) {
+        for (const xFraction of [0.02, 0.98, 0.5]) {
+          const x = Math.round(overlayRect.left + overlayRect.width * xFraction);
+          const y = Math.round(overlayRect.top + overlayRect.height * yFraction);
+          if (outsideDialog(x, y) && document.elementFromPoint(x, y) === overlay) {
+            return { x, y };
+          }
+        }
+      }
+      return null;
+    })();
+  `);
+  if (!settingsBackdropHit) {
+    throw new Error("Could not locate a visible Settings backdrop point outside the dialog.");
+  }
+  win.webContents.focus();
+  win.webContents.sendInputEvent({ type: "mouseMove", x: settingsBackdropHit.x, y: settingsBackdropHit.y });
+  win.webContents.sendInputEvent({
+    type: "mouseDown",
+    x: settingsBackdropHit.x,
+    y: settingsBackdropHit.y,
+    button: "left",
+    clickCount: 1
+  });
+  win.webContents.sendInputEvent({
+    type: "mouseUp",
+    x: settingsBackdropHit.x,
+    y: settingsBackdropHit.y,
+    button: "left",
+    clickCount: 1
+  });
+  await waitFor(`document.querySelector('[data-testid="settings-dialog"]') === null`);
+  await waitFor(
+    `document.activeElement?.dataset?.testid === 'settings-open'`
+  );
+  const settingsBackdropClosed = await runStep<{ closed: boolean; focusRestored: boolean }>(`
+    (() => ({
+      closed: document.querySelector('[data-testid="settings-dialog"]') === null,
+      focusRestored: document.activeElement?.dataset?.testid === 'settings-open'
+    }))();
+  `);
+  await sendClick("settings-open");
+  await waitFor(`
+    document.querySelector('[data-testid="settings-dialog"]') !== null &&
+      document.activeElement?.dataset?.testid === 'settings-language-ko' &&
+      document.querySelector('[data-testid="settings-language-ko"]')?.checked === true
+  `);
+  onStep("proving Settings blocks representative keyboard and native-menu workspace mutations");
+  await focusSettingsWorkspaceGuardTarget();
+  const workspaceGuardCheckpoints: LaunchSmokeModalFocusEvidence["settingsLocalization"]["workspaceGuardCheckpoints"] = [
+    await settingsWorkspaceGuardCheckpoint("baseline")
+  ];
+  await sendKey("Space");
+  workspaceGuardCheckpoints.push(await settingsWorkspaceGuardCheckpoint("keyboard-space"));
+  await focusSettingsWorkspaceGuardTarget();
+  await sendKey("Z", commandModifier);
+  workspaceGuardCheckpoints.push(await settingsWorkspaceGuardCheckpoint("keyboard-undo"));
+  activateNativeMenuCommandForSmoke(win, "toggle-playback");
+  await new Promise((resolve) => setTimeout(resolve, 140));
+  workspaceGuardCheckpoints.push(await settingsWorkspaceGuardCheckpoint("native-menu-playback"));
+  activateNativeMenuCommandForSmoke(win, "undo");
+  await new Promise((resolve) => setTimeout(resolve, 140));
+  workspaceGuardCheckpoints.push(await settingsWorkspaceGuardCheckpoint("native-menu-undo"));
+  await sendKey("K", commandModifier);
+  const settingsShortcutBlocked = await runStep<boolean>(`
+    document.querySelector('[data-testid="settings-dialog"]') !== null &&
+      document.querySelector('[data-testid="quick-actions"]') === null
+  `);
+  activateNativeMenuCommandForSmoke(win, "quick-actions");
+  await new Promise((resolve) => setTimeout(resolve, 140));
+  const settingsNativeMenuShortcutBlocked = await runStep<boolean>(`
+    document.querySelector('[data-testid="settings-dialog"]') !== null &&
+      document.querySelector('[data-testid="quick-actions"]') === null
+  `);
+  const settingsProjectAfter = await settingsIsolationSnapshot();
+  await sendKey("Escape");
+  await waitFor(
+    `document.querySelector('[data-testid="settings-dialog"]') === null && document.activeElement?.dataset?.testid === 'settings-open'`
+  );
+  const settingsClosed = await runStep<{ escapeClosed: boolean; focusRestored: boolean }>(`
+    (() => ({
+      escapeClosed: document.querySelector('[data-testid="settings-dialog"]') === null,
+      focusRestored: document.activeElement?.dataset?.testid === 'settings-open'
+    }))();
+  `);
+
+  onStep("reloading to prove Korean locale persistence");
+  await reloadRenderer();
+  await waitFor(`
+    document.querySelector('main.app-shell')?.getAttribute('data-locale') === 'ko' &&
+      document.documentElement.lang === 'ko'
+  `, 60000);
+  const reloadPersisted = await runStep<boolean>(`
+    document.querySelector('main.app-shell')?.getAttribute('data-locale') === 'ko' &&
+      document.documentElement.lang === 'ko' &&
+      localStorage.getItem('grooveforge.ui.locale.v1') === 'ko' &&
+      document.querySelector('[data-testid="workflow-navigator"]')?.textContent?.includes('메인 탭') === true
+  `);
+  const reloadMenuReady = await waitForNativeMenuLocale("ko");
+
+  onStep("recovering an invalid stored locale to English");
+  await runStep(`localStorage.setItem('grooveforge.ui.locale.v1', 'invalid-locale')`);
+  await reloadRenderer();
+  await waitFor(`
+    document.querySelector('main.app-shell')?.getAttribute('data-locale') === 'en' &&
+      document.documentElement.lang === 'en'
+  `, 60000);
+  const corruptFallbackReady = await runStep<boolean>(`
+    document.querySelector('main.app-shell')?.getAttribute('data-locale') === 'en' &&
+      document.documentElement.lang === 'en' &&
+      localStorage.getItem('grooveforge.ui.locale.v1') === 'en' &&
+      document.querySelector('[data-testid="workflow-navigator"]')?.textContent?.includes('MAIN TABS') === true
+  `);
+  const englishMenuRestored = await waitForNativeMenuLocale("en");
+  const settingsLocalization: LaunchSmokeModalFocusEvidence["settingsLocalization"] = {
+    backdropClosed: settingsBackdropClosed.closed,
+    backdropFocusRestored: settingsBackdropClosed.focusRestored,
+    corruptFallbackReady,
+    englishImmediateReady,
+    englishMenuReady,
+    englishMenuRestored,
+    englishMenuTree,
+    escapeClosed: settingsClosed.escapeClosed,
+    focusRestored: settingsClosed.focusRestored,
+    initialFocusReady: settingsInitialFocusReady,
+    koreanImmediateReady: koreanState.immediateReady,
+    koreanLabelsReady: koreanState.labelsReady,
+    koreanLayout,
+    koreanMenuReady,
+    koreanMenuTree,
+    historyDepthReady: settingsProjectBefore.historyDepthReady && settingsProjectAfter.historyDepthReady,
+    nativeMenuShortcutBlocked: settingsNativeMenuShortcutBlocked,
+    projectFingerprintPreserved:
+      settingsProjectAfter.projectFingerprint === settingsProjectBefore.projectFingerprint,
+    reloadMenuReady,
+    reloadPersisted,
+    secondKoreanLabelsReady,
+    shortcutBlocked: settingsShortcutBlocked,
+    storagePersisted: koreanState.storagePersisted,
+    undoPosturePreserved:
+      settingsProjectAfter.historyDepthPosture === settingsProjectBefore.historyDepthPosture,
+    workspaceGuardCheckpoints,
+    writeFailureSessionReady
+  };
+
   onStep("modal focus evidence complete");
   return {
     commandShortcutFromEditable,
@@ -9561,6 +11011,7 @@ async function collectLaunchSmokeModalFocusEvidence(
     quickKeyboardResultTitle: keyboardAfterEnter.resultTitle,
     quickKeyboardSelectedTitle: keyboardBeforeEnter.title,
     quickShortcutFromEditable,
+    settingsLocalization,
     switchFocusRestored: !switchClosed.open && switchClosed.activeTestId === "project-title-input",
     switchInitialFocus: switchInitial.activeTestId
   };
@@ -13421,23 +14872,18 @@ function createWindow(): void {
   });
 
   win.webContents.on("will-prevent-unload", (event) => {
+    if (isLaunchSmoke && allowLaunchSmokeRendererReload) {
+      // Settings persistence smoke만 기존 dirty 상태를 유지한 채 renderer를 재로딩한다.
+      event.preventDefault();
+      return;
+    }
     if (isCloseFlowSmoke) {
       closeFlowSmokeState.willPreventUnloadCount += 1;
       closeFlowSmokeState.events.push("first-close-prevented");
     }
     const choice = isCloseFlowSmoke
       ? saveAndCloseChoiceId
-      : dialog.showMessageBoxSync(win, {
-          type: "warning",
-          buttons: ["Save and close", "Close without a project file", "Keep editing"],
-          defaultId: saveAndCloseChoiceId,
-          cancelId: keepEditingChoiceId,
-          title: "Unsaved GrooveForge work",
-          message: "Save this project before closing GrooveForge?",
-          detail:
-            "Save and close creates a durable .grooveforge.json project file. Newer edits or a recovery draft that has not been restored keep GrooveForge open for review.",
-          noLink: true
-        });
+      : dialog.showMessageBoxSync(win, createNativeUnsavedCloseDialogOptions(nativeMenuLocale));
     if (isCloseFlowSmoke) {
       closeFlowSmokeState.smokeChoiceSubstituted = true;
       closeFlowSmokeState.events.push("smoke-save-choice");

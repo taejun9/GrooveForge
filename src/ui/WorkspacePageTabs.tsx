@@ -5,6 +5,7 @@
  */
 import type { KeyboardEvent, ReactElement, ReactNode } from "react";
 import { useEffect, useRef } from "react";
+import { useLocalization } from "./localization";
 
 export type WorkspacePageTabItem<PageId extends string> = {
   id: PageId;
@@ -29,6 +30,7 @@ export function WorkspacePageTabs<PageId extends string>({
   onSelect: (page: PageId) => void;
   title: string;
 }): ReactElement {
+  const { t } = useLocalization();
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const tablistRef = useRef<HTMLDivElement | null>(null);
   const activeItem = items.find((item) => item.id === activePage) ?? items[0];
@@ -93,9 +95,13 @@ export function WorkspacePageTabs<PageId extends string>({
       data-testid={`${idPrefix}-page-tabs`}
     >
       <header className="workspace-page-tabs-heading">
-        <span>FOCUSED PAGE</span>
+        <span>{t("nav.subTabs")}</span>
         <strong>{title}</strong>
-        <small>{activeItem ? `${activeItem.label} · ${activeItem.detail}` : "Choose a page"}</small>
+        <small>
+          {activeItem
+            ? t("nav.currentSubTab", { label: activeItem.label, detail: activeItem.detail })
+            : t("nav.chooseSubTab")}
+        </small>
       </header>
       <div
         aria-label={ariaLabel}
@@ -126,7 +132,7 @@ export function WorkspacePageTabs<PageId extends string>({
               }}
               role="tab"
               tabIndex={selected ? 0 : -1}
-              title={`Open ${item.label} page: ${item.detail}`}
+              title={t("nav.openSubTab", { label: item.label, detail: item.detail })}
               type="button"
             >
               <span className="workspace-page-tab-icon" aria-hidden="true">
@@ -136,7 +142,7 @@ export function WorkspacePageTabs<PageId extends string>({
                 <strong>{item.label}</strong>
                 <small>{item.detail}</small>
               </span>
-              <span className="workspace-page-tab-meta">{selected ? "OPEN" : item.meta}</span>
+              <span className="workspace-page-tab-meta">{selected ? t("nav.open") : item.meta}</span>
             </button>
           );
         })}

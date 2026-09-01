@@ -29,6 +29,7 @@ import {
   Redo2,
   Save,
   Scissors,
+  Settings,
   SlidersHorizontal,
   Sparkles,
   Target,
@@ -142,8 +143,6 @@ import {
   drumStepTimingMs,
   drumStepVelocity,
   drumGroovePresetIds,
-  drumGroovePresetDetail,
-  drumGroovePresetLabel,
   defaultSessionBrief,
   expandPatternChainArrangement,
   hatRepeatCount,
@@ -810,6 +809,8 @@ import {
   createCommandReferenceRouteReadoutSummary
 } from "./workstationShellPanels";
 import { WorkspacePageTabs } from "./WorkspacePageTabs";
+import { SettingsDialog } from "./SettingsDialog";
+import { useLocalization } from "./localization";
 import {
   auditionSelectedChord as auditionSelectedChordEvent,
   auditionSelectedDrumHit as auditionSelectedDrumHitEvent,
@@ -1081,6 +1082,7 @@ import {
 } from "./workstationAppHelpers";
 import { createSnapshotCompareProjectProfileFromAnalysis } from "./workstationAppHelpers";
 import { ProjectAudioAnalysisGate } from "./workstationAppHelpers";
+import { swingFeelPadLabel } from "./workstationAppHelpers";
 import type {
   ArrangementTransitionLoopTarget, BeatBlueprintPreviewCue, BeatBlueprintPreviewDecision, EditHistoryEntry, ExportPreflightPriority, FinishChecklistPriority, GuideQuickStartQuickActionTarget, HandoffExportFormatPriority, HandoffPackageCheckPriority, HookFixAction, HookFixOption, HookFixResult, HookFixResultMetric, HookLoopCueTarget, ProductionSnapshotPriority, ReviewFixAction, ReviewFixOption, ReviewFixPreviewSummary, ReviewFixResult, ReviewFixResultMetric, ReviewQueuePriority, SelectedBlockQuickActionDescriptor, SessionBriefCompassFocusTarget, SessionBriefFieldRefs, StyleGoalCueResult, ToplineFixAction, ToplineFixOption, ToplineFixResult, ToplineFixResultMetric, ToplineLoopCueTarget
 } from "./workstationAppHelpers";
@@ -1142,12 +1144,6 @@ import {
 
 type QuickActionGraphFactory = typeof import("./workstationAppQuickActionGraph")["createQuickActions"];
 
-const tempoNudgePadVisibleLabels: Record<TempoNudgePadId, string> = {
-  down: "-1 BPM",
-  up: "+1 BPM",
-  half: "Half",
-  double: "Double"
-};
 const nativeRecoveryDebounceMs = 750;
 
 function isCompactTransportViewport(): boolean {
@@ -1165,6 +1161,7 @@ function workspaceActivityMode(visible: boolean): "visible" | "hidden" {
 }
 
 type ComposeWorkspacePageId = "drums" | "notes" | "instruments";
+type ArrangeWorkspacePageId = "timeline" | "structure";
 type MixWorkspacePageId = "mixer" | "master";
 
 type MetadataDraftSnapshot =
@@ -1177,6 +1174,8 @@ type WorkspaceRouteTargetId =
   | "notes"
   | "sound"
   | "arrange"
+  | "arrange-structure"
+  | "arrange-mute-map"
   | "mix"
   | "master"
   | "deliver";
@@ -1224,6 +1223,7 @@ function ProjectTitleInput({
 }
 
 export function App(): ReactElement {
+  const { locale, t } = useLocalization();
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<EditHistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<EditHistoryEntry[]>([]);
@@ -1284,8 +1284,10 @@ export function App(): ReactElement {
   const [commandReferenceOpen, setCommandReferenceOpen] = useState(false);
   const modalReturnFocusRef = useRef<HTMLElement | null>(null);
   const [guidanceCenterOpen, setGuidanceCenterOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeWorkspaceZone, setActiveWorkspaceZone] = useState<WorkflowZoneId>("compose");
   const [activeComposeWorkspacePage, setActiveComposeWorkspacePage] = useState<ComposeWorkspacePageId>("drums");
+  const [activeArrangeWorkspacePage, setActiveArrangeWorkspacePage] = useState<ArrangeWorkspacePageId>("timeline");
   const [activeMixWorkspacePage, setActiveMixWorkspacePage] = useState<MixWorkspacePageId>("mixer");
   const [launchpadOpen, setLaunchpadOpen] = useState(true);
   const [styleChangePreview, setStyleChangePreview] = useState<StyleChangePreview | null>(null);
@@ -1445,6 +1447,7 @@ export function App(): ReactElement {
   const selectedEventDeleteSelectionGuardRef = useRef(false);
   const activeWorkspaceZoneRef = useRef<WorkflowZoneId>(activeWorkspaceZone);
   const activeComposeWorkspacePageRef = useRef<ComposeWorkspacePageId>(activeComposeWorkspacePage);
+  const activeArrangeWorkspacePageRef = useRef<ArrangeWorkspacePageId>(activeArrangeWorkspacePage);
   const activeMixWorkspacePageRef = useRef<MixWorkspacePageId>(activeMixWorkspacePage);
   const modeAwareToolPanelsModeRef = useRef<ProjectState["mode"] | null>(null);
   const studioExpandedWorkspaceZonesRef = useRef<Set<WorkflowZoneId>>(new Set());
@@ -1484,6 +1487,8 @@ export function App(): ReactElement {
   const patternTabRefs = useRef<Record<PatternSlot, HTMLButtonElement | null>>({ A: null, B: null, C: null });
   const soundPanelRef = useRef<HTMLElement | null>(null);
   const arrangePanelRef = useRef<HTMLElement | null>(null);
+  const arrangeStructurePanelRef = useRef<HTMLElement | null>(null);
+  const arrangementMuteMapPanelRef = useRef<HTMLElement | null>(null);
   const mixPanelRef = useRef<HTMLElement | null>(null);
   const deliverPanelRef = useRef<HTMLElement | null>(null);
   const masterPanelRef = useRef<HTMLElement | null>(null);
@@ -1494,6 +1499,7 @@ export function App(): ReactElement {
   const sessionBriefNotesRef = useRef<HTMLTextAreaElement | null>(null);
   activeWorkspaceZoneRef.current = activeWorkspaceZone;
   activeComposeWorkspacePageRef.current = activeComposeWorkspacePage;
+  activeArrangeWorkspacePageRef.current = activeArrangeWorkspacePage;
   activeMixWorkspacePageRef.current = activeMixWorkspacePage;
   const style = getStyle(project);
   const deliveryTarget = activeDeliveryTarget(project);
@@ -1689,20 +1695,34 @@ export function App(): ReactElement {
       (channel) => channel.id !== "master" && !channel.muted && (!soloActive || channel.solo)
     ).length;
   }, [project.mixer]);
-  const activeChannelLabel = `${activeChannels} active ${activeChannels === 1 ? "channel" : "channels"}`;
+  const activeChannelLabel = t(activeChannels === 1 ? "mix.activeChannel" : "mix.activeChannels", {
+    count: activeChannels
+  });
   const mixBalancePadOptions = useMemo(() => createMixBalancePadOptions(project.mixer), [project.mixer]);
   const mixBalancePreviewSummary = useMemo(
-    () => createMixBalancePreviewSummary(project.mixer, mixBalancePadOptions),
-    [project.mixer, mixBalancePadOptions]
+    () => createMixBalancePreviewSummary(project.mixer, mixBalancePadOptions, locale),
+    [locale, project.mixer, mixBalancePadOptions]
   );
   const mixSnapshotComparison = useMemo(() => createMixSnapshotComparison(mixSnapshots), [mixSnapshots]);
+  const mixSnapshotStatusLabel = t(
+    !mixSnapshots.A && !mixSnapshots.B
+      ? "mix.snapshotNoCaptures"
+      : !mixSnapshots.A || !mixSnapshots.B
+        ? "mix.snapshotOneCapture"
+        : Math.abs(mixSnapshots.A.score - mixSnapshots.B.score) <= 2
+          ? "mix.snapshotClosePasses"
+          : "mix.snapshotSaferPass"
+  );
   const spaceFxPadOptions = useMemo(() => createSpaceFxPadOptions(project.mixer), [project.mixer]);
   const spaceFxPreviewSummary = useMemo(
-    () => createSpaceFxPreviewSummary(project.mixer, spaceFxPadOptions),
-    [project.mixer, spaceFxPadOptions]
+    () => createSpaceFxPreviewSummary(project.mixer, spaceFxPadOptions, locale),
+    [locale, project.mixer, spaceFxPadOptions]
   );
   const stemAuditionPadOptions = useMemo(() => createStemAuditionPadOptions(project.mixer), [project.mixer]);
-  const stemAuditionReadout = useMemo(() => createStemAuditionReadoutSummary(project.mixer), [project.mixer]);
+  const stemAuditionReadout = useMemo(
+    () => createStemAuditionReadoutSummary(project.mixer, locale),
+    [locale, project.mixer]
+  );
   const stemAuditionDecision = useMemo(
     () => createStemAuditionDecisionSummary(stemAuditionPadOptions, stemAuditionReadout),
     [stemAuditionPadOptions, stemAuditionReadout]
@@ -1754,8 +1774,8 @@ export function App(): ReactElement {
     [project, masterAutomationPadOptions]
   );
   const masterOutputRoleSummary = useMemo(
-    () => createMasterOutputRoleSummary(project, exportAnalysis),
-    [project, exportAnalysis]
+    () => createMasterOutputRoleSummary(project, exportAnalysis, locale),
+    [locale, project, exportAnalysis]
   );
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
@@ -1766,7 +1786,8 @@ export function App(): ReactElement {
     redoStack.length,
     projectStatus,
     nextUndoLabel,
-    nextRedoLabel
+    nextRedoLabel,
+    locale
   );
   const currentPlaybackStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
   const currentEditorStep = playbackPosition?.pattern === project.selectedPattern ? currentPlaybackStep : null;
@@ -1775,8 +1796,9 @@ export function App(): ReactElement {
   const patternPlaybackReadout = createPatternPlaybackReadoutSummary(
     project.selectedPattern,
     playingPattern,
-    patternEventCount(currentPattern),
-    playingPattern ? patternEventCount(project.patterns[playingPattern]) : null
+    t("compose.panel.eventCount", { count: patternEventTotal(currentPattern) }),
+    playingPattern ? t("compose.panel.eventCount", { count: patternEventTotal(project.patterns[playingPattern]) }) : null,
+    locale
   );
   const playingArrangementIndex =
     isPlaying && playbackPosition?.mode === "arrangement" && typeof playbackPosition.arrangementIndex === "number"
@@ -1807,7 +1829,8 @@ export function App(): ReactElement {
   const arrangementPlaybackReadout = createArrangementPlaybackReadoutSummary(
     project,
     selectedArrangementIndex,
-    playingArrangementIndex
+    playingArrangementIndex,
+    locale
   );
   const selectedArrangementBars = selectedArrangementBlock ? normalizeArrangementBars(selectedArrangementBlock.bars) : 1;
   const selectedArrangementMaximumBars = Math.min(
@@ -1833,19 +1856,62 @@ export function App(): ReactElement {
       : transportLoopScope === "transition"
         ? arrangementTransitionLoopTarget?.startBar ?? 0
         : 0;
-  const transportLoopReadout = transportLoopStatus(
-    project,
-    transportLoopScope,
-    selectedArrangementIndex,
-    arrangementTransitionLoopTarget
-  );
+  const localizedBarCountLabel = (bars: number): string =>
+    t(bars === 1 ? "arrange.helper.oneBar" : "arrange.helper.barCount", { count: bars });
+  const localizedTransportLoopLabel = (scope: TransportLoopScope): string => {
+    switch (scope) {
+      case "arrangement":
+        return t("transport.song");
+      case "block":
+        return t("transport.block");
+      case "transition":
+        return t("transport.turn");
+      case "pattern":
+        return t("transport.pattern");
+    }
+  };
+  const transportLoopReadout = (() => {
+    if (transportLoopScope === "pattern") {
+      return t("transport.patternLoopStatus", {
+        pattern: project.selectedPattern,
+        bars: localizedBarCountLabel(2)
+      });
+    }
+    if (transportLoopScope === "block") {
+      if (!selectedArrangementBlock) {
+        return t("transport.blockLoopUnavailable");
+      }
+      return t("transport.blockLoopStatus", {
+        block: Math.min(selectedArrangementIndex + 1, project.arrangement.length),
+        section: selectedArrangementBlock.section,
+        pattern: selectedArrangementBlock.pattern,
+        bars: localizedBarCountLabel(selectedArrangementBlock.bars)
+      });
+    }
+    if (transportLoopScope === "transition") {
+      if (!arrangementTransitionLoopTarget) {
+        return t("transport.transitionLoopUnavailable");
+      }
+      return t("transport.transitionLoopStatus", {
+        transition: arrangementTransitionLoopTarget.transition.value,
+        start: arrangementTransitionLoopTarget.startBar + 1,
+        end: arrangementTransitionLoopTarget.endBar,
+        bars: localizedBarCountLabel(arrangementTransitionLoopTarget.bars)
+      });
+    }
+    return t("transport.songLoopStatus", { bars: localizedBarCountLabel(arrangementTotalBars(project)) });
+  })();
   const transportPrimary = isPlaying
     ? playbackPosition?.mode === "pattern"
-      ? `Pattern ${playbackPosition.pattern} ${playbackPosition.bar}.${playbackPosition.beat}`
-      : `${playbackPosition?.section ?? "Arrangement"} ${playbackPosition?.bar ?? 1}.${playbackPosition?.beat ?? 1}`
-    : "Ready";
+      ? `${t("transport.pattern")} ${playbackPosition.pattern} ${playbackPosition.bar}.${playbackPosition.beat}`
+      : `${playbackPosition?.section ?? t("transport.arrangement")} ${playbackPosition?.bar ?? 1}.${playbackPosition?.beat ?? 1}`
+    : t("transport.ready");
   const transportSecondary = isPlaying
-    ? `${transportLoopLabel(transportLoopScope)} / Pattern ${playbackPosition?.pattern ?? project.selectedPattern} / Step ${(currentPlaybackStep ?? 0) + 1}`
+    ? t("transport.playingStatus", {
+        scope: localizedTransportLoopLabel(transportLoopScope),
+        pattern: playbackPosition?.pattern ?? project.selectedPattern,
+        step: (currentPlaybackStep ?? 0) + 1
+      })
     : transportLoopReadout;
   const transportPositionReadout = createTransportPositionReadoutSummary(
     project,
@@ -1854,51 +1920,62 @@ export function App(): ReactElement {
     transportLoopScope,
     selectedArrangementIndex,
     selectedArrangementStartBar,
-    arrangementTransitionLoopTarget
+    arrangementTransitionLoopTarget,
+    locale
   );
-  const songLoopTargetLabel = `All ${barCountLabel(arrangementTotalBars(project))}`;
-  const songLoopAccessibleTarget = `${barCountLabel(arrangementTotalBars(project))} timeline`;
+  const songLoopTargetLabel = t("transport.allBars", { bars: localizedBarCountLabel(arrangementTotalBars(project)) });
+  const songLoopAccessibleTarget = t("transport.timelineTarget", {
+    bars: localizedBarCountLabel(arrangementTotalBars(project))
+  });
   const blockLoopTargetLabel = selectedArrangementBlock
-    ? `${selectedArrangementBlock.section} · ${barCountLabel(selectedArrangementBlock.bars)}`
-    : "Select block";
+    ? `${selectedArrangementBlock.section} · ${localizedBarCountLabel(selectedArrangementBlock.bars)}`
+    : t("transport.selectBlock");
   const turnLoopTargetLabel = arrangementTransitionLoopTarget
     ? arrangementTransitionLoopTarget.transition.value.replace(" -> ", " → ")
-    : "Select handoff";
+    : t("transport.selectHandoff");
   const turnLoopAccessibleTarget = arrangementTransitionLoopTarget
-    ? `${arrangementTransitionLoopTarget.transition.value.replace(" -> ", " to ")}, ${barCountLabel(
+    ? `${arrangementTransitionLoopTarget.transition.value.replace(" -> ", t("transport.transitionConnector"))}, ${localizedBarCountLabel(
         arrangementTransitionLoopTarget.bars
       )}`
-    : "adjacent block handoff unavailable";
+    : t("transport.handoffUnavailable");
   const patternLoopTargetLabel = `${project.selectedPattern} · ${patternEventCount(currentPattern)}`;
   const transportPlaybackTarget = (() => {
     if (transportLoopScope === "block") {
       if (!selectedArrangementBlock) {
         return {
-          detailLabel: "Block · unavailable",
-          accessibleTarget: "selected block unavailable",
-          titleTarget: "selected block unavailable"
+          detailLabel: t("transport.blockUnavailableDetail"),
+          accessibleTarget: t("transport.selectedBlockUnavailable"),
+          titleTarget: t("transport.selectedBlockUnavailable")
         };
       }
-      const bars = barCountLabel(selectedArrangementBlock.bars);
+      const bars = localizedBarCountLabel(selectedArrangementBlock.bars);
       return {
-        detailLabel: `Block · ${selectedArrangementBlock.section}`,
-        accessibleTarget: `${selectedArrangementBlock.section}, ${bars}, Pattern ${selectedArrangementBlock.pattern}`,
-        titleTarget: `${selectedArrangementBlock.section} · ${bars} · Pattern ${selectedArrangementBlock.pattern}`
+        detailLabel: t("transport.blockDetail", { section: selectedArrangementBlock.section }),
+        accessibleTarget: t("transport.blockAccessibleTarget", {
+          section: selectedArrangementBlock.section,
+          bars,
+          pattern: selectedArrangementBlock.pattern
+        }),
+        titleTarget: t("transport.blockTitleTarget", {
+          section: selectedArrangementBlock.section,
+          bars,
+          pattern: selectedArrangementBlock.pattern
+        })
       };
     }
 
     if (transportLoopScope === "transition") {
       if (!arrangementTransitionLoopTarget) {
         return {
-          detailLabel: "Turn · unavailable",
-          accessibleTarget: "adjacent block handoff unavailable",
-          titleTarget: "adjacent block handoff unavailable"
+          detailLabel: t("transport.turnUnavailableDetail"),
+          accessibleTarget: t("transport.handoffUnavailable"),
+          titleTarget: t("transport.handoffUnavailable")
         };
       }
-      const transition = arrangementTransitionLoopTarget.transition.value.replace(" -> ", " to ");
-      const bars = barCountLabel(arrangementTransitionLoopTarget.bars);
+      const transition = arrangementTransitionLoopTarget.transition.value.replace(" -> ", t("transport.transitionConnector"));
+      const bars = localizedBarCountLabel(arrangementTransitionLoopTarget.bars);
       return {
-        detailLabel: `Turn · ${bars}`,
+        detailLabel: t("transport.turnDetail", { bars }),
         accessibleTarget: `${transition}, ${bars}`,
         titleTarget: `${transition} · ${bars}`
       };
@@ -1906,79 +1983,158 @@ export function App(): ReactElement {
 
     if (transportLoopScope === "pattern") {
       return {
-        detailLabel: `Pattern · ${project.selectedPattern}`,
-        accessibleTarget: `Pattern ${project.selectedPattern}, ${barCountLabel(2)}`,
-        titleTarget: `Pattern ${project.selectedPattern} · ${barCountLabel(2)}`
+        detailLabel: t("transport.patternDetail", { pattern: project.selectedPattern }),
+        accessibleTarget: t("transport.patternAccessibleTarget", {
+          pattern: project.selectedPattern,
+          bars: localizedBarCountLabel(2)
+        }),
+        titleTarget: t("transport.patternTitleTarget", {
+          pattern: project.selectedPattern,
+          bars: localizedBarCountLabel(2)
+        })
       };
     }
 
-    const bars = barCountLabel(arrangementTotalBars(project));
+    const bars = localizedBarCountLabel(arrangementTotalBars(project));
     return {
-      detailLabel: `Song · ${bars}`,
-      accessibleTarget: `${bars} timeline`,
-      titleTarget: `${bars} timeline`
+      detailLabel: t("transport.songDetail", { bars }),
+      accessibleTarget: t("transport.timelineTarget", { bars }),
+      titleTarget: t("transport.timelineTarget", { bars })
     };
   })();
-  const transportPlaybackAction = isPlaying ? "Stop" : "Play";
-  const transportPlaybackScopeLabel = transportLoopLabel(transportLoopScope);
+  const transportPlaybackAction = isPlaying ? t("transport.stop") : t("transport.play");
+  const transportPlaybackScopeLabel = localizedTransportLoopLabel(transportLoopScope);
   const transportPlaybackAccessibleLabel = isPlaying
-    ? `Stop ${transportPlaybackScopeLabel} loop playback, ${transportPlaybackTarget.accessibleTarget}, ${project.bpm} BPM`
-    : `Play ${transportPlaybackScopeLabel} loop, ${transportPlaybackTarget.accessibleTarget}, ${project.bpm} BPM`;
-  const transportPlaybackTitle = `${transportPlaybackAction} ${transportPlaybackScopeLabel} loop · ${transportPlaybackTarget.titleTarget} · ${project.bpm} BPM · Space`;
-  const metronomeStateLabel = project.metronomeEnabled ? "On" : "Off";
-  const metronomeActionLabel = project.metronomeEnabled ? "Turn off" : "Turn on";
+    ? t("transport.stopLoopAria", {
+        scope: transportPlaybackScopeLabel,
+        target: transportPlaybackTarget.accessibleTarget,
+        bpm: project.bpm
+      })
+    : t("transport.playLoopAria", {
+        scope: transportPlaybackScopeLabel,
+        target: transportPlaybackTarget.accessibleTarget,
+        bpm: project.bpm
+      });
+  const transportPlaybackTitle = t("transport.playbackTitle", {
+    action: transportPlaybackAction,
+    scope: transportPlaybackScopeLabel,
+    target: transportPlaybackTarget.titleTarget,
+    bpm: project.bpm
+  });
+  const metronomeStateLabel = project.metronomeEnabled ? t("transport.on") : t("transport.off");
+  const metronomeAccessibleStateLabel = project.metronomeEnabled ? t("transport.onLower") : t("transport.offLower");
+  const metronomeActionLabel = project.metronomeEnabled ? t("transport.turnOff") : t("transport.turnOn");
   const metronomeDetailLabel = `${metronomeStateLabel} · ${project.bpm} BPM`;
-  const metronomeAccessibleLabel = `Metronome ${metronomeStateLabel.toLowerCase()}, ${project.bpm} BPM. ${metronomeActionLabel}`;
-  const tempoNudgePadPresentations = tempoNudgePads.map((pad) => {
-    const targetBpm = tempoNudgePadBpm(project.bpm, pad.id);
+  const metronomeAccessibleLabel = t("transport.metronomeAria", {
+    state: metronomeAccessibleStateLabel,
+    bpm: project.bpm,
+    action: metronomeActionLabel
+  });
+  function createTempoNudgePadPresentation(pad: TempoNudgePadDefinition, currentBpm: number) {
+    const action =
+      pad.id === "down"
+        ? t("transport.nudgeDown")
+        : pad.id === "up"
+          ? t("transport.nudgeUp")
+          : pad.id === "half"
+            ? t("transport.nudgeHalf")
+            : t("transport.nudgeDouble");
+    const targetBpm = tempoNudgePadBpm(currentBpm, pad.id);
     return {
       pad,
       targetBpm,
-      visibleLabel: tempoNudgePadVisibleLabels[pad.id],
-      accessibleLabel: `${pad.title}, ${project.bpm} to ${targetBpm} BPM`,
-      title: `${pad.title}: ${project.bpm} → ${targetBpm} BPM`
+      visibleLabel:
+        pad.id === "half"
+          ? t("transport.nudgeHalfLabel")
+          : pad.id === "double"
+            ? t("transport.nudgeDoubleLabel")
+            : pad.label === "-1"
+              ? "-1 BPM"
+              : "+1 BPM",
+      accessibleLabel: t("transport.nudgeAria", { action, before: currentBpm, after: targetBpm }),
+      title: t("transport.nudgeTitle", { action, before: currentBpm, after: targetBpm })
     };
-  });
-  const tapTempoReadout = createTapTempoReadoutSummary(project.bpm, tapTempo);
+  }
+  function localizedDrumGroovePresetLabel(preset: DrumGroovePreset): string {
+    return t(
+      preset === "tight"
+        ? "compose.grooveTight"
+        : preset === "pocket"
+          ? "compose.groovePocket"
+          : preset === "push"
+            ? "compose.groovePush"
+            : "compose.grooveReset"
+    );
+  }
+  function localizedDrumGroovePresetDetail(preset: DrumGroovePreset): string {
+    return t(
+      preset === "tight"
+        ? "compose.grooveTightDetail"
+        : preset === "pocket"
+          ? "compose.groovePocketDetail"
+          : preset === "push"
+            ? "compose.groovePushDetail"
+            : "compose.grooveResetDetail"
+    );
+  }
+  const tempoNudgePadPresentations = tempoNudgePads.map((pad) => createTempoNudgePadPresentation(pad, project.bpm));
+  const tapTempoReadout = createTapTempoReadoutSummary(project.bpm, tapTempo, locale);
   const tapTempoButtonPresentation = (() => {
     if (tapTempo.bpm !== null) {
-      const tapCountLabel = `${tapTempo.taps} taps`;
+      const tapCountLabel = t("transport.tapCount", { count: tapTempo.taps });
       if (tapTempo.applied) {
         return {
-          accessibleLabel: `Tap Tempo, ${tapCountLabel} applied at ${tapTempo.bpm} BPM. Tap again to refine`,
-          detailLabel: `Set · ${tapTempo.bpm} BPM`,
-          title: `Tap Tempo: ${tapCountLabel} applied at ${tapTempo.bpm} BPM · Tap again to refine`
+          accessibleLabel: t("transport.tapAppliedAria", { taps: tapCountLabel, bpm: tapTempo.bpm }),
+          detailLabel: t("transport.tapAppliedDetail", { bpm: tapTempo.bpm }),
+          title: t("transport.tapAppliedTitle", { taps: tapCountLabel, bpm: tapTempo.bpm })
         };
       }
       return {
-        accessibleLabel: `Tap Tempo, ${tapCountLabel} averaging ${tapTempo.bpm} BPM, current project ${project.bpm} BPM. Tap again or pause to apply`,
-        detailLabel: `Tap again · ${tapTempo.bpm} BPM`,
-        title: `Tap Tempo: ${tapCountLabel} averaging ${tapTempo.bpm} BPM · current project ${project.bpm} BPM · Tap again or pause to apply`
+        accessibleLabel: t("transport.tapAveragingAria", {
+          taps: tapCountLabel,
+          bpm: tapTempo.bpm,
+          projectBpm: project.bpm
+        }),
+        detailLabel: t("transport.tapAveragingDetail", { bpm: tapTempo.bpm }),
+        title: t("transport.tapAveragingTitle", {
+          taps: tapCountLabel,
+          bpm: tapTempo.bpm,
+          projectBpm: project.bpm
+        })
       };
     }
 
     if (tapTempo.taps === 1) {
       return {
-        accessibleLabel: `Tap Tempo, 1 tap captured, current project ${project.bpm} BPM. Tap again within 3 seconds`,
-        detailLabel: `Tap again · ${project.bpm} BPM`,
-        title: `Tap Tempo: 1 tap captured · current project ${project.bpm} BPM · Tap again within 3 seconds`
+        accessibleLabel: t("transport.tapSingleAria", { bpm: project.bpm }),
+        detailLabel: t("transport.tapAveragingDetail", { bpm: project.bpm }),
+        title: t("transport.tapSingleTitle", { bpm: project.bpm })
       };
     }
 
     return {
-      accessibleLabel: `Tap Tempo, current project ${project.bpm} BPM. Start with two or more taps`,
-      detailLabel: `Start · ${project.bpm} BPM`,
-      title: `Tap Tempo: current project ${project.bpm} BPM · Tap two or more times to set tempo`
+      accessibleLabel: t("transport.tapStartAria", { bpm: project.bpm }),
+      detailLabel: t("transport.tapStartDetail", { bpm: project.bpm }),
+      title: t("transport.tapStartTitle", { bpm: project.bpm })
     };
   })();
-  const localDraftStatusLabel = localDraftSavedAt ? `Draft ${formatLocalDraftSavedAt(localDraftSavedAt)}` : "Draft local";
+  const formattedLocalDraftSavedAt = localDraftSavedAt ? formatLocalDraftSavedAt(localDraftSavedAt) : null;
+  const localDraftStatusLabel = formattedLocalDraftSavedAt
+    ? t("core.localDraftStatus", {
+        savedAt:
+          formattedLocalDraftSavedAt === "local draft"
+            ? t("core.localDraftFallback")
+            : formattedLocalDraftSavedAt
+      })
+    : t("core.localDraftLocal");
   const projectSafetyReadout = createProjectSafetyReadoutSummary(
     localDraftRecovery,
     localDraftRecoveryDeferred,
     localDraftSavedAt,
     projectStatus,
     projectFileLabel,
-    projectHasUnsavedChanges
+    projectHasUnsavedChanges,
+    locale
   );
   const selectedArrangementNextBlock = project.arrangement[selectedArrangementIndex + 1];
   const selectedArrangementNextBars = selectedArrangementNextBlock ? normalizeArrangementBars(selectedArrangementNextBlock.bars) : 0;
@@ -2003,8 +2159,8 @@ export function App(): ReactElement {
     [arrangementBlockClipboard, project, selectedArrangementIndex]
   );
   const selectedArrangementBlockRole = useMemo(
-    () => selectedArrangementBlockRoleSummary(project, selectedArrangementIndex),
-    [project, selectedArrangementIndex]
+    () => selectedArrangementBlockRoleSummary(project, selectedArrangementIndex, locale),
+    [locale, project, selectedArrangementIndex]
   );
   const arrangementTemplatePreviewSummary = useMemo(
     () => createArrangementTemplatePreviewSummary(project.arrangement),
@@ -2128,7 +2284,8 @@ export function App(): ReactElement {
     activeKeyboardCaptureDefaults,
     keyboardCaptureNextStep,
     keyboardCaptureStepMode,
-    keyboardCapturePlayheadStep
+    keyboardCapturePlayheadStep,
+    locale
   );
   const midiInputOptions = useMemo(() => createMidiInputOptions(midiAccess), [midiAccess, midiPortRevision]);
   const midiCaptureSummary = createMidiCaptureSummary(
@@ -2685,6 +2842,7 @@ export function App(): ReactElement {
     quickActionsOpen,
     commandReferenceOpen,
     styleChangePreview,
+    settingsOpen,
     keyboardCaptureEnabled,
     keyboardCaptureTarget,
     keyboardCaptureDefaults,
@@ -2710,6 +2868,7 @@ export function App(): ReactElement {
     quickActionsOpen,
     commandReferenceOpen,
     styleChangePreview,
+    settingsOpen,
     keyboardCaptureEnabled,
     keyboardCaptureTarget,
     keyboardCaptureDefaults,
@@ -2730,7 +2889,7 @@ export function App(): ReactElement {
     const wantsSave = withCommandModifier && !event.shiftKey && key === "s";
     const wantsOpen = withCommandModifier && !event.shiftKey && key === "o";
 
-    if (styleChangePreview) {
+    if (styleChangePreview || settingsOpen) {
       return;
     }
 
@@ -2850,7 +3009,7 @@ export function App(): ReactElement {
   }
 
   function handleNativeMenuCommand(command: NativeMenuCommand): void {
-    if (styleChangePreview) {
+    if (styleChangePreview || settingsOpen) {
       return;
     }
 
@@ -3315,7 +3474,7 @@ export function App(): ReactElement {
       `${pad.label} swing ${percentLabel(nextSwing)}`
     );
     const afterProject = projectRef.current;
-    setSwingFeelResult(createSwingFeelResult(pad, beforeProject, afterProject));
+    setSwingFeelResult(createSwingFeelResult(pad, beforeProject, afterProject, locale));
     if (!changed) {
       setProjectStatus(`${pad.label} swing held at ${percentLabel(nextSwing)}`);
     }
@@ -6394,7 +6553,10 @@ export function App(): ReactElement {
   function applySelectedDrumGroove(preset: DrumGroovePreset): void {
     updateCurrentPattern(
       (pattern) => applyDrumGroovePreset(pattern, preset),
-      `${drumGroovePresetLabel(preset)} groove applied to Pattern ${projectRef.current.selectedPattern}`
+      t("compose.grooveAppliedStatus", {
+        label: localizedDrumGroovePresetLabel(preset),
+        pattern: projectRef.current.selectedPattern
+      })
     );
     setSelectedNote(null);
     setSelectedDrumStep(null);
@@ -8420,7 +8582,9 @@ export function App(): ReactElement {
   function toggleMetronome(): void {
     updateProject(
       (current) => ({ ...current, metronomeEnabled: !current.metronomeEnabled }),
-      projectRef.current.metronomeEnabled ? "Metronome off" : "Metronome on"
+      projectRef.current.metronomeEnabled
+        ? t("transport.metronomeOffStatus")
+        : t("transport.metronomeOnStatus")
     );
   }
 
@@ -8428,7 +8592,7 @@ export function App(): ReactElement {
     const beforeProject = projectRef.current;
     const changed = updateProject(
       (current) => (current.mode === mode ? current : { ...current, mode }),
-      `Switched to ${modeLabel(mode)} mode`
+      t("mode.switchedStatus", { mode: mode === "guided" ? t("mode.guided") : t("mode.studio") })
     );
     const afterProject = projectRef.current;
 
@@ -8473,11 +8637,14 @@ export function App(): ReactElement {
         afterModeFocusSummary,
         afterSessionPassSummary,
         afterFirstBeatPathSummary,
-        changed
+        changed,
+        locale
       )
     );
     if (!changed) {
-      setProjectStatus(`${modeLabel(mode)} mode already active`);
+      setProjectStatus(
+        t("mode.activeTitle", { mode: mode === "guided" ? t("mode.guided") : t("mode.studio") })
+      );
     }
   }
 
@@ -8746,6 +8913,17 @@ export function App(): ReactElement {
     }
   }
 
+  function activateArrangeWorkspacePage(page: ArrangeWorkspacePageId, announce = false): void {
+    if (activeArrangeWorkspacePageRef.current === page) {
+      return;
+    }
+    activeArrangeWorkspacePageRef.current = page;
+    setActiveArrangeWorkspacePage(page);
+    if (announce) {
+      setProjectStatus(`Opened Arrange / ${page === "timeline" ? "Timeline" : "Structure & Transitions"} page`);
+    }
+  }
+
   function activateMixWorkspacePage(page: MixWorkspacePageId, announce = false): void {
     if (activeMixWorkspacePageRef.current === page) {
       return;
@@ -8765,6 +8943,12 @@ export function App(): ReactElement {
       if (activeComposeWorkspacePageRef.current !== page) {
         // 탭 DOM을 즉시 교체해야 이어지는 포커스/측정이 숨은 이전 페이지를 읽지 않으므로 이 경계만 동기 커밋한다.
         flushSync(() => activateComposeWorkspacePage(page));
+      }
+      return;
+    }
+    if (zone === "arrange" && (page === "timeline" || page === "structure")) {
+      if (activeArrangeWorkspacePageRef.current !== page) {
+        flushSync(() => activateArrangeWorkspacePage(page));
       }
       return;
     }
@@ -8829,6 +9013,8 @@ export function App(): ReactElement {
       case "sound":
         return "compose";
       case "arrange":
+      case "arrange-structure":
+      case "arrange-mute-map":
         return "arrange";
       case "mix":
       case "master":
@@ -8852,6 +9038,10 @@ export function App(): ReactElement {
         return soundPanelRef.current;
       case "arrange":
         return arrangePanelRef.current;
+      case "arrange-structure":
+        return arrangeStructurePanelRef.current;
+      case "arrange-mute-map":
+        return arrangementMuteMapPanelRef.current;
       case "mix":
         return mixPanelRef.current;
       case "master":
@@ -8871,6 +9061,14 @@ export function App(): ReactElement {
         return;
       case "sound":
         activateComposeWorkspacePage("instruments");
+        return;
+      case "arrange":
+        activateArrangeWorkspacePage("timeline");
+        return;
+      case "arrange-structure":
+      case "arrange-mute-map":
+        activateArrangeWorkspacePage("structure");
+        setArrangementToolsOpen(true);
         return;
       case "mix":
         activateMixWorkspacePage("mixer");
@@ -8901,10 +9099,21 @@ export function App(): ReactElement {
     block: ScrollLogicalPosition = "start"
   ): void {
     const zone = workspaceRouteZone(target);
-    // 먼저 목적 하위 탭을 실제 DOM에 드러낸 다음 요소를 조회해야 동일 영역 내 숨은 페이지로 잘못 스크롤하지 않는다.
+    // 상위 탭과 목적 하위 탭을 순서대로 실제 DOM에 드러낸 다음 요소를 조회해야 숨은 Activity의 0px 위치를 읽지 않는다.
+    if (zone !== null) {
+      activateWorkspaceZone(zone);
+    }
     flushSync(() => activateWorkspaceRoutePage(target));
     if (target === "sound" && !soundDesignOpen) {
       flushSync(() => setSoundDesignOpen(true));
+    }
+    if (target === "arrange-mute-map") {
+      // 포커스는 Quick Actions 목적지에 남겨 두고 Structure 패널의 content-visibility만 먼저 깨운다.
+      arrangeStructurePanelRef.current?.scrollIntoView({ block, behavior: "auto" });
+      requestAnimationFrame(() => {
+        scrollWorkspaceTargetIntoView(() => workspaceRouteElement(target), block, zone);
+      });
+      return;
     }
     scrollWorkspaceTargetIntoView(() => workspaceRouteElement(target), block, zone);
   }
@@ -9418,7 +9627,7 @@ export function App(): ReactElement {
   }
 
   function focusPatternChainReadout(): void {
-    routeWorkspaceTargetIntoView("arrange", "start");
+    routeWorkspaceTargetIntoView("arrange-structure", "start");
     setProjectStatus(
       `Pattern Chain ${patternChainPreviewSummary.statusLabel}: ${patternChainPreviewSummary.actionLabel} / ${patternChainPreviewSummary.sequenceLabel}`
     );
@@ -9426,7 +9635,7 @@ export function App(): ReactElement {
 
   function focusChainExpandReadout(): void {
     const outline = expandPatternChainArrangement(projectRef.current.arrangement);
-    routeWorkspaceTargetIntoView("arrange", "start");
+    routeWorkspaceTargetIntoView("arrange-structure", "start");
     setProjectStatus(
       `Chain Expand ${patternChainPreviewSummary.statusLabel}: ${patternChainReadout(outline)} / ${barCountLabel(
         arrangementTotalBars({ ...projectRef.current, arrangement: outline })
@@ -9436,21 +9645,21 @@ export function App(): ReactElement {
 
   function focusArrangementTemplateReadout(): void {
     const summary = createArrangementTemplatePreviewSummary(projectRef.current.arrangement);
-    routeWorkspaceTargetIntoView("arrange", "start");
+    routeWorkspaceTargetIntoView("arrange-structure", "start");
     setProjectStatus(
       `Arrangement Template ${summary.statusLabel}: ${summary.templateLabel} / ${summary.sectionLabel} / ${summary.patternLabel}`
     );
   }
 
   function focusArrangementArcReadout(): void {
-    routeWorkspaceTargetIntoView("arrange", "start");
+    routeWorkspaceTargetIntoView("arrange-structure", "start");
     setProjectStatus(
       `Arrangement Arc ${arrangementArcPreviewSummary.statusLabel}: ${arrangementArcPreviewSummary.padLabel} / ${arrangementArcPreviewSummary.energyLabel} / ${arrangementArcPreviewSummary.muteLabel}`
     );
   }
 
   function focusArrangementFocusReadout(): void {
-    routeWorkspaceTargetIntoView("arrange", "start");
+    routeWorkspaceTargetIntoView("arrange-structure", "start");
     setProjectStatus(
       arrangementFocusPreviewSummary
         ? `Arrangement Focus ${arrangementFocusPreviewSummary.statusLabel}: ${arrangementFocusPreviewSummary.presetLabel} / ${arrangementFocusPreviewSummary.blockLabel} / ${arrangementFocusPreviewSummary.sectionLabel}`
@@ -9469,7 +9678,7 @@ export function App(): ReactElement {
 
   function focusSectionLocatorReadout(): void {
     const summary = createSectionLocatorCueDecisionSummary(sectionLocatorPads, isPlaying);
-    routeWorkspaceTargetIntoView("arrange", "start");
+    routeWorkspaceTargetIntoView("arrange-structure", "start");
     setProjectStatus(
       summary.section
         ? `Section Locator ${summary.statusLabel}: ${summary.sectionLabel} / ${summary.metricLabel} / ${summary.detailLabel}`
@@ -9479,7 +9688,7 @@ export function App(): ReactElement {
 
   function focusSongFormOverviewReadout(): void {
     const priority = createSongFormPrioritySummary(songFormOverviewSummary);
-    routeWorkspaceTargetIntoView("arrange", "start");
+    routeWorkspaceTargetIntoView("arrange-structure", "start");
     setProjectStatus(
       priority.targetIndex === null
         ? `Song Form Overview ${priority.statusLabel}: ${priority.reasonLabel}`
@@ -9501,7 +9710,7 @@ export function App(): ReactElement {
       setProjectStatus("Audio meters updating; retry Master Output Role");
       return;
     }
-    const summary = createMasterOutputRoleSummary(projectRef.current, analysis);
+    const summary = createMasterOutputRoleSummary(projectRef.current, analysis, locale);
     routeWorkspaceTargetIntoView("master", "center");
     setProjectStatus(`Master Output Role: ${summary.roleLabel} / ${summary.detailLabel}`);
   }
@@ -9881,7 +10090,7 @@ export function App(): ReactElement {
   function focusArrangementMuteMapLane(lane: ArrangementMuteMapLane): void {
     setArrangementToolsOpen(true);
     setArrangementMuteMapFocusId(lane.id);
-    routeWorkspaceTargetIntoView("arrange", "start");
+    routeWorkspaceTargetIntoView("arrange-mute-map", "start");
     setArrangementMuteMapResult(createArrangementMuteMapFocusResult(lane, arrangementMuteMapSummary));
     setProjectStatus(`Mute Map ${lane.label}: ${lane.value}`);
   }
@@ -9889,7 +10098,7 @@ export function App(): ReactElement {
   function focusArrangementMuteMapReadout(): void {
     setArrangementToolsOpen(true);
     const lane = activeArrangementMuteMapQuickActionLane(arrangementMuteMapSummary);
-    routeWorkspaceTargetIntoView("arrange", "start");
+    routeWorkspaceTargetIntoView("arrange-mute-map", "start");
     setProjectStatus(
       lane
         ? `Arrangement Mute Map ${lane.status}: ${lane.label} / ${lane.value} / ${lane.detail}`
@@ -9900,7 +10109,7 @@ export function App(): ReactElement {
   function focusArrangementTransitionMapTransition(transition: ArrangementTransitionMapTransition): void {
     setArrangementToolsOpen(true);
     setArrangementTransitionMapFocusId(transition.id);
-    routeWorkspaceTargetIntoView("arrange", "start");
+    routeWorkspaceTargetIntoView("arrange-structure", "start");
     setArrangementTransitionMapResult(createArrangementTransitionMapFocusResult(transition, arrangementTransitionMapSummary));
     setProjectStatus(`Transition ${transition.fromIndex + 1}->${transition.toIndex + 1}: ${transition.status}`);
   }
@@ -9908,7 +10117,7 @@ export function App(): ReactElement {
   function focusArrangementTransitionMapReadout(): void {
     setArrangementToolsOpen(true);
     const transition = activeArrangementTransitionMapQuickActionTransition(arrangementTransitionMapSummary);
-    routeWorkspaceTargetIntoView("arrange", "start");
+    routeWorkspaceTargetIntoView("arrange-structure", "start");
     setProjectStatus(
       transition
         ? `Arrangement Transition Map ${transition.status}: ${transition.value} / ${transition.energyLabel} / ${transition.patternLabel}`
@@ -12171,10 +12380,10 @@ export function App(): ReactElement {
       const tapTempoButtonDetail = tapTempoButton?.querySelector<HTMLElement>(":scope small") ?? null;
       const tapTempoButtonRect = tapTempoButton?.getBoundingClientRect() ?? null;
       const expectedTapTempoAccessibleName = expectedMetronomeBpm
-        ? `Tap Tempo, current project ${expectedMetronomeBpm} BPM. Start with two or more taps`
+        ? t("transport.tapStartAria", { bpm: expectedMetronomeBpm })
         : "";
       const expectedTapTempoTitle = expectedMetronomeBpm
-        ? `Tap Tempo: current project ${expectedMetronomeBpm} BPM · Tap two or more times to set tempo`
+        ? t("transport.tapStartTitle", { bpm: expectedMetronomeBpm })
         : "";
       const tapTempoReadable = Boolean(
         tapTempoButtonLabel &&
@@ -12204,16 +12413,10 @@ export function App(): ReactElement {
       const tempoNudgeGroupRect = tempoNudgeGroup?.getBoundingClientRect() ?? null;
       const expectedTempoNudgeBpm = Number(expectedMetronomeBpm);
       const expectedTempoNudgePads = Number.isFinite(expectedTempoNudgeBpm)
-        ? tempoNudgePads.map((pad) => {
-            const targetBpm = tempoNudgePadBpm(expectedTempoNudgeBpm, pad.id);
-            return {
-              accessibleLabel: `${pad.title}, ${expectedTempoNudgeBpm} to ${targetBpm} BPM`,
-              targetBpm,
-              testId: tempoNudgePadTestId(pad.id),
-              title: `${pad.title}: ${expectedTempoNudgeBpm} → ${targetBpm} BPM`,
-              visibleLabel: tempoNudgePadVisibleLabels[pad.id]
-            };
-          })
+        ? tempoNudgePads.map((pad) => ({
+            ...createTempoNudgePadPresentation(pad, expectedTempoNudgeBpm),
+            testId: tempoNudgePadTestId(pad.id)
+          }))
         : [];
       const tempoNudgeAccessibleNames = tempoNudgeButtons
         .map((button) => button.getAttribute("aria-label")?.trim() ?? "")
@@ -12773,7 +12976,7 @@ export function App(): ReactElement {
         tempoNudgeRoleReady:
           starterId === "beginner" &&
           tempoNudgeGroup?.getAttribute("role") === "group" &&
-          tempoNudgeGroup.getAttribute("aria-label") === "Tempo nudge pads",
+          tempoNudgeGroup.getAttribute("aria-label") === t("core.tempoNudgePadsAria"),
         tempoNudgeRowCount: starterId === "beginner" ? tempoNudgeRowCount : 0,
         tempoNudgeStateCopyReady: starterId === "beginner" ? tempoNudgeStateCopyReady : false,
         tempoNudgeTitleReadyCount:
@@ -13409,24 +13612,31 @@ export function App(): ReactElement {
       }
     };
   }, [audienceSessionReadoutSummary, quickActions, selectedArrangementIndex]);
-  const guidedModeContext = createModeSwitchButtonContext({
-    firstBeatPathSummary,
-    mode: "guided",
-    modeFocusSummary,
-    projectMode: project.mode,
-    sessionPassSummary
-  });
-  const studioModeContext = createModeSwitchButtonContext({
-    firstBeatPathSummary,
-    mode: "studio",
-    modeFocusSummary,
-    projectMode: project.mode,
-    sessionPassSummary
-  });
+  const guidedModeContext =
+    locale === "en"
+      ? createModeSwitchButtonContext({
+          firstBeatPathSummary,
+          mode: "guided",
+          modeFocusSummary,
+          projectMode: project.mode,
+          sessionPassSummary
+        })
+      : t(project.mode === "guided" ? "mode.activeTitle" : "mode.switchTitle", { mode: t("mode.guided") });
+  const studioModeContext =
+    locale === "en"
+      ? createModeSwitchButtonContext({
+          firstBeatPathSummary,
+          mode: "studio",
+          modeFocusSummary,
+          projectMode: project.mode,
+          sessionPassSummary
+        })
+      : t(project.mode === "studio" ? "mode.activeTitle" : "mode.switchTitle", { mode: t("mode.studio") });
 
   return (
     <main
       className="app-shell"
+      data-locale={locale}
       data-workspace-command-dock-visible={workspaceCommandDockVisible}
       data-quick-actions-graph-state={
         quickActionGraphFactory ? "ready" : quickActionGraphLoadError ? "error" : quickActionsRequested ? "loading" : "deferred"
@@ -13440,14 +13650,30 @@ export function App(): ReactElement {
         window.grooveforge?.manualQa ? JSON.stringify(project.automation) : undefined
       }
     >
+      <a className="skip-link" href="#workspace-main">
+        {t("nav.skipToWorkspace")}
+      </a>
       <header className="transport-band" data-testid="workflow-target-transport" ref={transportPanelRef}>
         <div className="brand-start">
           <div className="brand-lockup">
             <Disc3 size={28} aria-hidden="true" />
-            <div>
+            <div className="brand-copy">
               <h1>GrooveForge</h1>
-              <span>{window.grooveforge?.appKind ?? "desktop"} workstation</span>
+              <span>{t("app.workstation", { kind: window.grooveforge?.appKind ?? "desktop" })}</span>
             </div>
+            <button
+              aria-expanded={settingsOpen}
+              aria-haspopup="dialog"
+              aria-label={t("action.settingsTitle")}
+              className="brand-settings-button"
+              data-testid="settings-open"
+              onClick={() => setSettingsOpen(true)}
+              title={t("action.settingsTitle")}
+              type="button"
+            >
+              <Settings size={17} aria-hidden="true" />
+              <span>{t("action.settings")}</span>
+            </button>
           </div>
           <details className="first-run-launchpad" data-testid="first-run-launchpad" open={launchpadOpen}>
             <summary
@@ -13462,21 +13688,26 @@ export function App(): ReactElement {
                 <Sparkles size={15} />
               </span>
               <span className="first-run-launchpad-summary-copy">
-                <strong>Start or switch project</strong>
-                <small>{launchpadOpen ? "Choose a ready-to-edit local project" : `${project.title} active · reopen project choices`}</small>
+                <strong>{t("launch.title")}</strong>
+                <small>
+                  {launchpadOpen
+                    ? t("launch.chooseProject")
+                    : t("launch.activeProject", { title: project.title })}
+                </small>
               </span>
               <span className="first-run-launchpad-summary-context">
-                {project.mode === "studio" ? "Studio" : "Guided"} · {launchpadOpen ? "Choices open" : "Compact"}
+                {project.mode === "studio" ? t("mode.studio") : t("mode.guided")} ·{" "}
+                {launchpadOpen ? t("launch.choicesOpen") : t("launch.compact")}
               </span>
               <ArrowDown className="first-run-launchpad-chevron" size={14} aria-hidden="true" />
             </summary>
             <div className="first-run-launchpad-content" data-testid="first-run-launchpad-content">
             <div className="first-run-launchpad-heading">
               <Sparkles size={15} aria-hidden="true" />
-              <span>Start here</span>
+              <span>{t("launch.startHere")}</span>
             </div>
-            <strong>Make a beat now</strong>
-            <small>Choose a ready-to-edit local project. No samples or setup required.</small>
+            <strong>{t("launch.makeBeat")}</strong>
+            <small>{t("launch.detail")}</small>
             <button
               className="first-run-launchpad-action primary"
               data-testid="first-run-start-beat"
@@ -13485,8 +13716,8 @@ export function App(): ReactElement {
             >
               <Music2 size={15} aria-hidden="true" />
               <span>
-                <strong>Start an 8-bar beat</strong>
-                <small>Guided · opens the drum grid</small>
+                <strong>{t("launch.guidedBeat")}</strong>
+                <small>{t("launch.guidedBeatDetail")}</small>
               </span>
             </button>
             <button
@@ -13497,8 +13728,8 @@ export function App(): ReactElement {
             >
               <SlidersHorizontal size={15} aria-hidden="true" />
               <span>
-                <strong>Start a studio pass</strong>
-                <small>Studio · opens Review Queue</small>
+                <strong>{t("launch.studioPass")}</strong>
+                <small>{t("launch.studioPassDetail")}</small>
               </span>
             </button>
             <button
@@ -13508,7 +13739,7 @@ export function App(): ReactElement {
               onClick={() => void handleOpenProject()}
             >
               <FolderOpen size={14} aria-hidden="true" />
-              <span>Open an existing project</span>
+              <span>{t("launch.openProject")}</span>
             </button>
             </div>
           </details>
@@ -13516,7 +13747,7 @@ export function App(): ReactElement {
 
         <div className="transport-controls">
           <label className="field title-field">
-            <span>Title</span>
+            <span>{t("field.title")}</span>
             <ProjectTitleInput
               authoritativeRevision={metadataDraftRevision}
               title={project.title}
@@ -13536,7 +13767,7 @@ export function App(): ReactElement {
           <label className="field compact">
             <span>BPM</span>
             <input
-              aria-label="Project BPM"
+              aria-label={t("core.projectBpmAria")}
               data-testid="project-bpm-input"
               type="number"
               min={minProjectBpm}
@@ -13547,7 +13778,7 @@ export function App(): ReactElement {
           </label>
           <div
             className="tempo-nudge-pads"
-            aria-label="Tempo nudge pads"
+            aria-label={t("core.tempoNudgePadsAria")}
             data-testid="tempo-nudge-pads"
             role="group"
           >
@@ -13566,9 +13797,9 @@ export function App(): ReactElement {
             ))}
           </div>
           <label className="field">
-            <span>Key</span>
+            <span>{t("field.key")}</span>
             <select
-              aria-label="Project key"
+              aria-label={t("core.projectKeyAria")}
               data-testid="project-key-select"
               value={project.key}
               onChange={(event) => applyProjectKey(event.target.value)}
@@ -13579,31 +13810,31 @@ export function App(): ReactElement {
             </select>
           </label>
           <div
-            aria-label={`Time signature ${projectTimeSignature}, fixed grid`}
+            aria-label={t("core.timeSignatureAria", { signature: projectTimeSignature })}
             className="field time-signature-field"
             data-testid="project-time-signature"
             role="group"
-            title="GrooveForge currently uses a fixed 4/4 project grid"
+            title={t("core.fixedGridTitle")}
           >
-            <span>Time signature</span>
+            <span>{t("field.timeSignature")}</span>
             <output data-testid="project-time-signature-value">
               <strong>{projectTimeSignature}</strong>
-              <small>Fixed grid</small>
+              <small>{t("field.fixedGrid")}</small>
             </output>
           </div>
           <label className="field">
             <span className="style-field-label">
-              Style
+              {t("field.style")}
               <small data-testid="style-starting-point" id="style-change-behavior">
-                Starting point · {styleProfiles.length} editable styles · review before Apply
+                {t("field.styleDetail", { count: styleProfiles.length })}
               </small>
             </span>
             <select
               aria-describedby="style-change-behavior"
-              aria-label="Style"
+              aria-label={t("field.style")}
               data-testid="style-select"
               ref={styleSelectRef}
-              title={`${styleProfiles.length} editable styles · review BPM, swing, sound, and Pattern A/B/C before apply`}
+              title={t("field.styleTitle", { count: styleProfiles.length })}
               value={project.styleId}
               onChange={(event) => void selectStyle(event.target.value as ProjectState["styleId"])}
             >
@@ -13633,35 +13864,44 @@ export function App(): ReactElement {
           </div>
           </div>
           <div className="transport-essential-controls" data-testid="transport-essential-controls">
-          <div className="segmented playback-mode-row" aria-label="Choose audition loop scope" role="group">
+          <div className="segmented playback-mode-row" aria-label={t("core.loopScopeAria")} role="group">
             <button
-              aria-label={`Song loop, ${songLoopAccessibleTarget}${transportLoopScope === "arrangement" ? ", selected" : ""}`}
+              aria-label={t("core.songLoopAria", {
+                target: songLoopAccessibleTarget,
+                selected: transportLoopScope === "arrangement" ? t("core.selectedSuffix") : ""
+              })}
               aria-pressed={transportLoopScope === "arrangement"}
               className={transportLoopScope === "arrangement" ? "selected" : ""}
               data-testid="playback-mode-arrangement"
               disabled={isPlaying && transportLoopScope !== "arrangement"}
               onClick={() => selectTransportLoopScope("arrangement")}
-              title="Loop the full arrangement timeline"
+              title={t("core.songLoopTitle")}
               type="button"
             >
-              <strong>Song</strong>
+              <strong>{t("transport.song")}</strong>
               <small>{songLoopTargetLabel}</small>
             </button>
             <button
-              aria-label={`Block loop, ${blockLoopTargetLabel}${transportLoopScope === "block" ? ", selected" : ""}`}
+              aria-label={t("core.blockLoopAria", {
+                target: blockLoopTargetLabel,
+                selected: transportLoopScope === "block" ? t("core.selectedSuffix") : ""
+              })}
               aria-pressed={transportLoopScope === "block"}
               className={transportLoopScope === "block" ? "selected" : ""}
               data-testid="transport-loop-block"
               disabled={isPlaying && transportLoopScope !== "block"}
               onClick={() => selectTransportLoopScope("block")}
-              title="Loop the selected arrangement block"
+              title={t("core.blockLoopTitle")}
               type="button"
             >
-              <strong>Block</strong>
+              <strong>{t("transport.block")}</strong>
               <small>{blockLoopTargetLabel}</small>
             </button>
             <button
-              aria-label={`Turn loop, ${turnLoopAccessibleTarget}${transportLoopScope === "transition" ? ", selected" : ""}`}
+              aria-label={t("core.turnLoopAria", {
+                target: turnLoopAccessibleTarget,
+                selected: transportLoopScope === "transition" ? t("core.selectedSuffix") : ""
+              })}
               aria-pressed={transportLoopScope === "transition"}
               className={transportLoopScope === "transition" ? "selected" : ""}
               data-testid="transport-loop-transition"
@@ -13669,27 +13909,29 @@ export function App(): ReactElement {
               onClick={() => selectTransportLoopScope("transition")}
               title={
                 arrangementTransitionLoopTarget
-                  ? `Loop ${arrangementTransitionLoopTarget.transition.value} transition`
-                  : "Select or focus an adjacent arrangement transition"
+                  ? t("core.turnLoopTitle", { transition: arrangementTransitionLoopTarget.transition.value })
+                  : t("core.turnLoopEmptyTitle")
               }
               type="button"
             >
-              <strong>Turn</strong>
+              <strong>{t("transport.turn")}</strong>
               <small>{turnLoopTargetLabel}</small>
             </button>
             <button
-              aria-label={`Pattern loop, Pattern ${project.selectedPattern}, ${patternEventCount(currentPattern)}${
-                transportLoopScope === "pattern" ? ", selected" : ""
-              }`}
+              aria-label={t("core.patternLoopAria", {
+                pattern: project.selectedPattern,
+                events: patternEventCount(currentPattern),
+                selected: transportLoopScope === "pattern" ? t("core.selectedSuffix") : ""
+              })}
               aria-pressed={transportLoopScope === "pattern"}
               className={transportLoopScope === "pattern" ? "selected" : ""}
               data-testid="playback-mode-pattern"
               disabled={isPlaying && transportLoopScope !== "pattern"}
               onClick={() => selectTransportLoopScope("pattern")}
-              title="Loop the selected Pattern A/B/C"
+              title={t("core.patternLoopTitle")}
               type="button"
             >
-              <strong>Pattern</strong>
+              <strong>{t("transport.pattern")}</strong>
               <small>{patternLoopTargetLabel}</small>
             </button>
           </div>
@@ -13699,10 +13941,10 @@ export function App(): ReactElement {
             className={`icon-button metronome-toggle ${project.metronomeEnabled ? "selected" : ""}`}
             data-testid="metronome-toggle"
             type="button"
-            title={project.metronomeEnabled ? "Turn metronome off" : "Turn metronome on"}
+            title={project.metronomeEnabled ? t("core.metronomeOffTitle") : t("core.metronomeOnTitle")}
             onClick={toggleMetronome}
           >
-            <strong>Metronome</strong>
+            <strong>{t("transport.metronome")}</strong>
             <small>{metronomeDetailLabel}</small>
           </button>
           <button
@@ -13710,22 +13952,22 @@ export function App(): ReactElement {
             className="icon-button"
             data-testid="quick-actions-open"
             type="button"
-            title="Open Quick Actions (Ctrl/Cmd+K)"
+            title={t("action.openActionsTitle")}
             onClick={openQuickActions}
           >
             <KeyboardMusic size={18} aria-hidden="true" />
-            <span>Actions</span>
+            <span>{t("action.actions")}</span>
           </button>
           <button
             aria-keyshortcuts="? Control+/ Meta+/"
             className="icon-button"
             data-testid="command-reference-open"
             type="button"
-            title="Open Command Reference (? or Ctrl/Cmd+/)"
+            title={t("action.openHelpTitle")}
             onClick={openCommandReference}
           >
             <CircleHelp size={18} aria-hidden="true" />
-            <span>Help</span>
+            <span>{t("action.help")}</span>
           </button>
           <button
             aria-label={transportPlaybackAccessibleLabel}
@@ -13750,46 +13992,46 @@ export function App(): ReactElement {
             className="icon-button"
             data-testid="undo-button"
             type="button"
-            title="Undo last edit (Ctrl/Cmd+Z)"
+            title={t("action.undoTitle")}
             disabled={!canUndo}
             onClick={undoProject}
           >
             <Undo2 size={18} aria-hidden="true" />
-            <span>Undo</span>
+            <span>{t("action.undo")}</span>
           </button>
           <button
             aria-keyshortcuts="Control+Y Meta+Y Control+Shift+Z Meta+Shift+Z"
             className="icon-button"
             data-testid="redo-button"
             type="button"
-            title="Redo last undone edit (Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y)"
+            title={t("action.redoTitle")}
             disabled={!canRedo}
             onClick={redoProject}
           >
             <Redo2 size={18} aria-hidden="true" />
-            <span>Redo</span>
+            <span>{t("action.redo")}</span>
           </button>
           <button
             aria-keyshortcuts="Control+O Meta+O"
             className="icon-button"
             data-testid="project-open"
             type="button"
-            title="Open project (Ctrl/Cmd+O)"
+            title={t("action.openTitle")}
             onClick={() => void handleOpenProject()}
           >
             <FolderOpen size={18} aria-hidden="true" />
-            <span>Open</span>
+            <span>{t("action.open")}</span>
           </button>
           <button
             aria-keyshortcuts="Control+S Meta+S"
             className="icon-button"
             data-testid="project-save"
             type="button"
-            title="Save project (Ctrl/Cmd+S)"
+            title={t("action.saveTitle")}
             onClick={() => void handleSaveProject()}
           >
             <Save size={18} aria-hidden="true" />
-            <span>Save</span>
+            <span>{t("action.save")}</span>
           </button>
           </div>
           <details className="transport-session-tools" data-testid="transport-session-tools" open={transportSessionOpen}>
@@ -13802,8 +14044,8 @@ export function App(): ReactElement {
             >
               <Gauge size={16} aria-hidden="true" />
               <span>
-                <strong>Session Context</strong>
-                <small>Tap Tempo · Undo/Keys</small>
+                <strong>{t("action.sessionContext")}</strong>
+                <small>{t("action.sessionContextDetail")}</small>
               </span>
               <ArrowDown size={14} aria-hidden="true" />
             </summary>
@@ -13818,7 +14060,7 @@ export function App(): ReactElement {
               >
                 <Gauge size={18} aria-hidden="true" />
                 <span className="tap-tempo-button-copy">
-                  <strong>Tap Tempo</strong>
+                  <strong>{t("action.tapTempo")}</strong>
                   <small>{tapTempoButtonPresentation.detailLabel}</small>
                 </span>
               </button>
@@ -13833,7 +14075,9 @@ export function App(): ReactElement {
               </div>
               <div
                 className={`edit-history-readout ${editHistoryReadout.tone}`}
+                data-redo-depth={redoStack.length}
                 data-testid="edit-history-readout"
+                data-undo-depth={undoStack.length}
                 title={editHistoryReadout.detailTitle}
               >
                 <span data-testid="edit-history-status">{editHistoryReadout.statusLabel}</span>
@@ -13861,31 +14105,31 @@ export function App(): ReactElement {
             >
               <Download size={16} aria-hidden="true" />
               <span>
-                <strong>Exports</strong>
-                <small>WAV, stems, MIDI, sheet, and bundle</small>
+                <strong>{t("action.exports")}</strong>
+                <small>{t("action.exportsDetail")}</small>
               </span>
               <ArrowDown size={14} aria-hidden="true" />
             </summary>
             <div className="transport-tools-content" data-testid="transport-export-content">
-          <button className="icon-button" data-testid="export-wav" type="button" title="Export WAV" onClick={handleExportWav}>
+          <button className="icon-button" data-testid="export-wav" type="button" title={t("core.exportWavTitle")} onClick={handleExportWav}>
             <Download size={18} aria-hidden="true" />
             <span>WAV</span>
           </button>
-          <button className="icon-button" data-testid="export-stems" type="button" title="Export stem WAVs" onClick={handleExportStems}>
+          <button className="icon-button" data-testid="export-stems" type="button" title={t("core.exportStemsTitle")} onClick={handleExportStems}>
             <Download size={18} aria-hidden="true" />
-            <span>Stems</span>
+            <span>{t("core.stems")}</span>
           </button>
-          <button className="icon-button" data-testid="export-midi" type="button" title="Export MIDI" onClick={handleExportMidi}>
+          <button className="icon-button" data-testid="export-midi" type="button" title={t("core.exportMidiTitle")} onClick={handleExportMidi}>
             <Download size={18} aria-hidden="true" />
             <span>MIDI</span>
           </button>
-          <button className="icon-button" data-testid="export-handoff-sheet" type="button" title="Export handoff sheet" onClick={handleExportHandoffSheet}>
+          <button className="icon-button" data-testid="export-handoff-sheet" type="button" title={t("core.exportSheetTitle")} onClick={handleExportHandoffSheet}>
             <Download size={18} aria-hidden="true" />
-            <span>Sheet</span>
+            <span>{t("core.sheet")}</span>
           </button>
-          <button className="icon-button" data-testid="export-delivery-bundle" type="button" title="Export delivery bundle ZIP" onClick={handleExportDeliveryBundle}>
+          <button className="icon-button" data-testid="export-delivery-bundle" type="button" title={t("core.exportBundleTitle")} onClick={handleExportDeliveryBundle}>
             <Download size={18} aria-hidden="true" />
-            <span>Bundle</span>
+            <span>{t("core.bundle")}</span>
           </button>
             </div>
           </details>
@@ -13894,7 +14138,7 @@ export function App(): ReactElement {
 
       {workspaceCommandDockVisible && (
         <div
-          aria-label="Workspace command dock"
+          aria-label={t("core.commandDockAria")}
           className="workspace-command-dock"
           data-testid="workspace-command-dock"
           role="toolbar"
@@ -13919,18 +14163,18 @@ export function App(): ReactElement {
             type="button"
           >
             {isPlaying ? <CircleStop size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
-            <span>{isPlaying ? "Stop" : "Play"}</span>
+            <span>{isPlaying ? t("transport.stop") : t("transport.play")}</span>
           </button>
           <button
             aria-keyshortcuts="Control+K Meta+K"
             className="workspace-command-dock-button"
             data-testid="workspace-command-dock-actions"
             onClick={openQuickActions}
-            title="Open Quick Actions (Ctrl/Cmd+K)"
+            title={t("action.openActionsTitle")}
             type="button"
           >
             <KeyboardMusic size={16} aria-hidden="true" />
-            <span>Actions</span>
+            <span>{t("action.actions")}</span>
           </button>
           <button
             aria-keyshortcuts="Control+Z Meta+Z"
@@ -13938,11 +14182,11 @@ export function App(): ReactElement {
             data-testid="workspace-command-dock-undo"
             disabled={!canUndo}
             onClick={undoProject}
-            title="Undo last edit (Ctrl/Cmd+Z)"
+            title={t("action.undoTitle")}
             type="button"
           >
             <Undo2 size={16} aria-hidden="true" />
-            <span>Undo</span>
+            <span>{t("action.undo")}</span>
           </button>
           <button
             aria-keyshortcuts="Control+Y Meta+Y Control+Shift+Z Meta+Shift+Z"
@@ -13950,22 +14194,22 @@ export function App(): ReactElement {
             data-testid="workspace-command-dock-redo"
             disabled={!canRedo}
             onClick={redoProject}
-            title="Redo last undone edit (Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y)"
+            title={t("action.redoTitle")}
             type="button"
           >
             <Redo2 size={16} aria-hidden="true" />
-            <span>Redo</span>
+            <span>{t("action.redo")}</span>
           </button>
           <button
             aria-keyshortcuts="Control+S Meta+S"
             className="workspace-command-dock-button"
             data-testid="workspace-command-dock-save"
             onClick={() => void handleSaveProject()}
-            title="Save project (Ctrl/Cmd+S)"
+            title={t("action.saveTitle")}
             type="button"
           >
             <Save size={16} aria-hidden="true" />
-            <span>Save</span>
+            <span>{t("action.save")}</span>
           </button>
         </div>
       )}
@@ -14012,6 +14256,7 @@ export function App(): ReactElement {
         onApply={confirmStyleChange}
         onCancel={cancelStyleChange}
       />
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {localDraftRecovery && !localDraftRecoveryDeferred && (
         <LocalDraftRecoveryBanner
@@ -14022,7 +14267,7 @@ export function App(): ReactElement {
         />
       )}
 
-      <section className="mode-row" aria-label="Mode">
+      <section className="mode-row" aria-label={t("mode.label")}>
         <input
           ref={importInputRef}
           className="file-input"
@@ -14033,23 +14278,25 @@ export function App(): ReactElement {
         <div className="segmented">
           <button
             aria-label={guidedModeContext}
+            aria-pressed={project.mode === "guided"}
             className={project.mode === "guided" ? "selected" : ""}
             data-testid="mode-guided"
             title={guidedModeContext}
             type="button"
             onClick={() => switchProjectMode("guided")}
           >
-            Guided
+            {t("mode.guided")}
           </button>
           <button
             aria-label={studioModeContext}
+            aria-pressed={project.mode === "studio"}
             className={project.mode === "studio" ? "selected" : ""}
             data-testid="mode-studio"
             title={studioModeContext}
             type="button"
             onClick={() => switchProjectMode("studio")}
           >
-            Studio
+            {t("mode.studio")}
           </button>
         </div>
         <div className="session-meter">
@@ -14060,20 +14307,20 @@ export function App(): ReactElement {
           <span>{project.masterPreset}</span>
           <span data-testid="audio-analysis-status">
             {projectAudioAnalysis.status === "error"
-              ? "Audio meters unavailable"
+              ? t("analysis.unavailable")
               : projectAudioAnalysis.pending
-                ? "Audio meters updating"
-                : "Audio meters ready"}
+                ? t("analysis.updating")
+                : t("analysis.ready")}
           </span>
           {projectAudioAnalysis.status === "error" && (
             <button
               className="audio-analysis-retry"
               data-testid="audio-analysis-retry"
               onClick={retryCurrentProjectAudioAnalysis}
-              title="Retry exact local audio meter analysis"
+              title={t("core.retryMetersTitle")}
               type="button"
             >
-              Retry meters
+              {t("analysis.retry")}
             </button>
           )}
           <span data-testid="local-draft-status">{localDraftStatusLabel}</span>
@@ -14131,15 +14378,16 @@ export function App(): ReactElement {
             <CircleHelp size={18} />
           </span>
           <span className="guidance-center-copy">
-            <strong>Guide &amp; Review Center</strong>
+            <strong>{t("guide.title")}</strong>
             <small>
               {project.mode === "guided"
-                ? "Open step-by-step guidance, beat checks, and delivery help"
-                : "Open production diagnostics, review tools, and handoff checks"}
+                ? t("guide.guidedDetail")
+                : t("guide.studioDetail")}
             </small>
           </span>
           <span className="guidance-center-context">
-            {project.mode === "guided" ? "Guided" : "Studio"} · {guidanceCenterOpen ? "Open" : "On demand"}
+            {project.mode === "guided" ? t("mode.guided") : t("mode.studio")} ·{" "}
+            {guidanceCenterOpen ? t("guide.open") : t("guide.onDemand")}
           </span>
           <ArrowDown className="guidance-center-chevron" size={17} aria-hidden="true" />
         </summary>
@@ -14467,7 +14715,13 @@ export function App(): ReactElement {
         {quickActionResult && <QuickActionResultStrip result={quickActionResult} />}
       </div>
 
-      <div className="workspace-tabpanels" data-active-workspace-zone={activeWorkspaceZone}>
+      <div
+        aria-label={t("nav.mainTabsAria")}
+        className="workspace-tabpanels"
+        data-active-workspace-zone={activeWorkspaceZone}
+        id="workspace-main"
+        tabIndex={-1}
+      >
       <section
         aria-labelledby="workspace-tab-compose"
         className="workspace-grid workspace-zone-panel workspace-compose-panel"
@@ -14480,33 +14734,33 @@ export function App(): ReactElement {
         <Activity mode={workspaceActivityMode(activeWorkspaceZone === "compose")} name="workspace-compose">
         <WorkspacePageTabs
           activePage={activeComposeWorkspacePage}
-          ariaLabel="Compose editor pages"
+          ariaLabel={t("nav.subTabsAria", { title: t("nav.compose") })}
           idPrefix="compose"
           items={[
             {
               id: "drums",
-              label: "Drums",
-              detail: "16-step patterns and groove",
-              meta: "Pattern grid",
+              label: t("nav.drums"),
+              detail: t("nav.drumsDetail"),
+              meta: t("nav.drumsMeta"),
               icon: <Drum size={18} />
             },
             {
               id: "notes",
-              label: "Bass / Melody",
-              detail: "Scale-locked 808 and Synth notes",
-              meta: "Note lanes",
+              label: t("nav.notes"),
+              detail: t("nav.notesDetail"),
+              meta: t("nav.notesMeta"),
               icon: <KeyboardMusic size={18} />
             },
             {
               id: "instruments",
-              label: "Chords & Sound",
-              detail: "Harmony, instruments, and tone design",
-              meta: "Sound tools",
+              label: t("nav.instruments"),
+              detail: t("nav.instrumentsDetail"),
+              meta: t("nav.instrumentsMeta"),
               icon: <Sparkles size={18} />
             }
           ]}
           onSelect={(page) => activateComposeWorkspacePage(page, true)}
-          title="Compose editor"
+          title={t("nav.composeEditor")}
         />
         <section
           aria-labelledby="compose-page-tab-drums"
@@ -14515,14 +14769,14 @@ export function App(): ReactElement {
           data-testid="workflow-target-compose"
           hidden={activeComposeWorkspacePage !== "drums"}
           id="compose-page-panel-drums"
-          aria-label="Pattern editor"
+          aria-label={t("compose.patternEditorAria")}
           ref={composePanelRef}
           role="tabpanel"
           tabIndex={activeComposeWorkspacePage === "drums" ? 0 : -1}
         >
-          <PanelTitle icon={<Drum size={18} />} title="Drums" meta="16 step rack" />
+          <PanelTitle icon={<Drum size={18} />} title={t("nav.drums")} meta={t("panel.drumsMeta")} />
           <div
-            aria-label="Edit Pattern A, B, or C"
+            aria-label={t("compose.patternTabsAria")}
             aria-orientation="horizontal"
             className="pattern-tabs"
             role="tablist"
@@ -14531,11 +14785,27 @@ export function App(): ReactElement {
               const selected = project.selectedPattern === pattern;
               const playing = playingPattern === pattern;
               const eventLabel = patternEventCount(project.patterns[pattern]);
-              const visibleState = selected && playing ? "Editing + playing" : selected ? "Editing" : playing ? "Playing" : "";
-              const accessibleState = selected && playing ? "editing and playing" : selected ? "editing" : playing ? "playing" : "";
+              const visibleState = selected && playing
+                ? t("compose.stateEditingPlayingVisible")
+                : selected
+                  ? t("compose.stateEditingVisible")
+                  : playing
+                    ? t("compose.statePlayingVisible")
+                    : "";
+              const accessibleState = selected && playing
+                ? t("compose.stateEditingPlayingAria")
+                : selected
+                  ? t("compose.stateEditingAria")
+                  : playing
+                    ? t("compose.statePlayingAria")
+                    : "";
               return (
                 <button
-                  aria-label={`Pattern ${pattern}${accessibleState ? `, ${accessibleState}` : ""}, ${eventLabel}`}
+                  aria-label={t("compose.patternTabAria", {
+                    pattern,
+                    state: accessibleState ? `, ${accessibleState}` : "",
+                    events: eventLabel
+                  })}
                   aria-keyshortcuts={String(patternSlots.indexOf(pattern) + 1)}
                   aria-selected={selected}
                   key={pattern}
@@ -14551,10 +14821,13 @@ export function App(): ReactElement {
                   role="tab"
                   tabIndex={selected ? 0 : -1}
                   type="button"
-                  title={`Edit Pattern ${pattern} (${patternSlots.indexOf(pattern) + 1})`}
+                  title={t("compose.editPatternTitle", {
+                    pattern,
+                    index: patternSlots.indexOf(pattern) + 1
+                  })}
                   onClick={() => selectPattern(pattern)}
                 >
-                  <span>Pattern {pattern}</span>
+                  <span>{t("compose.patternLabel", { pattern })}</span>
                   <small>
                     {visibleState && <strong>{visibleState}</strong>}
                     <em>{eventLabel}</em>
@@ -14574,10 +14847,10 @@ export function App(): ReactElement {
             <button
               aria-label={
                 audiblePatternFollowTarget
-                  ? `Edit audible Pattern ${audiblePatternFollowTarget}`
+                  ? t("compose.editAudiblePatternAria", { pattern: audiblePatternFollowTarget })
                   : playingPattern
-                    ? "Editing Pattern already matches audible Pattern"
-                    : "No audible Pattern to follow"
+                    ? t("compose.audiblePatternSynced")
+                    : t("compose.noAudiblePattern")
               }
               className="pattern-playback-follow-button"
               data-testid="pattern-playback-follow"
@@ -14585,15 +14858,21 @@ export function App(): ReactElement {
               onClick={followAudiblePattern}
               title={
                 audiblePatternFollowTarget
-                  ? `Switch edit focus to audible Pattern ${audiblePatternFollowTarget}`
+                  ? t("compose.switchToAudiblePatternTitle", { pattern: audiblePatternFollowTarget })
                   : playingPattern
-                    ? "Editing Pattern already matches audible Pattern"
-                    : "Play Song or Block with another Pattern to follow the audible Pattern"
+                    ? t("compose.audiblePatternSynced")
+                    : t("compose.playToFollowPatternTitle")
               }
               type="button"
             >
               <ArrowRight size={13} aria-hidden="true" />
-              <span>{audiblePatternFollowTarget ? `Edit ${audiblePatternFollowTarget}` : playingPattern ? "In sync" : "Idle"}</span>
+              <span>
+                {audiblePatternFollowTarget
+                  ? t("compose.editPattern", { pattern: audiblePatternFollowTarget })
+                  : playingPattern
+                    ? t("compose.inSync")
+                    : t("compose.idle")}
+              </span>
             </button>
           </div>
           <details className="pattern-lab" data-testid="pattern-lab">
@@ -14602,11 +14881,14 @@ export function App(): ReactElement {
                 <Sparkles size={16} />
               </span>
               <span className="pattern-lab-copy">
-                <strong>Pattern Lab</strong>
-                <small>Compare, generate, clone, vary, stack, and add fills</small>
+                <strong>{t("compose.patternLab")}</strong>
+                <small>{t("compose.patternLabDetail")}</small>
               </span>
               <span className="pattern-lab-context">
-                Pattern {project.selectedPattern} · {patternEventCount(currentPattern)}
+                {t("compose.patternLabContext", {
+                  pattern: project.selectedPattern,
+                  events: patternEventCount(currentPattern)
+                })}
               </span>
               <ArrowDown className="pattern-lab-chevron" size={16} aria-hidden="true" />
             </summary>
@@ -14656,14 +14938,17 @@ export function App(): ReactElement {
           <DrumFoundationPads foundations={drumFoundationOptions} onApply={applyDrumFoundation} />
           <GrooveFeelPads feels={grooveFeelOptions} onApply={applyGrooveFeel} />
           <DrumAccentPads accents={drumAccentOptions} onApply={applyDrumAccent} />
-          <div className="pattern-tools" aria-label="Pattern tools">
+          <div className="pattern-tools" aria-label={t("compose.patternToolsAria")}>
             {patternVariationPresetIds.map((preset) => (
               <button
                 key={preset}
                 data-testid={`pattern-variation-${preset}`}
                 data-previewed={patternVariationPreviewPreset === preset ? "true" : "false"}
                 type="button"
-                title={`Apply ${patternVariationPresetLabel(preset)} variation to Pattern ${project.selectedPattern}`}
+                title={t("compose.applyVariationTitle", {
+                  variation: patternVariationPresetLabel(preset),
+                  pattern: project.selectedPattern
+                })}
                 onFocus={() => setPatternVariationPreviewPreset(preset)}
                 onMouseEnter={() => setPatternVariationPreviewPreset(preset)}
                 onClick={() => {
@@ -14682,28 +14967,28 @@ export function App(): ReactElement {
                   key={pattern}
                   data-testid={`pattern-copy-${pattern}`}
                   type="button"
-                  title={`Copy selected pattern to Pattern ${pattern}`}
+                  title={t("compose.copyPatternTitle", { pattern })}
                   onClick={() => copySelectedPattern(pattern)}
                 >
                   <Copy size={14} aria-hidden="true" />
-                  <span>Copy to {pattern}</span>
+                  <span>{t("compose.copyTo", { pattern })}</span>
                 </button>
               ))}
             <button
               className="danger"
               data-testid="pattern-clear"
               type="button"
-              title={`Clear Pattern ${project.selectedPattern}`}
+              title={t("compose.clearPatternTitle", { pattern: project.selectedPattern })}
               onClick={clearSelectedPattern}
             >
               <Trash2 size={14} aria-hidden="true" />
-              <span>Clear {project.selectedPattern}</span>
+              <span>{t("compose.clearPattern", { pattern: project.selectedPattern })}</span>
             </button>
           </div>
           {patternVariationResult && <PatternVariationResultStrip result={patternVariationResult} />}
           <PatternFillSuggestion summary={patternFillSuggestionSummary} />
           <PatternFillPreview preview={patternFillPreviewSummary} />
-          <div className="pattern-fill-row" aria-label="Pattern fills">
+          <div className="pattern-fill-row" aria-label={t("compose.patternFillsAria")}>
             {patternFillPresetIds.map((preset) => {
               const isClear = preset === "clear_tail";
               return (
@@ -14713,7 +14998,10 @@ export function App(): ReactElement {
                   data-testid={`pattern-fill-${preset}`}
                   data-previewed={patternFillPreviewPreset === preset ? "true" : "false"}
                   type="button"
-                  title={`Apply ${patternFillPresetLabel(preset)} to Pattern ${project.selectedPattern}`}
+                  title={t("compose.applyFillTitle", {
+                    fill: patternFillPresetLabel(preset),
+                    pattern: project.selectedPattern
+                  })}
                   onFocus={() => setPatternFillPreviewPreset(preset)}
                   onMouseEnter={() => setPatternFillPreviewPreset(preset)}
                   onClick={() => {
@@ -14731,11 +15019,11 @@ export function App(): ReactElement {
             </div>
           </details>
           <p className="drum-grid-keyboard-help" id="drum-grid-keyboard-help">
-            Arrow keys move · Enter or Space toggles
+            {t("compose.drumGridHelp")}
           </p>
           <div
             aria-describedby="drum-grid-keyboard-help"
-            aria-label="Drum step sequencer"
+            aria-label={t("compose.drumSequencerAria")}
             className="step-grid"
             data-testid="drum-step-grid"
             role="group"
@@ -14753,9 +15041,9 @@ export function App(): ReactElement {
                   const timing = drumStepTimingMs(currentPattern, lane, step);
                   const ariaDetails = active
                     ? [
-                        `${velocityPercent}% velocity`,
-                        hasChanceBadge ? `${chanceBadgeLabel(probability)} chance` : "",
-                        lane === "hat" && repeat > 1 ? `${repeat}x repeat` : "",
+                        t("compose.velocityDetail", { velocity: velocityPercent }),
+                        hasChanceBadge ? t("compose.chanceDetail", { chance: chanceBadgeLabel(probability) }) : "",
+                        lane === "hat" && repeat > 1 ? t("compose.repeatDetail", { repeat }) : "",
                         timing === 0 ? "" : timingLabel(timing)
                       ]
                         .filter(Boolean)
@@ -14770,7 +15058,11 @@ export function App(): ReactElement {
                     .join(" ");
                   return (
                     <button
-                      aria-label={`${drumLabels[lane]} step ${step + 1}${ariaDetails ? ` ${ariaDetails}` : ""}`}
+                      aria-label={t("compose.drumStepAria", {
+                        lane: drumLabels[lane],
+                        step: step + 1,
+                        details: ariaDetails ? ` ${ariaDetails}` : ""
+                      })}
                       aria-pressed={active}
                       className={[
                         "step",
@@ -14817,7 +15109,7 @@ export function App(): ReactElement {
           </div>
           <div className="micro-controls">
             <label>
-              <span>Swing</span>
+              <span>{t("compose.swing")}</span>
               <input
                 type="range"
                 min={0}
@@ -14827,10 +15119,12 @@ export function App(): ReactElement {
                 onChange={(event) => updateProject((current) => ({ ...current, swing: Number(event.target.value) }))}
               />
             </label>
-            <div className="swing-feel-row" aria-label="Swing Feel Pads" data-testid="swing-feel-pads">
+            <div className="swing-feel-row" aria-label={t("compose.swingFeelPadsAria")} data-testid="swing-feel-pads">
               {swingFeelPads.map((pad) => {
                 const targetSwing = swingFeelPadSwing(pad, project);
                 const selected = normalizeSwingFeelValue(project.swing) === targetSwing;
+                const label = swingFeelPadLabel(pad, locale);
+                const detail = swingFeelPadDetail(pad, project, locale);
                 return (
                   <button
                     aria-pressed={selected}
@@ -14838,12 +15132,16 @@ export function App(): ReactElement {
                     data-testid={`swing-feel-${pad.id}`}
                     key={pad.id}
                     onClick={() => applySwingFeelPad(pad.id)}
-                    title={`${pad.label} swing feel: ${swingFeelPadDetail(pad, project)} at ${percentLabel(targetSwing)}`}
+                    title={t("compose.swingFeelTitle", {
+                      label,
+                      detail,
+                      percent: percentLabel(targetSwing)
+                    })}
                     type="button"
                   >
-                    <span>{pad.label}</span>
+                    <span>{label}</span>
                     <strong>{percentLabel(targetSwing)}</strong>
-                    <small>{swingFeelPadDetail(pad, project)}</small>
+                    <small>{detail}</small>
                   </button>
                 );
               })}
@@ -14856,22 +15154,26 @@ export function App(): ReactElement {
               data-testid="pattern-groove-presets"
             >
               <div className="groove-row-heading">
-                <span id="pattern-groove-label">Pattern groove</span>
-                <strong>Pattern {project.selectedPattern}</strong>
+                <span id="pattern-groove-label">{t("compose.patternGroove")}</span>
+                <strong>{t("compose.patternLabel", { pattern: project.selectedPattern })}</strong>
               </div>
-              <small id="pattern-groove-help">Applies editable velocity + timing. Use Undo to compare.</small>
+              <small id="pattern-groove-help">{t("compose.grooveDetail")}</small>
               <div
-                aria-label={`Pattern ${project.selectedPattern} groove presets`}
+                aria-label={t("compose.groovePresetsAria", { pattern: project.selectedPattern })}
                 className="groove-actions"
                 role="group"
               >
                 {drumGroovePresetIds.map((preset) => {
-                  const label = drumGroovePresetLabel(preset);
-                  const detail = drumGroovePresetDetail(preset);
+                  const label = localizedDrumGroovePresetLabel(preset);
+                  const detail = localizedDrumGroovePresetDetail(preset);
                   const actionLabel =
                     preset === "reset"
-                      ? `Reset Pattern ${project.selectedPattern} drum groove to default velocity and timing`
-                      : `Apply ${label} drum groove to Pattern ${project.selectedPattern}: ${detail}`;
+                      ? t("compose.resetGrooveAria", { pattern: project.selectedPattern })
+                      : t("compose.applyGrooveAria", {
+                          label,
+                          pattern: project.selectedPattern,
+                          detail
+                        });
                   return (
                     <button
                       aria-label={actionLabel}
@@ -14922,7 +15224,7 @@ export function App(): ReactElement {
         </section>
 
         <section
-          aria-label="Bass and melody editor"
+          aria-label={t("compose.notesEditorAria")}
           aria-labelledby="compose-page-tab-notes"
           className="panel piano-panel workspace-page-panel"
           data-workspace-page="notes"
@@ -14933,7 +15235,11 @@ export function App(): ReactElement {
           role="tabpanel"
           tabIndex={activeComposeWorkspacePage === "notes" ? 0 : -1}
         >
-          <PanelTitle icon={<KeyboardMusic size={18} />} title="Bass / Melody" meta={`${bassStyleLabel(style.bassStyle)} voice · scale locked grid`} />
+          <PanelTitle
+            icon={<KeyboardMusic size={18} />}
+            title={t("nav.notes")}
+            meta={t("panel.notesMeta", { voice: bassStyleLabel(style.bassStyle) })}
+          />
           <details
             className="capture-ideas"
             data-testid="capture-ideas"
@@ -14945,12 +15251,14 @@ export function App(): ReactElement {
                 <KeyboardMusic size={16} />
               </span>
               <span className="capture-ideas-copy">
-                <strong>Capture &amp; Ideas</strong>
-                <small>Keyboard, MIDI, bass moves, and melody starters</small>
+                <strong>{t("compose.captureIdeas")}</strong>
+                <small>{t("compose.captureIdeasDetail")}</small>
               </span>
               <span className="capture-ideas-context">
-                {keyboardCaptureTarget === "bass" ? `${bassStyleLabel(style.bassStyle)} Bass` : "Synth"} · {keyboardCaptureEnabled ? "Keys armed" : "Keys off"} ·{" "}
-                {midiCaptureArmed ? "MIDI armed" : midiCaptureSummary.statusLabel}
+                {keyboardCaptureTarget === "bass"
+                  ? t("compose.bass", { style: bassStyleLabel(style.bassStyle) })
+                  : t("compose.synth")} · {keyboardCaptureEnabled ? t("compose.keysArmed") : t("compose.keysOff")} ·{" "}
+                {midiCaptureArmed ? t("compose.midiArmed") : midiCaptureSummary.statusLabel}
               </span>
               <ArrowDown className="capture-ideas-chevron" size={16} aria-hidden="true" />
             </summary>
@@ -14997,7 +15305,7 @@ export function App(): ReactElement {
           </details>
           <div className="note-lanes">
             <NoteEditor
-              title={`${bassStyleLabel(style.bassStyle)} Bass`}
+              title={t("compose.bass", { style: bassStyleLabel(style.bassStyle) })}
               track="bass"
               notes={currentPattern.bassNotes}
               pitches={bassPitches}
@@ -15008,7 +15316,7 @@ export function App(): ReactElement {
               onToggle={toggleBassNote}
             />
             <NoteEditor
-              title="Synth"
+              title={t("compose.synth")}
               track="melody"
               notes={currentPattern.melodyNotes}
               pitches={melodyPitches}
@@ -15056,7 +15364,7 @@ export function App(): ReactElement {
         </section>
 
         <section
-          aria-label="Instrument panel"
+          aria-label={t("compose.instrumentPanelAria")}
           aria-labelledby="compose-page-tab-instruments"
           className="panel instrument-panel workspace-page-panel"
           data-workspace-page="instruments"
@@ -15067,7 +15375,11 @@ export function App(): ReactElement {
           role="tabpanel"
           tabIndex={activeComposeWorkspacePage === "instruments" ? 0 : -1}
         >
-          <PanelTitle icon={<Sparkles size={18} />} title="Instruments" meta={project.mode === "guided" ? "curated" : "editable"} />
+          <PanelTitle
+            icon={<Sparkles size={18} />}
+            title={t("panel.instruments")}
+            meta={project.mode === "guided" ? t("panel.curated") : t("panel.editable")}
+          />
           <div className="instrument-direct-chords" data-testid="instrument-direct-chords">
             <ChordEditor
               advancedOpen={harmonyMovesOpen}
@@ -15128,25 +15440,47 @@ export function App(): ReactElement {
             >
               <span className="instrument-tools-icon" aria-hidden="true"><SlidersHorizontal size={16} /></span>
               <span className="instrument-tools-copy">
-                <strong>Sound Design</strong>
-                <small>Devices, kits, tone shaping, and A/B snapshots</small>
+                <strong>{t("compose.soundDesign")}</strong>
+                <small>{t("compose.soundDesignDetail")}</small>
               </span>
               <span className="instrument-tools-context">
-                {soundPresetLabel(project.sound.preset)} · {soundTimbreCheckSummary.statusLabel} · {project.mode === "studio" ? "Studio" : "Guided"}
+                {soundPresetLabel(project.sound.preset)} · {soundTimbreCheckSummary.statusLabel} · {project.mode === "studio" ? t("mode.studio") : t("mode.guided")}
               </span>
               <ArrowDown className="instrument-tools-chevron" size={16} aria-hidden="true" />
             </summary>
             <div className="instrument-tools-content" data-testid="sound-design-content">
               <div className="device-list">
-                <Device icon={<Drum size={17} />} name="Drum Rack" value={`${soundPresetLabel(project.sound.preset)} kit`} color="#78f0c8" />
+                <Device
+                  icon={<Drum size={17} />}
+                  name={t("compose.drumRack")}
+                  value={t("compose.kit", { preset: soundPresetLabel(project.sound.preset) })}
+                  color="#78f0c8"
+                />
                 <Device
                   icon={<Waves size={17} />}
-                  name="Bass Engine"
-                  value={`${bassStyleLabel(style.bassStyle)} voice / drive ${percentLabel(project.sound.bassDrive)} / duck ${percentLabel(project.sound.sidechainDuck)}`}
+                  name={t("compose.bassEngine")}
+                  value={t("compose.bassDeviceValue", {
+                    style: bassStyleLabel(style.bassStyle),
+                    drive: percentLabel(project.sound.bassDrive),
+                    duck: percentLabel(project.sound.sidechainDuck)
+                  })}
                   color="#ff7a4f"
                 />
-                <Device icon={<Music2 size={17} />} name="Synth" value={`${style.melodyStyle} / bright ${percentLabel(project.sound.synthBrightness)}`} color="#8aa8ff" />
-                <Device icon={<SlidersHorizontal size={17} />} name="Chord Tone" value={`warm ${percentLabel(project.sound.chordWarmth)}`} color="#d58cff" />
+                <Device
+                  icon={<Music2 size={17} />}
+                  name={t("compose.synth")}
+                  value={t("compose.synthDeviceValue", {
+                    style: style.melodyStyle,
+                    bright: percentLabel(project.sound.synthBrightness)
+                  })}
+                  color="#8aa8ff"
+                />
+                <Device
+                  icon={<SlidersHorizontal size={17} />}
+                  name={t("compose.chordTone")}
+                  value={t("compose.chordDeviceValue", { warm: percentLabel(project.sound.chordWarmth) })}
+                  color="#d58cff"
+                />
               </div>
               <SoundDesigner
                 drumKitPads={drumKitPadOptions}
@@ -15195,8 +15529,53 @@ export function App(): ReactElement {
         tabIndex={activeWorkspaceZone === "arrange" ? 0 : -1}
       >
         <Activity mode={workspaceActivityMode(activeWorkspaceZone === "arrange")} name="workspace-arrange">
-        <section className="panel arrangement-panel" data-testid="workflow-target-arrange" aria-label="Arrangement" ref={arrangePanelRef}>
-          <PanelTitle icon={<Music2 size={18} />} title="Arrangement" meta={`${project.arrangement.length} blocks / ${barCountLabel(arrangementTotalBars(project))}`} />
+        <WorkspacePageTabs
+          activePage={activeArrangeWorkspacePage}
+          ariaLabel={t("nav.subTabsAria", { title: t("nav.arrange") })}
+          idPrefix="arrange"
+          items={[
+            {
+              id: "timeline",
+              label: t("nav.timeline"),
+              detail: t("nav.timelineDetail"),
+              meta: t("nav.timelineMeta"),
+              icon: <Music2 size={18} />
+            },
+            {
+              id: "structure",
+              label: t("nav.structure"),
+              detail: t("nav.structureDetail"),
+              meta: t("nav.structureMeta"),
+              icon: <ListChecks size={18} />
+            }
+          ]}
+          onSelect={(page) => {
+            activateArrangeWorkspacePage(page, true);
+            if (page === "structure") {
+              setArrangementToolsOpen(true);
+            }
+          }}
+          title={t("nav.arrangeEditor")}
+        />
+        <section
+          aria-labelledby="arrange-page-tab-timeline"
+          className="panel arrangement-panel workspace-page-panel"
+          data-workspace-page="timeline"
+          data-testid="workflow-target-arrange"
+          hidden={activeArrangeWorkspacePage !== "timeline"}
+          id="arrange-page-panel-timeline"
+          ref={arrangePanelRef}
+          role="tabpanel"
+          tabIndex={activeArrangeWorkspacePage === "timeline" ? 0 : -1}
+        >
+          <PanelTitle
+            icon={<Music2 size={18} />}
+            title={t("panel.arrangement")}
+            meta={t("panel.arrangementMeta", {
+              blocks: project.arrangement.length,
+              bars: localizedBarCountLabel(arrangementTotalBars(project))
+            })}
+          />
           <div
             className={["arrangement-playback-readout", arrangementPlaybackReadout.tone].join(" ")}
             data-testid="arrangement-playback-readout"
@@ -15208,10 +15587,10 @@ export function App(): ReactElement {
             <button
               aria-label={
                 audibleArrangementFollowBlock
-                  ? `Edit audible Block ${audibleArrangementFollowBlockNumber}`
+                  ? t("arrange.editAudibleBlockAria", { block: audibleArrangementFollowBlockNumber })
                   : editingAudibleArrangementBlock
-                    ? "Editing block already matches audible block"
-                    : "No audible arrangement block to follow"
+                    ? t("arrange.audibleBlockSynced")
+                    : t("arrange.noAudibleBlock")
               }
               className="arrangement-playback-follow-button"
               data-testid="arrangement-playback-follow"
@@ -15219,20 +15598,20 @@ export function App(): ReactElement {
               onClick={followAudibleArrangementBlock}
               title={
                 audibleArrangementFollowBlock
-                  ? `Switch edit focus to audible Block ${audibleArrangementFollowBlockNumber}`
+                  ? t("arrange.switchToAudibleBlockTitle", { block: audibleArrangementFollowBlockNumber })
                   : editingAudibleArrangementBlock
-                    ? "Editing block already matches audible block"
-                    : "Play Song loop with another block to follow the audible block"
+                    ? t("arrange.audibleBlockSynced")
+                    : t("arrange.playToFollowBlockTitle")
               }
               type="button"
             >
               <ArrowRight size={13} aria-hidden="true" />
               <span>
                 {audibleArrangementFollowBlock
-                  ? `Edit ${audibleArrangementFollowBlockNumber}`
+                  ? t("arrange.editBlock", { block: audibleArrangementFollowBlockNumber })
                   : editingAudibleArrangementBlock
-                    ? "In sync"
-                    : "Idle"}
+                    ? t("arrange.inSync")
+                    : t("arrange.idle")}
               </span>
             </button>
           </div>
@@ -15242,7 +15621,12 @@ export function App(): ReactElement {
               const playing = playingArrangementIndex === index;
               return (
                 <button
-                  aria-label={`Block ${index + 1} ${block.section} Pattern ${block.pattern} ${barCountLabel(block.bars)}`}
+                  aria-label={t("arrange.blockAria", {
+                    block: index + 1,
+                    section: block.section,
+                    pattern: block.pattern,
+                    bars: localizedBarCountLabel(block.bars)
+                  })}
                   aria-pressed={selected}
                   className={["arrangement-block", selected ? "selected" : "", playing ? "playing" : ""]
                     .filter(Boolean)
@@ -15255,21 +15639,25 @@ export function App(): ReactElement {
                 >
                   <span>{block.section}</span>
                   <strong>{block.pattern}</strong>
-                  <small>{barCountLabel(block.bars)}</small>
-                  {block.mutedTracks.length > 0 && <em>{block.mutedTracks.length} mute</em>}
+                  <small>{localizedBarCountLabel(block.bars)}</small>
+                  {block.mutedTracks.length > 0 && <em>{t("arrange.muteCount", { count: block.mutedTracks.length })}</em>}
                   <i style={{ inlineSize: `${Math.max(18, block.energy * 100)}%` }} />
                 </button>
               );
             })}
           </div>
           {selectedArrangementBlock && (
-            <div className="arrangement-editor" aria-label="Selected arrangement block editor" data-testid="selected-block-editor">
+            <div
+              className="arrangement-editor"
+              aria-label={t("arrange.selectedBlockEditorAria")}
+              data-testid="selected-block-editor"
+            >
               <div className="arrangement-editor-heading">
-                <span>Block {selectedArrangementIndex + 1}</span>
+                <span>{t("arrange.blockNumber", { block: selectedArrangementIndex + 1 })}</span>
                 <strong>
-                  {selectedArrangementBlock.section} / Pattern {selectedArrangementBlock.pattern}
+                  {selectedArrangementBlock.section} / {t("arrange.pattern")} {selectedArrangementBlock.pattern}
                 </strong>
-                <small>{barCountLabel(selectedArrangementBlock.bars)}</small>
+                <small>{localizedBarCountLabel(selectedArrangementBlock.bars)}</small>
               </div>
               {selectedArrangementBlockRole && (
                 <div
@@ -15286,7 +15674,7 @@ export function App(): ReactElement {
                 </div>
               )}
               <label>
-                <span>Section</span>
+                <span>{t("arrange.section")}</span>
                 <select
                   data-testid="arrangement-section-select"
                   value={selectedArrangementBlock.section}
@@ -15303,12 +15691,12 @@ export function App(): ReactElement {
               </label>
               <div className="arrangement-control-group" data-testid="arrangement-pattern-controls">
                 <div className="arrangement-control-group-heading">
-                  <span>Pattern</span>
+                  <span>{t("arrange.pattern")}</span>
                   <small>
                     {selectedArrangementBlock.pattern} · {patternEventCount(project.patterns[selectedArrangementBlock.pattern])}
                   </small>
                 </div>
-                <div className="block-pattern-row" aria-label="Block pattern">
+                <div className="block-pattern-row" aria-label={t("arrange.blockPatternAria")}>
                   {patternSlots.map((pattern) => (
                     <button
                       key={pattern}
@@ -15325,14 +15713,14 @@ export function App(): ReactElement {
               </div>
               <div className="arrangement-control-group" data-testid="arrangement-track-state-controls">
                 <div className="arrangement-control-group-heading">
-                  <span>Track state</span>
+                  <span>{t("arrange.trackState")}</span>
                   <small>
                     {selectedArrangementBlock.mutedTracks.length === 0
-                      ? "All playing"
-                      : `${selectedArrangementBlock.mutedTracks.length} muted`}
+                      ? t("arrange.allPlaying")
+                      : t("arrange.mutedCount", { count: selectedArrangementBlock.mutedTracks.length })}
                   </small>
                 </div>
-                <div className="arrangement-mute-row" aria-label="Block track mutes">
+                <div className="arrangement-mute-row" aria-label={t("arrange.blockTrackMutesAria")}>
                   {arrangementMuteTrackIds.map((track) => {
                     const muted = selectedArrangementBlock.mutedTracks.includes(track);
                     return (
@@ -15342,7 +15730,10 @@ export function App(): ReactElement {
                         data-testid={`arrangement-track-mute-${track}`}
                         key={track}
                         onClick={() => toggleArrangementTrackMute(track)}
-                        title={`${muted ? "Unmute" : "Mute"} ${arrangementMuteTrackLabel(track)} in this block`}
+                        title={t("arrange.trackMuteTitle", {
+                          action: muted ? t("arrange.unmute") : t("arrange.mute"),
+                          track: arrangementMuteTrackLabel(track)
+                        })}
                         type="button"
                       >
                         {arrangementMuteTrackLabel(track)}
@@ -15351,43 +15742,51 @@ export function App(): ReactElement {
                   })}
                 </div>
               </div>
-              <div className="arrangement-clipboard-row" aria-label="Arrangement block clipboard">
+              <div className="arrangement-clipboard-row" aria-label={t("arrange.clipboardAria")}>
                 <button
                   data-testid="arrangement-copy"
                   onClick={copySelectedArrangementBlock}
-                  title="Copy selected arrangement block"
+                  title={t("arrange.copyBlockTitle")}
                   type="button"
                 >
                   <Copy size={14} aria-hidden="true" />
-                  <span>Copy Block</span>
+                  <span>{t("arrange.copyBlock")}</span>
                 </button>
                 <button
                   data-testid="arrangement-paste"
                   disabled={!arrangementBlockClipboard}
                   onClick={pasteArrangementBlockAfterSelected}
-                  title="Paste copied arrangement block after the selected block"
+                  title={t("arrange.pasteAfterTitle")}
                   type="button"
                 >
                   <Plus size={14} aria-hidden="true" />
-                  <span>Paste After</span>
+                  <span>{t("arrange.pasteAfter")}</span>
                 </button>
                 <small data-testid="arrangement-clipboard-detail">
                   {arrangementBlockClipboard
-                    ? `Clipboard ${arrangementBlockClipboard.section} ${arrangementBlockClipboard.pattern} / ${barCountLabel(arrangementBlockClipboard.bars)}`
-                    : "Clipboard empty"}
+                    ? t("arrange.clipboardValue", {
+                        section: arrangementBlockClipboard.section,
+                        pattern: arrangementBlockClipboard.pattern,
+                        bars: localizedBarCountLabel(arrangementBlockClipboard.bars)
+                      })
+                    : t("arrange.clipboardEmpty")}
                 </small>
               </div>
               <div className="arrangement-control-group arrangement-shape-controls" data-testid="arrangement-shape-controls">
                 <div className="arrangement-control-group-heading">
-                  <span>Block shape</span>
+                  <span>{t("arrange.blockShape")}</span>
                   <small>
-                    {barCountLabel(selectedArrangementBlock.bars)} · {Math.round(selectedArrangementBlock.energy * 100)}% energy · {canSplitArrangementBlock ? "Split ready" : "1 bar cannot split"}
+                    {t("arrange.shapeSummary", {
+                      bars: localizedBarCountLabel(selectedArrangementBlock.bars),
+                      energy: Math.round(selectedArrangementBlock.energy * 100),
+                      split: canSplitArrangementBlock ? t("arrange.splitReady") : t("arrange.oneBarNoSplit")
+                    })}
                   </small>
                 </div>
                 <label>
-                  <span>Bars</span>
+                  <span>{t("arrange.bars")}</span>
                   <input
-                    aria-label="Arrangement block bars"
+                    aria-label={t("arrange.blockBarsAria")}
                     data-testid="arrangement-bars-input"
                     type="number"
                     min={minArrangementBars}
@@ -15407,9 +15806,9 @@ export function App(): ReactElement {
                   />
                 </label>
                 <label>
-                  <span>Split after</span>
+                  <span>{t("arrange.splitAfter")}</span>
                   <input
-                    aria-label="Split arrangement block after bars"
+                    aria-label={t("arrange.splitAfterAria")}
                     data-testid="arrangement-split-after"
                     disabled={!canSplitArrangementBlock}
                     type="number"
@@ -15421,8 +15820,12 @@ export function App(): ReactElement {
                   />
                 </label>
                 <label>
-                  <span title={`${arrangementEnergyGain(selectedArrangementBlock.energy).toFixed(2)}x gain`}>
-                    Energy {Math.round(selectedArrangementBlock.energy * 100)}%
+                  <span
+                    title={t("arrange.gainTitle", {
+                      gain: arrangementEnergyGain(selectedArrangementBlock.energy).toFixed(2)
+                    })}
+                  >
+                    {t("arrange.energy", { energy: Math.round(selectedArrangementBlock.energy * 100) })}
                   </span>
                   <div className="energy-inputs">
                     <input
@@ -15437,7 +15840,7 @@ export function App(): ReactElement {
                       }
                     />
                     <input
-                      aria-label="Arrangement energy percent"
+                      aria-label={t("arrange.energyPercentAria")}
                       data-testid="arrangement-energy-input"
                       type="number"
                       min={0}
@@ -15451,67 +15854,67 @@ export function App(): ReactElement {
                   </div>
                 </label>
               </div>
-              <div className="arrangement-actions" aria-label="Arrangement structure actions">
+              <div className="arrangement-actions" aria-label={t("arrange.structureActionsAria")}>
                 <button
-                  aria-label="Move selected arrangement block left"
+                  aria-label={t("arrange.moveLeftAria")}
                   data-testid="arrangement-move-left"
                   disabled={selectedArrangementIndex === 0}
                   onClick={() => moveArrangementBlock(-1)}
-                  title="Move selected block left"
+                  title={t("arrange.moveLeftTitle")}
                   type="button"
                 >
                   <ArrowLeft size={15} aria-hidden="true" />
-                  <span>Move left</span>
+                  <span>{t("arrange.moveLeft")}</span>
                 </button>
                 <button
-                  aria-label="Move selected arrangement block right"
+                  aria-label={t("arrange.moveRightAria")}
                   data-testid="arrangement-move-right"
                   disabled={selectedArrangementIndex >= project.arrangement.length - 1}
                   onClick={() => moveArrangementBlock(1)}
-                  title="Move selected block right"
+                  title={t("arrange.moveRightTitle")}
                   type="button"
                 >
                   <ArrowRight size={15} aria-hidden="true" />
-                  <span>Move right</span>
+                  <span>{t("arrange.moveRight")}</span>
                 </button>
                 <button
                   data-testid="arrangement-duplicate"
                   onClick={duplicateArrangementBlock}
-                  title="Duplicate selected block"
+                  title={t("arrange.duplicateTitle")}
                   type="button"
                 >
                   <Copy size={15} aria-hidden="true" />
-                  <span>Duplicate</span>
+                  <span>{t("arrange.duplicate")}</span>
                 </button>
                 <button
                   data-testid="arrangement-split"
                   disabled={!canSplitArrangementBlock}
                   onClick={splitArrangementBlock}
-                  title="Split selected block"
+                  title={t("arrange.splitTitle")}
                   type="button"
                 >
                   <Scissors size={15} aria-hidden="true" />
-                  <span>Split</span>
+                  <span>{t("arrange.split")}</span>
                 </button>
                 <button
                   data-testid="arrangement-merge"
                   disabled={!canMergeArrangementBlock}
                   onClick={mergeArrangementBlock}
-                  title="Merge selected block with next block"
+                  title={t("arrange.mergeTitle")}
                   type="button"
                 >
                   <Plus size={15} aria-hidden="true" />
-                  <span>Merge</span>
+                  <span>{t("arrange.merge")}</span>
                 </button>
                 <button
                   data-testid="arrangement-delete"
                   disabled={project.arrangement.length <= 1}
                   onClick={deleteArrangementBlock}
-                  title="Delete selected block"
+                  title={t("arrange.deleteTitle")}
                   type="button"
                 >
                   <Trash2 size={15} aria-hidden="true" />
-                  <span>Delete</span>
+                  <span>{t("arrange.delete")}</span>
                 </button>
               </div>
               {selectedBlockEditResult?.blockIndex === selectedArrangementIndex && (
@@ -15527,11 +15930,15 @@ export function App(): ReactElement {
                   }}
                 >
                   <span className="block-moves-copy">
-                    <strong>Block Moves</strong>
-                    <small>Producer presets, priority suggestions, and structural previews</small>
+                    <strong>{t("arrange.blockMoves")}</strong>
+                    <small>{t("arrange.blockMovesDetail")}</small>
                   </span>
                   <span className="block-moves-context">
-                    Block {selectedArrangementIndex + 1} · {selectedArrangementBlock.section} · Pattern {selectedArrangementBlock.pattern}
+                    {t("arrange.blockMovesContext", {
+                      block: selectedArrangementIndex + 1,
+                      section: selectedArrangementBlock.section,
+                      pattern: selectedArrangementBlock.pattern
+                    })}
                   </span>
                   <ArrowDown className="block-moves-chevron" size={16} aria-hidden="true" />
                 </summary>
@@ -15545,13 +15952,13 @@ export function App(): ReactElement {
                     }}
                   />
                   <ArrangementMovePriorityReadout summary={arrangementMovePrioritySummary} onApply={applyArrangementMoveToSelected} />
-                  <div className="arrangement-move-row" aria-label="Arrangement moves">
+                  <div className="arrangement-move-row" aria-label={t("arrange.movesAria")}>
                     {arrangementMovePresetIds.map((preset) => (
                       <button
                         data-testid={`arrangement-move-${preset}`}
                         key={preset}
                         onClick={() => applyArrangementMoveToSelected(preset)}
-                        title={`Apply ${arrangementMovePresetLabel(preset)} move to selected block`}
+                        title={t("arrange.applyMoveTitle", { move: arrangementMovePresetLabel(preset) })}
                         type="button"
                       >
                         {arrangementMovePresetLabel(preset)}
@@ -15573,6 +15980,26 @@ export function App(): ReactElement {
               </details>
             </div>
           )}
+        </section>
+        <section
+          aria-labelledby="arrange-page-tab-structure"
+          className="panel arrangement-panel workspace-page-panel"
+          data-workspace-page="structure"
+          data-testid="arrange-structure-page"
+          hidden={activeArrangeWorkspacePage !== "structure"}
+          id="arrange-page-panel-structure"
+          ref={arrangeStructurePanelRef}
+          role="tabpanel"
+          tabIndex={activeArrangeWorkspacePage === "structure" ? 0 : -1}
+        >
+          <PanelTitle
+            icon={<ListChecks size={18} />}
+            title={t("panel.structure")}
+            meta={t("panel.arrangementMeta", {
+              blocks: project.arrangement.length,
+              bars: localizedBarCountLabel(arrangementTotalBars(project))
+            })}
+          />
           <details className="arrangement-tools" data-testid="arrangement-tools" open={arrangementToolsOpen}>
             <summary
               className="arrangement-tools-summary"
@@ -15583,11 +16010,15 @@ export function App(): ReactElement {
               }}
             >
               <span className="arrangement-tools-copy">
-                <strong>Arrangement Tools</strong>
-                <small>Templates, song-form chains, section cues, mute maps, and transitions</small>
+                <strong>{t("arrange.tools")}</strong>
+                <small>{t("arrange.toolsDetail")}</small>
               </span>
               <span className="arrangement-tools-context">
-                {project.arrangement.length} blocks · {barCountLabel(arrangementTotalBars(project))} · {project.mode === "studio" ? "Studio" : "Guided"}
+                {t("arrange.toolsContext", {
+                  blocks: project.arrangement.length,
+                  bars: localizedBarCountLabel(arrangementTotalBars(project)),
+                  mode: project.mode === "studio" ? t("mode.studio") : t("mode.guided")
+                })}
               </span>
               <ArrowDown className="arrangement-tools-chevron" size={16} aria-hidden="true" />
             </summary>
@@ -15604,7 +16035,7 @@ export function App(): ReactElement {
                 onApply={applyArrangementArcPad}
               />
               <SectionLocatorPads disabled={isPlaying} pads={sectionLocatorPads} result={sectionCueResult} onCue={cueSectionLocator} />
-              <div className="pattern-chain-row" aria-label="Pattern chain">
+              <div className="pattern-chain-row" aria-label={t("arrange.patternChainAria")}>
                 <PatternChainPreview preview={patternChainPreviewSummary} />
                 <PatternChainPreviewDecision
                   summary={createPatternChainPreviewDecision(patternChainPreviewSummary)}
@@ -15612,19 +16043,19 @@ export function App(): ReactElement {
                 />
                 <PatternChainPriorityReadout summary={patternChainPrioritySummary} onRun={runPatternChainPriorityAction} />
                 <div className="pattern-chain-heading">
-                  <span>Chain</span>
+                  <span>{t("arrange.chain")}</span>
                   <strong data-testid="pattern-chain-current">{patternChainReadout(project.arrangement)}</strong>
                 </div>
                 <button
                   className="pattern-chain-expand"
                   data-testid="pattern-chain-expand"
                   onClick={expandPatternChain}
-                  title="Expand the current chain into a longer song form"
+                  title={t("arrange.expandChainTitle")}
                   type="button"
                 >
                   <ArrowRight size={14} aria-hidden="true" />
-                  <span>Expand</span>
-                  <small>{barCountLabel(16)} song form</small>
+                  <span>{t("arrange.expand")}</span>
+                  <small>{t("arrange.songForm", { bars: localizedBarCountLabel(16) })}</small>
                 </button>
                 <div className="pattern-chain-actions">
                   {patternChainIds.map((chain) => {
@@ -15635,30 +16066,40 @@ export function App(): ReactElement {
                         data-testid={`pattern-chain-${chain}`}
                         key={chain}
                         onClick={() => applyPatternChain(chain)}
-                        title={`Apply ${patternChainLabel(chain)}`}
+                        title={t("arrange.applyChainTitle", { chain: patternChainLabel(chain) })}
                         type="button"
                       >
                         <ArrowRight size={14} aria-hidden="true" />
                         <span>{patternChainLabel(chain)}</span>
-                        <small>{patternChainReadout(chainBlocks)} / {barCountLabel(chainBars)}</small>
+                        <small>{patternChainReadout(chainBlocks)} / {localizedBarCountLabel(chainBars)}</small>
                       </button>
                     );
                   })}
                 </div>
-                <div className="pattern-chain-editor" aria-label="Pattern chain step editor" data-testid="pattern-chain-step-editor">
+                <div
+                  className="pattern-chain-editor"
+                  aria-label={t("arrange.chainEditorAria")}
+                  data-testid="pattern-chain-step-editor"
+                >
                   {project.arrangement.slice(0, 8).map((block, index) => {
                     const nextPattern = nextPatternSlot(block.pattern);
                     return (
                       <button
-                        aria-label={`Chain step ${index + 1} ${block.section} Pattern ${block.pattern}, ${barCountLabel(block.bars)}. Switch to Pattern ${nextPattern}`}
+                        aria-label={t("arrange.chainStepAria", {
+                          step: index + 1,
+                          section: block.section,
+                          pattern: block.pattern,
+                          bars: localizedBarCountLabel(block.bars),
+                          nextPattern
+                        })}
                         className={selectedArrangementIndex === index ? "selected" : ""}
                         data-testid={`pattern-chain-step-${index}`}
                         key={`${block.section}-${index}-${block.pattern}`}
                         onClick={() => cyclePatternChainStep(index)}
-                        title={`Switch step ${index + 1} to Pattern ${nextPattern}`}
+                        title={t("arrange.switchStepTitle", { step: index + 1, pattern: nextPattern })}
                         type="button"
                       >
-                        <span>Step {index + 1}</span>
+                        <span>{t("arrange.step", { step: index + 1 })}</span>
                         <strong data-testid={`pattern-chain-step-pattern-${index}`}>{block.pattern}</strong>
                         <small>
                           {block.section} {normalizeArrangementBars(block.bars)}b
@@ -15680,6 +16121,7 @@ export function App(): ReactElement {
                 onFocus={focusArrangementMuteMapLane}
                 playingArrangementIndex={playingArrangementIndex}
                 result={arrangementMuteMapResult}
+                routeRef={arrangementMuteMapPanelRef}
                 summary={arrangementMuteMapSummary}
               />
               <ArrangementTransitionMap
@@ -15710,29 +16152,29 @@ export function App(): ReactElement {
         <Activity mode={workspaceActivityMode(activeWorkspaceZone === "mix")} name="workspace-mix">
         <WorkspacePageTabs
           activePage={activeMixWorkspacePage}
-          ariaLabel="Mix editor pages"
+          ariaLabel={t("nav.subTabsAria", { title: t("nav.mix") })}
           idPrefix="mix"
           items={[
             {
               id: "mixer",
-              label: "Mixer",
-              detail: "Channel balance, processing, and space",
-              meta: `${activeChannels} audible`,
+              label: t("nav.mixer"),
+              detail: t("nav.mixerDetail"),
+              meta: t("nav.audibleChannels", { count: activeChannels }),
               icon: <SlidersHorizontal size={18} />
             },
             {
               id: "master",
-              label: "Master & Review",
-              detail: "Finish, automation, meters, and checks",
+              label: t("nav.master"),
+              detail: t("nav.masterDetail"),
               meta: project.masterPreset,
               icon: <Gauge size={18} />
             }
           ]}
           onSelect={(page) => activateMixWorkspacePage(page, true)}
-          title="Mix editor"
+          title={t("nav.mixEditor")}
         />
         <section
-          aria-label="Mixer"
+          aria-label={t("mix.mixerAria")}
           aria-labelledby="mix-page-tab-mixer"
           className="panel mixer-panel workspace-page-panel"
           data-workspace-page="mixer"
@@ -15743,7 +16185,11 @@ export function App(): ReactElement {
           role="tabpanel"
           tabIndex={activeMixWorkspacePage === "mixer" ? 0 : -1}
         >
-          <PanelTitle icon={<SlidersHorizontal size={18} />} title="Mixer" meta={`${activeChannels} audible`} />
+          <PanelTitle
+            icon={<SlidersHorizontal size={18} />}
+            title={t("nav.mixer")}
+            meta={t("panel.mixerMeta", { count: activeChannels })}
+          />
           {!exactProjectAudioAnalysisReady && (
             <ProjectAudioAnalysisGate
               onRetry={retryCurrentProjectAudioAnalysis}
@@ -15753,7 +16199,7 @@ export function App(): ReactElement {
           )}
           <div className="mixer-strips" data-testid="mixer-channel-strips">
             {project.mixer.map((channel) => {
-              const roleSummary = mixerChannelRoleSummary(channel);
+              const roleSummary = mixerChannelRoleSummary(channel, locale);
               return (
                 <div
                   className="strip"
@@ -15764,24 +16210,26 @@ export function App(): ReactElement {
                 <div className="strip-top">
                   <span>{channel.name}</span>
                   <div
-                    aria-label={`${channel.name} mute and solo controls`}
+                    aria-label={t("mix.channelTogglesAria", { channel: channel.name })}
                     className="strip-toggles"
                     data-testid={`mixer-toggles-${channel.id}`}
                     role="group"
                   >
                     <button
-                      aria-label={`Mute ${channel.name}`}
+                      aria-label={t("mix.muteAria", { channel: channel.name })}
                       aria-pressed={channel.muted}
                       className={channel.muted ? "mini-toggle active" : "mini-toggle"}
                       data-testid={`mixer-mute-${channel.id}`}
                       type="button"
                       onClick={() => updateMixerChannel(channel.id, { muted: !channel.muted })}
-                      title={channel.muted ? `Unmute ${channel.name}` : `Mute ${channel.name}`}
+                      title={channel.muted
+                        ? t("mix.unmuteTitle", { channel: channel.name })
+                        : t("mix.muteTitle", { channel: channel.name })}
                     >
-                      <span>Mute</span>
+                      <span>{t("mix.mute")}</span>
                     </button>
                     <button
-                      aria-label={`Solo ${channel.name}`}
+                      aria-label={t("mix.soloAria", { channel: channel.name })}
                       aria-pressed={channel.solo}
                       className={channel.solo ? "mini-toggle active solo" : "mini-toggle"}
                       data-testid={`mixer-solo-${channel.id}`}
@@ -15790,13 +16238,13 @@ export function App(): ReactElement {
                       onClick={() => updateMixerChannel(channel.id, { solo: !channel.solo })}
                       title={
                         channel.id === "master"
-                          ? "Solo is unavailable on the Master channel"
+                          ? t("mix.soloUnavailableTitle")
                           : channel.solo
-                            ? `Stop soloing ${channel.name}`
-                            : `Solo ${channel.name}`
+                            ? t("mix.stopSoloTitle", { channel: channel.name })
+                            : t("mix.soloTitle", { channel: channel.name })
                       }
                     >
-                      <span>Solo</span>
+                      <span>{t("mix.solo")}</span>
                     </button>
                   </div>
                 </div>
@@ -15809,9 +16257,9 @@ export function App(): ReactElement {
                   <small data-testid={`mixer-channel-role-detail-${channel.id}`}>{roleSummary.detailLabel}</small>
                 </div>
                 <label className="strip-control">
-                  <span>Volume</span>
+                  <span>{t("mix.volume")}</span>
                   <input
-                    aria-label={`${channel.name} volume`}
+                    aria-label={t("mix.channelVolumeAria", { channel: channel.name })}
                     data-testid={`mixer-volume-${channel.id}`}
                     max={3}
                     min={-36}
@@ -15822,10 +16270,10 @@ export function App(): ReactElement {
                   />
                 </label>
                 <label className="strip-control">
-                  <span>Pan</span>
+                  <span>{t("mix.pan")}</span>
                   <div className="pan-inputs">
                     <input
-                      aria-label={`${channel.name} pan`}
+                      aria-label={t("mix.channelPanAria", { channel: channel.name })}
                       data-testid={`mixer-pan-${channel.id}`}
                       max={100}
                       min={-100}
@@ -15835,7 +16283,7 @@ export function App(): ReactElement {
                       value={channel.pan}
                     />
                     <input
-                      aria-label={`${channel.name} pan value`}
+                      aria-label={t("mix.channelPanValueAria", { channel: channel.name })}
                       data-testid={`mixer-pan-input-${channel.id}`}
                       max={100}
                       min={-100}
@@ -15864,18 +16312,24 @@ export function App(): ReactElement {
                       }}
                     >
                       <span>
-                        <strong>Tone &amp; Space</strong>
-                        <small>Cut {percentLabel(channel.lowCut)} · Drive {percentLabel(channel.drive)} · Space {percentLabel(channel.send)}</small>
+                        <strong>{t("mix.toneSpace")}</strong>
+                        <small>
+                          {t("mix.toneSpaceSummary", {
+                            cut: percentLabel(channel.lowCut),
+                            drive: percentLabel(channel.drive),
+                            space: percentLabel(channel.send)
+                          })}
+                        </small>
                       </span>
                       <ArrowDown className="mixer-processing-chevron" size={14} aria-hidden="true" />
                     </summary>
                     <div className="mixer-processing-content">
-                      <div className="eq-controls" aria-label={`${channel.name} channel EQ`}>
+                      <div className="eq-controls" aria-label={t("mix.channelEqAria", { channel: channel.name })}>
                     <label className="strip-control">
-                      <span>Low cut</span>
+                      <span>{t("mix.lowCut")}</span>
                       <div className="eq-inputs">
                         <input
-                          aria-label={`${channel.name} low cut`}
+                          aria-label={t("mix.channelLowCutAria", { channel: channel.name })}
                           data-testid={`mixer-low-cut-${channel.id}`}
                           max={1}
                           min={0}
@@ -15885,7 +16339,7 @@ export function App(): ReactElement {
                           value={channel.lowCut}
                         />
                         <input
-                          aria-label={`${channel.name} low cut percent`}
+                          aria-label={t("mix.channelLowCutPercentAria", { channel: channel.name })}
                           data-testid={`mixer-low-cut-input-${channel.id}`}
                           max={100}
                           min={0}
@@ -15897,10 +16351,10 @@ export function App(): ReactElement {
                       </div>
                     </label>
                     <label className="strip-control">
-                      <span>Air</span>
+                      <span>{t("mix.air")}</span>
                       <div className="eq-inputs">
                         <input
-                          aria-label={`${channel.name} air`}
+                          aria-label={t("mix.channelAirAria", { channel: channel.name })}
                           data-testid={`mixer-air-${channel.id}`}
                           max={1}
                           min={0}
@@ -15910,7 +16364,7 @@ export function App(): ReactElement {
                           value={channel.air}
                         />
                         <input
-                          aria-label={`${channel.name} air percent`}
+                          aria-label={t("mix.channelAirPercentAria", { channel: channel.name })}
                           data-testid={`mixer-air-input-${channel.id}`}
                           max={100}
                           min={0}
@@ -15922,10 +16376,10 @@ export function App(): ReactElement {
                       </div>
                     </label>
                     <label className="strip-control">
-                      <span>Drive</span>
+                      <span>{t("mix.drive")}</span>
                       <div className="eq-inputs">
                         <input
-                          aria-label={`${channel.name} drive`}
+                          aria-label={t("mix.channelDriveAria", { channel: channel.name })}
                           data-testid={`mixer-drive-${channel.id}`}
                           max={1}
                           min={0}
@@ -15935,7 +16389,7 @@ export function App(): ReactElement {
                           value={channel.drive}
                         />
                         <input
-                          aria-label={`${channel.name} drive percent`}
+                          aria-label={t("mix.channelDrivePercentAria", { channel: channel.name })}
                           data-testid={`mixer-drive-input-${channel.id}`}
                           max={100}
                           min={0}
@@ -15947,10 +16401,10 @@ export function App(): ReactElement {
                       </div>
                     </label>
                     <label className="strip-control">
-                      <span>Glue</span>
+                      <span>{t("mix.glue")}</span>
                       <div className="eq-inputs">
                         <input
-                          aria-label={`${channel.name} glue`}
+                          aria-label={t("mix.channelGlueAria", { channel: channel.name })}
                           data-testid={`mixer-glue-${channel.id}`}
                           max={1}
                           min={0}
@@ -15960,7 +16414,7 @@ export function App(): ReactElement {
                           value={channel.glue}
                         />
                         <input
-                          aria-label={`${channel.name} glue percent`}
+                          aria-label={t("mix.channelGluePercentAria", { channel: channel.name })}
                           data-testid={`mixer-glue-input-${channel.id}`}
                           max={100}
                           min={0}
@@ -15972,10 +16426,10 @@ export function App(): ReactElement {
                       </div>
                     </label>
                     <label className="strip-control">
-                      <span>Space</span>
+                      <span>{t("mix.space")}</span>
                       <div className="eq-inputs">
                         <input
-                          aria-label={`${channel.name} space send`}
+                          aria-label={t("mix.channelSpaceAria", { channel: channel.name })}
                           data-testid={`mixer-send-${channel.id}`}
                           max={1}
                           min={0}
@@ -15985,7 +16439,7 @@ export function App(): ReactElement {
                           value={channel.send}
                         />
                         <input
-                          aria-label={`${channel.name} space send percent`}
+                          aria-label={t("mix.channelSpacePercentAria", { channel: channel.name })}
                           data-testid={`mixer-send-input-${channel.id}`}
                           max={100}
                           min={0}
@@ -16005,11 +16459,11 @@ export function App(): ReactElement {
                   <span>{panLabel(channel.pan)}</span>
                   {channel.id !== "master" && (
                     <>
-                      <span>Cut {percentLabel(channel.lowCut)}</span>
-                      <span>Air {percentLabel(channel.air)}</span>
-                      <span>Drive {percentLabel(channel.drive)}</span>
-                      <span>Glue {percentLabel(channel.glue)}</span>
-                      <span>Space {percentLabel(channel.send)}</span>
+                      <span>{t("mix.cut")} {percentLabel(channel.lowCut)}</span>
+                      <span>{t("mix.air")} {percentLabel(channel.air)}</span>
+                      <span>{t("mix.drive")} {percentLabel(channel.drive)}</span>
+                      <span>{t("mix.glue")} {percentLabel(channel.glue)}</span>
+                      <span>{t("mix.space")} {percentLabel(channel.send)}</span>
                     </>
                   )}
                 </div>
@@ -16027,11 +16481,11 @@ export function App(): ReactElement {
               }}
             >
               <span className="mix-tools-copy">
-                <strong>Mix Moves</strong>
-                <small>Balance presets and Space send shaping</small>
+                <strong>{t("mix.moves")}</strong>
+                <small>{t("mix.movesDetail")}</small>
               </span>
               <span className="mix-tools-context">
-                {mixBalancePreviewSummary.statusLabel} · {spaceFxPreviewSummary.statusLabel} · {project.mode === "studio" ? "Studio" : "Guided"}
+                {mixBalancePreviewSummary.statusLabel} · {spaceFxPreviewSummary.statusLabel} · {project.mode === "studio" ? t("mode.studio") : t("mode.guided")}
               </span>
               <ArrowDown className="mix-tools-chevron" size={16} aria-hidden="true" />
             </summary>
@@ -16060,11 +16514,11 @@ export function App(): ReactElement {
               }}
             >
               <span className="mix-tools-copy">
-                <strong>Audition &amp; Compare</strong>
-                <small>Stem isolation, listening decisions, and Mix Snapshot A/B</small>
+                <strong>{t("mix.auditionCompare")}</strong>
+                <small>{t("mix.auditionCompareDetail")}</small>
               </span>
               <span className="mix-tools-context">
-                {stemAuditionReadout.statusLabel} · {mixSnapshotComparison.statusLabel} · {project.mode === "studio" ? "Studio" : "Guided"}
+                {stemAuditionReadout.statusLabel} · {mixSnapshotStatusLabel} · {project.mode === "studio" ? t("mode.studio") : t("mode.guided")}
               </span>
               <ArrowDown className="mix-tools-chevron" size={16} aria-hidden="true" />
             </summary>
@@ -16124,7 +16578,7 @@ export function App(): ReactElement {
         </section>
 
         <section
-          aria-label="Master"
+          aria-label={t("master.aria")}
           aria-labelledby="mix-page-tab-master"
           className="panel master-panel workspace-page-panel"
           data-workspace-page="master"
@@ -16137,18 +16591,18 @@ export function App(): ReactElement {
         >
           <PanelTitle
             icon={<Gauge size={18} />}
-            title="Master"
+            title={t("panel.master")}
             meta={
               exactProjectAudioAnalysisReady
-                ? "export ready"
+                ? t("analysis.ready")
                 : projectAudioAnalysis.status === "pending"
-                  ? "Analyzing"
-                  : "Meters unavailable"
+                  ? t("analysis.updating")
+                  : t("analysis.unavailable")
             }
           />
           <div className="master-readout">
             <strong>{project.masterPreset}</strong>
-            <span>{project.masterCeilingDb} dB ceiling</span>
+            <span>{project.masterCeilingDb} dB {t("master.ceiling")}</span>
           </div>
           {exactProjectAudioAnalysisReady ? (
             <div
@@ -16176,12 +16630,12 @@ export function App(): ReactElement {
           <div className="master-output-controls" data-testid="master-output-controls">
             <div className="master-ceiling-control">
               <label>
-                <span>Limiter ceiling</span>
+                <span>{t("master.limiterCeiling")}</span>
                 <strong>{project.masterCeilingDb.toFixed(1)} dB</strong>
               </label>
               <div className="master-ceiling-inputs">
                 <input
-                  aria-label="Master limiter ceiling"
+                  aria-label={t("master.limiterCeilingAria")}
                   data-testid="master-ceiling"
                   type="range"
                   min={-6}
@@ -16198,7 +16652,7 @@ export function App(): ReactElement {
                   }}
                 />
                 <input
-                  aria-label="Master limiter ceiling decibels"
+                  aria-label={t("master.limiterCeilingDbAria")}
                   data-testid="master-ceiling-input"
                   type="number"
                   min={-6}
@@ -16208,10 +16662,10 @@ export function App(): ReactElement {
                   onChange={(event) => updateMasterCeilingDb(Number(event.target.value))}
                 />
               </div>
-              <small>Lower values leave more headroom before export.</small>
+              <small>{t("master.headroomHint")}</small>
             </div>
             <div className="master-preset-control">
-              <span>Output preset</span>
+              <span>{t("master.outputPreset")}</span>
               <div className="preset-row">
                 {masterPresets.map((preset) => (
                   <button
@@ -16237,11 +16691,11 @@ export function App(): ReactElement {
               }}
             >
               <span className="master-tools-copy">
-                <strong>Polish &amp; Automation</strong>
-                <small>Finish presets and master automation moves</small>
+                <strong>{t("master.polishAutomation")}</strong>
+                <small>{t("master.polishAutomationDetail")}</small>
               </span>
               <span className="master-tools-context">
-                {masterFinishPreviewSummary.statusLabel} · {masterAutomationPreviewSummary.statusLabel} · {project.mode === "studio" ? "Studio" : "Guided"}
+                {masterFinishPreviewSummary.statusLabel} · {masterAutomationPreviewSummary.statusLabel} · {project.mode === "studio" ? t("mode.studio") : t("mode.guided")}
               </span>
               <ArrowDown className="master-tools-chevron" size={16} aria-hidden="true" />
             </summary>
@@ -16270,15 +16724,15 @@ export function App(): ReactElement {
               }}
             >
               <span className="master-tools-copy">
-                <strong>Review &amp; Export</strong>
-                <small>Finish checks, review queue, export meter, and Mix Coach</small>
+                <strong>{t("master.reviewExport")}</strong>
+                <small>{t("master.reviewExportDetail")}</small>
               </span>
               <span className="master-tools-context">
                 {exactProjectAudioAnalysisReady
                   ? `${finishChecklistSummary.headline} · ${exportAnalysis.status}`
                   : projectAudioAnalysis.status === "pending"
-                    ? "Analyzing · exact review deferred"
-                    : "Meters unavailable · review deferred"} · {project.mode === "studio" ? "Studio" : "Guided"}
+                    ? t("master.analyzingDeferred")
+                    : t("master.metersUnavailableDeferred")} · {project.mode === "studio" ? t("mode.studio") : t("mode.guided")}
               </span>
               <ArrowDown className="master-tools-chevron" size={16} aria-hidden="true" />
             </summary>
@@ -16302,8 +16756,8 @@ export function App(): ReactElement {
                   }}
                 >
                   <span className="master-diagnostic-copy">
-                    <strong>Review Queue</strong>
-                    <small>Prioritized production issues and targeted fixes</small>
+                    <strong>{t("master.reviewQueue")}</strong>
+                    <small>{t("master.reviewQueueDetail")}</small>
                   </span>
                   <span className="master-diagnostic-context">{reviewQueueSummary.headline}</span>
                   <ArrowDown className="master-diagnostic-chevron" size={15} aria-hidden="true" />
@@ -16334,8 +16788,8 @@ export function App(): ReactElement {
                   }}
                 >
                   <span className="master-diagnostic-copy">
-                    <strong>Mix Coach</strong>
-                    <small>Balance diagnosis and local corrective moves</small>
+                    <strong>{t("master.mixCoach")}</strong>
+                    <small>{t("master.mixCoachDetail")}</small>
                   </span>
                   <span className="master-diagnostic-context">{mixCoachSummary(mixCoachChecks)}</span>
                   <ArrowDown className="master-diagnostic-chevron" size={15} aria-hidden="true" />
@@ -16406,7 +16860,11 @@ export function App(): ReactElement {
         />
       ) : (
         <section className="panel handoff-pack" data-testid="workflow-target-deliver" ref={deliverPanelRef}>
-          <PanelTitle icon={<Download size={18} />} title="Handoff Pack" meta="Exact meters required" />
+          <PanelTitle
+            icon={<Download size={18} />}
+            title={t("panel.handoff")}
+            meta={t("panel.exactMetersRequired")}
+          />
           <ProjectAudioAnalysisGate
             onRetry={retryCurrentProjectAudioAnalysis}
             status={projectAudioAnalysis.status}

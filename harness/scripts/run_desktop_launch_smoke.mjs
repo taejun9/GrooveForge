@@ -132,6 +132,42 @@ function check(condition, message) {
   }
 }
 
+function expectedNativeMenuTree(locale) {
+  const labels = {
+    en: {
+      app: ["About GrooveForge", "Services", "Hide GrooveForge", "Hide Others", "Show All", "Quit GrooveForge"],
+      edit: ["Undo", "Redo", "Cut", "Copy", "Paste", "Delete Selected Event"],
+      file: ["Open Project...", "Save Project"],
+      help: ["Check for Updates...", "Command Reference", "GrooveForge Local Workstation"],
+      top: ["File", "Edit", "Transport", "View", "Window", "Help"],
+      transport: ["Play / Stop", "Quick Actions"],
+      view: ["Reload", "Force Reload", "Actual Size", "Zoom In", "Zoom Out", "Toggle Full Screen"],
+      window: ["Minimize", "Zoom", "Bring All to Front"]
+    },
+    ko: {
+      app: ["GrooveForge 정보", "서비스", "GrooveForge 가리기", "다른 앱 가리기", "모두 보기", "GrooveForge 종료"],
+      edit: ["실행 취소", "다시 실행", "오려두기", "복사", "붙여넣기", "선택한 이벤트 삭제"],
+      file: ["프로젝트 열기...", "프로젝트 저장"],
+      help: ["업데이트 확인...", "명령 도움말", "GrooveForge 로컬 워크스테이션"],
+      top: ["파일", "편집", "재생", "보기", "윈도우", "도움말"],
+      transport: ["재생 / 정지", "빠른 작업"],
+      view: ["새로고침", "강제로 새로고침", "실제 크기", "확대", "축소", "전체 화면 전환"],
+      window: ["최소화", "확대/축소", "모두 앞으로 가져오기"]
+    }
+  }[locale];
+  const tree = labels.top.map((label, index) => ({
+    items: [labels.file, labels.edit, labels.transport, labels.view, labels.window, labels.help][index],
+    label
+  }));
+  if (process.platform === "darwin") {
+    tree.unshift({ items: labels.app, label: "GrooveForge" });
+  } else {
+    tree[0].items = [...tree[0].items, locale === "ko" ? "GrooveForge 종료" : "Quit GrooveForge"];
+    tree[4].items = tree[4].items.slice(0, 2);
+  }
+  return tree;
+}
+
 function fail(message, details = "") {
   rmSync(smokeWorkspaceRoot, { recursive: true, force: true });
   console.error("GrooveForge desktop launch smoke failed:");
@@ -223,12 +259,15 @@ function checkResult(result) {
   check(
     workspacePages?.composeTraversal?.map(({ input, page }) => `${input}:${page}`).join("|") ===
       "initial:drums|native-click:notes|ArrowRight:instruments|Home:drums|ArrowLeft:instruments|ArrowRight:drums" &&
+      workspacePages?.arrangeTraversal?.map(({ input, page }) => `${input}:${page}`).join("|") ===
+        "initial:timeline|native-click:structure|ArrowLeft:timeline|End:structure|Home:timeline|ArrowRight:structure" &&
       workspacePages?.mixTraversal?.map(({ input, page }) => `${input}:${page}`).join("|") ===
         "initial:mixer|native-click:master|ArrowLeft:mixer|End:master|Home:mixer|ArrowRight:master",
-    "live desktop nested Compose and Mix pages should traverse with native click plus Arrow/Home/End input"
+    "live desktop nested Compose, Arrange, and Mix pages should traverse with native click plus Arrow/Home/End input"
   );
   for (const [group, pages] of [
     ["compose", ["drums", "notes", "instruments"]],
+    ["arrange", ["timeline", "structure"]],
     ["mix", ["mixer", "master"]]
   ]) {
     for (const page of pages) {
@@ -251,9 +290,29 @@ function checkResult(result) {
     }
   }
   check(
-    workspacePages?.pageStatePreservedAcrossOuterTabs?.compose === true &&
+    workspacePages?.pageStatePreservedAcrossOuterTabs?.arrange === true &&
+      workspacePages?.pageStatePreservedAcrossOuterTabs?.compose === true &&
       workspacePages?.pageStatePreservedAcrossOuterTabs?.mix === true,
     "live desktop nested page selection should survive outer workspace tab round trips"
+  );
+  check(
+    functionalTabs?.arrangeStructureRoute?.activeZone === "arrange" &&
+      functionalTabs?.arrangeStructureRoute?.activePage === "structure" &&
+      functionalTabs?.arrangeStructureRoute?.arrangementToolsOpen === true &&
+      functionalTabs?.arrangeStructureRoute?.coldRouteResultAbsent === true &&
+      functionalTabs?.arrangeStructureRoute?.coldRouteSettled === true &&
+      functionalTabs?.arrangeStructureRoute?.historyDepthReady === true &&
+      functionalTabs?.arrangeStructureRoute?.historyDepthPreserved === true &&
+      functionalTabs?.arrangeStructureRoute?.muteMapRouteFocused === true &&
+      functionalTabs?.arrangeStructureRoute?.muteMapRouteVisible === true &&
+      functionalTabs?.arrangeStructureRoute?.priorityFocusMatched === true &&
+      functionalTabs?.arrangeStructureRoute?.priorityResultLaneMatched === true &&
+      functionalTabs?.arrangeStructureRoute?.resultInViewport === true &&
+      functionalTabs?.arrangeStructureRoute?.resultVisible === true &&
+      functionalTabs?.arrangeStructureRoute?.structurePanelVisible === true &&
+      functionalTabs?.arrangeStructureRoute?.timelinePanelHidden === true &&
+      functionalTabs?.arrangeStructureRoute?.projectFingerprintPreserved === true,
+    `live desktop Mute Map readout Quick Action should cold-route from Timeline into an untouched visible Structure surface, then the native priority action should create its matching result without editing project data or history (${JSON.stringify(functionalTabs?.arrangeStructureRoute ?? null)})`
   );
   check(
     functionalTabs?.states?.deliver?.deliverHandoffVisible === true,
@@ -530,6 +589,112 @@ function checkResult(result) {
       evidence?.modalFocus?.dockActionsOpened === true &&
       evidence?.modalFocus?.dockActionsFocusRestored === true,
     "live desktop workspace command dock should mirror header state and reuse Play plus Quick Actions through native pointer/Escape input"
+  );
+  check(
+    evidence?.modalFocus?.settingsLocalization?.backdropClosed === true &&
+      evidence?.modalFocus?.settingsLocalization?.backdropFocusRestored === true &&
+      evidence?.modalFocus?.settingsLocalization?.initialFocusReady === true &&
+      evidence?.modalFocus?.settingsLocalization?.englishImmediateReady === true &&
+      evidence?.modalFocus?.settingsLocalization?.englishMenuReady === true &&
+      evidence?.modalFocus?.settingsLocalization?.koreanImmediateReady === true &&
+      evidence?.modalFocus?.settingsLocalization?.koreanLabelsReady === true &&
+      evidence?.modalFocus?.settingsLocalization?.koreanMenuReady === true &&
+      evidence?.modalFocus?.settingsLocalization?.historyDepthReady === true &&
+      evidence?.modalFocus?.settingsLocalization?.nativeMenuShortcutBlocked === true &&
+      evidence?.modalFocus?.settingsLocalization?.storagePersisted === true &&
+      evidence?.modalFocus?.settingsLocalization?.shortcutBlocked === true &&
+      evidence?.modalFocus?.settingsLocalization?.projectFingerprintPreserved === true &&
+      evidence?.modalFocus?.settingsLocalization?.undoPosturePreserved === true &&
+      evidence?.modalFocus?.settingsLocalization?.writeFailureSessionReady === true &&
+      evidence?.modalFocus?.settingsLocalization?.escapeClosed === true &&
+      evidence?.modalFocus?.settingsLocalization?.focusRestored === true &&
+      evidence?.modalFocus?.settingsLocalization?.reloadPersisted === true &&
+      evidence?.modalFocus?.settingsLocalization?.reloadMenuReady === true &&
+      evidence?.modalFocus?.settingsLocalization?.secondKoreanLabelsReady === true &&
+      evidence?.modalFocus?.settingsLocalization?.corruptFallbackReady === true &&
+      evidence?.modalFocus?.settingsLocalization?.englishMenuRestored === true,
+    `live desktop Settings should native-click both English and Korean renderer/menu choices, persist Korean across reload, restore focus, preserve project/history, block shortcuts, and recover corrupt storage (${JSON.stringify(evidence?.modalFocus?.settingsLocalization ?? null)})`
+  );
+  const settingsLocalization = evidence?.modalFocus?.settingsLocalization;
+  const expectedSettingsGuardLabels = [
+    "baseline",
+    "keyboard-space",
+    "keyboard-undo",
+    "native-menu-playback",
+    "native-menu-undo"
+  ];
+  const workspaceGuardBaseline = settingsLocalization?.workspaceGuardCheckpoints?.[0];
+  check(
+    workspaceGuardBaseline !== undefined &&
+      settingsLocalization?.workspaceGuardCheckpoints?.length === expectedSettingsGuardLabels.length &&
+      settingsLocalization.workspaceGuardCheckpoints.every(
+        (checkpoint, index) =>
+          checkpoint?.label === expectedSettingsGuardLabels[index] &&
+          checkpoint?.activeElementTestId === "settings-dialog" &&
+          checkpoint?.dialogOpen === true &&
+          checkpoint?.historyDepthPosture === workspaceGuardBaseline.historyDepthPosture &&
+          checkpoint?.playbackPosture === workspaceGuardBaseline.playbackPosture &&
+          checkpoint?.projectFingerprintSha256 === workspaceGuardBaseline.projectFingerprintSha256
+      ),
+    `live Settings should focus its non-editable dialog and block keyboard Space/Undo plus native-menu Play/Undo without changing playback, project controls, or exact edit-history posture (${JSON.stringify(settingsLocalization?.workspaceGuardCheckpoints ?? null)})`
+  );
+  check(
+    JSON.stringify(settingsLocalization?.englishMenuTree) === JSON.stringify(expectedNativeMenuTree("en")) &&
+      JSON.stringify(settingsLocalization?.koreanMenuTree) === JSON.stringify(expectedNativeMenuTree("ko")),
+    `live desktop should expose every non-separator English and Korean native menu label in the exact platform tree (${JSON.stringify({
+      english: settingsLocalization?.englishMenuTree,
+      korean: settingsLocalization?.koreanMenuTree
+    })})`
+  );
+  const minimumKoreanLayout = settingsLocalization?.koreanLayout?.minimum;
+  check(
+    minimumKoreanLayout?.viewportWidth === 1180 &&
+      minimumKoreanLayout?.documentOverflowX <= 1 &&
+      minimumKoreanLayout?.appOverflowX <= 1 &&
+      minimumKoreanLayout?.mainTabCount === 4 &&
+      minimumKoreanLayout?.subTabCount === 3 &&
+      minimumKoreanLayout?.mainTabListContained === true &&
+      minimumKoreanLayout?.subTabListContained === true &&
+      minimumKoreanLayout?.mainTabListScrollOverflow <= 1 &&
+      minimumKoreanLayout?.subTabListScrollOverflow <= 1 &&
+      minimumKoreanLayout?.mainSelectedFullyVisible === true &&
+      minimumKoreanLayout?.subSelectedFullyVisible === true &&
+      minimumKoreanLayout?.mainTabMinimumHeight >= 64 &&
+      minimumKoreanLayout?.subTabMinimumHeight >= 64 &&
+      minimumKoreanLayout?.mainTabMinimumLabelFontSize >= 14 &&
+      minimumKoreanLayout?.subTabMinimumLabelFontSize >= 14 &&
+      minimumKoreanLayout?.settingsContained === true &&
+      minimumKoreanLayout?.settingsHorizontalOverflow <= 1 &&
+      minimumKoreanLayout?.settingsOptionCount === 2 &&
+      minimumKoreanLayout?.settingsColumnCount === 2 &&
+      minimumKoreanLayout?.settingsMinimumOptionHeight >= 78,
+    `Korean main/sub tabs and Settings should remain readable without horizontal clipping at the 1180px desktop minimum (${JSON.stringify(minimumKoreanLayout ?? null)})`
+  );
+  const narrowKoreanLayout = settingsLocalization?.koreanLayout?.narrow;
+  check(
+    narrowKoreanLayout?.viewportWidth === 390 &&
+      narrowKoreanLayout?.documentOverflowX <= 1 &&
+      narrowKoreanLayout?.appOverflowX <= 1 &&
+      narrowKoreanLayout?.mainTabCount === 4 &&
+      narrowKoreanLayout?.subTabCount === 3 &&
+      narrowKoreanLayout?.mainTabListContained === true &&
+      narrowKoreanLayout?.subTabListContained === true &&
+      narrowKoreanLayout?.mainTabListOverflowX === "auto" &&
+      narrowKoreanLayout?.subTabListOverflowX === "auto" &&
+      narrowKoreanLayout?.mainTabListScrollOverflow > 0 &&
+      narrowKoreanLayout?.subTabListScrollOverflow > 0 &&
+      narrowKoreanLayout?.mainSelectedFullyVisible === true &&
+      narrowKoreanLayout?.subSelectedFullyVisible === true &&
+      narrowKoreanLayout?.mainTabMinimumHeight >= 68 &&
+      narrowKoreanLayout?.subTabMinimumHeight >= 68 &&
+      narrowKoreanLayout?.mainTabMinimumLabelFontSize >= 14 &&
+      narrowKoreanLayout?.subTabMinimumLabelFontSize >= 14 &&
+      narrowKoreanLayout?.settingsContained === true &&
+      narrowKoreanLayout?.settingsHorizontalOverflow <= 1 &&
+      narrowKoreanLayout?.settingsOptionCount === 2 &&
+      narrowKoreanLayout?.settingsColumnCount === 1 &&
+      narrowKoreanLayout?.settingsMinimumOptionHeight >= 78,
+    `Korean main/sub tabs should use contained horizontal scrolling and Settings should stack cleanly at 390px (${JSON.stringify(narrowKoreanLayout ?? null)})`
   );
   check(evidence?.bodyTextLength > 20000, "live desktop renderer should expose a substantial workstation surface");
   check(Array.isArray(evidence?.missingText) && evidence.missingText.length === 0, "live desktop renderer should contain all expected beginner/pro text");
@@ -918,7 +1083,7 @@ function checkResult(result) {
       evidence?.layout?.arrangementToolsOpen === false &&
       evidence?.layout?.blockMovesToggleVisible === true &&
       evidence?.layout?.arrangementToolsToggleVisible === true,
-    "live desktop Guided mode should show collapsed Block Moves and Arrangement Tools toggles"
+    "live desktop Guided mode should show collapsed Block Moves and Arrangement Tools toggles on their Arrange sub tabs"
   );
   check(
     evidence?.palette?.arrangementTools?.guidedArrangementOpen === false &&
@@ -1769,6 +1934,7 @@ child.on("exit", (code, signal) => {
     `- Minimum Studio transport: ${result.evidence.layout.minimumWindowStudioCompactHeight}px compact vs ${result.evidence.layout.minimumWindowStudioExpandedHeight}px manual expansion, wide auto-expand and resize collapse ready`
   );
   console.log("- Modal focus: Quick Actions and Command Reference search entry, Tab/Shift+Tab wrap, Escape restore, and cross-dialog handoff ready");
+  console.log("- Settings locale: native Korean switch, renderer/native-menu parity, persistence reload, focus restore, project/history guard, and corrupt-value English fallback ready");
   console.log(
     `- Workspace command dock: conditional show/hide ready, ${result.evidence.modalFocus.dockControlCount} controls, focusable with native Play and Actions, viewport contained`
   );

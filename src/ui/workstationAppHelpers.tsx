@@ -39,6 +39,12 @@ import {
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode, Ref } from "react";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
+import {
+  localizeWorkflowNavigatorItem,
+  translate,
+  useLocalization,
+  type AppLocale
+} from "./localization";
 import type { ProjectAudioAnalysisStatus } from "./useProjectAudioAnalysis";
 import { deliveryBundleZipFileName } from "../audio/deliveryBundle";
 import { exportMidi, midiFileName } from "../audio/midi";
@@ -1097,14 +1103,46 @@ export function swingFeelPadSwing(pad: SwingFeelPadDefinition, project: ProjectS
   return normalizeSwingFeelValue(pad.value === "style" ? getStyle(project).defaultSwing : pad.value);
 }
 
-export function swingFeelPadDetail(pad: SwingFeelPadDefinition, project: ProjectState): string {
-  return pad.id === "style" ? `${getStyle(project).name} default` : pad.detail;
+export function swingFeelPadLabel(pad: SwingFeelPadDefinition, locale: AppLocale = "en"): string {
+  return translate(
+    locale,
+    pad.id === "straight"
+      ? "compose.swingStraight"
+      : pad.id === "tight"
+        ? "compose.swingTight"
+        : pad.id === "laid"
+          ? "compose.swingLaid"
+          : pad.id === "loose"
+            ? "compose.swingLoose"
+            : "compose.swingStyle"
+  );
+}
+
+export function swingFeelPadDetail(
+  pad: SwingFeelPadDefinition,
+  project: ProjectState,
+  locale: AppLocale = "en"
+): string {
+  if (pad.id === "style") {
+    return translate(locale, "compose.swingStyleDetail", { style: getStyle(project).name });
+  }
+  return translate(
+    locale,
+    pad.id === "straight"
+      ? "compose.swingStraightDetail"
+      : pad.id === "tight"
+        ? "compose.swingTightDetail"
+        : pad.id === "laid"
+          ? "compose.swingLaidDetail"
+          : "compose.swingLooseDetail"
+  );
 }
 
 export function createSwingFeelResult(
   pad: SwingFeelPadDefinition,
   beforeProject: ProjectState,
-  afterProject: ProjectState
+  afterProject: ProjectState,
+  locale: AppLocale = "en"
 ): SwingFeelResult {
   const beforeSwing = normalizeSwingFeelValue(beforeProject.swing);
   const afterSwing = normalizeSwingFeelValue(afterProject.swing);
@@ -1112,21 +1150,25 @@ export function createSwingFeelResult(
 
   return {
     padId: pad.id,
-    title: `${pad.label} Swing Feel`,
-    status: changed ? "Applied" : "Held",
-    detail: `${swingFeelPadDetail(pad, afterProject)} / Pattern ${afterProject.selectedPattern}`,
-    scope: "Global swing timing",
+    title: translate(locale, "compose.swingResultTitle", { label: swingFeelPadLabel(pad, locale) }),
+    status: translate(locale, changed ? "compose.swingResultApplied" : "compose.swingResultHeld"),
+    detail: translate(locale, "compose.swingResultDetail", {
+      detail: swingFeelPadDetail(pad, afterProject, locale),
+      pattern: afterProject.selectedPattern
+    }),
+    scope: translate(locale, "compose.swingResultScope"),
     metric: {
       id: "swing-feel",
-      label: "Swing",
+      label: translate(locale, "compose.swingResultMetric"),
       before: percentLabel(beforeSwing),
       after: percentLabel(afterSwing),
       tone: changed ? "good" : "warn"
     },
-    auditionCue: `Loop Pattern ${afterProject.selectedPattern}; listen for hat pocket, clap placement, and 808 timing against ${percentLabel(
-      afterSwing
-    )} swing.`,
-    nextCheck: "Use Groove Compass, Style Inspector swing, or the manual Swing slider if the pocket needs finer adjustment.",
+    auditionCue: translate(locale, "compose.swingResultAudition", {
+      pattern: afterProject.selectedPattern,
+      swing: percentLabel(afterSwing)
+    }),
+    nextCheck: translate(locale, "compose.swingResultNext"),
     tone: changed ? "good" : "warn"
   };
 }
@@ -2163,10 +2205,11 @@ export function ArrangementTemplateControls({
   preview: ArrangementTemplatePreviewSummary;
   result: ArrangementTemplateResultSummary | null;
 }): ReactElement {
+  const { t } = useLocalization();
   const decision = createArrangementTemplatePreviewDecision(preview);
 
   return (
-    <section className="arrangement-template-panel" data-testid="arrangement-template-panel" aria-label="Arrangement templates">
+    <section className="arrangement-template-panel" data-testid="arrangement-template-panel" aria-label={t("arrange.helper.templatesAria")}>
       <div
         className={`arrangement-template-preview ${preview.tone}`}
         data-preview-arrangement-template={preview.templateId}
@@ -2189,7 +2232,7 @@ export function ArrangementTemplateControls({
         }}
       />
       <ArrangementTemplatePriorityReadout summary={createArrangementTemplatePrioritySummary(preview)} onApply={onApply} />
-      <div className="arrangement-template-row" aria-label="Arrangement template buttons">
+      <div className="arrangement-template-row" aria-label={t("arrange.helper.templateButtonsAria")}>
         {arrangementTemplateIds.map((template) => {
           const templateBlocks = createArrangementTemplate(template);
           const templateBars = templateBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
@@ -2198,12 +2241,20 @@ export function ArrangementTemplateControls({
               data-testid={`arrangement-template-${template}`}
               key={template}
               onClick={() => onApply(template)}
-              title={`Apply ${arrangementTemplateLabel(template)} arrangement`}
+              title={t("arrange.helper.applyArrangementTitle", { label: arrangementTemplateLabel(template) })}
               type="button"
             >
               <ArrowRight size={14} aria-hidden="true" />
               <span>{arrangementTemplateLabel(template)}</span>
-              <small>{templateBlocks.length} blocks / {barCountLabel(templateBars)}</small>
+              <small>
+                {t("arrange.helper.templateStats", {
+                  count: templateBlocks.length,
+                  bars:
+                    templateBars === 1
+                      ? t("arrange.helper.oneBar")
+                      : t("arrange.helper.barCount", { count: templateBars })
+                })}
+              </small>
             </button>
           );
         })}
@@ -2220,6 +2271,7 @@ export function ArrangementTemplatePreviewDecision({
   onApply: () => void;
   summary: ArrangementTemplatePreviewDecisionSummary;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`arrangement-template-priority arrangement-template-decision ${summary.tone}`}
@@ -2237,7 +2289,11 @@ export function ArrangementTemplatePreviewDecision({
         data-testid="arrangement-template-decision-run"
         disabled={summary.disabled}
         onClick={onApply}
-        title={summary.disabled ? "Current arrangement already matches this template" : `Apply ${summary.templateLabel} template`}
+        title={
+          summary.disabled
+            ? t("arrange.helper.currentTemplateMatches")
+            : t("arrange.helper.applyTemplateTitle", { label: summary.templateLabel })
+        }
         type="button"
       >
         <ListChecks size={12} aria-hidden="true" />
@@ -2254,6 +2310,7 @@ export function ArrangementTemplatePriorityReadout({
   onApply: (template: ArrangementTemplateId) => void;
   summary: ArrangementTemplatePrioritySummary;
 }): ReactElement {
+  const { t } = useLocalization();
   const disabled = summary.templateId === "aligned";
   return (
     <div
@@ -2276,16 +2333,17 @@ export function ArrangementTemplatePriorityReadout({
             onApply(summary.templateId);
           }
         }}
-        title={disabled ? summary.reasonLabel : `Apply ${summary.templateLabel} template`}
+        title={disabled ? summary.reasonLabel : t("arrange.helper.applyTemplateTitle", { label: summary.templateLabel })}
         type="button"
       >
-        {disabled ? "Aligned" : summary.templateLabel}
+        {disabled ? t("arrange.helper.aligned") : summary.templateLabel}
       </button>
     </div>
   );
 }
 
 export function ArrangementTemplateResultStrip({ result }: { result: ArrangementTemplateResultSummary }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`arrangement-template-result ${result.tone}`}
@@ -2315,11 +2373,11 @@ export function ArrangementTemplateResultStrip({ result }: { result: Arrangement
       </div>
       <div className="arrangement-template-result-followup" data-testid="arrangement-template-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("arrange.helper.audition")}</b>
           <em data-testid="arrangement-template-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("arrange.helper.nextCheck")}</b>
           <em data-testid="arrangement-template-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -2338,6 +2396,7 @@ export function ArrangementFocusPanel({
   result: ArrangementFocusResultSummary | null;
   summary: ArrangementFocusSummary | null;
 }): ReactElement | null {
+  const { t } = useLocalization();
   if (!summary || !preview) {
     return null;
   }
@@ -2347,14 +2406,26 @@ export function ArrangementFocusPanel({
   const priorityActionDisabled = prioritySummary.statusLabel === "Focus aligned";
 
   return (
-    <section className="arrangement-focus" data-testid="arrangement-focus" aria-label="Arrangement focus">
+    <section className="arrangement-focus" data-testid="arrangement-focus" aria-label={t("arrange.helper.focusAria")}>
       <div className="arrangement-focus-summary">
-        <span>Focus</span>
+        <span>{t("arrange.helper.focusHeading")}</span>
         <strong data-testid="arrangement-focus-summary">
-          Block {summary.blockNumber} / {summary.section} / Pattern {summary.pattern}
+          {t("arrange.helper.focusSummary", {
+            block: summary.blockNumber,
+            section: summary.section,
+            pattern: summary.pattern
+          })}
         </strong>
         <small>
-          {barCountLabel(summary.bars)} / {Math.round(summary.energy * 100)}% energy / {summary.eventCount} events / {summary.mutedLabel}
+          {t("arrange.helper.focusStats", {
+            bars:
+              summary.bars === 1
+                ? t("arrange.helper.oneBar")
+                : t("arrange.helper.barCount", { count: summary.bars }),
+            energy: Math.round(summary.energy * 100),
+            events: summary.eventCount,
+            muted: summary.mutedLabel
+          })}
         </small>
       </div>
       <div
@@ -2398,10 +2469,14 @@ export function ArrangementFocusPanel({
               onApply(prioritySummary.presetId);
             }
           }}
-          title={priorityActionDisabled ? prioritySummary.reasonLabel : `Apply ${prioritySummary.presetLabel} focus`}
+          title={
+            priorityActionDisabled
+              ? prioritySummary.reasonLabel
+              : t("arrange.helper.applyFocusTitle", { label: prioritySummary.presetLabel })
+          }
           type="button"
         >
-          {priorityActionDisabled ? "Aligned" : prioritySummary.presetLabel}
+          {priorityActionDisabled ? t("arrange.helper.aligned") : prioritySummary.presetLabel}
         </button>
       </div>
       <div className="arrangement-focus-actions">
@@ -2417,7 +2492,14 @@ export function ArrangementFocusPanel({
             <Waves size={14} aria-hidden="true" />
             <span>{preset.label}</span>
             <small>
-              Pattern {preset.pattern} / {barCountLabel(preset.bars)} / {Math.round(preset.energy * 100)}%
+              {t("arrange.helper.focusPresetStats", {
+                pattern: preset.pattern,
+                bars:
+                  preset.bars === 1
+                    ? t("arrange.helper.oneBar")
+                    : t("arrange.helper.barCount", { count: preset.bars }),
+                energy: Math.round(preset.energy * 100)
+              })}
             </small>
           </button>
         ))}
@@ -2434,6 +2516,7 @@ export function ArrangementFocusPreviewDecision({
   onApply: () => void;
   summary: ArrangementFocusPreviewDecisionSummary;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`arrangement-focus-priority arrangement-focus-decision ${summary.tone}`}
@@ -2451,7 +2534,11 @@ export function ArrangementFocusPreviewDecision({
         data-testid="arrangement-focus-decision-run"
         disabled={summary.disabled}
         onClick={onApply}
-        title={summary.disabled ? "Selected block already matches this focus preset" : `Apply ${summary.presetLabel} focus`}
+        title={
+          summary.disabled
+            ? t("arrange.helper.currentFocusMatches")
+            : t("arrange.helper.applyFocusTitle", { label: summary.presetLabel })
+        }
         type="button"
       >
         <ListChecks size={12} aria-hidden="true" />
@@ -2462,6 +2549,7 @@ export function ArrangementFocusPreviewDecision({
 }
 
 export function ArrangementFocusResultStrip({ result }: { result: ArrangementFocusResultSummary }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`arrangement-focus-result ${result.tone}`}
@@ -2491,11 +2579,11 @@ export function ArrangementFocusResultStrip({ result }: { result: ArrangementFoc
       </div>
       <div className="arrangement-focus-result-followup" data-testid="arrangement-focus-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("arrange.helper.audition")}</b>
           <em data-testid="arrangement-focus-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("arrange.helper.nextCheck")}</b>
           <em data-testid="arrangement-focus-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -2514,11 +2602,12 @@ export function ArrangementArcPads({
   result: ArrangementArcResultSummary | null;
   onApply: (pad: ArrangementArcPadId) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
-    <section className="arrangement-arc" data-testid="arrangement-arc-pads" aria-label="Arrangement Arc Pads">
+    <section className="arrangement-arc" data-testid="arrangement-arc-pads" aria-label={t("arrange.helper.arcAria")}>
       <div className="arrangement-arc-heading">
-        <span>Arc</span>
-        <strong>Song energy</strong>
+        <span>{t("arrange.helper.arcHeading")}</span>
+        <strong>{t("arrange.helper.songEnergy")}</strong>
       </div>
       <div
         className={`arrangement-arc-preview ${preview.tone}`}
@@ -2548,7 +2637,7 @@ export function ArrangementArcPads({
             <Waves size={14} aria-hidden="true" />
             <span>{pad.label}</span>
             <strong>{pad.preview}</strong>
-            <small>{pad.changedCount} blocks / {pad.detail}</small>
+            <small>{t("arrange.helper.arcPadStats", { count: pad.changedCount, detail: pad.detail })}</small>
           </button>
         ))}
       </div>
@@ -2564,6 +2653,7 @@ export function ArrangementArcPreviewDecision({
   onApply: (pad: ArrangementArcPadId) => void;
   summary: ArrangementArcPreviewDecisionSummary;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`arrangement-arc-priority arrangement-arc-decision ${summary.tone}`}
@@ -2585,7 +2675,11 @@ export function ArrangementArcPreviewDecision({
             onApply(summary.targetPadId);
           }
         }}
-        title={summary.disabled ? "Current arrangement already matches this arc" : `Apply ${summary.padLabel} arc`}
+        title={
+          summary.disabled
+            ? t("arrange.helper.currentArcMatches")
+            : t("arrange.helper.applyArcTitle", { label: summary.padLabel })
+        }
         type="button"
       >
         <ListChecks size={12} aria-hidden="true" />
@@ -2602,6 +2696,7 @@ export function ArrangementMovePriorityReadout({
   onApply: (preset: ArrangementMovePreset) => void;
   summary: ArrangementMovePrioritySummary;
 }): ReactElement {
+  const { t } = useLocalization();
   const disabled = summary.presetId === "none";
   return (
     <div
@@ -2624,10 +2719,10 @@ export function ArrangementMovePriorityReadout({
             onApply(summary.presetId);
           }
         }}
-        title={disabled ? summary.reasonLabel : `Apply ${summary.presetLabel} move`}
+        title={disabled ? summary.reasonLabel : t("arrange.helper.applyMoveTitle", { label: summary.presetLabel })}
         type="button"
       >
-        {disabled ? "Select Block" : summary.presetLabel}
+        {disabled ? t("arrange.helper.selectBlock") : summary.presetLabel}
       </button>
     </div>
   );
@@ -2640,6 +2735,7 @@ export function ArrangementMovePreviewDecision({
   onApply: () => void;
   summary: ArrangementMovePreviewDecisionSummary;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`arrangement-move-priority arrangement-move-decision ${summary.tone}`}
@@ -2657,7 +2753,7 @@ export function ArrangementMovePreviewDecision({
         data-testid="arrangement-move-decision-run"
         disabled={summary.disabled}
         onClick={onApply}
-        title={summary.disabled ? summary.detailLabel : `Apply ${summary.presetLabel} move`}
+        title={summary.disabled ? summary.detailLabel : t("arrange.helper.applyMoveTitle", { label: summary.presetLabel })}
         type="button"
       >
         <ListChecks size={12} aria-hidden="true" />
@@ -2668,6 +2764,7 @@ export function ArrangementMovePreviewDecision({
 }
 
 export function ArrangementMoveResultStrip({ result }: { result: ArrangementMoveResultSummary }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`arrangement-move-result ${result.tone}`}
@@ -2697,11 +2794,11 @@ export function ArrangementMoveResultStrip({ result }: { result: ArrangementMove
       </div>
       <div className="arrangement-move-result-followup" data-testid="arrangement-move-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("arrange.helper.audition")}</b>
           <em data-testid="arrangement-move-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("arrange.helper.nextCheck")}</b>
           <em data-testid="arrangement-move-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -2716,6 +2813,7 @@ export function SelectedBlockEditPriorityReadout({
   onRun: (actionId: SelectedBlockEditPrioritySummary["actionId"]) => void;
   summary: SelectedBlockEditPrioritySummary;
 }): ReactElement {
+  const { t } = useLocalization();
   const disabled = summary.actionId === "none";
   return (
     <div
@@ -2734,10 +2832,10 @@ export function SelectedBlockEditPriorityReadout({
         data-testid="selected-block-edit-priority-run"
         disabled={disabled}
         onClick={() => onRun(summary.actionId)}
-        title={disabled ? summary.reasonLabel : `Run ${summary.actionLabel}`}
+        title={disabled ? summary.reasonLabel : t("arrange.helper.runTitle", { label: summary.actionLabel })}
         type="button"
       >
-        {disabled ? "Select Block" : summary.actionLabel}
+        {disabled ? t("arrange.helper.selectBlock") : summary.actionLabel}
       </button>
     </div>
   );
@@ -2750,6 +2848,7 @@ export function SelectedBlockEditPreviewDecision({
   onRun: (actionId: SelectedBlockEditPrioritySummary["actionId"]) => void;
   summary: SelectedBlockEditPreviewDecisionSummary;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`selected-block-edit-priority selected-block-edit-decision ${summary.tone}`}
@@ -2767,7 +2866,7 @@ export function SelectedBlockEditPreviewDecision({
         data-testid="selected-block-edit-decision-run"
         disabled={summary.disabled}
         onClick={() => onRun(summary.targetActionId)}
-        title={summary.disabled ? summary.detailLabel : `Run ${summary.actionLabel}`}
+        title={summary.disabled ? summary.detailLabel : t("arrange.helper.runTitle", { label: summary.actionLabel })}
         type="button"
       >
         <ListChecks size={12} aria-hidden="true" />
@@ -2778,6 +2877,7 @@ export function SelectedBlockEditPreviewDecision({
 }
 
 export function SelectedBlockEditResultStrip({ result }: { result: SelectedBlockEditResultSummary }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`selected-block-edit-result ${result.tone}`}
@@ -2807,11 +2907,11 @@ export function SelectedBlockEditResultStrip({ result }: { result: SelectedBlock
       </div>
       <div className="selected-block-edit-result-followup" data-testid="selected-block-edit-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("arrange.helper.audition")}</b>
           <em data-testid="selected-block-edit-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("arrange.helper.nextCheck")}</b>
           <em data-testid="selected-block-edit-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -2826,6 +2926,7 @@ export function ArrangementArcPriorityReadout({
   onApply: (pad: ArrangementArcPadId) => void;
   summary: ArrangementArcPrioritySummary;
 }): ReactElement {
+  const { t } = useLocalization();
   const disabled = summary.statusLabel === "Arc aligned";
   return (
     <div
@@ -2848,16 +2949,17 @@ export function ArrangementArcPriorityReadout({
             onApply(summary.padId);
           }
         }}
-        title={disabled ? summary.reasonLabel : `Apply ${summary.padLabel} arc`}
+        title={disabled ? summary.reasonLabel : t("arrange.helper.applyArcTitle", { label: summary.padLabel })}
         type="button"
       >
-        {disabled ? "Aligned" : summary.padLabel}
+        {disabled ? t("arrange.helper.aligned") : summary.padLabel}
       </button>
     </div>
   );
 }
 
 export function ArrangementArcResultStrip({ result }: { result: ArrangementArcResultSummary }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`arrangement-arc-result ${result.tone}`}
@@ -2887,11 +2989,11 @@ export function ArrangementArcResultStrip({ result }: { result: ArrangementArcRe
       </div>
       <div className="arrangement-arc-result-followup" data-testid="arrangement-arc-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("arrange.helper.audition")}</b>
           <em data-testid="arrangement-arc-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("arrange.helper.nextCheck")}</b>
           <em data-testid="arrangement-arc-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -2924,6 +3026,7 @@ export function PatternChainPreviewDecision({
   onRun: (actionId: PatternChainPreviewSummary["actionId"]) => void;
   summary: PatternChainPreviewDecisionSummary;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`pattern-chain-priority pattern-chain-decision ${summary.tone}`}
@@ -2945,7 +3048,11 @@ export function PatternChainPreviewDecision({
             onRun(summary.targetActionId);
           }
         }}
-        title={summary.disabled ? "Current arrangement already matches this chain" : `Run ${summary.actionLabel}`}
+        title={
+          summary.disabled
+            ? t("arrange.helper.currentChainMatches")
+            : t("arrange.helper.runTitle", { label: summary.actionLabel })
+        }
         type="button"
       >
         <ListChecks size={12} aria-hidden="true" />
@@ -2962,6 +3069,7 @@ export function PatternChainPriorityReadout({
   onRun: (actionId: PatternChainPrioritySummary["actionId"]) => void;
   summary: PatternChainPrioritySummary;
 }): ReactElement {
+  const { t } = useLocalization();
   const disabled = summary.actionId === "aligned";
   return (
     <div
@@ -2983,16 +3091,17 @@ export function PatternChainPriorityReadout({
             onRun(summary.actionId);
           }
         }}
-        title={disabled ? summary.reasonLabel : `Run ${summary.actionLabel}`}
+        title={disabled ? summary.reasonLabel : t("arrange.helper.runTitle", { label: summary.actionLabel })}
         type="button"
       >
-        {disabled ? "Aligned" : summary.actionLabel}
+        {disabled ? t("arrange.helper.aligned") : summary.actionLabel}
       </button>
     </div>
   );
 }
 
 export function PatternChainResultStrip({ result }: { result: PatternChainResultSummary }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`pattern-chain-result ${result.tone}`}
@@ -3022,11 +3131,11 @@ export function PatternChainResultStrip({ result }: { result: PatternChainResult
       </div>
       <div className="pattern-chain-result-followup" data-testid="pattern-chain-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("arrange.helper.audition")}</b>
           <em data-testid="pattern-chain-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("arrange.helper.nextCheck")}</b>
           <em data-testid="pattern-chain-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -3045,20 +3154,21 @@ export function SectionLocatorPads({
   pads: SectionLocatorPad[];
   result: SectionCueResult | null;
 }): ReactElement {
+  const { t } = useLocalization();
   const prioritySummary = createSectionLocatorPrioritySummary(pads);
   const cueDecision = createSectionLocatorCueDecisionSummary(pads, disabled);
   const priorityActionDisabled = disabled || prioritySummary.section === null;
   const priorityActionTitle = disabled
-    ? "Stop playback before cueing a section"
+    ? t("arrange.helper.stopPlaybackSection")
     : prioritySummary.section
-      ? `Cue ${prioritySummary.section} section`
+      ? t("arrange.helper.cueSectionTitle", { section: prioritySummary.section })
       : prioritySummary.reasonLabel;
 
   return (
-    <section className="section-locator" data-testid="section-locator-pads" aria-label="Section Locator Pads">
+    <section className="section-locator" data-testid="section-locator-pads" aria-label={t("arrange.helper.locatorAria")}>
       <div className="section-locator-heading">
-        <span>Locator</span>
-        <strong>Section cue</strong>
+        <span>{t("arrange.helper.locatorHeading")}</span>
+        <strong>{t("arrange.helper.sectionCue")}</strong>
       </div>
       <div
         className={`section-locator-priority ${prioritySummary.tone}`}
@@ -3081,7 +3191,9 @@ export function SectionLocatorPads({
           title={priorityActionTitle}
           type="button"
         >
-          {prioritySummary.section ? `Cue ${prioritySummary.section}` : "No cue"}
+          {prioritySummary.section
+            ? t("arrange.helper.cueSection", { section: prioritySummary.section })
+            : t("arrange.helper.noCue")}
         </button>
       </div>
       <SectionLocatorCueDecision summary={cueDecision} onCue={onCue} />
@@ -3092,10 +3204,10 @@ export function SectionLocatorPads({
           const disabledPad = disabled || missing;
           const rangeLabel =
             pad.startBar === null || pad.endBar === null
-              ? "Missing"
+              ? t("arrange.helper.missing")
               : pad.startBar === pad.endBar
-                ? `Bar ${pad.startBar}`
-                : `Bars ${pad.startBar}-${pad.endBar}`;
+                ? t("arrange.helper.bar", { start: pad.startBar })
+                : t("arrange.helper.bars", { start: pad.startBar, end: pad.endBar });
           return (
             <button
               aria-pressed={pad.selected}
@@ -3109,14 +3221,30 @@ export function SectionLocatorPads({
               onClick={() => onCue(pad.section)}
               title={
                 missing
-                  ? `${pad.section} section is not in the arrangement`
-                  : `Cue ${pad.section} as Block loop: Pattern ${pad.pattern}, ${rangeLabel}`
+                  ? t("arrange.helper.sectionMissingTitle", { section: pad.section })
+                  : t("arrange.helper.cueBlockLoopTitle", {
+                      section: pad.section,
+                      pattern: pad.pattern ?? "—",
+                      range: rangeLabel
+                    })
               }
               type="button"
             >
               <span>{pad.section}</span>
-              <strong>{missing ? "Missing" : `Pattern ${pad.pattern}`}</strong>
-              <small>{missing ? "Add section" : `${rangeLabel} / ${Math.round(pad.energy * 100)}% / ${pad.eventCount} events`}</small>
+              <strong>
+                {missing
+                  ? t("arrange.helper.missing")
+                  : t("arrange.helper.pattern", { pattern: pad.pattern ?? "—" })}
+              </strong>
+              <small>
+                {missing
+                  ? t("arrange.helper.addSection")
+                  : t("arrange.helper.locatorStats", {
+                      range: rangeLabel,
+                      energy: Math.round(pad.energy * 100),
+                      events: pad.eventCount
+                    })}
+              </small>
             </button>
           );
         })}
@@ -3126,6 +3254,7 @@ export function SectionLocatorPads({
 }
 
 export function SectionCueResultStrip({ result }: { result: SectionCueResult }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`quick-action-result section-cue-result ${result.tone}`}
@@ -3147,11 +3276,11 @@ export function SectionCueResultStrip({ result }: { result: SectionCueResult }):
       </div>
       <div className="quick-action-result-followup" data-testid="section-cue-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("arrange.helper.audition")}</b>
           <em data-testid="section-cue-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("arrange.helper.nextCheck")}</b>
           <em data-testid="section-cue-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -3166,6 +3295,7 @@ export function SectionLocatorCueDecision({
   onCue: (section: ArrangementSection) => void;
   summary: SectionLocatorCueDecisionSummary;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`section-locator-priority section-locator-decision ${summary.tone}`}
@@ -3187,7 +3317,11 @@ export function SectionLocatorCueDecision({
             onCue(summary.section);
           }
         }}
-        title={summary.disabled ? summary.detailLabel : `Cue ${summary.section} section`}
+        title={
+          summary.disabled
+            ? summary.detailLabel
+            : t("arrange.helper.cueSectionTitle", { section: summary.section ?? "" })
+        }
         type="button"
       >
         <ListChecks size={12} aria-hidden="true" />
@@ -3208,11 +3342,18 @@ export function ProjectAudioAnalysisGate({
   status: ProjectAudioAnalysisStatus;
   surface: "Guide" | "Mix" | "Master" | "Deliver";
 }): ReactElement {
+  const { t } = useLocalization();
   const pending = status === "pending";
-  const title = pending ? "Analyzing" : "Meters unavailable";
+  const surfaceLabel = {
+    Guide: t("analysis.surfaceGuide"),
+    Mix: t("analysis.surfaceMix"),
+    Master: t("analysis.surfaceMaster"),
+    Deliver: t("analysis.surfaceDeliver")
+  }[surface];
+  const title = pending ? t("analysis.analyzing") : t("analysis.metersUnavailable");
   const detail = pending
-    ? `Exact ${surface} meters are updating for the current project.`
-    : `Exact ${surface} meters could not be calculated for the current project.`;
+    ? t("analysis.pendingDetail", { surface: surfaceLabel })
+    : t("analysis.unavailableDetail", { surface: surfaceLabel });
 
   return (
     <div
@@ -3225,10 +3366,10 @@ export function ProjectAudioAnalysisGate({
     >
       <strong>{title}</strong>
       <span>{detail}</span>
-      <small>Meter values, readiness claims, and delivery actions stay hidden until analysis is exact.</small>
+      <small>{t("analysis.hiddenDetail")}</small>
       {!pending && (
         <button data-testid={`audio-analysis-gate-retry-${surface.toLowerCase()}`} onClick={onRetry} type="button">
-          Retry meters
+          {t("analysis.retry")}
         </button>
       )}
     </div>
@@ -6965,8 +7106,10 @@ export function HandoffPack({
   onToggleStatus: () => void;
   onToggleAudit: () => void;
 }): ReactElement {
+  const { locale, t } = useLocalization();
   const items = createHandoffPackItems({
     analysis,
+    locale,
     project,
     stemAnalyses,
     onExportDeliveryBundle,
@@ -6975,9 +7118,23 @@ export function HandoffPack({
     onExportStems,
     onExportWav
   });
+  const itemLabels: Record<HandoffPackItem["id"], string> = {
+    wav: t("handoff.mixWav"),
+    stems: t("handoff.stemWavs"),
+    midi: t("handoff.arrangementMidi"),
+    sheet: t("handoff.sheet"),
+    bundle: t("handoff.bundle")
+  };
+  const itemButtonLabels: Record<HandoffPackItem["id"], string> = {
+    wav: "WAV",
+    stems: t("deliver.helper.itemStems"),
+    midi: "MIDI",
+    sheet: t("deliver.helper.itemSheet"),
+    bundle: t("deliver.helper.itemBundle")
+  };
   const readyCount = items.filter((item) => item.tone === "good").length;
   const tone = weakestTone(items.map((item) => item.tone));
-  const routeSummary = createHandoffPackRouteSummary(project, stemAnalyses, items, tone);
+  const routeSummary = createHandoffPackRouteSummary(project, stemAnalyses, items, tone, locale);
   const sendOrderSummary = createHandoffPackSendOrderSummary(project, items);
   const receiptSummary = exportReceipt ?? emptyHandoffExportReceipt();
   const fileManifest = createHandoffFileManifest(project, stemAnalyses, items);
@@ -6990,16 +7147,44 @@ export function HandoffPack({
   const packagePriority = createHandoffPackageCheckPriority(packageCheckSummary);
   const packagePriorityCard = packageCheckSummary.cards.find((card) => card.focusId === packagePriority.focusId) ?? null;
   const packagePriorityActionDisabled = packagePriorityCard === null;
+  const receiptStatusLabel = exportReceipt
+    ? t(
+        exportReceipt.tone === "good"
+          ? "handoff.exportReady"
+          : exportReceipt.tone === "warn"
+            ? "handoff.exportReview"
+            : "handoff.exportBlocked"
+      )
+    : t("handoff.noExportYet");
+  const manifestStatusLabel = t(
+    manifestAudit.tone === "good"
+      ? "handoff.auditReady"
+      : manifestAudit.tone === "warn"
+        ? "handoff.auditReview"
+        : "handoff.auditBlocked"
+  );
+  const packageStatusLabel = t(
+    packageCheckSummary.tone === "good"
+      ? "handoff.packageReady"
+      : packageCheckSummary.tone === "warn"
+        ? "handoff.packageReview"
+        : "handoff.packageBlocked"
+  );
 
   return (
-    <section className={`handoff-pack ${tone}`} data-testid="handoff-pack" aria-label="Handoff pack" ref={sectionRef}>
+    <section
+      className={`handoff-pack ${tone}`}
+      data-testid="handoff-pack"
+      aria-label={t("deliver.helper.packAria")}
+      ref={sectionRef}
+    >
       <div className="handoff-pack-heading">
         <div>
           <Download size={17} aria-hidden="true" />
-          <span>Handoff Pack</span>
+          <span>{t("panel.handoff")}</span>
         </div>
         <strong data-testid="handoff-pack-summary">
-          {readyCount}/{items.length} ready
+          {t("handoff.ready", { ready: readyCount, total: items.length })}
         </strong>
         <small data-testid="handoff-pack-detail">
           {handoffSheetFileName(project)}
@@ -7018,26 +7203,26 @@ export function HandoffPack({
       </div>
       <div className="handoff-pack-direct" data-testid="handoff-pack-direct">
         <div className="handoff-pack-direct-heading">
-          <span>Choose a deliverable</span>
-          <strong>Export directly</strong>
-          <small>WAV is the finished mix. Stems and MIDI keep the session editable; Sheet and Bundle package the handoff.</small>
+          <span>{t("handoff.choose")}</span>
+          <strong>{t("handoff.exportDirect")}</strong>
+          <small>{t("handoff.exportDetail")}</small>
           <button
             aria-pressed={isWavPreviewing}
             className={isWavPreviewing ? "active" : ""}
             data-testid="handoff-pack-preview-wav"
             onClick={onToggleWavPreview}
-            title={isWavPreviewing ? "Stop the rendered WAV preview" : "Preview the exact rendered mix WAV before export"}
+            title={isWavPreviewing ? t("handoff.stopPreviewTitle") : t("handoff.previewTitle")}
             type="button"
           >
             {isWavPreviewing ? <CircleStop size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
-            <span>{isWavPreviewing ? "Stop preview" : "Preview WAV"}</span>
+            <span>{isWavPreviewing ? t("handoff.stopPreview") : t("handoff.previewWav")}</span>
           </button>
         </div>
         <div className="handoff-pack-grid" data-testid="handoff-pack-grid">
           {items.map((item) => (
             <div className={`handoff-pack-card ${item.tone}`} data-testid={`handoff-pack-${item.id}`} key={item.id}>
               <div>
-                <span>{item.label}</span>
+                <span>{itemLabels[item.id]}</span>
                 <strong>{item.value}</strong>
                 <small>{item.detail}</small>
               </div>
@@ -7049,7 +7234,7 @@ export function HandoffPack({
                 type="button"
               >
                 <Download size={14} aria-hidden="true" />
-                <span>{item.buttonLabel}</span>
+                <span>{itemButtonLabels[item.id]}</span>
               </button>
             </div>
           ))}
@@ -7064,10 +7249,12 @@ export function HandoffPack({
           }}
         >
           <span>
-            <strong>Delivery Status &amp; Receipt</strong>
-            <small>Next send item and the latest explicit export result</small>
+            <strong>{t("handoff.deliveryStatus")}</strong>
+            <small>{t("handoff.deliveryStatusDetail")}</small>
           </span>
-          <em>{receiptSummary.statusLabel} · {project.mode === "studio" ? "Studio" : "Guided"}</em>
+          <em>
+            {receiptStatusLabel} · {project.mode === "studio" ? t("mode.studio") : t("mode.guided")}
+          </em>
           <ArrowDown size={15} aria-hidden="true" />
         </summary>
         <div className="handoff-tools-content" data-testid="handoff-status-content">
@@ -7106,10 +7293,10 @@ export function HandoffPack({
           }}
         >
           <span>
-            <strong>Format &amp; Package Proof</strong>
-            <small>Manifest, deliverable metrics, package checks, and planned filenames</small>
+            <strong>{t("handoff.formatProof")}</strong>
+            <small>{t("handoff.formatProofDetail")}</small>
           </span>
-          <em>{manifestAudit.statusLabel} · {packageCheckSummary.headline}</em>
+          <em>{manifestStatusLabel} · {packageStatusLabel}</em>
           <ArrowDown size={15} aria-hidden="true" />
         </summary>
         <div className="handoff-tools-content" data-testid="handoff-audit-content">
@@ -7180,7 +7367,11 @@ export function HandoffPack({
                 onFocusExportFormat(formatPriorityMetric);
               }
             }}
-            title={formatPriorityMetric ? `Focus ${formatPriority.areaLabel}` : formatPriority.title}
+            title={
+              formatPriorityMetric
+                ? t("deliver.helper.focusTitle", { label: formatPriority.areaLabel })
+                : formatPriority.title
+            }
             type="button"
           >
             {formatPriority.actionLabel}
@@ -7205,11 +7396,11 @@ export function HandoffPack({
                   className="handoff-export-format-focus-button"
                   data-testid={`handoff-export-format-focus-${metric.id}`}
                   onClick={() => onFocusExportFormat(metric)}
-                  title={`Focus ${metric.label}: ${metric.value}`}
+                  title={t("deliver.helper.focusStatusTitle", { label: metric.label, status: metric.value })}
                   type="button"
                 >
                   <Target size={12} aria-hidden="true" />
-                  <span>{focused ? "Focused" : "Focus"}</span>
+                  <span>{focused ? t("deliver.helper.focused") : t("deliver.helper.focus")}</span>
                 </button>
               </span>
             );
@@ -7220,12 +7411,12 @@ export function HandoffPack({
       <div
         className={["handoff-package-check", packageCheckSummary.tone, packageCheckResult ? "has-result" : ""].filter(Boolean).join(" ")}
         data-testid="handoff-package-check"
-        aria-label="Handoff package check"
+        aria-label={t("deliver.helper.packageCheckAria")}
       >
         <div className="handoff-package-check-heading">
           <div>
             <PackageCheck size={15} aria-hidden="true" />
-            <span>Package Check</span>
+            <span>{t("deliver.helper.packageCheckHeading")}</span>
           </div>
           <strong data-testid="handoff-package-check-headline">{packageCheckSummary.headline}</strong>
           <small data-testid="handoff-package-check-detail">{packageCheckSummary.detail}</small>
@@ -7257,7 +7448,11 @@ export function HandoffPack({
                 onFocusPackageCheck(packagePriorityCard);
               }
             }}
-            title={packagePriorityCard ? `Focus ${packagePriority.areaLabel}` : packagePriority.title}
+            title={
+              packagePriorityCard
+                ? t("deliver.helper.focusTitle", { label: packagePriority.areaLabel })
+                : packagePriority.title
+            }
             type="button"
           >
             {packagePriority.actionLabel}
@@ -7277,7 +7472,7 @@ export function HandoffPack({
                   className="handoff-package-check-focus-button"
                   data-testid={`handoff-package-check-focus-${card.id}`}
                   onClick={() => onFocusPackageCheck(card)}
-                  title={`Focus ${card.focusLabel}: ${card.status}`}
+                  title={t("deliver.helper.focusStatusTitle", { label: card.focusLabel, status: card.status })}
                   type="button"
                 >
                   <ArrowRight size={13} aria-hidden="true" />
@@ -7288,7 +7483,11 @@ export function HandoffPack({
           })}
         </div>
       </div>
-      <div className="handoff-pack-file-manifest" data-testid="handoff-pack-file-manifest" aria-label="Handoff file manifest">
+      <div
+        className="handoff-pack-file-manifest"
+        data-testid="handoff-pack-file-manifest"
+        aria-label={t("deliver.helper.fileManifestAria")}
+      >
         {fileManifest.map((item) => (
           <div className={`handoff-pack-file ${item.tone}`} data-testid={`handoff-pack-file-${item.id}`} key={item.id} title={item.fileLabel}>
             <span>{item.label}</span>
@@ -8071,25 +8270,35 @@ export function ArrangementMuteMap({
   onFocus,
   playingArrangementIndex,
   result,
+  routeRef,
   summary
 }: {
   focusedLaneId: ArrangementMuteMapFocusId | null;
   onFocus: (lane: ArrangementMuteMapLane) => void;
   playingArrangementIndex: number | null;
   result: ArrangementMuteMapFocusResult | null;
+  routeRef?: Ref<HTMLElement>;
   summary: ArrangementMuteMapSummary;
 }): ReactElement {
+  const { t } = useLocalization();
   const focusSummary = createArrangementMuteMapFocusSummary(summary, focusedLaneId);
   const prioritySummary = createArrangementMuteMapPrioritySummary(summary);
   const priorityLane = summary.lanes.find((lane) => lane.id === prioritySummary.laneId) ?? null;
   const priorityActionDisabled = priorityLane === null;
 
   return (
-    <section className={`arrangement-mute-map ${summary.tone}`} data-testid="arrangement-mute-map" aria-label="Arrangement mute map">
+    <section
+      aria-label={t("arrange.helper.muteMapAria")}
+      className={`arrangement-mute-map arrangement-mute-map-route-target ${summary.tone}`}
+      data-arrangement-mute-map-route-target="true"
+      data-testid="arrangement-mute-map"
+      ref={routeRef}
+      role="region"
+    >
       <div className="arrangement-mute-map-heading">
         <div>
           <ListChecks size={17} aria-hidden="true" />
-          <span>Mute Map</span>
+          <span>{t("arrange.helper.muteMapHeading")}</span>
         </div>
         <strong data-testid="arrangement-mute-map-headline">{summary.headline}</strong>
         <small data-testid="arrangement-mute-map-detail">{summary.detail}</small>
@@ -8121,7 +8330,11 @@ export function ArrangementMuteMap({
               onFocus(priorityLane);
             }
           }}
-          title={priorityLane ? `Focus ${prioritySummary.laneLabel}` : prioritySummary.reasonLabel}
+          title={
+            priorityLane
+              ? t("arrange.helper.focusTitle", { label: prioritySummary.laneLabel })
+              : prioritySummary.reasonLabel
+          }
           type="button"
         >
           {prioritySummary.actionLabel}
@@ -8140,7 +8353,7 @@ export function ArrangementMuteMap({
                 aria-pressed={focused}
                 className="arrangement-mute-map-focus-button"
                 onClick={() => onFocus(lane)}
-                title={`Focus ${lane.label}: ${lane.status}`}
+                title={t("arrange.helper.focusStatusTitle", { label: lane.label, status: lane.status })}
                 type="button"
               >
                 <span>{lane.focusLabel}</span>
@@ -8159,10 +8372,17 @@ export function ArrangementMuteMap({
                   {segment.index + 1}. {segment.section}
                 </span>
                 <small>
-                  Pattern {segment.pattern} / {segment.startBar}-{segment.endBar}
+                  {t("arrange.helper.patternRange", {
+                    pattern: segment.pattern,
+                    start: segment.startBar,
+                    end: segment.endBar
+                  })}
                 </small>
               </div>
-              <div className="arrangement-mute-map-cells" aria-label={`Block ${segment.index + 1} layer mutes`}>
+              <div
+                className="arrangement-mute-map-cells"
+                aria-label={t("arrange.helper.blockMutesAria", { block: segment.index + 1 })}
+              >
                 {arrangementMuteTrackIds.map((track) => {
                   const muted = segment.mutedTracks.includes(track);
                   const focused = focusedLaneId === track;
@@ -8173,9 +8393,13 @@ export function ArrangementMuteMap({
                         .join(" ")}
                       data-testid={`arrangement-mute-map-cell-${segment.index}-${track}`}
                       key={track}
-                      title={`${arrangementMuteTrackLabel(track)} ${muted ? "muted" : "live"} in ${segment.section}`}
+                      title={t("arrange.helper.trackStateTitle", {
+                        track: arrangementMuteTrackLabel(track),
+                        state: muted ? t("arrange.helper.muted") : t("arrange.helper.live"),
+                        section: segment.section
+                      })}
                     >
-                      {muted ? "Mute" : "Live"}
+                      {muted ? t("arrange.helper.mute") : t("arrange.helper.liveLabel")}
                     </span>
                   );
                 })}
@@ -8236,6 +8460,7 @@ export function ArrangementTransitionMap({
   result: ArrangementTransitionMapFocusResult | null;
   summary: ArrangementTransitionMapSummary;
 }): ReactElement {
+  const { t } = useLocalization();
   const focusSummary = createArrangementTransitionMapFocusSummary(summary, focusedTransitionId);
   const prioritySummary = createArrangementTransitionMapPrioritySummary(summary);
   const priorityTransition = summary.transitions.find((transition) => transition.id === prioritySummary.transitionId) ?? null;
@@ -8245,12 +8470,12 @@ export function ArrangementTransitionMap({
     <section
       className={`arrangement-transition-map ${summary.tone}`}
       data-testid="arrangement-transition-map"
-      aria-label="Arrangement transition map"
+      aria-label={t("arrange.helper.transitionMapAria")}
     >
       <div className="arrangement-transition-map-heading">
         <div>
           <ArrowRight size={17} aria-hidden="true" />
-          <span>Transition Map</span>
+          <span>{t("arrange.helper.transitionMapHeading")}</span>
         </div>
         <strong data-testid="arrangement-transition-map-headline">{summary.headline}</strong>
         <small data-testid="arrangement-transition-map-detail">{summary.detail}</small>
@@ -8282,7 +8507,11 @@ export function ArrangementTransitionMap({
               onFocus(priorityTransition);
             }
           }}
-          title={priorityTransition ? `Focus ${prioritySummary.transitionLabel}` : prioritySummary.reasonLabel}
+          title={
+            priorityTransition
+              ? t("arrange.helper.focusTitle", { label: prioritySummary.transitionLabel })
+              : prioritySummary.reasonLabel
+          }
           type="button"
         >
           {prioritySummary.actionLabel}
@@ -8317,7 +8546,11 @@ export function ArrangementTransitionMap({
                   aria-pressed={focused}
                   className="arrangement-transition-map-focus-button"
                   onClick={() => onFocus(transition)}
-                  title={`Focus transition ${transition.fromIndex + 1} to ${transition.toIndex + 1}: ${transition.status}`}
+                  title={t("arrange.helper.focusTransitionTitle", {
+                    from: transition.fromIndex + 1,
+                    to: transition.toIndex + 1,
+                    status: transition.status
+                  })}
                   type="button"
                 >
                   <span>{transition.focusLabel}</span>
@@ -8330,12 +8563,15 @@ export function ArrangementTransitionMap({
                   onClick={() => onCue(transition)}
                   title={
                     isPlaying
-                      ? "Stop playback before cueing a transition loop"
-                      : `Cue transition loop ${transition.fromIndex + 1} to ${transition.toIndex + 1}`
+                      ? t("arrange.helper.stopPlaybackTransition")
+                      : t("arrange.helper.cueTransitionTitle", {
+                          from: transition.fromIndex + 1,
+                          to: transition.toIndex + 1
+                        })
                   }
                   type="button"
                 >
-                  <span>Cue</span>
+                  <span>{t("arrange.helper.cue")}</span>
                 </button>
               </div>
             </div>
@@ -10403,34 +10639,42 @@ export function createSnapshotSlotRoleSummary(project: ProjectState): SnapshotSl
   };
 }
 
-export function createTapTempoReadoutSummary(currentBpm: number, tapTempo: TapTempoState): TapTempoReadoutSummary {
+export function createTapTempoReadoutSummary(
+  currentBpm: number,
+  tapTempo: TapTempoState,
+  locale: AppLocale = "en"
+): TapTempoReadoutSummary {
   if (tapTempo.bpm !== null) {
     return {
       roleLabel: `${tapTempo.bpm} BPM`,
-      statusLabel: `${tapTempo.taps} taps`,
-      detailLabel: tapTempo.applied ? "Applied tempo" : "Release to apply",
+      statusLabel: translate(locale, "transport.tapCount", { count: tapTempo.taps }),
+      detailLabel: tapTempo.applied
+        ? translate(locale, "transport.tapReadoutApplied")
+        : translate(locale, "transport.tapReadoutRelease"),
       detailTitle: tapTempo.applied
-        ? `${tapTempo.taps} tap tempo pulses averaged into ${tapTempo.bpm} BPM`
-        : `${tapTempo.taps} tap tempo pulses averaging ${tapTempo.bpm} BPM / pause briefly to apply`,
+        ? translate(locale, "transport.tapReadoutAppliedTitle", { count: tapTempo.taps, bpm: tapTempo.bpm })
+        : translate(locale, "transport.tapReadoutAveragingTitle", { count: tapTempo.taps, bpm: tapTempo.bpm }),
       tone: "good"
     };
   }
 
   if (tapTempo.taps === 1) {
     return {
-      roleLabel: "Keep tapping",
-      statusLabel: "1 tap",
-      detailLabel: `${currentBpm} BPM now`,
-      detailTitle: `One tap captured / Tap again within ${Math.round(tapTempoWindowMs / 1000)} seconds to calculate tempo`,
+      roleLabel: translate(locale, "transport.tapReadoutKeepTapping"),
+      statusLabel: translate(locale, "transport.tapReadoutOneTap"),
+      detailLabel: translate(locale, "transport.tapReadoutCurrent", { bpm: currentBpm }),
+      detailTitle: translate(locale, "transport.tapReadoutOneTapTitle", {
+        seconds: Math.round(tapTempoWindowMs / 1000)
+      }),
       tone: "warn"
     };
   }
 
   return {
     roleLabel: `${currentBpm} BPM`,
-    statusLabel: "Tap BPM",
-    detailLabel: "2+ taps",
-    detailTitle: `Tap repeatedly to set the project BPM between ${minProjectBpm} and ${maxProjectBpm}`,
+    statusLabel: translate(locale, "transport.tapReadoutStatus"),
+    detailLabel: translate(locale, "transport.tapReadoutMinimum"),
+    detailTitle: translate(locale, "transport.tapReadoutStartTitle", { min: minProjectBpm, max: maxProjectBpm }),
     tone: "good"
   };
 }
@@ -10441,79 +10685,108 @@ export function createProjectSafetyReadoutSummary(
   localDraftSavedAt: string | null,
   projectStatus: string,
   projectFileLabel: string | null,
-  hasUnsavedChanges: boolean
+  hasUnsavedChanges: boolean,
+  locale: AppLocale = "en"
 ): ProjectSafetyReadoutSummary {
   const trimmedStatus = projectStatus.trim();
   const fileLabel = projectFileLabel?.trim() || null;
+  const localizedSavedAt = (savedAt: string): string => {
+    const formatted = formatLocalDraftSavedAt(savedAt);
+    return formatted === "local draft" ? translate(locale, "core.localDraftFallback") : formatted;
+  };
 
   if (recovery && recoveryDeferred) {
-    const savedLabel = formatLocalDraftSavedAt(recovery.savedAt);
+    const savedLabel = localizedSavedAt(recovery.savedAt);
     return {
-      roleLabel: "Current project kept",
-      statusLabel: "Recovery set aside",
-      detailLabel: `${savedLabel} / available in Actions`,
-      detailTitle: `Recovery copy set aside for this session / ${savedLabel} / Current project unchanged / Restore Draft or Clear Draft remains available in Actions`,
+      roleLabel: translate(locale, "core.projectSafetyCurrentKept"),
+      statusLabel: translate(locale, "core.projectSafetyRecoverySetAside"),
+      detailLabel: translate(locale, "core.projectSafetyAvailableInActions", { savedAt: savedLabel }),
+      detailTitle: translate(locale, "core.projectSafetyRecoverySetAsideTitle", { savedAt: savedLabel }),
       tone: "warn"
     };
   }
 
   if (recovery) {
-    const savedLabel = formatLocalDraftSavedAt(recovery.savedAt);
+    const savedLabel = localizedSavedAt(recovery.savedAt);
     return {
-      roleLabel: "Restore or clear",
-      statusLabel: "Draft found",
-      detailLabel: fileLabel ? `${savedLabel} / ${fileLabel}` : `${savedLabel} / local only`,
-      detailTitle: `Draft found / ${savedLabel} / ${fileLabel ? `Current file ${fileLabel} / ` : ""}Restore Draft or Clear Draft before deciding what to keep`,
+      roleLabel: translate(locale, "core.projectSafetyRestoreOrClear"),
+      statusLabel: translate(locale, "core.projectSafetyDraftFound"),
+      detailLabel: fileLabel
+        ? `${savedLabel} / ${fileLabel}`
+        : translate(locale, "core.projectSafetyLocalOnly", { savedAt: savedLabel }),
+      detailTitle: translate(locale, "core.projectSafetyDraftFoundTitle", {
+        savedAt: savedLabel,
+        fileContext: fileLabel
+          ? translate(locale, "core.projectSafetyCurrentFile", { file: fileLabel })
+          : ""
+      }),
       tone: "warn"
     };
   }
 
   if (localDraftSavedAt) {
-    const savedLabel = formatLocalDraftSavedAt(localDraftSavedAt);
+    const savedLabel = localizedSavedAt(localDraftSavedAt);
     return {
-      roleLabel: fileLabel && hasUnsavedChanges ? "Unsaved edits" : "Safety net",
-      statusLabel: `Draft ${savedLabel}`,
-      detailLabel: fileLabel ? `${fileLabel} changed` : "Save .grooveforge next",
-      detailTitle: `Renderer-local draft written ${savedLabel} / ${fileLabel ? `${fileLabel} has unsaved edits` : "Save a .grooveforge file for a durable copy"}`,
+      roleLabel:
+        fileLabel && hasUnsavedChanges
+          ? translate(locale, "core.projectSafetyUnsavedEdits")
+          : translate(locale, "core.projectSafetyNet"),
+      statusLabel: translate(locale, "core.localDraftStatus", { savedAt: savedLabel }),
+      detailLabel: fileLabel
+        ? translate(locale, "core.projectSafetyFileChanged", { file: fileLabel })
+        : translate(locale, "core.projectSafetySaveNext"),
+      detailTitle: translate(locale, "core.projectSafetyDraftWrittenTitle", {
+        savedAt: savedLabel,
+        detail: fileLabel
+          ? translate(locale, "core.projectSafetyFileUnsaved", { file: fileLabel })
+          : translate(locale, "core.projectSafetySaveDurable")
+      }),
       tone: "warn"
     };
   }
 
   if (fileLabel && hasUnsavedChanges) {
     return {
-      roleLabel: "Unsaved edits",
-      statusLabel: "File changed",
-      detailLabel: `${fileLabel} / draft pending`,
-      detailTitle: `${fileLabel} has unsaved edits / Local draft writes after project edits / Save to refresh the durable file`,
+      roleLabel: translate(locale, "core.projectSafetyUnsavedEdits"),
+      statusLabel: translate(locale, "core.projectSafetyFileChangedStatus"),
+      detailLabel: translate(locale, "core.projectSafetyDraftPending", { file: fileLabel }),
+      detailTitle: translate(locale, "core.projectSafetyUnsavedTitle", { file: fileLabel }),
       tone: "warn"
     };
   }
 
   if (fileLabel) {
     return {
-      roleLabel: "Durable copy",
-      statusLabel: "File saved",
+      roleLabel: translate(locale, "core.projectSafetyDurableCopy"),
+      statusLabel: translate(locale, "core.projectSafetyFileSaved"),
       detailLabel: fileLabel,
-      detailTitle: `${fileLabel} is the current durable project file / Local draft recovery cleared after explicit save or open`,
+      detailTitle: translate(locale, "core.projectSafetyDurableTitle", { file: fileLabel }),
       tone: "good"
     };
   }
 
   if (trimmedStatus.startsWith("Saved ") || trimmedStatus.startsWith("Downloaded ")) {
     return {
-      roleLabel: "Durable copy",
-      statusLabel: "File saved",
-      detailLabel: "Draft cleared",
-      detailTitle: `${trimmedStatus} / Local draft recovery cleared after explicit save`,
+      roleLabel: translate(locale, "core.projectSafetyDurableCopy"),
+      statusLabel: translate(locale, "core.projectSafetyFileSaved"),
+      detailLabel: translate(locale, "core.projectSafetyDraftCleared"),
+      detailTitle: translate(locale, "core.projectSafetySavedTitle", {
+        status: locale === "en" ? trimmedStatus : translate(locale, "core.projectSafetyFileSaved")
+      }),
       tone: "good"
     };
   }
 
   return {
-    roleLabel: "Save to keep",
-    statusLabel: "Editable now",
-    detailLabel: "Local project only",
-    detailTitle: `${trimmedStatus || "Editable project"} / Local project only / Use Save for a durable .grooveforge project file`,
+    roleLabel: translate(locale, "core.projectSafetySaveToKeep"),
+    statusLabel: translate(locale, "core.projectSafetyEditableNow"),
+    detailLabel: translate(locale, "core.projectSafetyLocalProjectOnly"),
+    detailTitle: translate(locale, "core.projectSafetyEditableTitle", {
+      status:
+        locale === "en"
+          ? trimmedStatus || translate(locale, "core.projectSafetyEditableProject")
+          : translate(locale, "core.projectSafetyEditableProject")
+    }),
     tone: "warn"
   };
 }
@@ -10522,31 +10795,36 @@ export function createPatternPlaybackReadoutSummary(
   selectedPattern: PatternSlot,
   playingPattern: PatternSlot | null,
   selectedEventCount: string,
-  playingEventCount: string | null
+  playingEventCount: string | null,
+  locale: AppLocale = "en"
 ): PatternPlaybackReadoutSummary {
-  const roleLabel = `Editing Pattern ${selectedPattern}`;
+  const roleLabel = translate(locale, "compose.playbackEditingPattern", { pattern: selectedPattern });
   if (!playingPattern) {
     return {
       roleLabel,
-      statusLabel: "Pattern idle",
+      statusLabel: translate(locale, "compose.playbackIdle"),
       detailLabel: selectedEventCount,
-      detailTitle: `${roleLabel} / playback stopped / ${selectedEventCount}`,
+      detailTitle: translate(locale, "compose.playbackStoppedTitle", { role: roleLabel, events: selectedEventCount }),
       tone: "warn"
     };
   }
 
-  const statusLabel = `Hearing Pattern ${playingPattern}`;
+  const statusLabel = translate(locale, "compose.playbackHearingPattern", { pattern: playingPattern });
   if (playingPattern === selectedPattern) {
+    const detailLabel = translate(locale, "compose.playbackLiveEvents", { events: selectedEventCount });
     return {
       roleLabel,
       statusLabel,
-      detailLabel: `${selectedEventCount} live`,
-      detailTitle: `${roleLabel} / ${statusLabel} / ${selectedEventCount} live`,
+      detailLabel,
+      detailTitle: `${roleLabel} / ${statusLabel} / ${detailLabel}`,
       tone: "good"
     };
   }
 
-  const detailLabel = `${selectedEventCount} edit / ${playingEventCount ?? "audible"} heard`;
+  const detailLabel = translate(locale, "compose.playbackEditHeard", {
+    edit: selectedEventCount,
+    heard: playingEventCount ?? translate(locale, "compose.playbackAudibleFallback")
+  });
   return {
     roleLabel,
     statusLabel,
@@ -10559,30 +10837,40 @@ export function createPatternPlaybackReadoutSummary(
 export function createArrangementPlaybackReadoutSummary(
   project: ProjectState,
   selectedIndex: number,
-  playingIndex: number | null
+  playingIndex: number | null,
+  locale: AppLocale = "en"
 ): ArrangementPlaybackReadoutSummary {
   const boundedSelectedIndex = Math.min(Math.max(0, selectedIndex), project.arrangement.length - 1);
   const selectedBlock = project.arrangement[boundedSelectedIndex];
   if (!selectedBlock) {
     return {
-      roleLabel: "No block",
-      statusLabel: "Arrangement idle",
-      detailLabel: "Create a block",
-      detailTitle: "Arrangement has no block selected or available for playback context.",
+      roleLabel: translate(locale, "arrange.playbackNoBlock"),
+      statusLabel: translate(locale, "arrange.playbackIdle"),
+      detailLabel: translate(locale, "arrange.playbackCreateBlock"),
+      detailTitle: translate(locale, "arrange.playbackNoBlockTitle"),
       tone: "danger"
     };
   }
 
-  const selectedLabel = `Block ${boundedSelectedIndex + 1} ${selectedBlock.section}`;
-  const roleLabel = `Editing ${selectedLabel}`;
-  const selectedDetail = `Pattern ${selectedBlock.pattern} / ${barCountLabel(selectedBlock.bars)}`;
+  const selectedLabel = translate(locale, "arrange.playbackBlock", {
+    block: boundedSelectedIndex + 1,
+    section: selectedBlock.section
+  });
+  const roleLabel = translate(locale, "arrange.playbackEditing", { block: selectedLabel });
+  const selectedBars = normalizeArrangementBars(selectedBlock.bars);
+  const selectedDetail = translate(locale, "arrange.playbackDetail", {
+    pattern: selectedBlock.pattern,
+    bars: translate(locale, selectedBars === 1 ? "arrange.helper.oneBar" : "arrange.helper.barCount", {
+      count: selectedBars
+    })
+  });
 
   if (playingIndex === null) {
     return {
       roleLabel,
-      statusLabel: "Arrangement idle",
+      statusLabel: translate(locale, "arrange.playbackIdle"),
       detailLabel: selectedDetail,
-      detailTitle: `${roleLabel} / playback stopped / ${selectedDetail}`,
+      detailTitle: translate(locale, "arrange.playbackStoppedTitle", { role: roleLabel, detail: selectedDetail }),
       tone: "warn"
     };
   }
@@ -10592,26 +10880,33 @@ export function createArrangementPlaybackReadoutSummary(
   if (!playingBlock) {
     return {
       roleLabel,
-      statusLabel: "Hearing Arrangement",
+      statusLabel: translate(locale, "arrange.playbackHearingArrangement"),
       detailLabel: selectedDetail,
-      detailTitle: `${roleLabel} / arrangement playback snapshot has no matching block / ${selectedDetail}`,
+      detailTitle: translate(locale, "arrange.playbackMissingSnapshotTitle", { role: roleLabel, detail: selectedDetail }),
       tone: "warn"
     };
   }
 
-  const playingLabel = `Block ${boundedPlayingIndex + 1} ${playingBlock.section}`;
-  const statusLabel = `Hearing ${playingLabel}`;
+  const playingLabel = translate(locale, "arrange.playbackBlock", {
+    block: boundedPlayingIndex + 1,
+    section: playingBlock.section
+  });
+  const statusLabel = translate(locale, "arrange.playbackHearing", { block: playingLabel });
   if (boundedPlayingIndex === boundedSelectedIndex) {
+    const detailLabel = translate(locale, "arrange.playbackLive", { detail: selectedDetail });
     return {
       roleLabel,
       statusLabel,
-      detailLabel: `${selectedDetail} live`,
-      detailTitle: `${roleLabel} / ${statusLabel} / ${selectedDetail} live`,
+      detailLabel,
+      detailTitle: `${roleLabel} / ${statusLabel} / ${detailLabel}`,
       tone: "good"
     };
   }
 
-  const detailLabel = `Pattern ${selectedBlock.pattern} edit / Pattern ${playingBlock.pattern} heard`;
+  const detailLabel = translate(locale, "arrange.playbackEditHeard", {
+    edit: selectedBlock.pattern,
+    heard: playingBlock.pattern
+  });
   return {
     roleLabel,
     statusLabel,
@@ -10638,20 +10933,30 @@ export function createEditHistoryReadoutSummary(
   redoDepth: number,
   projectStatus: string,
   nextUndoLabel: string | null,
-  nextRedoLabel: string | null
+  nextRedoLabel: string | null,
+  locale: AppLocale = "en"
 ): EditHistoryReadoutSummary {
-  const statusLabel = `${undoDepth} undo / ${redoDepth} redo`;
-  const statusDetail = projectStatus.trim() || "Project ready";
-  const undoDetail = nextUndoLabel ? `Undo: ${nextUndoLabel}` : null;
-  const redoDetail = nextRedoLabel ? `Redo: ${nextRedoLabel}` : null;
+  const statusLabel = translate(locale, "history.depth", { undo: undoDepth, redo: redoDepth });
+  const statusDetail =
+    locale === "en" ? projectStatus.trim() || translate(locale, "history.projectReady") : translate(locale, "history.projectReady");
+  const undoDetail = nextUndoLabel
+    ? locale === "en"
+      ? translate(locale, "history.undoAction", { label: nextUndoLabel })
+      : translate(locale, "history.undoGeneric")
+    : null;
+  const redoDetail = nextRedoLabel
+    ? locale === "en"
+      ? translate(locale, "history.redoAction", { label: nextRedoLabel })
+      : translate(locale, "history.redoGeneric")
+    : null;
   const actionDetail = [undoDetail, redoDetail].filter(Boolean).join(" / ");
 
   if (redoDepth > 0) {
     return {
-      roleLabel: "Redo window",
+      roleLabel: translate(locale, "history.redoWindow"),
       statusLabel,
-      detailLabel: actionDetail || `${redoDepth} redo ready`,
-      detailTitle: `${statusLabel} / ${actionDetail || "Redo ready"} / ${statusDetail}`,
+      detailLabel: actionDetail || translate(locale, "history.redoReady", { count: redoDepth }),
+      detailTitle: `${statusLabel} / ${actionDetail || translate(locale, "history.redoReadyTitle")} / ${statusDetail}`,
       nextUndoLabel,
       nextRedoLabel,
       tone: "good"
@@ -10660,10 +10965,10 @@ export function createEditHistoryReadoutSummary(
 
   if (undoDepth > 0) {
     return {
-      roleLabel: "Undo ready",
+      roleLabel: translate(locale, "history.undoReady"),
       statusLabel,
-      detailLabel: undoDetail ?? `${undoDepth} ${undoDepth === 1 ? "edit" : "edits"} backed up`,
-      detailTitle: `${statusLabel} / ${undoDetail ?? "Undo ready"} / ${statusDetail}`,
+      detailLabel: undoDetail ?? translate(locale, "history.editsBackedUp", { count: undoDepth }),
+      detailTitle: `${statusLabel} / ${undoDetail ?? translate(locale, "history.undoReady")} / ${statusDetail}`,
       nextUndoLabel,
       nextRedoLabel,
       tone: "good"
@@ -10671,9 +10976,9 @@ export function createEditHistoryReadoutSummary(
   }
 
   return {
-    roleLabel: "Clean slate",
+    roleLabel: translate(locale, "history.cleanSlate"),
     statusLabel,
-    detailLabel: "No edit history",
+    detailLabel: translate(locale, "history.noHistory"),
     detailTitle: `${statusLabel} / ${statusDetail}`,
     nextUndoLabel,
     nextRedoLabel,
@@ -11400,51 +11705,61 @@ export function createReviewQueueSummary(
 
 export function createWorkflowNavigatorJumpResult(
   item: WorkflowNavigatorItem,
-  items: WorkflowNavigatorItem[]
+  items: WorkflowNavigatorItem[],
+  locale: AppLocale = "en"
 ): WorkflowNavigatorJumpResult {
+  const localizedItem = localizeWorkflowNavigatorItem(locale, item);
   return {
     zoneId: item.id,
-    status: "Jumped",
-    title: `${item.label} zone ready`,
-    detail: `${item.value} / ${item.detail}`,
-    metricLabel: "Workflow",
-    metricValue: workflowNavigatorJumpMetricValue(items),
-    auditionCue: workflowNavigatorJumpAuditionCue(item),
-    nextCheck: workflowNavigatorJumpNextCheck(item),
+    status: translate(locale, "nav.workflowJumped"),
+    title: translate(locale, "nav.workflowZoneReady", { label: localizedItem.label }),
+    detail: `${localizedItem.value} / ${localizedItem.detail}`,
+    metricLabel: translate(locale, "nav.workflowMetric"),
+    metricValue: workflowNavigatorJumpMetricValue(items, locale),
+    auditionCue: workflowNavigatorJumpAuditionCue(item, locale),
+    nextCheck: workflowNavigatorJumpNextCheck(item, locale),
     tone: item.tone
   };
 }
 
-export function workflowNavigatorJumpMetricValue(items: WorkflowNavigatorItem[]): string {
+export function workflowNavigatorJumpMetricValue(items: WorkflowNavigatorItem[], locale: AppLocale = "en"): string {
   const readyCount = items.filter((item) => item.tone === "good").length;
   const reviewCount = items.filter((item) => item.tone === "warn").length;
   const blockerCount = items.filter((item) => item.tone === "danger").length;
+  if (locale === "ko") {
+    return translate(locale, "nav.workflowMetricCount", {
+      ready: readyCount,
+      total: items.length,
+      review: reviewCount,
+      blocker: blockerCount
+    });
+  }
   return `${readyCount}/${items.length} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
 }
 
-export function workflowNavigatorJumpAuditionCue(item: WorkflowNavigatorItem): string {
+export function workflowNavigatorJumpAuditionCue(item: WorkflowNavigatorItem, locale: AppLocale = "en"): string {
   switch (item.id) {
     case "compose":
-      return "Use Pattern loop audition while editing drums, 808/bass, chords, or melody.";
+      return translate(locale, "nav.workflowAuditionCompose");
     case "arrange":
-      return "Use Song or Block loop audition to check section order, energy, and Pattern A/B/C placement.";
+      return translate(locale, "nav.workflowAuditionArrange");
     case "mix":
-      return "Use Stem Audition and Mix Coach before choosing any explicit mix or master move.";
+      return translate(locale, "nav.workflowAuditionMix");
     case "deliver":
-      return "Use Export Preflight and Handoff Pack before explicit WAV, stems, MIDI, or sheet export.";
+      return translate(locale, "nav.workflowAuditionDeliver");
   }
 }
 
-export function workflowNavigatorJumpNextCheck(item: WorkflowNavigatorItem): string {
+export function workflowNavigatorJumpNextCheck(item: WorkflowNavigatorItem, locale: AppLocale = "en"): string {
   switch (item.id) {
     case "compose":
-      return "Return to Workflow Navigator after the core musical layers are ready.";
+      return translate(locale, "nav.workflowNextCompose");
     case "arrange":
-      return "Return after the hook, contrast, and target bar length are clear.";
+      return translate(locale, "nav.workflowNextArrange");
     case "mix":
-      return "Return after headroom, stem balance, low end, and master posture are ready.";
+      return translate(locale, "nav.workflowNextMix");
     case "deliver":
-      return "Return after exports and handoff context are ready for the selected target.";
+      return translate(locale, "nav.workflowNextDeliver");
   }
 }
 
@@ -12746,6 +13061,7 @@ export function reviewToneRank(tone: MixCoachTone): number {
 
 export function createHandoffPackItems({
   analysis,
+  locale = "en",
   project,
   stemAnalyses,
   onExportHandoffSheet,
@@ -12755,6 +13071,7 @@ export function createHandoffPackItems({
   onExportWav
 }: {
   analysis: ExportAnalysis;
+  locale?: AppLocale;
   project: ProjectState;
   stemAnalyses: StemExportAnalyses;
   onExportHandoffSheet: () => void;
@@ -12773,14 +13090,28 @@ export function createHandoffPackItems({
   const midiTone: MixCoachTone = bars >= 8 ? "good" : bars >= 4 ? "warn" : "danger";
   const sheetTone: MixCoachTone = briefFields >= 2 ? "good" : briefFields >= 1 ? "warn" : "danger";
   const bundleTone = weakestTone([exportTone, stemTone, midiTone, sheetTone]);
-  const audibleStemLabel = audibleStems.length > 0 ? audibleStems.map(stemTrackLabel).join("/") : "No audible stems";
+  const audibleStemLabel =
+    audibleStems.length > 0
+      ? audibleStems.map(stemTrackLabel).join("/")
+      : translate(locale, "handoff.cardNoAudibleStems");
+  const barLabel = translate(locale, bars === 1 ? "arrange.helper.oneBar" : "arrange.helper.barCount", { count: bars });
+  const analysisStatus = translate(
+    locale,
+    analysis.status === "Ready"
+      ? "master.analysisReady"
+      : analysis.status === "Hot"
+        ? "master.analysisHot"
+        : analysis.status === "Limiter active"
+          ? "master.analysisLimiter"
+          : "master.analysisSilent"
+  );
 
   return [
     {
       id: "wav",
       label: "Mix WAV",
-      value: analysis.status,
-      detail: `${barCountLabel(bars)} / ${formatDb(analysis.peakDb)} peak`,
+      value: analysisStatus,
+      detail: translate(locale, "handoff.cardPeak", { bars: barLabel, peak: formatDb(analysis.peakDb) }),
       tone: exportTone,
       buttonLabel: "WAV",
       run: onExportWav
@@ -12797,8 +13128,10 @@ export function createHandoffPackItems({
     {
       id: "midi",
       label: "Arrangement MIDI",
-      value: barCountLabel(bars),
-      detail: `Pattern ${usedPatternSlots(project).join("/") || project.selectedPattern} handoff`,
+      value: barLabel,
+      detail: translate(locale, "handoff.cardPattern", {
+        patterns: usedPatternSlots(project).join("/") || project.selectedPattern
+      }),
       tone: midiTone,
       buttonLabel: "MIDI",
       run: onExportMidi
@@ -12806,7 +13139,7 @@ export function createHandoffPackItems({
     {
       id: "sheet",
       label: "Handoff Sheet",
-      value: `${briefFields}/4 brief`,
+      value: translate(locale, "handoff.cardBrief", { count: briefFields }),
       detail: `${target.name} / ${handoffSheetFileName(project)}`,
       tone: sheetTone,
       buttonLabel: "Sheet",
@@ -12815,8 +13148,11 @@ export function createHandoffPackItems({
     {
       id: "bundle",
       label: "Delivery Bundle",
-      value: bundleTone === "good" ? "Ready" : bundleTone === "warn" ? "Review" : "Blocked",
-      detail: `${deliveryBundleZipFileName(project)} / project, mix, stems, MIDI, sheet, manifest`,
+      value: translate(
+        locale,
+        bundleTone === "good" ? "handoff.cardReady" : bundleTone === "warn" ? "handoff.cardReview" : "handoff.cardBlocked"
+      ),
+      detail: translate(locale, "handoff.cardBundleDetail", { file: deliveryBundleZipFileName(project) }),
       tone: bundleTone,
       buttonLabel: "Bundle",
       run: onExportDeliveryBundle ?? (() => undefined)
@@ -12828,22 +13164,48 @@ export function createHandoffPackRouteSummary(
   project: ProjectState,
   stemAnalyses: StemExportAnalyses,
   items: HandoffPackItem[],
-  tone: MixCoachTone
+  tone: MixCoachTone,
+  locale: AppLocale = "en"
 ): HandoffPackRouteSummary {
   const target = activeDeliveryTarget(project);
   const audibleStems = audibleStemTracks(stemAnalyses);
-  const briefStatus = sessionBriefStatus(project.sessionBrief);
   const briefFields = sessionBriefFilledFields(project.sessionBrief);
   const readyCount = items.filter((item) => item.tone === "good").length;
-  const openItems = items.filter((item) => item.tone !== "good").map((item) => item.label);
-  const openTitle = openItems.length === 0 ? "all deliverables clear" : `review ${openItems.join("/")}`;
+  const itemLabelKeys: Record<HandoffPackItem["id"], Parameters<typeof translate>[1]> = {
+    wav: "handoff.mixWav",
+    stems: "handoff.stemWavs",
+    midi: "handoff.arrangementMidi",
+    sheet: "handoff.sheet",
+    bundle: "handoff.bundle"
+  };
+  const openItems = items
+    .filter((item) => item.tone !== "good")
+    .map((item) => translate(locale, itemLabelKeys[item.id]));
+  const openTitle =
+    openItems.length === 0
+      ? translate(locale, "handoff.routeAllClear")
+      : translate(locale, "handoff.routeReview", { items: openItems.join("/") });
+  const routeLabel = translate(locale, "handoff.routeLabel", { target: target.name });
+  const statusLabel = translate(locale, "handoff.routeReady", { ready: readyCount, total: items.length });
+  const detailLabel = translate(locale, "handoff.routeContext", {
+    stems: audibleStems.length,
+    goal: target.stemGoal,
+    brief: briefFields
+  });
+  const fileLabel = handoffSheetFileName(project);
 
   return {
-    routeLabel: `${target.name} handoff`,
-    statusLabel: `${readyCount}/${items.length} ready`,
-    detailLabel: `${audibleStems.length}/${target.stemGoal} stems / ${briefFields}/4 brief`,
-    fileLabel: handoffSheetFileName(project),
-    detailTitle: `${target.name} handoff / ${readyCount}/${items.length} ready / ${audibleStems.length}/${target.stemGoal} target stems / ${briefStatus.detail} / ${openTitle} / ${handoffSheetFileName(project)}`,
+    routeLabel,
+    statusLabel,
+    detailLabel,
+    fileLabel,
+    detailTitle: translate(locale, "handoff.routeTitle", {
+      route: routeLabel,
+      ready: statusLabel,
+      context: detailLabel,
+      review: openTitle,
+      file: fileLabel
+    }),
     tone
   };
 }

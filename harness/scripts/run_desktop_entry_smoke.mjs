@@ -9,6 +9,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { runInNewContext } from "node:vm";
 import { isMacAppKitAbort, isMacDyldFrameworkAbort, macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -94,6 +95,10 @@ function checkBuiltArtifacts() {
   check(
     existsSync(path.join(root, "dist-electron/updateFeedConfig.js")),
     "dist-electron/updateFeedConfig.js is missing; run npm run build before desktop smoke"
+  );
+  check(
+    existsSync(path.join(root, "dist-electron/nativeDialogOptions.js")),
+    "dist-electron/nativeDialogOptions.js is missing; run npm run build before desktop smoke"
   );
   check(
     existsSync(path.join(root, "dist-electron/preload.cjs")),
@@ -502,6 +507,8 @@ function checkDesktopGuiLaunchGuardContract() {
 function checkElectronMainContract() {
   const appSource = readText("src/ui/App.tsx");
   const source = readText("electron/main.ts");
+  const nativeDialogOptionsSource = readText("electron/nativeDialogOptions.ts");
+  const nativeDialogOptionsBuilt = readText("dist-electron/nativeDialogOptions.js");
   const updateFeedConfigSource = readText("electron/updateFeedConfig.ts");
   const updateFeedConfigBuilt = readText("dist-electron/updateFeedConfig.js");
   const built = readText("dist-electron/main.js");
@@ -553,6 +560,18 @@ function checkElectronMainContract() {
     source,
     "function collectLaunchSmokePaletteEvidenceWithTimeout(",
     "async function waitForLaunchSmokeStarterZoneSurface(",
+    label
+  );
+  const saveProjectHandler = textBetween(
+    source,
+    'ipcMain.handle("grooveforge:save-project"',
+    'ipcMain.handle("grooveforge:open-project"',
+    label
+  );
+  const openProjectHandler = textBetween(
+    source,
+    'ipcMain.handle("grooveforge:open-project"',
+    'ipcMain.handle("grooveforge:save-project-recovery"',
     label
   );
   const launchSmokeAudienceStarterNativeCollector = textBetween(
@@ -852,10 +871,46 @@ function checkElectronMainContract() {
   checkIncludes(source, '!isCloseFlowSmoke && BrowserWindow.getAllWindows().length === 0', label);
   checkIncludes(source, 'process.platform !== "darwin" || isManualQa', label);
   checkIncludes(source, "Menu.setApplicationMenu(createNativeCommandMenu())", label);
+  checkIncludes(source, 'const localeChannel = "grooveforge:set-locale"', label);
+  checkIncludes(source, "nativeMenuLabels", label);
+  checkIncludes(source, 'ipcMain.on(localeChannel', label);
+  checkIncludes(source, 'locale !== "en" && locale !== "ko"', label);
   checkIncludes(source, "createWindow();", label);
   checkIncludes(source, "autoUpdater", label);
   checkIncludes(source, "resolveUpdateFeedConfig", label);
-  checkIncludes(source, 'label: "Check for Updates..."', label);
+  checkIncludes(source, 'checkUpdates: "Check for Updates..."', label);
+  checkIncludes(source, 'checkUpdates: "업데이트 확인..."', label);
+  checkIncludes(source, 'from "./nativeDialogOptions.js"', label);
+  checkIncludes(
+    saveProjectHandler,
+    "createNativeSaveProjectDialogOptions(\n      nativeMenuLocale,\n      workspace.projects,\n      payload.defaultName\n    )",
+    `${label} native Save dialog callsite`
+  );
+  checkIncludes(saveProjectHandler, "dialog.showSaveDialog(browserWindow, options)", `${label} native Save dialog callsite`);
+  checkIncludes(saveProjectHandler, "dialog.showSaveDialog(options)", `${label} native Save dialog callsite`);
+  checkIncludes(
+    openProjectHandler,
+    "createNativeOpenProjectDialogOptions(nativeMenuLocale, workspace.projects)",
+    `${label} native Open dialog callsite`
+  );
+  checkIncludes(openProjectHandler, "dialog.showOpenDialog(browserWindow, options)", `${label} native Open dialog callsite`);
+  checkIncludes(openProjectHandler, "dialog.showOpenDialog(options)", `${label} native Open dialog callsite`);
+  checkIncludes(
+    source,
+    "dialog.showMessageBoxSync(win, createNativeUnsavedCloseDialogOptions(nativeMenuLocale))",
+    `${label} native unsaved-close dialog callsite`
+  );
+  for (const factoryName of [
+    "createNativeSaveProjectDialogOptions",
+    "createNativeOpenProjectDialogOptions",
+    "createNativeUnsavedCloseDialogOptions"
+  ]) {
+    checkIncludes(nativeDialogOptionsSource, `export function ${factoryName}`, "electron/nativeDialogOptions.ts");
+    checkIncludes(nativeDialogOptionsBuilt, `function ${factoryName}`, "dist-electron/nativeDialogOptions.js");
+  }
+  checkIncludes(nativeDialogOptionsSource, 'saveProjectTitle: "GrooveForge 프로젝트 저장"', "electron/nativeDialogOptions.ts");
+  checkIncludes(nativeDialogOptionsSource, 'openProjectTitle: "GrooveForge 프로젝트 열기"', "electron/nativeDialogOptions.ts");
+  checkIncludes(nativeDialogOptionsSource, 'unsavedTitle: "저장되지 않은 GrooveForge 작업"', "electron/nativeDialogOptions.ts");
   checkIncludes(source, "GROOVEFORGE_UPDATE_FEED_URL", label);
   checkIncludes(source, "GROOVEFORGE_UPDATE_CHANNEL", label);
   checkIncludes(source, "autoUpdater.setFeedURL", label);
@@ -870,9 +925,9 @@ function checkElectronMainContract() {
   checkIncludes(updateFeedConfigSource, "Update release channel must use 1-32 lowercase letters", "electron/updateFeedConfig.ts");
   checkIncludes(updateFeedConfigBuilt, "updateFeedUrlKeys", "dist-electron/updateFeedConfig.js");
   checkIncludes(updateFeedConfigBuilt, "redactUpdateFeedConfig", "dist-electron/updateFeedConfig.js");
-  checkIncludes(source, 'label: "GrooveForge Local Workstation"', label);
-  checkIncludes(source, 'filters: projectFilters', label);
-  checkIncludes(source, 'properties: ["openFile"]', label);
+  checkIncludes(source, 'localWorkstation: "GrooveForge Local Workstation"', label);
+  checkIncludes(nativeDialogOptionsSource, "filters: localizedProjectFilters(locale)", "electron/nativeDialogOptions.ts");
+  checkIncludes(nativeDialogOptionsSource, 'properties: ["openFile"]', "electron/nativeDialogOptions.ts");
   check(
     !functionalTabsCollector.includes("rmSync(evidenceDirectory"),
     "electron/main.ts functional-tab evidence collector should never recursively delete a configured evidence directory"
@@ -881,6 +936,11 @@ function checkElectronMainContract() {
   checkIncludes(functionalTabsCollector, 'activateNativeMenuCommandForSmoke(win, "delete-selected-event")', `${label} functional-tab native menu guard`);
   checkIncludes(functionalTabsCollector, 'activateNativeMenuCommandForSmoke(win, "quick-actions")', `${label} functional-tab Quick Actions reveal`);
   checkIncludes(functionalTabsCollector, '"quick-action-finish-checklist-route-readout-action"', `${label} functional-tab Finish Checklist route`);
+  checkIncludes(functionalTabsCollector, '"quick-action-arrangement-mute-map-readout-action"', `${label} functional-tab Mute Map cold route`);
+  checkIncludes(functionalTabsCollector, '"arrangement-mute-map-priority-run"', `${label} functional-tab Mute Map native priority action`);
+  checkIncludes(functionalTabsCollector, "priorityResultLaneMatched", `${label} functional-tab Mute Map result transition evidence`);
+  checkIncludes(functionalTabsCollector, "historyDepthPreserved", `${label} functional-tab Mute Map history isolation`);
+  checkIncludes(functionalTabsCollector, "projectDataFingerprint", `${label} functional-tab full project isolation`);
   checkIncludes(functionalTabsCollector, 'await sendLaunchSmokeFunctionalTabNativeKey(win, "K", commandModifier)', `${label} functional-tab native Quick Actions shortcut`);
   checkIncludes(functionalTabsCollector, 'await win.webContents.insertText("beat passport route")', `${label} functional-tab Guide route native search`);
   checkIncludes(functionalTabsCollector, '"quick-action-beat-passport-route-readout-action"', `${label} functional-tab Guide route target`);
@@ -1229,6 +1289,15 @@ function checkElectronMainContract() {
     "dockRestoredPlaybackPosture.playbackScope === dockPlayOriginal.playbackScope",
     `${label} workspace dock original playback scope restoration`
   );
+  checkIncludes(launchSmokeModalFocusCollector, 'sendClick("settings-language-en")', `${label} Settings English native click`);
+  checkIncludes(launchSmokeModalFocusCollector, 'sendClick("settings-language-ko")', `${label} Settings Korean native click`);
+  checkIncludes(launchSmokeModalFocusCollector, "historyDepthPosture", `${label} Settings locale-neutral history-depth isolation`);
+  checkIncludes(source, "allowLaunchSmokeRendererReload", `${label} scoped Settings reload guard`);
+  checkIncludes(
+    source,
+    "isLaunchSmoke && allowLaunchSmokeRendererReload",
+    `${label} scoped Settings beforeunload bypass`
+  );
   checkIncludes(source, "Menu.getApplicationMenu()?.getMenuItemById", `${label} native menu smoke activation`);
   checkIncludes(source, "menuItem.click({}, win, win.webContents)", `${label} native menu smoke activation`);
   checkIncludes(source, "480000", `${label} functional-tab screen timeout`);
@@ -1271,6 +1340,9 @@ function checkPreloadContract() {
   checkIncludes(source, 'manualQa: process.env.GROOVEFORGE_DESKTOP_MANUAL_QA === "1"', label);
   checkIncludes(source, 'ipcRenderer.invoke("grooveforge:save-project"', label);
   checkIncludes(source, 'ipcRenderer.send("grooveforge:close-window")', label);
+  checkIncludes(source, 'setLocale: (locale: "en" | "ko")', label);
+  checkIncludes(source, 'if (locale === "en" || locale === "ko")', label);
+  checkIncludes(source, 'ipcRenderer.send("grooveforge:set-locale", locale)', label);
   checkIncludes(source, 'ipcRenderer.invoke("grooveforge:open-project")', label);
   checkIncludes(source, 'ipcRenderer.on("grooveforge:menu-command"', label);
   checkIncludes(source, "isNativeMenuCommand(command)", label);
@@ -1285,8 +1357,88 @@ function checkPreloadContract() {
   checkIncludes(built, "GROOVEFORGE_DESKTOP_MANUAL_QA", "dist-electron/preload.cjs");
   checkIncludes(built, "grooveforge:save-project", "dist-electron/preload.cjs");
   checkIncludes(built, "grooveforge:close-window", "dist-electron/preload.cjs");
+  checkIncludes(built, "grooveforge:set-locale", "dist-electron/preload.cjs");
   checkIncludes(built, "grooveforge:open-project", "dist-electron/preload.cjs");
   checkIncludes(built, "grooveforge:menu-command", "dist-electron/preload.cjs");
+
+  const sent = [];
+  const menuListeners = [];
+  const removedMenuListeners = [];
+  let exposedApi = null;
+  const preloadModule = { exports: {} };
+  try {
+    runInNewContext(
+      built,
+      {
+        exports: preloadModule.exports,
+        module: preloadModule,
+        process: { env: {}, platform: "darwin" },
+        require(specifier) {
+          if (specifier !== "electron") {
+            throw new Error(`Unexpected preload dependency: ${specifier}`);
+          }
+          return {
+            contextBridge: {
+              exposeInMainWorld(name, api) {
+                if (name === "grooveforge") {
+                  exposedApi = api;
+                }
+              }
+            },
+            ipcRenderer: {
+              invoke() {
+                return Promise.resolve({});
+              },
+              on(channel, listener) {
+                menuListeners.push({ channel, listener });
+              },
+              removeListener(channel, listener) {
+                removedMenuListeners.push({ channel, listener });
+              },
+              send(channel, payload) {
+                sent.push({ channel, payload });
+              }
+            }
+          };
+        }
+      },
+      { filename: "dist-electron/preload.cjs" }
+    );
+  } catch (error) {
+    failures.push(
+      `dist-electron/preload.cjs should execute against a bounded Electron mock: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  if (exposedApi) {
+    exposedApi.setLocale("ko");
+    exposedApi.setLocale("en");
+    exposedApi.setLocale("fr");
+    exposedApi.setLocale(null);
+    const localeSends = sent.filter(({ channel }) => channel === "grooveforge:set-locale");
+    check(
+      JSON.stringify(localeSends) ===
+        JSON.stringify([
+          { channel: "grooveforge:set-locale", payload: "ko" },
+          { channel: "grooveforge:set-locale", payload: "en" }
+        ]),
+      "built preload should send only runtime-valid English and Korean locale values"
+    );
+    const menuCommands = [];
+    const removeMenuListener = exposedApi.onMenuCommand((command) => menuCommands.push(command));
+    const menuListener = menuListeners.find(({ channel }) => channel === "grooveforge:menu-command")?.listener;
+    menuListener?.({}, "undo");
+    menuListener?.({}, "not-a-command");
+    removeMenuListener();
+    check(
+      menuCommands.join(",") === "undo" &&
+        removedMenuListeners.some(
+          ({ channel, listener }) => channel === "grooveforge:menu-command" && listener === menuListener
+        ),
+      "built preload should deliver only allowed native menu commands and unregister the exact listener"
+    );
+  } else {
+    failures.push("dist-electron/preload.cjs should expose the GrooveForge API at runtime");
+  }
 }
 
 function checkRendererNativeMenuContract() {
@@ -1303,6 +1455,7 @@ function checkRendererNativeMenuContract() {
 
   checkIncludes(declarations, "type NativeMenuCommand =", typeLabel);
   checkIncludes(declarations, "manualQa?: boolean;", typeLabel);
+  checkIncludes(declarations, 'setLocale?: (locale: "en" | "ko") => void;', typeLabel);
   checkIncludes(declarations, "onMenuCommand?: (callback: (command: NativeMenuCommand) => void) => () => void;", typeLabel);
   checkIncludes(appSource, "window.grooveforge?.onMenuCommand?.(handleNativeMenuCommand)", appLabel);
 

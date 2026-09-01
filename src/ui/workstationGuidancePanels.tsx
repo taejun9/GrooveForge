@@ -17,6 +17,12 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement, type Ref } from "react";
 import type { AudienceStarterProjectId, ProjectState } from "../domain/workstation";
+import {
+  localizeWorkflowNavigatorItem,
+  translate,
+  useLocalization,
+  type AppLocale
+} from "./localization";
 import type {
   BeatReadinessCheck,
   FirstBeatPathStepId,
@@ -659,28 +665,38 @@ export function createModeSwitchResult(
   modeFocus: ModeFocusSummary,
   sessionPass: SessionPassSummary,
   firstBeatPath: FirstBeatPathSummary,
-  changed: boolean
+  changed: boolean,
+  locale: AppLocale = "en"
 ): ModeSwitchResult {
-  const label = modeLabel(mode);
+  const label = translate(locale, mode === "guided" ? "mode.guided" : "mode.studio");
   const activePass = sessionPass.cards.find((card) => card.id === mode) ?? sessionPass.cards[0] ?? null;
   const resultTone = changed
     ? modeSwitchWeakestTone([modeFocus.tone, sessionPass.tone, firstBeatPath.tone, activePass?.tone ?? "good"])
     : "warn";
+  const localizedDetail = translate(locale, mode === "guided" ? "mode.resultGuidedDetail" : "mode.resultStudioDetail");
+  const localizedAudition = translate(
+    locale,
+    mode === "guided" ? "mode.resultGuidedAudition" : "mode.resultStudioAudition"
+  );
+  const localizedNextCheck = translate(
+    locale,
+    mode === "guided" ? "mode.resultGuidedNext" : "mode.resultStudioNext"
+  );
 
   return {
     mode,
-    title: `${label} mode ${changed ? "active" : "already active"}`,
-    status: changed ? "Switched" : "Held",
-    detail: modeSwitchDetail(mode, modeFocus, sessionPass, firstBeatPath),
+    title: translate(locale, changed ? "mode.resultActive" : "mode.resultAlreadyActive", { mode: label }),
+    status: translate(locale, changed ? "mode.resultSwitched" : "mode.resultHeld"),
+    detail: locale === "en" ? modeSwitchDetail(mode, modeFocus, sessionPass, firstBeatPath) : localizedDetail,
     metric: {
       id: "mode-switch",
-      label: "Mode",
-      before: modeLabel(beforeProject.mode),
-      after: modeLabel(afterProject.mode),
+      label: translate(locale, "mode.resultMetric"),
+      before: translate(locale, beforeProject.mode === "guided" ? "mode.guided" : "mode.studio"),
+      after: translate(locale, afterProject.mode === "guided" ? "mode.guided" : "mode.studio"),
       tone: changed ? "good" : "warn"
     },
-    auditionCue: modeSwitchAuditionCue(mode),
-    nextCheck: modeSwitchNextCheck(mode, modeFocus, sessionPass, firstBeatPath),
+    auditionCue: locale === "en" ? modeSwitchAuditionCue(mode) : localizedAudition,
+    nextCheck: locale === "en" ? modeSwitchNextCheck(mode, modeFocus, sessionPass, firstBeatPath) : localizedNextCheck,
     tone: resultTone
   };
 }
@@ -2544,6 +2560,7 @@ export function GuideQuickStart({
   onJumpWorkflowSpotlight: (item: WorkflowNavigatorItem) => void;
   onOpenGuideCenter?: () => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const nextStep =
     firstBeatPathSummary.steps.find((step) => step.id === firstBeatPathSummary.nextStepId) ??
     firstBeatPathSummary.steps[0] ??
@@ -2609,6 +2626,143 @@ export function GuideQuickStart({
     (completionBottleneckItem.id === "path" && !nextStep) ||
     (completionBottleneckItem.id === "session" && !sessionCard) ||
     (completionBottleneckItem.id === "workflow" && !workflowSpotlightItem);
+  const localizedToneState = (itemTone: MixCoachTone): string =>
+    t(
+      itemTone === "danger"
+        ? "guide.quickStart.stateBlocker"
+        : itemTone === "warn"
+          ? "guide.quickStart.stateReview"
+          : "guide.quickStart.stateReady"
+    );
+  const localizedSourceLabel = (source: GuideQuickStartDecision["source"]): string => {
+    switch (source) {
+      case "path":
+        return t("guide.quickStart.sourcePath");
+      case "session":
+        return t("guide.quickStart.sourceSession");
+      case "workflow":
+        return t("guide.quickStart.sourceWorkflow");
+    }
+  };
+  const localizedStepLabel = (step: FirstBeatPathStep | null): string => {
+    switch (step?.id) {
+      case "setup":
+        return t("guide.quickStart.stepSetup");
+      case "compose":
+        return t("nav.compose");
+      case "arrange":
+        return t("nav.arrange");
+      case "mix":
+        return t("nav.mix");
+      case "deliver":
+        return t("nav.deliver");
+      default:
+        return t("guide.quickStart.sourcePath");
+    }
+  };
+  const localizedSessionLabel = (card: SessionPassCard | null): string => {
+    switch (card?.id) {
+      case "guided":
+        return t("guide.quickStart.guidedPass");
+      case "studio":
+        return t("guide.quickStart.studioPass");
+      case "finish":
+        return t("guide.quickStart.finishPass");
+      case "deliver":
+        return t("guide.quickStart.deliveryPass");
+      default:
+        return t("guide.quickStart.sourceSession");
+    }
+  };
+  const localizedWorkflowLabel = (item: WorkflowNavigatorItem | null): string => {
+    switch (item?.id) {
+      case "compose":
+        return t("nav.compose");
+      case "arrange":
+        return t("nav.arrange");
+      case "mix":
+        return t("nav.mix");
+      case "deliver":
+        return t("nav.deliver");
+      default:
+        return t("guide.quickStart.sourceWorkflow");
+    }
+  };
+  const localizedReadinessCount = (tones: MixCoachTone[]): string =>
+    t("guide.quickStart.readinessCount", {
+      ready: tones.filter((itemTone) => itemTone === "good").length,
+      total: tones.length,
+      review: tones.filter((itemTone) => itemTone === "warn").length,
+      blocker: tones.filter((itemTone) => itemTone === "danger").length
+    });
+  const pathCount = localizedReadinessCount(firstBeatPathSummary.steps.map((step) => step.tone));
+  const sessionCount = localizedReadinessCount(sessionPassSummary.cards.map((card) => card.tone));
+  const workflowCount = localizedReadinessCount(
+    workflowNavigatorItems.length > 0
+      ? workflowNavigatorItems.map((item) => item.tone)
+      : [workflowSpotlight.tone]
+  );
+  const decisionSourceLabel = localizedSourceLabel(decision.source);
+  const decisionTargetLabel =
+    decision.source === "path"
+      ? localizedStepLabel(nextStep)
+      : decision.source === "session"
+        ? localizedSessionLabel(sessionCard)
+        : localizedWorkflowLabel(workflowSpotlightItem);
+  const decisionLaneLabel =
+    decision.source === "path"
+      ? t("guide.quickStart.pathLane", { target: decisionTargetLabel })
+      : decision.source === "session"
+        ? t("guide.quickStart.sessionLane", { target: decisionTargetLabel })
+        : t("guide.quickStart.workflowLane", { target: decisionTargetLabel });
+  const decisionMetricLabel =
+    decision.source === "path" ? pathCount : decision.source === "session" ? sessionCount : workflowCount;
+  const decisionDetailLabel =
+    decision.source === "path"
+      ? t("guide.quickStart.pathDetail", { target: decisionTargetLabel })
+      : decision.source === "session"
+        ? t("guide.quickStart.sessionDetail", { target: decisionTargetLabel })
+        : t("guide.quickStart.workflowDetail", { target: decisionTargetLabel });
+  const decisionAuditionLabel =
+    decision.source === "path"
+      ? t("guide.quickStart.pathAudition")
+      : decision.source === "session"
+        ? t("guide.quickStart.sessionAudition")
+        : t("guide.quickStart.workflowAudition");
+  const decisionNextLabel =
+    decision.source === "path"
+      ? t("guide.quickStart.pathNext")
+      : decision.source === "session"
+        ? t("guide.quickStart.sessionNext")
+        : t("guide.quickStart.workflowNext");
+  const localizedPathStatus = t("guide.quickStart.pathStatus", {
+    state: localizedToneState(firstBeatPathSummary.tone)
+  });
+  const localizedDecisionStatus = t("guide.quickStart.decisionStatus", {
+    source: decisionSourceLabel,
+    state: localizedToneState(decision.tone)
+  });
+  const localizedDecisionTitle = t("guide.quickStart.decisionTitle", {
+    source: decisionSourceLabel,
+    detail: decisionDetailLabel
+  });
+  const localizedSummaryDetail = t("guide.quickStart.summaryDetail", {
+    path: pathCount,
+    session: sessionCount,
+    workflow: workflowCount
+  });
+  const localizedSectionTitle = t("guide.quickStart.sectionTitle", {
+    status: localizedPathStatus,
+    lane: decisionLaneLabel,
+    detail: decisionDetailLabel
+  });
+  const localizedCompletionScore = t("guide.quickStart.completionScore", { percent: completionScore.percent });
+  const localizedCompletionBottleneck = completionBottleneckItem
+    ? t("guide.quickStart.bottleneck", {
+        source: localizedSourceLabel(completionBottleneckItem.id),
+        percent: completionBottleneckItem.percent
+      })
+    : t("guide.quickStart.bottleneckUnscored");
   const pathButtonContext = nextStep
     ? guideQuickStartButtonContext({
         source: "path",
@@ -2643,17 +2797,15 @@ export function GuideQuickStart({
       })
     : "No Workflow Spotlight target";
   const decisionActionContext = !decisionActionDisabled
-    ? guideQuickStartButtonContext({
-        source: decision.source,
-        nextStep,
-        sessionCard,
-        firstBeatPathSummary,
-        sessionPassSummary,
-        workflowSpotlight,
-        workflowSpotlightItem,
-        prefix: `Run ${guideQuickStartSourceLabel(decision.source)} decision`
+    ? t("guide.quickStart.runContext", {
+        prefix: t("guide.quickStart.runSource", { source: decisionSourceLabel }),
+        destination: decisionTargetLabel,
+        metric: decisionMetricLabel,
+        detail: decisionDetailLabel,
+        audition: decisionAuditionLabel,
+        next: decisionNextLabel
       })
-    : decision.title;
+    : t("guide.quickStart.noTarget", { source: decisionSourceLabel });
   const bottleneckActionContext =
     completionBottleneckItem && !bottleneckActionDisabled
       ? guideQuickStartButtonContext({
@@ -2736,30 +2888,28 @@ export function GuideQuickStart({
     <section
       className={`guide-quick-start ${tone}`}
       data-testid="guide-quick-start"
-      aria-label="Guide quick start"
-      title={`${firstBeatPathSummary.headline}: ${firstBeatPathSummary.detail}`}
+      aria-label={t("guide.quickStart.aria")}
+      title={localizedSectionTitle}
     >
       <div className="guide-quick-start-heading">
         <div>
           <ListChecks size={16} aria-hidden="true" />
-          <span data-testid="guide-quick-start-status">{firstBeatPathSummary.statusLabel}</span>
+          <span data-testid="guide-quick-start-status">{localizedPathStatus}</span>
         </div>
-        <strong data-testid="guide-quick-start-headline">Guide Quick Start</strong>
-        <small data-testid="guide-quick-start-detail">
-          {firstBeatPathSummary.countLabel} / {sessionPassSummary.headline} / {workflowSpotlight.countLabel}
-        </small>
+        <strong data-testid="guide-quick-start-headline">{t("guide.quickStart.headline")}</strong>
+        <small data-testid="guide-quick-start-detail">{localizedSummaryDetail}</small>
       </div>
       <div className="guide-quick-start-body">
         <div
           className={`guide-quick-start-decision ${decision.tone}`}
           data-guide-quick-start-decision={decision.source}
           data-testid="guide-quick-start-decision"
-          title={decision.title}
+          title={localizedDecisionTitle}
         >
-          <span data-testid="guide-quick-start-decision-status">{decision.statusLabel}</span>
-          <strong data-testid="guide-quick-start-decision-lane">{decision.laneLabel}</strong>
-          <small data-testid="guide-quick-start-decision-metric">{decision.metricLabel}</small>
-          <small data-testid="guide-quick-start-decision-detail">{decision.detailLabel}</small>
+          <span data-testid="guide-quick-start-decision-status">{localizedDecisionStatus}</span>
+          <strong data-testid="guide-quick-start-decision-lane">{decisionLaneLabel}</strong>
+          <small data-testid="guide-quick-start-decision-metric">{decisionMetricLabel}</small>
+          <small data-testid="guide-quick-start-decision-detail">{decisionDetailLabel}</small>
           <button
             aria-label={decisionActionContext}
             className="guide-quick-start-decision-action"
@@ -2771,17 +2921,20 @@ export function GuideQuickStart({
             type="button"
           >
             <ArrowRight size={13} aria-hidden="true" />
-            <span>Run {decision.source}</span>
+            <span>{t("guide.quickStart.runSource", { source: decisionSourceLabel })}</span>
           </button>
         </div>
         <details className="guide-quick-start-details" data-testid="guide-quick-start-details">
           <summary className="guide-quick-start-details-summary" data-testid="guide-quick-start-details-toggle">
             <span className="guide-quick-start-details-copy">
-              <strong>Progress &amp; routes</strong>
-              <small>Completion diagnostics, bottleneck, context, and alternate paths</small>
+              <strong>{t("guide.quickStart.progressTitle")}</strong>
+              <small>{t("guide.quickStart.progressDetail")}</small>
             </span>
             <span className="guide-quick-start-details-context">
-              {completionScore.scoreLabel} · {completionBottleneckLabel}
+              {t("guide.quickStart.progressContext", {
+                score: localizedCompletionScore,
+                bottleneck: localizedCompletionBottleneck
+              })}
             </span>
             <ArrowDown className="guide-quick-start-details-chevron" size={15} aria-hidden="true" />
           </summary>
@@ -3816,10 +3969,24 @@ export function WorkflowNavigator({
   sectionRef?: Ref<HTMLElement>;
   onJump: (item: WorkflowNavigatorItem) => void;
 }): ReactElement {
+  const { locale, t } = useLocalization();
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const tablistRef = useRef<HTMLDivElement | null>(null);
-  const spotlight = createWorkflowSpotlightSummary(items);
+  const spotlight = createLocalizedWorkflowSpotlightSummary(items, locale);
   const spotlightItem = spotlight.zoneId ? items.find((item) => item.id === spotlight.zoneId) ?? null : null;
+  const localizedSpotlightItem = spotlightItem ? localizeWorkflowNavigatorItem(locale, spotlightItem) : null;
+  const localizedTabLabels: Record<WorkflowZoneId, string> = {
+    compose: t("nav.compose"),
+    arrange: t("nav.arrange"),
+    mix: t("nav.mix"),
+    deliver: t("nav.deliver")
+  };
+  const localizedTabDetails: Record<WorkflowZoneId, string> = {
+    compose: t("nav.composeTabDetail"),
+    arrange: t("nav.arrangeTabDetail"),
+    mix: t("nav.mixTabDetail"),
+    deliver: t("nav.deliverTabDetail")
+  };
 
   useEffect(() => {
     const activeIndex = items.findIndex((item) => item.id === activeZone);
@@ -3880,7 +4047,7 @@ export function WorkflowNavigator({
   }
 
   return (
-    <nav className="workflow-navigator" data-testid="workflow-navigator" aria-label="Workflow navigator" ref={sectionRef}>
+    <nav className="workflow-navigator" data-testid="workflow-navigator" aria-label={t("nav.mainTabsAria")} ref={sectionRef}>
       <section
         className="workspace-tabs-surface"
         data-active-workspace-tab={activeZone}
@@ -3890,13 +4057,13 @@ export function WorkflowNavigator({
         <header className="workspace-tabs-heading">
           <div className="workspace-tabs-kicker">
             <SlidersHorizontal size={17} aria-hidden="true" />
-            <span>WORKSPACE TABS</span>
+            <span>{t("nav.mainTabs")}</span>
           </div>
-          <strong id="workspace-tabs-title">Choose a production stage</strong>
-          <small>Compose · Arrange · Mix · Deliver</small>
+          <strong id="workspace-tabs-title">{t("nav.mainTabsTitle")}</strong>
+          <small>{t("nav.mainTabsDetail")}</small>
         </header>
         <div
-          aria-label="Workstation function tabs"
+          aria-label={t("nav.mainTabsAria")}
           aria-orientation="horizontal"
           className="workflow-navigator-grid"
           ref={tablistRef}
@@ -3904,6 +4071,15 @@ export function WorkflowNavigator({
         >
           {items.map((item, index) => {
             const selected = item.id === activeZone;
+            const localizedLabel = localizedTabLabels[item.id];
+            const localizedValue =
+              locale === "ko"
+                ? item.value
+                    .replace(/^Pattern /u, "패턴 ")
+                    .replace(/^(\d+) bars?$/u, "$1마디")
+                    .replace(/^Ready$/u, "준비됨")
+                    .replace(/^Analyzing$/u, "분석 중")
+                : item.value;
             return (
               <button
                 aria-controls={`workspace-panel-${item.id}`}
@@ -3924,29 +4100,29 @@ export function WorkflowNavigator({
                 }}
                 role="tab"
                 tabIndex={selected ? 0 : -1}
-                title={`Jump to ${item.label}`}
+                title={t("nav.jumpTo", { label: localizedLabel })}
                 type="button"
               >
                 {workflowNavigatorIcon(item.id)}
-                <span className="workflow-tab-label">{item.label}</span>
+                <span className="workflow-tab-label">{localizedLabel}</span>
                 <span className="workflow-tab-status" aria-hidden="true">
-                  {selected ? "ACTIVE" : String(index + 1).padStart(2, "0")}
+                  {selected ? t("nav.active") : String(index + 1).padStart(2, "0")}
                 </span>
-                <strong>{item.value}</strong>
-                <small>{item.detail}</small>
+                <strong>{localizedValue}</strong>
+                <small>{localizedTabDetails[item.id]}</small>
               </button>
             );
           })}
         </div>
       </section>
-      <section className="workflow-review-surface" aria-label="Workflow review">
+      <section className="workflow-review-surface" aria-label={t("nav.workflowReview")}>
         <div className="workflow-navigator-heading">
           <div>
             <ArrowRight size={16} aria-hidden="true" />
-            <span>Workflow review</span>
+            <span>{t("nav.workflowReview")}</span>
           </div>
-          <strong>Next production check</strong>
-          <small>Readiness guidance, separate from tabs</small>
+          <strong>{t("nav.nextCheck")}</strong>
+          <small>{t("nav.reviewDetail")}</small>
         </div>
         <div
           className={`workflow-spotlight-decision ${spotlight.tone}`}
@@ -3967,7 +4143,14 @@ export function WorkflowNavigator({
                 onJump(spotlightItem);
               }
             }}
-            title={spotlightItem ? `Jump to ${spotlightItem.label}: ${spotlightItem.detail}` : spotlight.detailTitle}
+            title={
+              localizedSpotlightItem
+                ? t("nav.workflowJumpWithDetail", {
+                    label: localizedSpotlightItem.label,
+                    detail: localizedSpotlightItem.detail
+                  })
+                : spotlight.detailTitle
+            }
             type="button"
           >
             <ArrowRight size={13} aria-hidden="true" />
@@ -3985,7 +4168,14 @@ export function WorkflowNavigator({
               onJump(spotlightItem);
             }
           }}
-          title={spotlight.zoneId ? `Jump to ${spotlight.zoneLabel}` : spotlight.detailTitle}
+          title={
+            localizedSpotlightItem
+              ? t("nav.workflowJumpWithDetail", {
+                  label: localizedSpotlightItem.label,
+                  detail: localizedSpotlightItem.value
+                })
+              : spotlight.detailTitle
+          }
           type="button"
         >
           <span data-testid="workflow-spotlight-status">{spotlight.statusLabel}</span>
@@ -3994,39 +4184,191 @@ export function WorkflowNavigator({
           <small data-testid="workflow-spotlight-count">{spotlight.countLabel}</small>
         </button>
       </section>
-      {result && <WorkflowNavigatorJumpResultStrip result={result} />}
+      {result && <WorkflowNavigatorJumpResultStrip items={items} result={result} />}
     </nav>
   );
 }
 
-function WorkflowNavigatorJumpResultStrip({ result }: { result: WorkflowNavigatorJumpResult }): ReactElement {
+function WorkflowNavigatorJumpResultStrip({
+  items,
+  result
+}: {
+  items: WorkflowNavigatorItem[];
+  result: WorkflowNavigatorJumpResult;
+}): ReactElement {
+  const { locale } = useLocalization();
+  const localizedResult = localizeWorkflowNavigatorJumpResult(result, items, locale);
   return (
     <div
       aria-live="polite"
-      className={`workflow-navigator-result ${result.tone}`}
-      data-result-workflow-zone={result.zoneId}
+      className={`workflow-navigator-result ${localizedResult.tone}`}
+      data-result-workflow-zone={localizedResult.zoneId}
       data-testid="workflow-navigator-result"
-      title={`${result.title}: ${result.detail}`}
+      title={`${localizedResult.title}: ${localizedResult.detail}`}
     >
       <div className="workflow-navigator-result-main">
         <Target size={14} aria-hidden="true" />
         <span>
-          <strong data-testid="workflow-navigator-result-title">{result.title}</strong>
-          <small data-testid="workflow-navigator-result-detail">{result.detail}</small>
+          <strong data-testid="workflow-navigator-result-title">{localizedResult.title}</strong>
+          <small data-testid="workflow-navigator-result-detail">{localizedResult.detail}</small>
         </span>
       </div>
       <div className="workflow-navigator-result-metric" data-testid="workflow-navigator-result-metric">
-        <span data-testid="workflow-navigator-result-status">{result.status}</span>
+        <span data-testid="workflow-navigator-result-status">{localizedResult.status}</span>
         <strong data-testid="workflow-navigator-result-value">
-          {result.metricLabel}: {result.metricValue}
+          {localizedResult.metricLabel}: {localizedResult.metricValue}
         </strong>
       </div>
       <div className="workflow-navigator-result-followup" data-testid="workflow-navigator-result-followup">
-        <span>{result.auditionCue}</span>
-        <small>{result.nextCheck}</small>
+        <span>{localizedResult.auditionCue}</span>
+        <small>{localizedResult.nextCheck}</small>
       </div>
     </div>
   );
+}
+
+function localizeWorkflowNavigatorJumpResult(
+  result: WorkflowNavigatorJumpResult,
+  items: WorkflowNavigatorItem[],
+  locale: AppLocale
+): WorkflowNavigatorJumpResult {
+  if (locale === "en") {
+    return result;
+  }
+
+  const sourceItem = items.find((item) => item.id === result.zoneId) ?? {
+    id: result.zoneId,
+    label: "",
+    value: "",
+    detail: "",
+    tone: result.tone
+  };
+  const localizedItem = localizeWorkflowNavigatorItem(locale, sourceItem);
+  const readyCount = items.filter((item) => item.tone === "good").length;
+  const reviewCount = items.filter((item) => item.tone === "warn").length;
+  const blockerCount = items.filter((item) => item.tone === "danger").length;
+
+  return {
+    ...result,
+    status: translate(locale, "nav.workflowJumped"),
+    title: translate(locale, "nav.workflowZoneReady", { label: localizedItem.label }),
+    detail: `${localizedItem.value} / ${localizedItem.detail}`,
+    metricLabel: translate(locale, "nav.workflowMetric"),
+    metricValue: translate(locale, "nav.workflowMetricCount", {
+      ready: readyCount,
+      total: items.length,
+      review: reviewCount,
+      blocker: blockerCount
+    }),
+    auditionCue: workflowNavigatorLocalizedAuditionCue(result.zoneId, locale),
+    nextCheck: workflowNavigatorLocalizedNextCheck(result.zoneId, locale)
+  };
+}
+
+function workflowNavigatorLocalizedAuditionCue(zoneId: WorkflowZoneId, locale: AppLocale): string {
+  switch (zoneId) {
+    case "compose":
+      return translate(locale, "nav.workflowAuditionCompose");
+    case "arrange":
+      return translate(locale, "nav.workflowAuditionArrange");
+    case "mix":
+      return translate(locale, "nav.workflowAuditionMix");
+    case "deliver":
+      return translate(locale, "nav.workflowAuditionDeliver");
+  }
+}
+
+function workflowNavigatorLocalizedNextCheck(zoneId: WorkflowZoneId, locale: AppLocale): string {
+  switch (zoneId) {
+    case "compose":
+      return translate(locale, "nav.workflowNextCompose");
+    case "arrange":
+      return translate(locale, "nav.workflowNextArrange");
+    case "mix":
+      return translate(locale, "nav.workflowNextMix");
+    case "deliver":
+      return translate(locale, "nav.workflowNextDeliver");
+  }
+}
+
+function createLocalizedWorkflowSpotlightSummary(
+  items: WorkflowNavigatorItem[],
+  locale: AppLocale
+): WorkflowSpotlightSummary {
+  const summary = createWorkflowSpotlightSummary(items);
+  if (locale === "en") {
+    return summary;
+  }
+
+  const readyCount = items.filter((item) => item.tone === "good").length;
+  const reviewCount = items.filter((item) => item.tone === "warn").length;
+  const blockerCount = items.filter((item) => item.tone === "danger").length;
+  const countLabel = translate(locale, "nav.workflowCount", {
+    ready: readyCount,
+    review: reviewCount,
+    blocker: blockerCount
+  });
+  const focusItem = summary.zoneId ? items.find((item) => item.id === summary.zoneId) ?? null : null;
+
+  if (!focusItem) {
+    return {
+      ...summary,
+      statusLabel: translate(locale, "nav.workflowNoZones"),
+      zoneLabel: translate(locale, "nav.workflowNoTarget"),
+      detailLabel: translate(locale, "nav.workflowNoVisibleZones"),
+      countLabel,
+      detailTitle: translate(locale, "nav.workflowEmptyTitle", { count: countLabel }),
+      decisionStatus: translate(locale, "nav.workflowEmpty"),
+      decisionLabel: translate(locale, "nav.workflowNoTarget"),
+      decisionDetail: translate(locale, "nav.workflowAddZones"),
+      decisionTitle: translate(locale, "nav.workflowEmptyTitle", { count: countLabel })
+    };
+  }
+
+  const localizedItem = localizeWorkflowNavigatorItem(locale, focusItem);
+  const statusLabel = translate(
+    locale,
+    focusItem.tone === "danger"
+      ? "nav.workflowNextBlocker"
+      : focusItem.tone === "warn"
+        ? "nav.workflowNextReview"
+        : "nav.workflowClear"
+  );
+  const decisionStatus = translate(
+    locale,
+    focusItem.tone === "danger"
+      ? "nav.workflowDecisionBlocker"
+      : focusItem.tone === "warn"
+        ? "nav.workflowDecisionReview"
+        : "nav.workflowDecisionReady"
+  );
+  const decisionLabel = translate(locale, "nav.workflowJumpAction", { label: localizedItem.label });
+  const decisionDetail = `${localizedItem.value}: ${localizedItem.detail}`;
+
+  return {
+    ...summary,
+    statusLabel,
+    zoneLabel: `${localizedItem.label}: ${localizedItem.value}`,
+    detailLabel: translate(locale, "nav.workflowJumpTarget", {
+      label: localizedItem.label,
+      detail: localizedItem.detail
+    }),
+    countLabel,
+    detailTitle: translate(locale, "nav.workflowSpotlightTitle", {
+      status: statusLabel,
+      label: localizedItem.label,
+      value: localizedItem.value,
+      detail: localizedItem.detail,
+      count: countLabel
+    }),
+    decisionStatus,
+    decisionLabel,
+    decisionDetail,
+    decisionTitle: translate(locale, "nav.workflowDecisionTitle", {
+      action: decisionLabel,
+      detail: localizedItem.detail
+    })
+  };
 }
 
 export function createWorkflowSpotlightSummary(items: WorkflowNavigatorItem[]): WorkflowSpotlightSummary {

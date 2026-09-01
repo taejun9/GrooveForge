@@ -20,6 +20,7 @@ import { chanceBadgeLabel, clampStepStart, compactChanceBadgeLabel, nextEmptyCho
 import type { StudioToneBaseline, StudioToneBaselineResult, StudioToneDriftSummary, StudioToneResetResult } from "./studioToneTools";
 import { studioToneControls, studioToneResetNextCheck } from "./studioToneTools";
 import { handleChordCardKeyboardActivation } from "./chordCardKeyboardActivation";
+import { useLocalization } from "./localization";
 
 export function DrumStepInspector({
   selectedStep,
@@ -60,6 +61,7 @@ export function DrumStepInspector({
   onDuplicateBeat: () => void;
   onDuplicatePreviousBeat: () => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const velocityValue = velocity ?? 0.75;
   const probabilityValue = probability ?? 1;
   const timingValue = normalizeDrumTimingMs(timingMs);
@@ -67,8 +69,8 @@ export function DrumStepInspector({
   const [timingText, setTimingText] = useState(timingTextValue);
   const [isEditingTiming, setIsEditingTiming] = useState(false);
   const skipNextTimingBlurCommit = useRef(false);
-  const label = selectedStep ? `${drumLabels[selectedStep.lane]} ${selectedStep.step + 1}` : "No step";
-  const clipboardLabel = drumClipboard ? `${drumLabels[drumClipboard.lane]} ${drumClipboard.step + 1}` : "Empty";
+  const label = selectedStep ? `${drumLabels[selectedStep.lane]} ${selectedStep.step + 1}` : t("compose.panel.noStep");
+  const clipboardLabel = drumClipboard ? `${drumLabels[drumClipboard.lane]} ${drumClipboard.step + 1}` : t("compose.panel.empty");
   const pocketSummary =
     selectedStep && active ? selectedDrumPocketSummary(selectedStep, velocityValue, probabilityValue, timingValue, hatRepeat) : null;
 
@@ -91,13 +93,13 @@ export function DrumStepInspector({
   }
 
   return (
-    <div className="drum-step-inspector" aria-label="Drum step dynamics">
+    <div className="drum-step-inspector" aria-label={t("compose.panel.drums.dynamicsAria")}>
       <div className="inspector-heading">
-        <span>Dynamics</span>
+        <span>{t("compose.panel.drums.dynamics")}</span>
         <strong data-testid="drum-step-readout">
           {selectedStep
-            ? `${label} ${active ? `${percentLabel(velocityValue)} / ${percentLabel(probabilityValue)} chance / ${timingLabel(timingValue)}` : "off"}`
-            : "Select step"}
+            ? `${label} ${active ? `${percentLabel(velocityValue)} / ${percentLabel(probabilityValue)} ${t("compose.panel.chance")} / ${timingLabel(timingValue)}` : t("compose.panel.off")}`
+            : t("compose.panel.drums.selectStep")}
         </strong>
       </div>
       {pocketSummary && (
@@ -108,10 +110,10 @@ export function DrumStepInspector({
         </div>
       )}
       <label>
-        <span>Velocity {active ? percentLabel(velocityValue) : "--"}</span>
+        <span>{t("compose.panel.velocity")} {active ? percentLabel(velocityValue) : "--"}</span>
         <div className="drum-value-row">
           <input
-            aria-label="Drum velocity"
+            aria-label={t("compose.panel.drums.velocityAria")}
             data-testid="drum-velocity"
             disabled={!selectedStep || !active}
             max={1}
@@ -122,7 +124,7 @@ export function DrumStepInspector({
             value={velocityValue}
           />
           <input
-            aria-label="Drum velocity percent"
+            aria-label={t("compose.panel.drums.velocityPercentAria")}
             data-testid="drum-velocity-input"
             disabled={!selectedStep || !active}
             max={100}
@@ -135,10 +137,10 @@ export function DrumStepInspector({
         </div>
       </label>
       <label>
-        <span>Chance {active ? percentLabel(probabilityValue) : "--"}</span>
+        <span>{t("compose.panel.chance")} {active ? percentLabel(probabilityValue) : "--"}</span>
         <div className="drum-value-row">
           <input
-            aria-label="Drum probability"
+            aria-label={t("compose.panel.drums.probabilityAria")}
             data-testid="drum-probability"
             disabled={!selectedStep || !active}
             max={1}
@@ -149,7 +151,7 @@ export function DrumStepInspector({
             value={probabilityValue}
           />
           <input
-            aria-label="Drum probability percent"
+            aria-label={t("compose.panel.drums.probabilityPercentAria")}
             data-testid="drum-probability-input"
             disabled={!selectedStep || !active}
             max={100}
@@ -162,12 +164,12 @@ export function DrumStepInspector({
         </div>
       </label>
       <label>
-        <span>Timing {active ? timingLabel(timingValue) : "--"}</span>
-        <div className="timing-row" aria-label="Drum timing">
+        <span>{t("compose.panel.drums.timing")} {active ? timingLabel(timingValue) : "--"}</span>
+        <div className="timing-row" aria-label={t("compose.panel.drums.timingAria")}>
           {[
-            { label: "Early", timing: -15, testId: "drum-timing-early" },
-            { label: "On", timing: 0, testId: "drum-timing-on" },
-            { label: "Late", timing: 15, testId: "drum-timing-late" }
+            { label: t("compose.panel.drums.early"), timing: -15, testId: "drum-timing-early" },
+            { label: t("compose.panel.drums.onGrid"), timing: 0, testId: "drum-timing-on" },
+            { label: t("compose.panel.drums.late"), timing: 15, testId: "drum-timing-late" }
           ].map((option) => (
             <button
               className={timingValue === option.timing ? "selected" : ""}
@@ -181,7 +183,7 @@ export function DrumStepInspector({
             </button>
           ))}
           <input
-            aria-label="Drum timing milliseconds"
+            aria-label={t("compose.panel.drums.timingMsAria")}
             data-testid="drum-timing-input"
             disabled={!selectedStep || !active}
             max={maxDrumTimingMs}
@@ -221,7 +223,7 @@ export function DrumStepInspector({
         </div>
       </label>
       {selectedStep?.lane === "hat" && (
-        <div className="repeat-row" aria-label="Hat repeat">
+        <div className="repeat-row" aria-label={t("compose.panel.drums.hatRepeatAria")}>
           {[1, 2, 3, 4].map((repeat) => (
             <button
               className={hatRepeat === repeat ? "selected" : ""}
@@ -236,67 +238,69 @@ export function DrumStepInspector({
           ))}
         </div>
       )}
-      <div className="drum-clipboard-row" aria-label="Selected drum hit tools">
+      <div className="drum-clipboard-row" aria-label={t("compose.panel.drums.hitToolsAria")}>
         <button
-          aria-label="Audition selected drum hit"
+          aria-label={t("compose.panel.drums.auditionHit")}
           data-testid="drum-audition"
           disabled={!selectedStep || !active}
           onClick={onAudition}
-          title="Audition selected drum hit"
+          title={t("compose.panel.drums.auditionHit")}
           type="button"
         >
           <Play size={14} aria-hidden="true" />
-          <span>Audition</span>
+          <span>{t("compose.panel.audition")}</span>
         </button>
         <button
-          aria-label="Copy selected drum hit shape"
+          aria-label={t("compose.panel.drums.copyHitShape")}
           data-testid="drum-copy"
           disabled={!selectedStep || !active}
           onClick={onCopy}
-          title="Copy selected drum hit shape"
+          title={t("compose.panel.drums.copyHitShape")}
           type="button"
         >
           <Copy size={14} aria-hidden="true" />
-          <span>Copy hit</span>
+          <span>{t("compose.panel.drums.copyHit")}</span>
         </button>
         <button
-          aria-label="Paste copied drum hit to the next empty step"
+          aria-label={t("compose.panel.drums.pasteHitNext")}
           data-testid="drum-paste"
           disabled={!drumClipboard}
           onClick={onPaste}
-          title="Paste copied hit to the next empty step"
+          title={t("compose.panel.drums.pasteHitNext")}
           type="button"
         >
           <Plus size={14} aria-hidden="true" />
-          <span>Paste next</span>
+          <span>{t("compose.panel.drums.pasteNext")}</span>
         </button>
         <button
-          aria-label="Duplicate selected drum hit to the previous beat"
+          aria-label={t("compose.panel.drums.duplicatePrevious")}
           data-testid="drum-duplicate-previous-beat"
           disabled={!selectedStep || !active || previousBeatDuplicateStep === null}
           onClick={onDuplicatePreviousBeat}
           title={
             previousBeatDuplicateStep === null
-              ? "No earlier empty beat-grid hit slot"
-              : `Duplicate selected drum hit to beat step ${previousBeatDuplicateStep + 1}`
+              ? t("compose.panel.drums.noEarlierSlot")
+              : t("compose.panel.drums.duplicateToStep", { step: previousBeatDuplicateStep + 1 })
           }
           type="button"
         >
           <ArrowLeft size={14} aria-hidden="true" />
-          <span>Previous beat</span>
+          <span>{t("compose.panel.previousBeat")}</span>
         </button>
         <button
-          aria-label="Duplicate selected drum hit to the next beat"
+          aria-label={t("compose.panel.drums.duplicateNext")}
           data-testid="drum-duplicate-beat"
           disabled={!selectedStep || !active || beatDuplicateStep === null}
           onClick={onDuplicateBeat}
-          title={beatDuplicateStep === null ? "No later empty beat-grid hit slot" : `Duplicate selected drum hit to beat step ${beatDuplicateStep + 1}`}
+          title={beatDuplicateStep === null ? t("compose.panel.drums.noLaterSlot") : t("compose.panel.drums.duplicateToStep", { step: beatDuplicateStep + 1 })}
           type="button"
         >
           <ArrowRight size={14} aria-hidden="true" />
-          <span>Next beat</span>
+          <span>{t("compose.panel.nextBeat")}</span>
         </button>
-        <small data-testid="drum-clipboard-detail">{drumClipboard ? `Clipboard ${clipboardLabel}` : "Clipboard empty"}</small>
+        <small data-testid="drum-clipboard-detail">
+          {drumClipboard ? t("compose.panel.clipboardValue", { value: clipboardLabel }) : t("compose.panel.clipboardEmpty")}
+        </small>
       </div>
     </div>
   );
@@ -323,6 +327,7 @@ export function DrumMovePreview({ preview }: { preview: DrumMovePreviewSummary }
 }
 
 export function SwingFeelResultStrip({ result }: { result: SwingFeelResult }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div className={`quick-action-result ${result.tone}`} data-result-swing-feel={result.padId} data-testid="swing-feel-result" aria-live="polite">
       <div className="quick-action-result-main">
@@ -338,11 +343,11 @@ export function SwingFeelResultStrip({ result }: { result: SwingFeelResult }): R
       </div>
       <div className="quick-action-result-followup" data-testid="swing-feel-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("compose.panel.audition")}</b>
           <em data-testid="swing-feel-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("compose.panel.nextCheck")}</b>
           <em data-testid="swing-feel-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -394,26 +399,31 @@ export function GrooveFeelPads({
   feels: GrooveFeelOption[];
   onApply: (feel: GrooveFeelId) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div className="groove-feel-panel" data-testid="groove-feel-pads">
       <div className="groove-feel-heading">
-        <span>Groove Feel</span>
-        <strong>Timing + Chance</strong>
+        <span>{t("compose.panel.grooveFeel.title")}</span>
+        <strong>{t("compose.panel.grooveFeel.detail")}</strong>
       </div>
-      <div className="groove-feel-row" aria-label="Groove Feel Pads">
-        {feels.map((feel) => (
-          <button
-            data-testid={`groove-feel-${feel.id}`}
-            key={feel.id}
-            onClick={() => onApply(feel.id)}
-            title={`${feel.label} ${feel.timingPreview}`}
-            type="button"
-          >
-            <span>{feel.label}</span>
-            <strong>{feel.timingPreview}</strong>
-            <small>{feel.chancePreview} / {feel.detail}</small>
-          </button>
-        ))}
+      <div className="groove-feel-row" aria-label={t("compose.panel.grooveFeel.padsAria")}>
+        {feels.map((feel) => {
+          const label = t(`compose.panel.grooveFeel.${feel.id}`);
+          const detail = t(`compose.panel.grooveFeel.${feel.id}Detail`);
+          return (
+            <button
+              data-testid={`groove-feel-${feel.id}`}
+              key={feel.id}
+              onClick={() => onApply(feel.id)}
+              title={`${label} ${feel.timingPreview}`}
+              type="button"
+            >
+              <span>{label}</span>
+              <strong>{feel.timingPreview}</strong>
+              <small>{feel.chancePreview} / {detail}</small>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -426,26 +436,31 @@ export function DrumAccentPads({
   accents: DrumAccentOption[];
   onApply: (accent: DrumAccentId) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div className="drum-accent-panel" data-testid="drum-accent-pads">
       <div className="drum-accent-heading">
-        <span>Drum Accents</span>
-        <strong>Velocity Shape</strong>
+        <span>{t("compose.panel.drumAccents.title")}</span>
+        <strong>{t("compose.panel.drumAccents.detail")}</strong>
       </div>
-      <div className="drum-accent-row" aria-label="Drum Accent Pads">
-        {accents.map((accent) => (
-          <button
-            data-testid={`drum-accent-${accent.id}`}
-            key={accent.id}
-            onClick={() => onApply(accent.id)}
-            title={`${accent.label} ${accent.preview}`}
-            type="button"
-          >
-            <span>{accent.label}</span>
-            <strong>{accent.preview}</strong>
-            <small>{accent.detail}</small>
-          </button>
-        ))}
+      <div className="drum-accent-row" aria-label={t("compose.panel.drumAccents.padsAria")}>
+        {accents.map((accent) => {
+          const label = t(`compose.panel.drumAccents.${accent.id}`);
+          const detail = t(`compose.panel.drumAccents.${accent.id}Detail`);
+          return (
+            <button
+              data-testid={`drum-accent-${accent.id}`}
+              key={accent.id}
+              onClick={() => onApply(accent.id)}
+              title={`${label} ${accent.preview}`}
+              type="button"
+            >
+              <span>{label}</span>
+              <strong>{accent.preview}</strong>
+              <small>{detail}</small>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -768,26 +783,33 @@ export function BasslinePads({
   pads: BasslinePadOption[];
   onApply: (pad: BasslinePadId) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div className="bassline-pad-panel" data-testid="bassline-pads">
       <div className="bassline-pad-heading">
-        <span>Basslines</span>
-        <strong>Low end</strong>
+        <span>{t("compose.panel.basslines.title")}</span>
+        <strong>{t("compose.panel.basslines.detail")}</strong>
       </div>
-      <div className="bassline-pad-row" aria-label="Bassline Pads">
-        {pads.map((pad) => (
-          <button
-            data-testid={`bassline-pad-${pad.id}`}
-            key={pad.id}
-            onClick={() => onApply(pad.id)}
-            title={`${pad.label} ${pad.preview}`}
-            type="button"
-          >
-            <span>{pad.label}</span>
-            <strong>{pad.preview}</strong>
-            <small>{pad.eventCount} notes / {pad.glideCount} glide / {pad.detail}</small>
-          </button>
-        ))}
+      <div className="bassline-pad-row" aria-label={t("compose.panel.basslines.padsAria")}>
+        {pads.map((pad) => {
+          const label = t(`compose.panel.basslines.${pad.id}`);
+          const detail = t(`compose.panel.basslines.${pad.id}Detail`);
+          return (
+            <button
+              data-testid={`bassline-pad-${pad.id}`}
+              key={pad.id}
+              onClick={() => onApply(pad.id)}
+              title={`${label} ${pad.preview}`}
+              type="button"
+            >
+              <span>{label}</span>
+              <strong>{pad.preview}</strong>
+              <small>
+                {t("compose.panel.noteCount", { count: pad.eventCount })} / {t("compose.panel.glideCount", { count: pad.glideCount })} / {detail}
+              </small>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -800,26 +822,31 @@ export function BassGlidePads({
   pads: BassGlidePadOption[];
   onApply: (pad: BassGlidePadId) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div className="bass-glide-panel" data-testid="bass-glide-pads">
       <div className="bass-glide-heading">
-        <span>Bass Glide</span>
-        <strong>Length + Chance</strong>
+        <span>{t("compose.panel.bassGlide.title")}</span>
+        <strong>{t("compose.panel.bassGlide.detail")}</strong>
       </div>
-      <div className="bass-glide-row" aria-label="Bass Glide Pads">
-        {pads.map((pad) => (
-          <button
-            data-testid={`bass-glide-${pad.id}`}
-            key={pad.id}
-            onClick={() => onApply(pad.id)}
-            title={`${pad.label} ${pad.preview}`}
-            type="button"
-          >
-            <span>{pad.label}</span>
-            <strong>{pad.preview}</strong>
-            <small>{pad.glideCount} glide / {pad.detail}</small>
-          </button>
-        ))}
+      <div className="bass-glide-row" aria-label={t("compose.panel.bassGlide.padsAria")}>
+        {pads.map((pad) => {
+          const label = t(`compose.panel.bassGlide.${pad.id}`);
+          const detail = t(`compose.panel.bassGlide.${pad.id}Detail`);
+          return (
+            <button
+              data-testid={`bass-glide-${pad.id}`}
+              key={pad.id}
+              onClick={() => onApply(pad.id)}
+              title={`${label} ${pad.preview}`}
+              type="button"
+            >
+              <span>{label}</span>
+              <strong>{pad.preview}</strong>
+              <small>{t("compose.panel.glideCount", { count: pad.glideCount })} / {detail}</small>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -926,26 +953,31 @@ export function MelodyMotifPads({
   motifs: MelodyMotifOption[];
   onApply: (motif: MelodyMotifId) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div className="melody-motif-panel" data-testid="melody-motif-pads">
       <div className="melody-motif-heading">
-        <span>Melody Motifs</span>
-        <strong>Synth</strong>
+        <span>{t("compose.panel.melodyMotifs.title")}</span>
+        <strong>{t("compose.panel.melodyMotifs.detail")}</strong>
       </div>
-      <div className="melody-motif-row" aria-label="Melody Motif Pads">
-        {motifs.map((motif) => (
-          <button
-            data-testid={`melody-motif-${motif.id}`}
-            key={motif.id}
-            onClick={() => onApply(motif.id)}
-            title={`${motif.label} ${motif.preview}`}
-            type="button"
-          >
-            <span>{motif.label}</span>
-            <strong>{motif.preview}</strong>
-            <small>{motif.eventCount} notes / {motif.detail}</small>
-          </button>
-        ))}
+      <div className="melody-motif-row" aria-label={t("compose.panel.melodyMotifs.padsAria")}>
+        {motifs.map((motif) => {
+          const label = t(`compose.panel.melodyMotifs.${motif.id}`);
+          const detail = t(`compose.panel.melodyMotifs.${motif.id}Detail`);
+          return (
+            <button
+              data-testid={`melody-motif-${motif.id}`}
+              key={motif.id}
+              onClick={() => onApply(motif.id)}
+              title={`${label} ${motif.preview}`}
+              type="button"
+            >
+              <span>{label}</span>
+              <strong>{motif.preview}</strong>
+              <small>{t("compose.panel.noteCount", { count: motif.eventCount })} / {detail}</small>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -1042,9 +1074,10 @@ export function KeyboardCapturePanel({
   onStepModeChange: (mode: KeyboardCaptureStepMode) => void;
   onTargetChange: (target: NoteTrack) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const selectedLabel = selectedNote
     ? `${selectedNote.track === "bass" ? "808" : "Synth"} ${selectedNote.pitch}.${selectedNote.step + 1}`
-    : "None";
+    : t("compose.panel.none");
   const velocityPercent = Math.round(defaults.velocity * 100);
   const [minOctave, maxOctave] = trackOctaveRange(target);
 
@@ -1052,8 +1085,8 @@ export function KeyboardCapturePanel({
     <div className="keyboard-capture" data-testid="keyboard-capture">
       <div className="keyboard-capture-heading">
         <div>
-          <span>Keyboard Capture</span>
-          <strong>{enabled ? "armed" : "off"}</strong>
+          <span>{t("compose.panel.keyboard.title")}</span>
+          <strong>{enabled ? t("compose.panel.keyboard.armedLower") : t("compose.panel.off")}</strong>
         </div>
         <button
           aria-pressed={enabled}
@@ -1062,11 +1095,11 @@ export function KeyboardCapturePanel({
           onClick={() => onEnabledChange(!enabled)}
           type="button"
         >
-          {enabled ? "On" : "Off"}
+          {enabled ? t("compose.panel.on") : t("compose.panel.offTitle")}
         </button>
       </div>
       <div className="keyboard-capture-controls">
-        <div className="capture-target-row" aria-label="Keyboard Capture target">
+        <div className="capture-target-row" aria-label={t("compose.panel.keyboard.targetAria")}>
           <button
             className={target === "bass" ? "selected" : ""}
             data-testid="keyboard-capture-target-bass"
@@ -1085,19 +1118,19 @@ export function KeyboardCapturePanel({
           </button>
         </div>
         <div className="capture-readout">
-          <span>{stepMode === "playhead" ? "Playhead" : "Next"}</span>
-          <strong>{stepMode === "playhead" ? (playheadStep === null ? "Waiting" : playheadStep + 1) : nextStep + 1}</strong>
+          <span>{stepMode === "playhead" ? t("compose.panel.keyboard.playhead") : t("compose.panel.next")}</span>
+          <strong>{stepMode === "playhead" ? (playheadStep === null ? t("compose.panel.keyboard.waiting") : playheadStep + 1) : nextStep + 1}</strong>
         </div>
         <div className="capture-readout">
-          <span>Step Mode</span>
-          <strong>{stepMode === "next-free" ? "Next" : stepMode === "replace-selected" ? "Replace" : "Overdub"}</strong>
+          <span>{t("compose.panel.keyboard.stepMode")}</span>
+          <strong>{stepMode === "next-free" ? t("compose.panel.next") : stepMode === "replace-selected" ? t("compose.panel.keyboard.replace") : t("compose.panel.keyboard.overdub")}</strong>
         </div>
         <div className="capture-readout">
-          <span>Selected</span>
+          <span>{t("compose.panel.selected")}</span>
           <strong>{selectedLabel}</strong>
         </div>
       </div>
-      <div className="capture-step-mode-row" aria-label="Keyboard Capture step mode">
+      <div className="capture-step-mode-row" aria-label={t("compose.panel.keyboard.stepModeAria")}>
         <button
           aria-pressed={stepMode === "next-free"}
           className={stepMode === "next-free" ? "selected" : ""}
@@ -1105,8 +1138,8 @@ export function KeyboardCapturePanel({
           onClick={() => onStepModeChange("next-free")}
           type="button"
         >
-          <span>Next</span>
-          <small>empty step</small>
+          <span>{t("compose.panel.next")}</span>
+          <small>{t("compose.panel.keyboard.emptyStep")}</small>
         </button>
         <button
           aria-pressed={stepMode === "replace-selected"}
@@ -1115,24 +1148,24 @@ export function KeyboardCapturePanel({
           onClick={() => onStepModeChange("replace-selected")}
           type="button"
         >
-          <span>Replace</span>
-          <small>selected step</small>
+          <span>{t("compose.panel.keyboard.replace")}</span>
+          <small>{t("compose.panel.keyboard.selectedStep")}</small>
         </button>
         <button
           aria-pressed={stepMode === "playhead"}
           className={stepMode === "playhead" ? "selected" : ""}
           data-testid="keyboard-capture-step-mode-playhead"
           onClick={() => onStepModeChange("playhead")}
-          title="Quantize Desktop Keyboard and MIDI notes to the current Pattern playhead"
+          title={t("compose.panel.keyboard.overdubTitle")}
           type="button"
         >
-          <span>Overdub</span>
-          <small>live playhead</small>
+          <span>{t("compose.panel.keyboard.overdub")}</span>
+          <small>{t("compose.panel.keyboard.livePlayhead")}</small>
         </button>
       </div>
-      <div className="capture-defaults" aria-label="Keyboard Capture defaults">
+      <div className="capture-defaults" aria-label={t("compose.panel.keyboard.defaultsAria")}>
         <label className="capture-default-field">
-          <span>Octave</span>
+          <span>{t("compose.panel.octave")}</span>
           <input
             data-testid="keyboard-capture-octave"
             max={maxOctave}
@@ -1144,7 +1177,7 @@ export function KeyboardCapturePanel({
           />
         </label>
         <label className="capture-default-field">
-          <span>Length</span>
+          <span>{t("compose.panel.length")}</span>
           <input
             data-testid="keyboard-capture-length"
             max={16}
@@ -1156,7 +1189,7 @@ export function KeyboardCapturePanel({
           />
         </label>
         <label className="capture-default-field velocity">
-          <span>Velocity</span>
+          <span>{t("compose.panel.velocity")}</span>
           <input
             data-testid="keyboard-capture-velocity"
             max={100}
@@ -1174,18 +1207,18 @@ export function KeyboardCapturePanel({
             className={defaults.glide ? "mini-toggle selected" : "mini-toggle"}
             data-testid="keyboard-capture-glide"
             onClick={() => onDefaultsChange({ glide: !defaults.glide })}
-            title="Toggle captured Bass glide"
+            title={t("compose.panel.keyboard.glideTitle")}
             type="button"
           >
-            Glide {defaults.glide ? "On" : "Off"}
+            {t("compose.panel.glide")} {defaults.glide ? t("compose.panel.on") : t("compose.panel.offTitle")}
           </button>
         )}
       </div>
-      <div className="capture-key-map" aria-label="Keyboard Capture key map">
+      <div className="capture-key-map" aria-label={t("compose.panel.keyboard.keyMapAria")}>
         {keyMap.map((item) => (
           <kbd
             className={item.pitch ? "" : "muted"}
-            aria-label={`${keyboardCaptureKeyLabels[item.key]} ${item.pitch ?? "out of range"} ${item.degreeLabel ?? ""}`.trim()}
+            aria-label={`${keyboardCaptureKeyLabels[item.key]} ${item.pitch ?? t("compose.panel.keyboard.outOfRange")} ${item.degreeLabel ?? ""}`.trim()}
             data-testid={`keyboard-capture-key-${item.key}`}
             key={item.key}
           >
@@ -1224,6 +1257,7 @@ export function MidiCapturePanel({
   onRefresh: () => void;
   onRequestAccess: () => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const hasInputs = inputOptions.length > 0;
   const hasConnectedInput = inputOptions.some((input) => input.connected);
   const canArm = status !== "unsupported" && status !== "requesting" && status !== "denied" && hasConnectedInput;
@@ -1233,7 +1267,7 @@ export function MidiCapturePanel({
     <div className={`midi-capture ${summary.tone}`} data-testid="midi-capture">
       <div className="midi-capture-heading">
         <div>
-          <span>Web MIDI Input</span>
+          <span>{t("compose.panel.midi.title")}</span>
           <strong data-testid="midi-capture-status">{summary.statusLabel}</strong>
         </div>
         <div className="midi-capture-actions">
@@ -1244,7 +1278,7 @@ export function MidiCapturePanel({
             onClick={onRequestAccess}
             type="button"
           >
-            {status === "requesting" ? "Requesting" : "Connect"}
+            {status === "requesting" ? t("compose.panel.midi.requesting") : t("compose.panel.midi.connect")}
           </button>
           <button
             className={armed ? "mini-toggle selected" : "mini-toggle"}
@@ -1254,20 +1288,20 @@ export function MidiCapturePanel({
             onClick={() => onArmChange(!armed)}
             type="button"
           >
-            {armed ? "Armed" : "Arm"}
+            {armed ? t("compose.panel.midi.armed") : t("compose.panel.midi.arm")}
           </button>
         </div>
       </div>
       <div className="midi-capture-controls">
         <label className="midi-input-field">
-          <span>Input</span>
+          <span>{t("compose.panel.midi.input")}</span>
           <select
             data-testid="midi-input-select"
             disabled={!hasInputs}
             value={selectedInputId}
             onChange={(event) => onInputChange(event.currentTarget.value)}
           >
-            <option value="all">All connected inputs</option>
+            <option value="all">{t("compose.panel.midi.allInputs")}</option>
             {inputOptions.map((input) => (
               <option key={input.id} value={input.id}>
                 {input.label}
@@ -1276,15 +1310,15 @@ export function MidiCapturePanel({
           </select>
         </label>
         <div className="midi-capture-readout" data-testid="midi-capture-target">
-          <span>Target</span>
+          <span>{t("compose.panel.midi.target")}</span>
           <strong>{targetLabel}</strong>
         </div>
         <div className="midi-capture-readout" data-testid="midi-capture-last-note">
-          <span>Latest</span>
+          <span>{t("compose.panel.midi.latest")}</span>
           <strong>{lastNoteLabel}</strong>
         </div>
         <button className="mini-toggle" data-testid="midi-capture-refresh" onClick={onRefresh} type="button">
-          Refresh
+          {t("compose.panel.midi.refresh")}
         </button>
       </div>
       <small data-testid="midi-capture-detail">{summary.detailLabel}</small>
@@ -1313,6 +1347,7 @@ export function NoteEditor({
   onSelect: (note: SelectedNote) => void;
   onToggle: (step: number, pitch: string) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const displayPitches = [...pitches].reverse();
   const tabStop = noteGridEntryCell(track, displayPitches, selectedNote);
 
@@ -1339,14 +1374,14 @@ export function NoteEditor({
     <div className="note-lane">
       <div className="lane-header">
         <span>{title}</span>
-        <strong>{notes.length} events</strong>
+        <strong>{t("compose.panel.eventCount", { count: notes.length })}</strong>
       </div>
       <p className="note-grid-keyboard-help" id={`note-grid-keyboard-help-${track}`}>
-        Arrow keys move · Enter or Space toggles
+        {t("compose.panel.notes.keyboardHelp")}
       </p>
       <div
         aria-describedby={`note-grid-keyboard-help-${track}`}
-        aria-label={`${title} note sequencer`}
+        aria-label={t("compose.panel.notes.sequencerAria", { title })}
         className="piano-grid"
         data-testid={`note-grid-${track}`}
         role="group"
@@ -1363,9 +1398,9 @@ export function NoteEditor({
                 const velocityPercent = Math.min(100, Math.max(0, Math.round((note?.velocity ?? 0.82) * 100)));
                 return (
                   <button
-                    aria-label={`${title} ${pitch} step ${step + 1}${
-                      note && note.probability !== undefined && note.probability < 1 ? ` ${chanceBadgeLabel(note.probability)} chance` : ""
-                    }${note ? ` ${velocityPercent}% velocity` : ""}`}
+                    aria-label={`${title} ${pitch} ${t("compose.panel.step")} ${step + 1}${
+                      note && note.probability !== undefined && note.probability < 1 ? ` ${chanceBadgeLabel(note.probability)} ${t("compose.panel.chance")}` : ""
+                    }${note ? ` ${velocityPercent}% ${t("compose.panel.velocityLower")}` : ""}`}
                     aria-pressed={Boolean(note)}
                     className={["note", note ? "active" : "", currentStep === step ? "playhead" : "", selected ? "selected" : ""]
                       .filter(Boolean)
@@ -1449,142 +1484,143 @@ export function NoteInspector({
   onDuplicateBeat: () => void;
   onDuplicatePreviousBeat: () => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const activeNote = bassNote ?? melodyNote;
-  const label = selectedNote ? `${selectedNote.track === "bass" ? "808" : "Synth"} ${selectedNote.pitch}.${selectedNote.step + 1}` : "None";
+  const label = selectedNote ? `${selectedNote.track === "bass" ? "808" : "Synth"} ${selectedNote.pitch}.${selectedNote.step + 1}` : t("compose.panel.none");
   const degreeSummary = selectedNote ? selectedNoteDegreeSummary(currentKey, selectedNote.pitch) : null;
   const clipboardLabel = noteClipboard
     ? `${noteClipboard.track === "bass" ? "808" : "Synth"} ${noteClipboard.note.pitch}.${noteClipboard.note.step + 1}`
-    : "Empty";
+    : t("compose.panel.empty");
   const probabilityValue = activeNote ? normalizeEventProbability(activeNote.probability) : 1;
   const velocityValue = activeNote?.velocity ?? 0.82;
   return (
     <div className="note-inspector">
       <div className="inspector-heading">
-        <span>Selected</span>
-        <strong>{activeNote ? `${label} / ${percentLabel(probabilityValue)} chance` : "None"}</strong>
+        <span>{t("compose.panel.selected")}</span>
+        <strong>{activeNote ? `${label} / ${percentLabel(probabilityValue)} ${t("compose.panel.chance")}` : t("compose.panel.none")}</strong>
       </div>
       {activeNote && (
         <>
           {degreeSummary && (
             <div className={degreeSummary.inKey ? "note-degree-readout" : "note-degree-readout warn"} data-testid="note-degree-readout">
-              <span>Degree</span>
+              <span>{t("compose.panel.notes.degree")}</span>
               <strong data-testid="note-degree-label">{degreeSummary.degreeLabel}</strong>
               <small data-testid="note-degree-role">
                 {degreeSummary.roleLabel} / {degreeSummary.pitchLabel}
               </small>
             </div>
           )}
-          <div className="note-action-row" aria-label="Selected note tools">
+          <div className="note-action-row" aria-label={t("compose.panel.notes.toolsAria")}>
             <button
-              aria-label="Move selected note one step left"
+              aria-label={t("compose.panel.notes.stepLeftTitle")}
               data-testid="note-nudge-left"
               onClick={() => onStepMove(-1)}
-              title="Move selected note one step left"
+              title={t("compose.panel.notes.stepLeftTitle")}
               type="button"
             >
               <ArrowLeft size={14} aria-hidden="true" />
-              <span>Step left</span>
+              <span>{t("compose.panel.stepLeft")}</span>
             </button>
             <button
-              aria-label="Move selected note one step right"
+              aria-label={t("compose.panel.notes.stepRightTitle")}
               data-testid="note-nudge-right"
               onClick={() => onStepMove(1)}
-              title="Move selected note one step right"
+              title={t("compose.panel.notes.stepRightTitle")}
               type="button"
             >
               <ArrowRight size={14} aria-hidden="true" />
-              <span>Step right</span>
+              <span>{t("compose.panel.stepRight")}</span>
             </button>
             <button
-              aria-label="Move selected note down in scale"
+              aria-label={t("compose.panel.notes.pitchDownTitle")}
               data-testid="note-pitch-down"
               onClick={() => onPitchMove(-1)}
-              title="Move selected note down in scale"
+              title={t("compose.panel.notes.pitchDownTitle")}
               type="button"
             >
               <ArrowDown size={14} aria-hidden="true" />
-              <span>Pitch down</span>
+              <span>{t("compose.panel.notes.pitchDown")}</span>
             </button>
             <button
-              aria-label="Move selected note up in scale"
+              aria-label={t("compose.panel.notes.pitchUpTitle")}
               data-testid="note-pitch-up"
               onClick={() => onPitchMove(1)}
-              title="Move selected note up in scale"
+              title={t("compose.panel.notes.pitchUpTitle")}
               type="button"
             >
               <ArrowUp size={14} aria-hidden="true" />
-              <span>Pitch up</span>
+              <span>{t("compose.panel.notes.pitchUp")}</span>
             </button>
             <button
-              aria-label="Move selected note down an octave"
+              aria-label={t("compose.panel.notes.octaveDownTitle")}
               data-testid="note-octave-down"
               onClick={() => onOctaveMove(-1)}
-              title="Move selected note down an octave"
+              title={t("compose.panel.notes.octaveDownTitle")}
               type="button"
             >
               <ArrowDown size={14} aria-hidden="true" />
-              <span>Octave down</span>
+              <span>{t("compose.panel.notes.octaveDown")}</span>
             </button>
             <button
-              aria-label="Move selected note up an octave"
+              aria-label={t("compose.panel.notes.octaveUpTitle")}
               data-testid="note-octave-up"
               onClick={() => onOctaveMove(1)}
-              title="Move selected note up an octave"
+              title={t("compose.panel.notes.octaveUpTitle")}
               type="button"
             >
               <ArrowUp size={14} aria-hidden="true" />
-              <span>Octave up</span>
+              <span>{t("compose.panel.notes.octaveUp")}</span>
             </button>
             <button
-              aria-label="Duplicate selected note to the next empty step"
+              aria-label={t("compose.panel.notes.duplicateTitle")}
               data-testid="note-duplicate"
               onClick={onDuplicate}
-              title="Duplicate selected note to the next empty step"
+              title={t("compose.panel.notes.duplicateTitle")}
               type="button"
             >
               <Copy size={14} aria-hidden="true" />
-              <span>Duplicate</span>
+              <span>{t("compose.panel.duplicate")}</span>
             </button>
             <button
-              aria-label="Duplicate selected note to the previous beat"
+              aria-label={t("compose.panel.notes.duplicatePrevious")}
               data-testid="note-duplicate-previous-beat"
               disabled={previousBeatDuplicateStep === null}
               onClick={onDuplicatePreviousBeat}
               title={
                 previousBeatDuplicateStep === null
-                  ? "No earlier empty beat-grid note slot"
-                  : `Duplicate selected note to beat step ${previousBeatDuplicateStep + 1}`
+                  ? t("compose.panel.notes.noEarlierSlot")
+                  : t("compose.panel.notes.duplicateToStep", { step: previousBeatDuplicateStep + 1 })
               }
               type="button"
             >
               <ArrowLeft size={14} aria-hidden="true" />
-              <span>Prev beat</span>
+              <span>{t("compose.panel.previousBeatShort")}</span>
             </button>
             <button
-              aria-label="Duplicate selected note to the next beat"
+              aria-label={t("compose.panel.notes.duplicateNext")}
               data-testid="note-duplicate-beat"
               disabled={beatDuplicateStep === null}
               onClick={onDuplicateBeat}
-              title={beatDuplicateStep === null ? "No later empty beat-grid note slot" : `Duplicate selected note to beat step ${beatDuplicateStep + 1}`}
+              title={beatDuplicateStep === null ? t("compose.panel.notes.noLaterSlot") : t("compose.panel.notes.duplicateToStep", { step: beatDuplicateStep + 1 })}
               type="button"
             >
               <ArrowRight size={14} aria-hidden="true" />
-              <span>Next beat</span>
+              <span>{t("compose.panel.nextBeat")}</span>
             </button>
             <button
-              aria-label="Audition selected 808 or Synth note"
+              aria-label={t("compose.panel.notes.auditionTitle")}
               data-testid="note-audition"
               onClick={onAudition}
-              title="Audition selected 808 or Synth note"
+              title={t("compose.panel.notes.auditionTitle")}
               type="button"
             >
               <Play size={14} aria-hidden="true" />
-              <span>Audition</span>
+              <span>{t("compose.panel.audition")}</span>
             </button>
           </div>
           <div className="inspector-grid">
             <label>
-              <span>Length</span>
+              <span>{t("compose.panel.length")}</span>
               <input
                 type="range"
                 min={1}
@@ -1596,14 +1632,14 @@ export function NoteInspector({
             </label>
             {bassNote && (
               <label className="toggle-row">
-                <span>Glide</span>
+                <span>{t("compose.panel.glide")}</span>
                 <input type="checkbox" checked={bassNote.glide} onChange={(event) => onGlideChange(event.target.checked)} />
               </label>
             )}
             <label>
-              <span>Velocity {percentLabel(velocityValue)}</span>
+              <span>{t("compose.panel.velocity")} {percentLabel(velocityValue)}</span>
               <input
-                aria-label="Note velocity"
+                aria-label={t("compose.panel.notes.velocityAria")}
                 data-testid="note-velocity"
                 type="range"
                 min={0}
@@ -1614,9 +1650,9 @@ export function NoteInspector({
               />
             </label>
             <label>
-              <span>Chance {percentLabel(probabilityValue)}</span>
+              <span>{t("compose.panel.chance")} {percentLabel(probabilityValue)}</span>
               <input
-                aria-label="Note probability"
+                aria-label={t("compose.panel.notes.probabilityAria")}
                 data-testid="note-probability"
                 max={1}
                 min={0}
@@ -1627,9 +1663,9 @@ export function NoteInspector({
               />
             </label>
             <label>
-              <span>Chance %</span>
+              <span>{t("compose.panel.chancePercent")}</span>
               <input
-                aria-label="Note probability percent"
+                aria-label={t("compose.panel.notes.probabilityPercentAria")}
                 data-testid="note-probability-input"
                 inputMode="numeric"
                 onChange={(event) => onProbabilityChange(Number(event.target.value) / 100)}
@@ -1642,16 +1678,18 @@ export function NoteInspector({
           </div>
         </>
       )}
-      <div className="note-clipboard-row" aria-label="Note clipboard">
-        <button data-testid="note-copy" disabled={!activeNote} onClick={onCopy} title="Copy selected note shape" type="button">
+      <div className="note-clipboard-row" aria-label={t("compose.panel.notes.clipboardAria")}>
+        <button data-testid="note-copy" disabled={!activeNote} onClick={onCopy} title={t("compose.panel.notes.copyTitle")} type="button">
           <Copy size={14} aria-hidden="true" />
-          <span>Copy</span>
+          <span>{t("compose.panel.copy")}</span>
         </button>
-        <button data-testid="note-paste" disabled={!noteClipboard} onClick={onPaste} title="Paste copied note to the next empty step" type="button">
+        <button data-testid="note-paste" disabled={!noteClipboard} onClick={onPaste} title={t("compose.panel.notes.pasteTitle")} type="button">
           <Plus size={14} aria-hidden="true" />
-          <span>Paste</span>
+          <span>{t("compose.panel.paste")}</span>
         </button>
-        <small data-testid="note-clipboard-detail">{noteClipboard ? `Clipboard ${clipboardLabel}` : "Clipboard empty"}</small>
+        <small data-testid="note-clipboard-detail">
+          {noteClipboard ? t("compose.panel.clipboardValue", { value: clipboardLabel }) : t("compose.panel.clipboardEmpty")}
+        </small>
       </div>
     </div>
   );
@@ -1738,23 +1776,24 @@ export function SoundDesigner({
   onStudioToneResetResult: (result: StudioToneResetResult) => void;
   onChange: (update: Partial<Omit<SoundDesign, "preset">>) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const presetBaseline = studioToneBaseline.sound;
   const presetDecision = createSoundPresetPreviewDecision(presetPreview);
 
   return (
     <div className="sound-designer">
       <div className="lane-header">
-        <span>Tone</span>
+        <span>{t("compose.panel.sound.tone")}</span>
         <strong data-testid="sound-preset-readout">{soundPresetLabel(sound.preset)}</strong>
       </div>
-      <div className="sound-preset-row" aria-label="Sound presets">
+      <div className="sound-preset-row" aria-label={t("compose.panel.sound.presetsAria")}>
         {soundPresetIds.map((preset) => (
           <button
             className={presetPreviewId === preset ? "selected" : sound.preset === preset ? "current" : ""}
             data-testid={`sound-preset-${preset}`}
             key={preset}
             onClick={() => onPreviewPreset(preset)}
-            title={`Preview ${soundPresetLabel(preset)} sound preset`}
+            title={t("compose.panel.sound.previewPreset", { preset: soundPresetLabel(preset) })}
             type="button"
           >
             {soundPresetLabel(preset)}
@@ -1774,26 +1813,26 @@ export function SoundDesigner({
         onRecall={onRecallSoundSnapshot}
         onClear={onClearSoundSnapshots}
       />
-      <div className="sound-readout" aria-label="Sound design state">
-        <span data-testid="sound-kick-readout">Kick {percentLabel(sound.kickPunch)}</span>
+      <div className="sound-readout" aria-label={t("compose.panel.sound.stateAria")}>
+        <span data-testid="sound-kick-readout">{t("compose.panel.sound.kick")} {percentLabel(sound.kickPunch)}</span>
         <span data-testid="sound-bass-readout">808 {percentLabel(sound.bassDrive)}</span>
-        <span data-testid="sound-duck-readout">Duck {percentLabel(sound.sidechainDuck)}</span>
+        <span data-testid="sound-duck-readout">{t("compose.panel.sound.duck")} {percentLabel(sound.sidechainDuck)}</span>
         <span data-testid="sound-synth-readout">Synth {percentLabel(sound.synthBrightness)}</span>
-        <span data-testid="sound-chord-readout">Chord {percentLabel(sound.chordWarmth)}</span>
+        <span data-testid="sound-chord-readout">{t("compose.panel.sound.chord")} {percentLabel(sound.chordWarmth)}</span>
       </div>
       {mode === "studio" && (
         <>
           <div className="studio-tone-baseline-source" data-testid="studio-tone-baseline-source">
-            <span>Reset baseline</span>
+            <span>{t("compose.panel.sound.resetBaseline")}</span>
             <strong data-testid="studio-tone-baseline-source-label">{studioToneBaseline.sourceLabel}</strong>
             <button
               data-testid="studio-tone-baseline-capture"
               onClick={onCaptureStudioToneBaseline}
-              title="Capture current Studio tone as the reset baseline"
+              title={t("compose.panel.sound.captureBaselineTitle")}
               type="button"
             >
               <Save size={12} aria-hidden="true" />
-              <span>Capture</span>
+              <span>{t("compose.panel.capture")}</span>
             </button>
           </div>
           {studioToneBaselineResult && <StudioToneBaselineResultStrip result={studioToneBaselineResult} />}
@@ -1828,6 +1867,7 @@ export function SoundTimbreCheck({
   summary: SoundTimbreCheckSummary;
   onApplyFocus: (pad: SoundFocusPadId) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const focusReady = focusPreview.tone !== "good";
 
   return (
@@ -1837,7 +1877,7 @@ export function SoundTimbreCheck({
       title={summary.detailTitle}
     >
       <div className="sound-timbre-heading">
-        <span>Timbre Check</span>
+        <span>{t("compose.panel.sound.timbreCheck")}</span>
         <strong data-testid="sound-timbre-status">{summary.statusLabel}</strong>
       </div>
       <div className="sound-timbre-summary">
@@ -1847,7 +1887,7 @@ export function SoundTimbreCheck({
         </span>
         <strong data-testid="sound-timbre-balance">{summary.balanceLabel}</strong>
       </div>
-      <div className="sound-timbre-metrics" aria-label="Sound Timbre metrics">
+      <div className="sound-timbre-metrics" aria-label={t("compose.panel.sound.timbreMetricsAria")}>
         {summary.metrics.map((metric) => (
           <span className={metric.tone} data-testid={`sound-timbre-metric-${metric.id}`} key={metric.id}>
             <b>{metric.label}</b>
@@ -1863,7 +1903,9 @@ export function SoundTimbreCheck({
         title={focusPreview.detailTitle}
       >
         <div>
-          <span data-testid="sound-timbre-focus-status">{focusReady ? "Suggested focus" : "Focus already matched"}</span>
+          <span data-testid="sound-timbre-focus-status">
+            {focusReady ? t("compose.panel.sound.suggestedFocus") : t("compose.panel.sound.focusMatched")}
+          </span>
           <strong data-testid="sound-timbre-focus-pad">{focusPreview.padLabel}</strong>
           <small data-testid="sound-timbre-focus-target">{focusPreview.focusLabel}</small>
           <small data-testid="sound-timbre-focus-parameters">{focusPreview.parameterLabel}</small>
@@ -1873,11 +1915,11 @@ export function SoundTimbreCheck({
           data-testid="sound-timbre-focus-apply"
           disabled={!focusReady}
           onClick={() => onApplyFocus(focusPreview.padId)}
-          title={focusReady ? `Apply ${focusPreview.padLabel} Sound Focus` : "Current sound already matches this focus"}
+          title={focusReady ? t("compose.panel.sound.applyFocusTitle", { focus: focusPreview.padLabel }) : t("compose.panel.sound.focusMatchedTitle")}
           type="button"
         >
           <SlidersHorizontal size={13} aria-hidden="true" />
-          <span>Apply Focus</span>
+          <span>{t("compose.panel.sound.applyFocus")}</span>
         </button>
       </div>
       <small data-testid="sound-timbre-next-check">{summary.nextCheck}</small>
@@ -1898,6 +1940,7 @@ export function SoundSnapshotAB({
   onRecall: (slot: SoundSnapshotSlotId) => void;
   onClear: () => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const slotIds: SoundSnapshotSlotId[] = ["A", "B"];
   const actionIsCapture = summary.actionId.startsWith("capture");
 
@@ -1921,56 +1964,56 @@ export function SoundSnapshotAB({
   return (
     <div className={`sound-snapshot-ab ${summary.tone}`} data-testid="sound-snapshot-ab">
       <div className="sound-snapshot-head">
-        <span>Sound Snapshot A/B</span>
-        <strong>Compare tone</strong>
-        <div className="sound-snapshot-actions" aria-label="Sound Snapshot A/B actions">
+        <span>{t("compose.panel.sound.snapshotTitle")}</span>
+        <strong>{t("compose.panel.sound.compareTone")}</strong>
+        <div className="sound-snapshot-actions" aria-label={t("compose.panel.sound.snapshotActionsAria")}>
           <button
             data-testid="sound-snapshot-capture-a"
             onClick={() => onCapture("A")}
-            title="Capture current sound as Snapshot A"
+            title={t("compose.panel.sound.captureSnapshotTitle", { slot: "A" })}
             type="button"
           >
             <Save size={13} aria-hidden="true" />
-            <span>Capture A</span>
+            <span>{t("compose.panel.captureSlot", { slot: "A" })}</span>
           </button>
           <button
             data-testid="sound-snapshot-capture-b"
             onClick={() => onCapture("B")}
-            title="Capture current sound as Snapshot B"
+            title={t("compose.panel.sound.captureSnapshotTitle", { slot: "B" })}
             type="button"
           >
             <Copy size={13} aria-hidden="true" />
-            <span>Capture B</span>
+            <span>{t("compose.panel.captureSlot", { slot: "B" })}</span>
           </button>
           <button
             data-testid="sound-snapshot-recall-a"
             disabled={!snapshots.A}
             onClick={() => onRecall("A")}
-            title={snapshots.A ? "Recall Snapshot A into the current sound" : "Capture Snapshot A before recall"}
+            title={snapshots.A ? t("compose.panel.sound.recallSnapshotTitle", { slot: "A" }) : t("compose.panel.sound.captureBeforeRecall", { slot: "A" })}
             type="button"
           >
             <RotateCcw size={13} aria-hidden="true" />
-            <span>Recall A</span>
+            <span>{t("compose.panel.recallSlot", { slot: "A" })}</span>
           </button>
           <button
             data-testid="sound-snapshot-recall-b"
             disabled={!snapshots.B}
             onClick={() => onRecall("B")}
-            title={snapshots.B ? "Recall Snapshot B into the current sound" : "Capture Snapshot B before recall"}
+            title={snapshots.B ? t("compose.panel.sound.recallSnapshotTitle", { slot: "B" }) : t("compose.panel.sound.captureBeforeRecall", { slot: "B" })}
             type="button"
           >
             <RotateCcw size={13} aria-hidden="true" />
-            <span>Recall B</span>
+            <span>{t("compose.panel.recallSlot", { slot: "B" })}</span>
           </button>
           <button
             data-testid="sound-snapshot-clear"
             disabled={!snapshots.A && !snapshots.B}
             onClick={onClear}
-            title={snapshots.A || snapshots.B ? "Clear Sound Snapshot A/B" : "Sound Snapshot A/B is already clear"}
+            title={snapshots.A || snapshots.B ? t("compose.panel.sound.clearSnapshotsTitle") : t("compose.panel.sound.snapshotsClearTitle")}
             type="button"
           >
             <X size={13} aria-hidden="true" />
-            <span>Clear</span>
+            <span>{t("compose.panel.clear")}</span>
           </button>
         </div>
       </div>
@@ -1983,7 +2026,7 @@ export function SoundSnapshotAB({
           data-sound-snapshot-action={summary.actionId}
           data-testid="sound-snapshot-run"
           onClick={runSnapshotAction}
-          title={`Run ${summary.actionLabel}: ${summary.detailTitle}`}
+          title={t("compose.panel.runActionTitle", { action: summary.actionLabel, detail: summary.detailTitle })}
           type="button"
         >
           {actionIsCapture ? (
@@ -2019,22 +2062,23 @@ function SoundSnapshotSlotCard({
   snapshot: SoundSnapshot | null;
   slot: SoundSnapshotSlotId;
 }): ReactElement {
+  const { t } = useLocalization();
   const testSlot = slot.toLowerCase();
   if (!snapshot) {
     return (
       <div className="sound-snapshot-slot empty" data-testid={`sound-snapshot-slot-${testSlot}`}>
-        <span data-testid={`sound-snapshot-slot-${testSlot}-time`}>Sound {slot}</span>
-        <strong data-testid={`sound-snapshot-slot-${testSlot}-preset`}>Empty slot</strong>
-        <small data-testid={`sound-snapshot-slot-${testSlot}-timbre`}>No tone pass</small>
-        <small data-testid={`sound-snapshot-slot-${testSlot}-drums`}>No drum tone</small>
-        <small data-testid={`sound-snapshot-slot-${testSlot}-bass`}>No 808 tone</small>
+        <span data-testid={`sound-snapshot-slot-${testSlot}-time`}>{t("compose.panel.sound.slot", { slot })}</span>
+        <strong data-testid={`sound-snapshot-slot-${testSlot}-preset`}>{t("compose.panel.emptySlot")}</strong>
+        <small data-testid={`sound-snapshot-slot-${testSlot}-timbre`}>{t("compose.panel.sound.noTonePass")}</small>
+        <small data-testid={`sound-snapshot-slot-${testSlot}-drums`}>{t("compose.panel.sound.noDrumTone")}</small>
+        <small data-testid={`sound-snapshot-slot-${testSlot}-bass`}>{t("compose.panel.sound.noBassTone")}</small>
       </div>
     );
   }
 
   return (
     <div className={`sound-snapshot-slot ${snapshot.tone}`} data-testid={`sound-snapshot-slot-${testSlot}`}>
-      <span data-testid={`sound-snapshot-slot-${testSlot}-time`}>Sound {slot} / {snapshot.capturedAtLabel}</span>
+      <span data-testid={`sound-snapshot-slot-${testSlot}-time`}>{t("compose.panel.sound.slotTime", { slot, time: snapshot.capturedAtLabel })}</span>
       <strong data-testid={`sound-snapshot-slot-${testSlot}-preset`}>{snapshot.presetLabel}</strong>
       <small data-testid={`sound-snapshot-slot-${testSlot}-timbre`}>{snapshot.timbreLabel}</small>
       <small data-testid={`sound-snapshot-slot-${testSlot}-drums`}>{snapshot.drumLabel}</small>
@@ -2050,6 +2094,7 @@ export function SoundPresetPreview({
   summary: SoundPresetPreviewSummary;
   onApply: () => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`sound-preset-preview ${summary.tone}`}
@@ -2062,7 +2107,7 @@ export function SoundPresetPreview({
       <small data-testid="sound-preset-preview-tone">{summary.toneLabel}</small>
       <small data-testid="sound-preset-preview-changes">{summary.changeLabel}</small>
       <button data-testid="sound-preset-apply" onClick={onApply} type="button">
-        Apply
+        {t("compose.panel.apply")}
       </button>
     </div>
   );
@@ -2075,6 +2120,7 @@ export function SoundPresetPreviewDecision({
   summary: SoundPresetPreviewDecisionSummary;
   onApply: () => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`sound-preset-decision ${summary.tone}`}
@@ -2092,7 +2138,7 @@ export function SoundPresetPreviewDecision({
         data-testid="sound-preset-decision-run"
         disabled={summary.disabled}
         onClick={onApply}
-        title={summary.disabled ? "Current sound already matches this preview" : `Apply ${summary.presetLabel}`}
+        title={summary.disabled ? t("compose.panel.sound.previewMatchedTitle") : t("compose.panel.applyTarget", { target: summary.presetLabel })}
         type="button"
       >
         <SlidersHorizontal size={12} aria-hidden="true" />
@@ -2122,6 +2168,7 @@ function createSoundPresetPreviewDecision(summary: SoundPresetPreviewSummary): S
 }
 
 export function SoundPresetResultStrip({ result }: { result: SoundPresetResult }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`sound-preset-result ${result.tone}`}
@@ -2151,11 +2198,11 @@ export function SoundPresetResultStrip({ result }: { result: SoundPresetResult }
       </div>
       <div className="sound-preset-result-followup" data-testid="sound-preset-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("compose.panel.audition")}</b>
           <em data-testid="sound-preset-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("compose.panel.nextCheck")}</b>
           <em data-testid="sound-preset-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -2174,13 +2221,14 @@ export function DrumKitPads({
   result: DrumKitResult | null;
   onApply: (pad: DrumKitPadId) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const decision = createDrumKitPreviewDecision(preview);
 
   return (
     <div className="drum-kit-panel" data-testid="drum-kit-pads">
       <div className="drum-kit-heading">
-        <span>Drum Kit</span>
-        <strong>Kick / Clap / Hat</strong>
+        <span>{t("compose.panel.sound.drumKit")}</span>
+        <strong>{t("compose.panel.sound.drumKitDetail")}</strong>
       </div>
       <div
         className={`drum-kit-preview ${preview.tone}`}
@@ -2195,7 +2243,7 @@ export function DrumKitPads({
         <small data-testid="drum-kit-preview-moves">{preview.moveLabel}</small>
       </div>
       <DrumKitPreviewDecision summary={decision} onApply={() => onApply(decision.padId)} />
-      <div className="drum-kit-row" aria-label="Drum Kit Pads">
+      <div className="drum-kit-row" aria-label={t("compose.panel.sound.drumKitPadsAria")}>
         {pads.map((pad) => (
           <button
             data-testid={`drum-kit-${pad.id}`}
@@ -2206,7 +2254,7 @@ export function DrumKitPads({
           >
             <span>{pad.label}</span>
             <strong>{pad.preview}</strong>
-            <small>{pad.changedCount} moves / {pad.detail}</small>
+            <small>{t("compose.panel.moveCount", { count: pad.changedCount })} / {pad.detail}</small>
           </button>
         ))}
       </div>
@@ -2222,6 +2270,7 @@ export function DrumKitPreviewDecision({
   summary: DrumKitPreviewDecisionSummary;
   onApply: () => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`drum-kit-decision ${summary.tone}`}
@@ -2239,7 +2288,7 @@ export function DrumKitPreviewDecision({
         data-testid="drum-kit-decision-run"
         disabled={summary.disabled}
         onClick={onApply}
-        title={summary.disabled ? "Current drums already match this kit" : `Apply ${summary.kitLabel}`}
+        title={summary.disabled ? t("compose.panel.sound.kitMatchedTitle") : t("compose.panel.applyTarget", { target: summary.kitLabel })}
         type="button"
       >
         <Drum size={12} aria-hidden="true" />
@@ -2269,6 +2318,7 @@ function createDrumKitPreviewDecision(summary: DrumKitPreviewSummary): DrumKitPr
 }
 
 export function DrumKitResultStrip({ result }: { result: DrumKitResult }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`drum-kit-result ${result.tone}`}
@@ -2298,11 +2348,11 @@ export function DrumKitResultStrip({ result }: { result: DrumKitResult }): React
       </div>
       <div className="drum-kit-result-followup" data-testid="drum-kit-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("compose.panel.audition")}</b>
           <em data-testid="drum-kit-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("compose.panel.nextCheck")}</b>
           <em data-testid="drum-kit-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -2321,13 +2371,14 @@ export function SoundFocusPads({
   result: SoundFocusResult | null;
   onApply: (pad: SoundFocusPadId) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const decision = createSoundFocusPreviewDecision(preview);
 
   return (
     <div className="sound-focus-panel" data-testid="sound-focus-pads">
       <div className="sound-focus-heading">
-        <span>Sound Focus</span>
-        <strong>Tone posture</strong>
+        <span>{t("compose.panel.sound.focus")}</span>
+        <strong>{t("compose.panel.sound.tonePosture")}</strong>
       </div>
       <div
         className={`sound-focus-preview ${preview.tone}`}
@@ -2343,7 +2394,7 @@ export function SoundFocusPads({
       </div>
       <SoundFocusPreviewDecision summary={decision} onApply={() => onApply(decision.padId)} />
       {result && <SoundFocusResultStrip result={result} />}
-      <div className="sound-focus-row" aria-label="Sound Focus Pads">
+      <div className="sound-focus-row" aria-label={t("compose.panel.sound.focusPadsAria")}>
         {pads.map((pad) => (
           <button
             data-testid={`sound-focus-${pad.id}`}
@@ -2354,7 +2405,7 @@ export function SoundFocusPads({
           >
             <span>{pad.label}</span>
             <strong>{pad.preview}</strong>
-            <small>{pad.changedCount} moves / {pad.detail}</small>
+            <small>{t("compose.panel.moveCount", { count: pad.changedCount })} / {pad.detail}</small>
           </button>
         ))}
       </div>
@@ -2369,6 +2420,7 @@ export function SoundFocusPreviewDecision({
   summary: SoundFocusPreviewDecisionSummary;
   onApply: () => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`sound-focus-decision ${summary.tone}`}
@@ -2386,7 +2438,7 @@ export function SoundFocusPreviewDecision({
         data-testid="sound-focus-decision-run"
         disabled={summary.disabled}
         onClick={onApply}
-        title={summary.disabled ? "Current sound already matches this focus" : `Apply ${summary.padLabel}`}
+        title={summary.disabled ? t("compose.panel.sound.focusMatchedTitle") : t("compose.panel.applyTarget", { target: summary.padLabel })}
         type="button"
       >
         <SlidersHorizontal size={12} aria-hidden="true" />
@@ -2416,6 +2468,7 @@ function createSoundFocusPreviewDecision(summary: SoundFocusPreviewSummary): Sou
 }
 
 export function SoundFocusResultStrip({ result }: { result: SoundFocusResult }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`sound-focus-result ${result.tone}`}
@@ -2445,11 +2498,11 @@ export function SoundFocusResultStrip({ result }: { result: SoundFocusResult }):
       </div>
       <div className="sound-focus-result-followup" data-testid="sound-focus-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("compose.panel.audition")}</b>
           <em data-testid="sound-focus-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("compose.panel.nextCheck")}</b>
           <em data-testid="sound-focus-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -2474,11 +2527,12 @@ export function SoundControl({
   onChange: (value: number) => void;
   onResetResult?: (result: StudioToneResetResult) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const percentValue = `${Math.round(value * 100)}`;
   const baselinePercent = Math.round(baseline * 100);
   const currentPercent = Math.round(value * 100);
   const deltaPercent = currentPercent - baselinePercent;
-  const deltaLabel = deltaPercent === 0 ? "Delta 0" : `Delta ${deltaPercent > 0 ? "+" : ""}${deltaPercent}`;
+  const deltaLabel = t("compose.panel.sound.delta", { value: deltaPercent === 0 ? "0" : `${deltaPercent > 0 ? "+" : ""}${deltaPercent}` });
   const resetDisabled = currentPercent === baselinePercent;
   const [percentText, setPercentText] = useState(percentValue);
   const [isEditingPercent, setIsEditingPercent] = useState(false);
@@ -2525,7 +2579,7 @@ export function SoundControl({
           value={value}
         />
         <input
-          aria-label={`${label} percent`}
+          aria-label={t("compose.panel.percentAria", { label })}
           data-testid={`sound-${id}-input`}
           max={100}
           min={0}
@@ -2563,8 +2617,8 @@ export function SoundControl({
         />
       </div>
       <div className="sound-control-reference" data-testid={`sound-${id}-reference`}>
-        <span data-testid={`sound-${id}-baseline`} title={`Baseline from ${baselineSourceLabel}`}>
-          Baseline {percentLabel(baseline)}
+        <span data-testid={`sound-${id}-baseline`} title={t("compose.panel.sound.baselineFrom", { source: baselineSourceLabel })}>
+          {t("compose.panel.sound.baselineValue", { value: percentLabel(baseline) })}
         </span>
         <span data-testid={`sound-${id}-delta`}>{deltaLabel}</span>
         <button
@@ -2584,11 +2638,13 @@ export function SoundControl({
             });
             onChange(baseline);
           }}
-          title={resetDisabled ? `${label} already matches ${baselineSourceLabel}` : `Reset ${label} to ${baselineSourceLabel}`}
+          title={resetDisabled
+            ? t("compose.panel.sound.resetMatched", { label, source: baselineSourceLabel })
+            : t("compose.panel.sound.resetTo", { label, source: baselineSourceLabel })}
           type="button"
         >
           <RotateCcw size={12} aria-hidden="true" />
-          <span>Reset</span>
+          <span>{t("compose.panel.reset")}</span>
         </button>
       </div>
     </div>
@@ -2596,12 +2652,13 @@ export function SoundControl({
 }
 
 function StudioToneResetResultStrip({ result }: { result: StudioToneResetResult }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div className="studio-tone-reset-result" data-testid="studio-tone-reset-result">
       <div className="studio-tone-reset-result-main">
         <ListChecks size={15} aria-hidden="true" />
         <span>
-          <b data-testid="studio-tone-reset-title">Reset {result.label}</b>
+          <b data-testid="studio-tone-reset-title">{t("compose.panel.resetTarget", { target: result.label })}</b>
           <em data-testid="studio-tone-reset-detail">
             {result.beforeLabel}
             {" -> "}
@@ -2611,7 +2668,7 @@ function StudioToneResetResultStrip({ result }: { result: StudioToneResetResult 
       </div>
       <div className="studio-tone-reset-result-meta">
         <span data-testid="studio-tone-reset-baseline">
-          Baseline {result.baselineSourceLabel} {result.baselineLabel}
+          {t("compose.panel.sound.baselineResult", { source: result.baselineSourceLabel, value: result.baselineLabel })}
         </span>
         <span data-testid="studio-tone-reset-delta">{result.deltaLabel}</span>
       </div>
@@ -2644,6 +2701,7 @@ function StudioToneDriftSummaryStrip({
   summary: StudioToneDriftSummary;
   onResetLargest: () => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div className="studio-tone-drift-summary" data-testid="studio-tone-drift-summary">
       <div className="studio-tone-drift-main">
@@ -2651,7 +2709,7 @@ function StudioToneDriftSummaryStrip({
         <span>
           <b data-testid="studio-tone-drift-posture">{summary.postureLabel}</b>
           <em data-testid="studio-tone-drift-count">
-            {summary.changedCount}/{summary.totalCount} controls changed
+            {t("compose.panel.sound.controlsChanged", { changed: summary.changedCount, total: summary.totalCount })}
           </em>
         </span>
       </div>
@@ -2663,11 +2721,11 @@ function StudioToneDriftSummaryStrip({
         data-testid="studio-tone-drift-reset-largest"
         disabled={!summary.resetTarget}
         onClick={onResetLargest}
-        title={summary.resetTarget ? `Reset ${summary.resetTarget.label} to baseline` : "No Studio tone drift to reset"}
+        title={summary.resetTarget ? t("compose.panel.sound.resetToBaseline", { label: summary.resetTarget.label }) : t("compose.panel.sound.noDrift")}
         type="button"
       >
         <RotateCcw size={12} aria-hidden="true" />
-        <span>Reset Largest</span>
+        <span>{t("compose.panel.sound.resetLargest")}</span>
       </button>
       <p data-testid="studio-tone-drift-next-check">{summary.nextCheck}</p>
     </div>
@@ -2739,10 +2797,11 @@ export function ChordEditor({
   onSelect: (index: number) => void;
   onVoicing: (voicing: ChordVoicingId) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const selectedChord = selectedIndex === null ? undefined : chords[selectedIndex];
   const selectedInversion = selectedChord ? normalizeChordInversion(selectedChord.inversion) : 0;
   const harmonicSummary = selectedChord ? selectedChordHarmonicSummary(currentKey, selectedChord) : null;
-  const chordClipboardLabel = chordClipboard ? `${chordClipboard.root}${chordClipboard.quality}.${chordClipboard.step + 1}` : "Empty";
+  const chordClipboardLabel = chordClipboard ? `${chordClipboard.root}${chordClipboard.quality}.${chordClipboard.step + 1}` : t("compose.panel.empty");
   const canMoveLeft =
     selectedIndex !== null &&
     selectedChord !== undefined &&
@@ -2759,128 +2818,130 @@ export function ChordEditor({
   return (
     <div className="chord-editor">
       <div className="lane-header">
-        <span>Chords</span>
-        <strong>{chords.length} events</strong>
+        <span>{t("compose.panel.chords.title")}</span>
+        <strong>{t("compose.panel.eventCount", { count: chords.length })}</strong>
       </div>
-      <div className="chord-primary-tools" aria-label="Chord event actions" data-testid="chord-primary-actions">
-        <button data-testid="chord-add" onClick={onAdd} title="Add chord event" type="button">
+      <div className="chord-primary-tools" aria-label={t("compose.panel.chords.eventActionsAria")} data-testid="chord-primary-actions">
+        <button data-testid="chord-add" onClick={onAdd} title={t("compose.panel.chords.addTitle")} type="button">
           <Plus size={14} aria-hidden="true" />
-          <span>Add chord</span>
+          <span>{t("compose.panel.chords.add")}</span>
         </button>
       </div>
       {harmonicSummary && (
         <div className={harmonicSummary.inKey ? "chord-harmonic-readout" : "chord-harmonic-readout warn"} data-testid="chord-harmonic-readout">
-          <span>Function</span>
+          <span>{t("compose.panel.chords.function")}</span>
           <strong data-testid="chord-harmonic-label">{harmonicSummary.romanLabel}</strong>
           <small data-testid="chord-harmonic-role">
             {harmonicSummary.degreeLabel} / {harmonicSummary.roleLabel} / {harmonicSummary.detailLabel}
           </small>
         </div>
       )}
-      <div className="chord-edit-row" aria-label="Selected chord edit tools" data-testid="chord-edit-tools">
+      <div className="chord-edit-row" aria-label={t("compose.panel.chords.editToolsAria")} data-testid="chord-edit-tools">
         <button
-          aria-label="Audition selected chord"
+          aria-label={t("compose.panel.chords.auditionTitle")}
           data-testid="chord-audition"
           disabled={!selectedChord}
           onClick={onAudition}
-          title="Audition selected chord"
+          title={t("compose.panel.chords.auditionTitle")}
           type="button"
         >
           <Play size={13} aria-hidden="true" />
-          <span>Audition</span>
+          <span>{t("compose.panel.audition")}</span>
         </button>
         <button
-          aria-label="Move selected chord one step left"
+          aria-label={t("compose.panel.chords.stepLeftTitle")}
           data-testid="chord-move-left"
           disabled={!canMoveLeft}
           onClick={() => onMoveStep(-1)}
-          title="Move selected chord left"
+          title={t("compose.panel.chords.stepLeftTitle")}
           type="button"
         >
           <ArrowLeft size={13} aria-hidden="true" />
-          <span>Step left</span>
+          <span>{t("compose.panel.stepLeft")}</span>
         </button>
         <button
-          aria-label="Move selected chord one step right"
+          aria-label={t("compose.panel.chords.stepRightTitle")}
           data-testid="chord-move-right"
           disabled={!canMoveRight}
           onClick={() => onMoveStep(1)}
-          title="Move selected chord right"
+          title={t("compose.panel.chords.stepRightTitle")}
           type="button"
         >
           <ArrowRight size={13} aria-hidden="true" />
-          <span>Step right</span>
+          <span>{t("compose.panel.stepRight")}</span>
         </button>
         <button
-          aria-label="Duplicate selected chord to the next empty step"
+          aria-label={t("compose.panel.chords.duplicateTitle")}
           data-testid="chord-duplicate"
           disabled={!canDuplicate}
           onClick={onDuplicate}
-          title="Duplicate selected chord to the next empty step"
+          title={t("compose.panel.chords.duplicateTitle")}
           type="button"
         >
           <Copy size={13} aria-hidden="true" />
-          <span>Duplicate</span>
+          <span>{t("compose.panel.duplicate")}</span>
         </button>
         <button
-          aria-label="Duplicate selected chord to the previous beat"
+          aria-label={t("compose.panel.chords.duplicatePrevious")}
           data-testid="chord-duplicate-previous-beat"
           disabled={previousBeatDuplicateStep === null}
           onClick={onDuplicatePreviousBeat}
           title={
             previousBeatDuplicateStep === null
-              ? "No earlier empty beat-grid chord slot"
-              : `Duplicate selected chord to beat step ${previousBeatDuplicateStep + 1}`
+              ? t("compose.panel.chords.noEarlierSlot")
+              : t("compose.panel.chords.duplicateToStep", { step: previousBeatDuplicateStep + 1 })
           }
           type="button"
         >
           <ArrowLeft size={13} aria-hidden="true" />
-          <span>Prev beat</span>
+          <span>{t("compose.panel.previousBeatShort")}</span>
         </button>
         <button
-          aria-label="Duplicate selected chord to the next beat"
+          aria-label={t("compose.panel.chords.duplicateNext")}
           data-testid="chord-duplicate-beat"
           disabled={beatDuplicateStep === null}
           onClick={onDuplicateBeat}
-          title={beatDuplicateStep === null ? "No later empty beat-grid chord slot" : `Duplicate selected chord to beat step ${beatDuplicateStep + 1}`}
+          title={beatDuplicateStep === null ? t("compose.panel.chords.noLaterSlot") : t("compose.panel.chords.duplicateToStep", { step: beatDuplicateStep + 1 })}
           type="button"
         >
           <ArrowRight size={13} aria-hidden="true" />
-          <span>Next beat</span>
+          <span>{t("compose.panel.nextBeat")}</span>
         </button>
         <button
-          aria-label="Move selected chord voicing down"
+          aria-label={t("compose.panel.chords.voiceDownTitle")}
           data-testid="chord-invert-down"
           disabled={!selectedChord || selectedInversion <= 0}
           onClick={() => onInvert(-1)}
-          title="Move selected chord voicing down"
+          title={t("compose.panel.chords.voiceDownTitle")}
           type="button"
         >
           <ArrowDown size={13} aria-hidden="true" />
-          <span>Voice down</span>
+          <span>{t("compose.panel.chords.voiceDown")}</span>
         </button>
         <button
-          aria-label="Move selected chord voicing up"
+          aria-label={t("compose.panel.chords.voiceUpTitle")}
           data-testid="chord-invert-up"
           disabled={!selectedChord || selectedInversion >= chordInversions[chordInversions.length - 1]}
           onClick={() => onInvert(1)}
-          title="Move selected chord voicing up"
+          title={t("compose.panel.chords.voiceUpTitle")}
           type="button"
         >
           <ArrowUp size={13} aria-hidden="true" />
-          <span>Voice up</span>
+          <span>{t("compose.panel.chords.voiceUp")}</span>
         </button>
       </div>
-      <div className="chord-clipboard-row" aria-label="Chord clipboard">
-        <button data-testid="chord-copy" disabled={!selectedChord} onClick={onCopy} title="Copy selected chord shape" type="button">
+      <div className="chord-clipboard-row" aria-label={t("compose.panel.chords.clipboardAria")}>
+        <button data-testid="chord-copy" disabled={!selectedChord} onClick={onCopy} title={t("compose.panel.chords.copyTitle")} type="button">
           <Copy size={13} aria-hidden="true" />
-          <span>Copy</span>
+          <span>{t("compose.panel.copy")}</span>
         </button>
-        <button data-testid="chord-paste" disabled={!canPaste} onClick={onPaste} title="Paste copied chord to the next empty step" type="button">
+        <button data-testid="chord-paste" disabled={!canPaste} onClick={onPaste} title={t("compose.panel.chords.pasteTitle")} type="button">
           <Plus size={13} aria-hidden="true" />
-          <span>Paste</span>
+          <span>{t("compose.panel.paste")}</span>
         </button>
-        <small data-testid="chord-clipboard-detail">{chordClipboard ? `Clipboard ${chordClipboardLabel}` : "Clipboard empty"}</small>
+        <small data-testid="chord-clipboard-detail">
+          {chordClipboard ? t("compose.panel.clipboardValue", { value: chordClipboardLabel }) : t("compose.panel.clipboardEmpty")}
+        </small>
       </div>
       <div className="chord-slots" data-testid="chord-event-grid">
         {chords.map((chord, index) => {
@@ -2891,9 +2952,9 @@ export function ChordEditor({
           return (
             <div
               aria-current={playing ? "step" : undefined}
-              aria-label={`Chord ${index + 1} ${chord.root}${chord.quality} step ${chord.step + 1} ${chordVelocityPercent}% velocity length ${
+              aria-label={`${t("compose.panel.chords.chord")} ${index + 1} ${chord.root}${chord.quality} ${t("compose.panel.step")} ${chord.step + 1} ${chordVelocityPercent}% ${t("compose.panel.velocityLower")} ${t("compose.panel.lengthLower")} ${
                 chord.length
-              }${chordProbability < 1 ? ` ${chanceBadgeLabel(chordProbability)} chance` : ""}`}
+              }${chordProbability < 1 ? ` ${chanceBadgeLabel(chordProbability)} ${t("compose.panel.chance")}` : ""}`}
               aria-controls={`chord-event-editor-${index}`}
               aria-expanded={selected}
               className={["chord-slot", selected ? "selected" : "", playing ? "playing" : ""].filter(Boolean).join(" ")}
@@ -2926,7 +2987,7 @@ export function ChordEditor({
                   data-testid={`chord-delete-${index}`}
                   disabled={chords.length <= 1}
                   onClick={() => onDelete(index)}
-                  title="Delete chord event"
+                  title={t("compose.panel.chords.deleteTitle")}
                   type="button"
                 >
                   <Trash2 size={13} aria-hidden="true" />
@@ -2942,19 +3003,19 @@ export function ChordEditor({
               </div>
               <div className="chord-slot-summary" data-testid={`chord-summary-${index}`}>
                 <span>
-                  <small>Length</small>
+                  <small>{t("compose.panel.length")}</small>
                   <strong>{chord.length}</strong>
                 </span>
                 <span>
-                  <small>Velocity</small>
+                  <small>{t("compose.panel.velocity")}</small>
                   <strong>{chordVelocityPercent}%</strong>
                 </span>
                 <span>
-                  <small>Chance</small>
+                  <small>{t("compose.panel.chance")}</small>
                   <strong>{percentLabel(chordProbability)}</strong>
                 </span>
                 <small className="chord-slot-edit-state" data-testid={`chord-edit-state-${index}`}>
-                  {selected ? "Editing" : "Select to edit"}
+                  {selected ? t("compose.panel.chords.editing") : t("compose.panel.chords.selectToEdit")}
                 </small>
               </div>
               <div
@@ -2964,7 +3025,7 @@ export function ChordEditor({
                 id={`chord-event-editor-${index}`}
               >
                 <label>
-                  <span>Step</span>
+                  <span>{t("compose.panel.step")}</span>
                   <input
                     data-testid={`chord-step-${index}`}
                     max={16}
@@ -2976,7 +3037,7 @@ export function ChordEditor({
                   />
                 </label>
               <label>
-                <span>Root</span>
+                <span>{t("compose.panel.chords.root")}</span>
                 <select
                   data-testid={`chord-root-${index}`}
                   value={chord.root}
@@ -2990,7 +3051,7 @@ export function ChordEditor({
                 </select>
               </label>
               <label>
-                <span>Quality</span>
+                <span>{t("compose.panel.chords.quality")}</span>
                 <select
                   data-testid={`chord-quality-${index}`}
                   value={chord.quality}
@@ -3004,8 +3065,8 @@ export function ChordEditor({
                 </select>
               </label>
               <label>
-                <span>Voicing {chordInversionLabel(normalizeChordInversion(chord.inversion))}</span>
-                <div className="chord-inversion-row" aria-label={`Chord ${index + 1} inversion`}>
+                <span>{t("compose.panel.chords.voicing")} {chordInversionLabel(normalizeChordInversion(chord.inversion))}</span>
+                <div className="chord-inversion-row" aria-label={t("compose.panel.chords.inversionAria", { index: index + 1 })}>
                   {chordInversions.map((inversion) => (
                     <button
                       className={normalizeChordInversion(chord.inversion) === inversion ? "selected" : ""}
@@ -3020,7 +3081,7 @@ export function ChordEditor({
                 </div>
               </label>
               <label>
-                <span>Length {chord.length}</span>
+                <span>{t("compose.panel.length")} {chord.length}</span>
                 <div className="chord-value-inputs">
                   <input
                     data-testid={`chord-length-${index}`}
@@ -3032,7 +3093,7 @@ export function ChordEditor({
                     value={chord.length}
                   />
                   <input
-                    aria-label={`Chord ${index + 1} length`}
+                    aria-label={t("compose.panel.chords.lengthAria", { index: index + 1 })}
                     data-testid={`chord-length-input-${index}`}
                     max={8}
                     min={1}
@@ -3044,7 +3105,7 @@ export function ChordEditor({
                 </div>
               </label>
               <label>
-                <span>Velocity {Math.round(chord.velocity * 100)}%</span>
+                <span>{t("compose.panel.velocity")} {Math.round(chord.velocity * 100)}%</span>
                 <div className="chord-value-inputs">
                   <input
                     data-testid={`chord-velocity-${index}`}
@@ -3056,7 +3117,7 @@ export function ChordEditor({
                     value={chord.velocity}
                   />
                   <input
-                    aria-label={`Chord ${index + 1} velocity percent`}
+                    aria-label={t("compose.panel.chords.velocityPercentAria", { index: index + 1 })}
                     data-testid={`chord-velocity-input-${index}`}
                     max={100}
                     min={10}
@@ -3068,10 +3129,10 @@ export function ChordEditor({
                 </div>
               </label>
               <label>
-                <span>Chance {percentLabel(chord.probability)}</span>
+                <span>{t("compose.panel.chance")} {percentLabel(chord.probability)}</span>
                 <div className="chord-value-inputs">
                   <input
-                    aria-label={`Chord ${index + 1} probability`}
+                    aria-label={t("compose.panel.chords.probabilityAria", { index: index + 1 })}
                     data-testid={`chord-probability-${index}`}
                     max={1}
                     min={0}
@@ -3081,7 +3142,7 @@ export function ChordEditor({
                     value={normalizeEventProbability(chord.probability)}
                   />
                   <input
-                    aria-label={`Chord ${index + 1} probability percent`}
+                    aria-label={t("compose.panel.chords.probabilityPercentAria", { index: index + 1 })}
                     data-testid={`chord-probability-input-${index}`}
                     inputMode="numeric"
                     onChange={(event) => onChange(index, { probability: Number(event.target.value) / 100 })}
@@ -3111,16 +3172,18 @@ export function ChordEditor({
           }}
         >
           <span className="harmony-moves-copy">
-            <strong>Harmony Moves</strong>
-            <small>Progressions, reharmonization, rhythm, and voicing</small>
+            <strong>{t("compose.panel.chords.harmonyMoves")}</strong>
+            <small>{t("compose.panel.chords.harmonyMovesDetail")}</small>
           </span>
           <span className="harmony-moves-context">
-            {selectedChord ? `${selectedChord.root}${selectedChord.quality} selected` : "Select a chord"} · {chords.length} events
+            {selectedChord
+              ? t("compose.panel.chords.selectedChord", { chord: `${selectedChord.root}${selectedChord.quality}` })
+              : t("compose.panel.chords.selectChord")} · {t("compose.panel.eventCount", { count: chords.length })}
           </span>
           <ArrowDown className="harmony-moves-chevron" size={16} aria-hidden="true" />
         </summary>
         <div className="harmony-moves-content" data-testid="harmony-moves-content">
-          <div className="chord-preset-row" aria-label="Chord progression presets">
+          <div className="chord-preset-row" aria-label={t("compose.panel.chords.progressionPresetsAria")}>
             {chordProgressionPresetIds.map((preset) => (
               <button
                 data-testid={`chord-preset-${preset}`}
@@ -3148,7 +3211,7 @@ export function ChordEditor({
             <small data-testid="chord-move-preview-moves">{chordMovePreview.moveLabel}</small>
           </div>
           {chordMoveResult && <ChordMoveResultStrip result={chordMoveResult} />}
-          <div className="chord-pad-row" aria-label="Chord Pads">
+          <div className="chord-pad-row" aria-label={t("compose.panel.chords.padsAria")}>
             {chordPads.map((pad) => (
               <button
                 className={pad.selected ? "selected" : ""}
@@ -3170,10 +3233,10 @@ export function ChordEditor({
           </div>
           <div className="chord-rhythm-panel" data-testid="chord-rhythm-pads">
             <div className="chord-rhythm-heading">
-              <span>Chord Rhythm</span>
-              <strong>Length + Chance</strong>
+              <span>{t("compose.panel.chords.rhythm")}</span>
+              <strong>{t("compose.panel.chords.rhythmDetail")}</strong>
             </div>
-            <div className="chord-rhythm-row" aria-label="Chord Rhythm Pads">
+            <div className="chord-rhythm-row" aria-label={t("compose.panel.chords.rhythmPadsAria")}>
               {chordRhythms.map((rhythm) => (
                 <button
                   data-testid={`chord-rhythm-${rhythm.id}`}
@@ -3185,17 +3248,17 @@ export function ChordEditor({
                 >
                   <span>{rhythm.label}</span>
                   <strong>{rhythm.preview}</strong>
-                  <small>{rhythm.chanceCount} chance edit / {rhythm.detail}</small>
+                  <small>{t("compose.panel.chords.chanceEditCount", { count: rhythm.chanceCount })} / {rhythm.detail}</small>
                 </button>
               ))}
             </div>
           </div>
           <div className="chord-voicing-panel" data-testid="chord-voicing-pads">
             <div className="chord-voicing-heading">
-              <span>Chord Voicing</span>
-              <strong>Color + Shape</strong>
+              <span>{t("compose.panel.chords.voicingTitle")}</span>
+              <strong>{t("compose.panel.chords.voicingDetail")}</strong>
             </div>
-            <div className="chord-voicing-row" aria-label="Chord Voicing Pads">
+            <div className="chord-voicing-row" aria-label={t("compose.panel.chords.voicingPadsAria")}>
               {chordVoicings.map((voicing) => (
                 <button
                   className={voicing.selected ? "selected" : ""}
@@ -3220,6 +3283,7 @@ export function ChordEditor({
 }
 
 export function ChordMoveResultStrip({ result }: { result: ChordMoveResult }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`chord-move-result ${result.tone}`}
@@ -3249,11 +3313,11 @@ export function ChordMoveResultStrip({ result }: { result: ChordMoveResult }): R
       </div>
       <div className="chord-move-result-followup" data-testid="chord-move-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("compose.panel.audition")}</b>
           <em data-testid="chord-move-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("compose.panel.nextCheck")}</b>
           <em data-testid="chord-move-result-next-check">{result.nextCheck}</em>
         </span>
       </div>

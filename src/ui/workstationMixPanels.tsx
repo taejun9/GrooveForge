@@ -42,6 +42,7 @@ import type {
   StemAuditionPadOption
 } from "./workstationUiModel";
 import { exportDynamicsDb, formatDb, formatPercent, meterPercent } from "./workstationPatternTools";
+import { useLocalization } from "./localization";
 
 export function MixBalancePads({
   pads,
@@ -54,13 +55,14 @@ export function MixBalancePads({
   result: MixBalanceResult | null;
   onApply: (pad: MixBalancePadId) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const decision = createMixBalancePreviewDecision(preview);
 
   return (
     <div className="mix-balance-panel" data-testid="mix-balance-pads">
       <div className="mix-balance-heading">
-        <span>Mix Balance</span>
-        <strong>Rough posture</strong>
+        <span>{t("mix.panel.balance.title")}</span>
+        <strong>{t("mix.panel.balance.detail")}</strong>
       </div>
       <div
         className={`mix-balance-preview ${preview.tone}`}
@@ -76,7 +78,7 @@ export function MixBalancePads({
       </div>
       <MixBalancePreviewDecision summary={decision} onApply={() => onApply(decision.padId)} />
       {result && <MixBalanceResultStrip result={result} />}
-      <div className="mix-balance-row" aria-label="Mix Balance Pads">
+      <div className="mix-balance-row" aria-label={t("mix.panel.balance.padsAria")}>
         {pads.map((pad) => (
           <button
             data-testid={`mix-balance-${pad.id}`}
@@ -87,7 +89,7 @@ export function MixBalancePads({
           >
             <span>{pad.label}</span>
             <strong>{pad.preview}</strong>
-            <small>{pad.changedCount} moves / {pad.detail}</small>
+            <small>{t("mix.panel.moveCount", { count: pad.changedCount })} / {pad.detail}</small>
           </button>
         ))}
       </div>
@@ -102,6 +104,7 @@ export function MixBalancePreviewDecision({
   summary: MixBalancePreviewDecisionSummary;
   onApply: () => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`mix-balance-decision ${summary.tone}`}
@@ -119,7 +122,7 @@ export function MixBalancePreviewDecision({
         data-testid="mix-balance-decision-run"
         disabled={summary.disabled}
         onClick={onApply}
-        title={summary.disabled ? "Current mixer already matches this balance" : `Apply ${summary.padLabel}`}
+        title={summary.disabled ? t("mix.panel.balance.matchedTitle") : t("mix.panel.applyTarget", { target: summary.padLabel })}
         type="button"
       >
         <Gauge size={12} aria-hidden="true" />
@@ -149,6 +152,7 @@ function createMixBalancePreviewDecision(summary: MixBalancePreviewSummary): Mix
 }
 
 function MixBalanceResultStrip({ result }: { result: MixBalanceResult }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`mix-balance-result ${result.tone}`}
@@ -178,11 +182,11 @@ function MixBalanceResultStrip({ result }: { result: MixBalanceResult }): ReactE
       </div>
       <div className="mix-balance-result-followup" data-testid="mix-balance-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("mix.panel.audition")}</b>
           <em data-testid="mix-balance-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("mix.panel.nextCheck")}</b>
           <em data-testid="mix-balance-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -201,13 +205,14 @@ export function SpaceFxPads({
   result: SpaceFxResult | null;
   onApply: (pad: SpaceFxPadId) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const decision = createSpaceFxPreviewDecision(preview);
 
   return (
     <div className="space-fx-panel" data-testid="space-fx-pads">
       <div className="space-fx-heading">
-        <span>Space FX</span>
-        <strong>Built-in send</strong>
+        <span>{t("mix.panel.space.title")}</span>
+        <strong>{t("mix.panel.space.detail")}</strong>
       </div>
       <div
         className={`space-fx-preview ${preview.tone}`}
@@ -223,7 +228,7 @@ export function SpaceFxPads({
       </div>
       <SpaceFxPreviewDecision summary={decision} onApply={() => onApply(decision.padId)} />
       {result && <SpaceFxResultStrip result={result} />}
-      <div className="space-fx-row" aria-label="Space FX Pads">
+      <div className="space-fx-row" aria-label={t("mix.panel.space.padsAria")}>
         {pads.map((pad) => (
           <button
             data-testid={`space-fx-${pad.id}`}
@@ -234,7 +239,7 @@ export function SpaceFxPads({
           >
             <span>{pad.label}</span>
             <strong>{pad.preview}</strong>
-            <small>{pad.changedCount} sends / {pad.detail}</small>
+            <small>{t("mix.panel.sendCount", { count: pad.changedCount })} / {pad.detail}</small>
           </button>
         ))}
       </div>
@@ -249,6 +254,7 @@ export function SpaceFxPreviewDecision({
   summary: SpaceFxPreviewDecisionSummary;
   onApply: () => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`space-fx-decision ${summary.tone}`}
@@ -266,7 +272,7 @@ export function SpaceFxPreviewDecision({
         data-testid="space-fx-decision-run"
         disabled={summary.disabled}
         onClick={onApply}
-        title={summary.disabled ? "Current sends already match this space" : `Apply ${summary.padLabel}`}
+        title={summary.disabled ? t("mix.panel.space.matchedTitle") : t("mix.panel.applyTarget", { target: summary.padLabel })}
         type="button"
       >
         <SlidersHorizontal size={12} aria-hidden="true" />
@@ -296,6 +302,7 @@ function createSpaceFxPreviewDecision(summary: SpaceFxPreviewSummary): SpaceFxPr
 }
 
 function SpaceFxResultStrip({ result }: { result: SpaceFxResult }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`space-fx-result ${result.tone}`}
@@ -325,11 +332,11 @@ function SpaceFxResultStrip({ result }: { result: SpaceFxResult }): ReactElement
       </div>
       <div className="space-fx-result-followup" data-testid="space-fx-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("mix.panel.audition")}</b>
           <em data-testid="space-fx-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("mix.panel.nextCheck")}</b>
           <em data-testid="space-fx-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -344,13 +351,14 @@ export function StemAuditionPads({
   pads: StemAuditionPadOption[];
   onApply: (pad: StemAuditionPadId) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div className="stem-audition-panel" data-testid="stem-audition-pads">
       <div className="stem-audition-heading">
-        <span>Stem Audition</span>
-        <strong>Solo check</strong>
+        <span>{t("mix.panel.stemAudition.title")}</span>
+        <strong>{t("mix.panel.stemAudition.detail")}</strong>
       </div>
-      <div className="stem-audition-row" aria-label="Stem Audition Pads">
+      <div className="stem-audition-row" aria-label={t("mix.panel.stemAudition.padsAria")}>
         {pads.map((pad) => (
           <button
             className={pad.active ? "active" : ""}
@@ -362,7 +370,7 @@ export function StemAuditionPads({
           >
             <span>{pad.label}</span>
             <strong>{pad.preview}</strong>
-            <small>{pad.changedCount} moves / {pad.detail}</small>
+            <small>{t("mix.panel.moveCount", { count: pad.changedCount })} / {pad.detail}</small>
           </button>
         ))}
       </div>
@@ -383,6 +391,7 @@ export function MixSnapshotAB({
   onRecall: (slot: MixSnapshotSlotId) => void;
   onClear: () => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const slotIds: MixSnapshotSlotId[] = ["A", "B"];
   const decisionActionIsCapture = summary.decisionActionId.startsWith("capture");
 
@@ -406,50 +415,50 @@ export function MixSnapshotAB({
   return (
     <div className={`mix-snapshot-ab ${summary.tone}`} data-testid="mix-snapshot-ab">
       <div className="mix-snapshot-head">
-        <span>Mix Snapshot A/B</span>
-        <strong>Safer pass</strong>
-        <div className="mix-snapshot-actions" aria-label="Mix Snapshot A/B actions">
+        <span>{t("mix.panel.snapshot.title")}</span>
+        <strong>{t("mix.panel.snapshot.detail")}</strong>
+        <div className="mix-snapshot-actions" aria-label={t("mix.panel.snapshot.actionsAria")}>
           <button
             data-testid="mix-snapshot-capture-a"
             onClick={() => onCapture("A")}
-            title="Capture current mix as Snapshot A"
+            title={t("mix.panel.snapshot.captureTitle", { slot: "A" })}
             type="button"
           >
             <Save size={13} aria-hidden="true" />
-            <span>Capture A</span>
+            <span>{t("mix.panel.captureSlot", { slot: "A" })}</span>
           </button>
           <button
             data-testid="mix-snapshot-capture-b"
             onClick={() => onCapture("B")}
-            title="Capture current mix as Snapshot B"
+            title={t("mix.panel.snapshot.captureTitle", { slot: "B" })}
             type="button"
           >
             <Copy size={13} aria-hidden="true" />
-            <span>Capture B</span>
+            <span>{t("mix.panel.captureSlot", { slot: "B" })}</span>
           </button>
           <button
             data-testid="mix-snapshot-recall-a"
             disabled={!snapshots.A}
             onClick={() => onRecall("A")}
-            title={snapshots.A ? "Recall Snapshot A into the current mix" : "Capture Snapshot A before recall"}
+            title={snapshots.A ? t("mix.panel.snapshot.recallTitle", { slot: "A" }) : t("mix.panel.snapshot.captureBeforeRecall", { slot: "A" })}
             type="button"
           >
             <RotateCcw size={13} aria-hidden="true" />
-            <span>Recall A</span>
+            <span>{t("mix.panel.recallSlot", { slot: "A" })}</span>
           </button>
           <button
             data-testid="mix-snapshot-recall-b"
             disabled={!snapshots.B}
             onClick={() => onRecall("B")}
-            title={snapshots.B ? "Recall Snapshot B into the current mix" : "Capture Snapshot B before recall"}
+            title={snapshots.B ? t("mix.panel.snapshot.recallTitle", { slot: "B" }) : t("mix.panel.snapshot.captureBeforeRecall", { slot: "B" })}
             type="button"
           >
             <RotateCcw size={13} aria-hidden="true" />
-            <span>Recall B</span>
+            <span>{t("mix.panel.recallSlot", { slot: "B" })}</span>
           </button>
-          <button data-testid="mix-snapshot-clear" onClick={onClear} title="Clear Mix Snapshot A/B" type="button">
+          <button data-testid="mix-snapshot-clear" onClick={onClear} title={t("mix.panel.snapshot.clearTitle")} type="button">
             <X size={13} aria-hidden="true" />
-            <span>Clear</span>
+            <span>{t("mix.panel.clear")}</span>
           </button>
         </div>
       </div>
@@ -467,7 +476,7 @@ export function MixSnapshotAB({
           data-mix-snapshot-decision-action={summary.decisionActionId}
           data-testid="mix-snapshot-decision-run"
           onClick={runDecisionAction}
-          title={`Run ${summary.decisionActionLabel}: ${summary.decisionTitle}`}
+          title={t("mix.panel.runActionTitle", { action: summary.decisionActionLabel, detail: summary.decisionTitle })}
           type="button"
         >
           {decisionActionIsCapture ? (
@@ -503,22 +512,23 @@ function MixSnapshotSlotCard({
   snapshot: MixSnapshot | null;
   slot: MixSnapshotSlotId;
 }): ReactElement {
+  const { t } = useLocalization();
   const testSlot = slot.toLowerCase();
   if (!snapshot) {
     return (
       <div className="mix-snapshot-slot empty" data-testid={`mix-snapshot-slot-${testSlot}`}>
-        <span data-testid={`mix-snapshot-slot-${testSlot}-time`}>Mix {slot}</span>
-        <strong data-testid={`mix-snapshot-slot-${testSlot}-export`}>Empty slot</strong>
-        <small data-testid={`mix-snapshot-slot-${testSlot}-master`}>No master pass</small>
-        <small data-testid={`mix-snapshot-slot-${testSlot}-balance`}>No balance pass</small>
-        <small data-testid={`mix-snapshot-slot-${testSlot}-stems`}>No stem pass</small>
+        <span data-testid={`mix-snapshot-slot-${testSlot}-time`}>{t("mix.panel.snapshot.slot", { slot })}</span>
+        <strong data-testid={`mix-snapshot-slot-${testSlot}-export`}>{t("mix.panel.emptySlot")}</strong>
+        <small data-testid={`mix-snapshot-slot-${testSlot}-master`}>{t("mix.panel.snapshot.noMaster")}</small>
+        <small data-testid={`mix-snapshot-slot-${testSlot}-balance`}>{t("mix.panel.snapshot.noBalance")}</small>
+        <small data-testid={`mix-snapshot-slot-${testSlot}-stems`}>{t("mix.panel.snapshot.noStem")}</small>
       </div>
     );
   }
 
   return (
     <div className={`mix-snapshot-slot ${snapshot.tone}`} data-testid={`mix-snapshot-slot-${testSlot}`}>
-      <span data-testid={`mix-snapshot-slot-${testSlot}-time`}>Mix {slot} / {snapshot.capturedAtLabel}</span>
+      <span data-testid={`mix-snapshot-slot-${testSlot}-time`}>{t("mix.panel.snapshot.slotTime", { slot, time: snapshot.capturedAtLabel })}</span>
       <strong data-testid={`mix-snapshot-slot-${testSlot}-export`}>{snapshot.exportLabel}</strong>
       <small data-testid={`mix-snapshot-slot-${testSlot}-master`}>{snapshot.masterLabel}</small>
       <small data-testid={`mix-snapshot-slot-${testSlot}-balance`}>{snapshot.balanceLabel}</small>
@@ -538,13 +548,14 @@ export function MasterFinishPads({
   result: MasterFinishResult | null;
   onApply: (pad: MasterFinishPadId) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const decision = createMasterFinishPreviewDecision(preview);
 
   return (
     <div className="master-finish-panel" data-testid="master-finish-pads">
       <div className="master-finish-heading">
-        <span>Master Finish</span>
-        <strong>Output posture</strong>
+        <span>{t("mix.panel.masterFinish.title")}</span>
+        <strong>{t("mix.panel.masterFinish.detail")}</strong>
       </div>
       <div
         className={`master-finish-preview ${preview.tone}`}
@@ -561,7 +572,7 @@ export function MasterFinishPads({
       </div>
       <MasterFinishPreviewDecision summary={decision} onApply={() => onApply(decision.padId)} />
       {result && <MasterFinishResultStrip result={result} />}
-      <div className="master-finish-row" aria-label="Master Finish Pads">
+      <div className="master-finish-row" aria-label={t("mix.panel.masterFinish.padsAria")}>
         {pads.map((pad) => (
           <button
             data-testid={`master-finish-${pad.id}`}
@@ -572,7 +583,7 @@ export function MasterFinishPads({
           >
             <span>{pad.label}</span>
             <strong>{pad.preview}</strong>
-            <small>{pad.changedCount} moves / {pad.detail}</small>
+            <small>{t("mix.panel.moveCount", { count: pad.changedCount })} / {pad.detail}</small>
           </button>
         ))}
       </div>
@@ -587,6 +598,7 @@ export function MasterFinishPreviewDecision({
   summary: MasterFinishPreviewDecisionSummary;
   onApply: () => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`master-finish-decision ${summary.tone}`}
@@ -604,7 +616,7 @@ export function MasterFinishPreviewDecision({
         data-testid="master-finish-decision-run"
         disabled={summary.disabled}
         onClick={onApply}
-        title={summary.disabled ? "Current master already matches this finish" : `Apply ${summary.padLabel}`}
+        title={summary.disabled ? t("mix.panel.masterFinish.matchedTitle") : t("mix.panel.applyTarget", { target: summary.padLabel })}
         type="button"
       >
         <Gauge size={12} aria-hidden="true" />
@@ -634,6 +646,7 @@ function createMasterFinishPreviewDecision(summary: MasterFinishPreviewSummary):
 }
 
 function MasterFinishResultStrip({ result }: { result: MasterFinishResult }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`master-finish-result ${result.tone}`}
@@ -663,11 +676,11 @@ function MasterFinishResultStrip({ result }: { result: MasterFinishResult }): Re
       </div>
       <div className="master-finish-result-followup" data-testid="master-finish-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("mix.panel.audition")}</b>
           <em data-testid="master-finish-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("mix.panel.nextCheck")}</b>
           <em data-testid="master-finish-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -686,13 +699,14 @@ export function MasterAutomationPads({
   result: MasterAutomationResult | null;
   onApply: (pad: MasterAutomationPadId) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const decision = createMasterAutomationPreviewDecision(preview);
 
   return (
     <div className="master-finish-panel master-automation-panel" data-testid="master-automation-pads">
       <div className="master-finish-heading master-automation-heading">
-        <span>Master Automation</span>
-        <strong>Fade lane</strong>
+        <span>{t("mix.panel.masterAutomation.title")}</span>
+        <strong>{t("mix.panel.masterAutomation.detail")}</strong>
       </div>
       <div
         className={`master-finish-preview master-automation-preview ${preview.tone}`}
@@ -709,7 +723,7 @@ export function MasterAutomationPads({
       </div>
       <MasterAutomationPreviewDecision summary={decision} onApply={() => onApply(decision.padId)} />
       {result && <MasterAutomationResultStrip result={result} />}
-      <div className="master-finish-row master-automation-row" aria-label="Master Automation Pads">
+      <div className="master-finish-row master-automation-row" aria-label={t("mix.panel.masterAutomation.padsAria")}>
         {pads.map((pad) => (
           <button
             className={pad.active ? "active" : ""}
@@ -721,7 +735,7 @@ export function MasterAutomationPads({
           >
             <span>{pad.label}</span>
             <strong>{pad.preview}</strong>
-            <small>{pad.changedCount} events / {pad.detail}</small>
+            <small>{t("mix.panel.eventCount", { count: pad.changedCount })} / {pad.detail}</small>
           </button>
         ))}
       </div>
@@ -736,6 +750,7 @@ export function MasterAutomationPreviewDecision({
   summary: MasterAutomationPreviewDecisionSummary;
   onApply: () => void;
 }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`master-finish-decision master-automation-decision ${summary.tone}`}
@@ -753,7 +768,7 @@ export function MasterAutomationPreviewDecision({
         data-testid="master-automation-decision-run"
         disabled={summary.disabled}
         onClick={onApply}
-        title={summary.disabled ? "Current master automation already matches this fade" : `Apply ${summary.padLabel}`}
+        title={summary.disabled ? t("mix.panel.masterAutomation.matchedTitle") : t("mix.panel.applyTarget", { target: summary.padLabel })}
         type="button"
       >
         <Gauge size={12} aria-hidden="true" />
@@ -785,6 +800,7 @@ function createMasterAutomationPreviewDecision(
 }
 
 function MasterAutomationResultStrip({ result }: { result: MasterAutomationResult }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`master-finish-result master-automation-result ${result.tone}`}
@@ -814,11 +830,11 @@ function MasterAutomationResultStrip({ result }: { result: MasterAutomationResul
       </div>
       <div className="master-finish-result-followup master-automation-result-followup" data-testid="master-automation-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("mix.panel.audition")}</b>
           <em data-testid="master-automation-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("mix.panel.nextCheck")}</b>
           <em data-testid="master-automation-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -827,23 +843,24 @@ function MasterAutomationResultStrip({ result }: { result: MasterAutomationResul
 }
 
 export function ExportMeter({ analysis }: { analysis: ExportAnalysis }): ReactElement {
+  const { t } = useLocalization();
   const peakPercent = meterPercent(analysis.peakDb, analysis.ceilingDb);
   const rmsPercent = meterPercent(analysis.rmsDb, analysis.ceilingDb);
   const dynamicsDb = exportDynamicsDb(analysis);
   return (
     <div className="export-meter" data-testid="export-meter">
       <div className={`meter-status ${analysis.status.toLowerCase().replace(/[^a-z]+/g, "-")}`}>
-        <span>Export meter</span>
+        <span>{t("mix.panel.meter.export")}</span>
         <strong data-testid="export-meter-status">{analysis.status}</strong>
       </div>
       <div className="meter-bars">
-        <MeterBar label="Peak" percent={peakPercent} value={formatDb(analysis.peakDb)} testId="export-peak-db" />
+        <MeterBar label={t("mix.panel.meter.peak")} percent={peakPercent} value={formatDb(analysis.peakDb)} testId="export-peak-db" />
         <MeterBar label="RMS" percent={rmsPercent} value={formatDb(analysis.rmsDb)} testId="export-rms-db" />
       </div>
       <div className="meter-stats">
-        <span data-testid="export-headroom-db">Headroom {formatDb(analysis.headroomDb)}</span>
-        <span data-testid="export-dynamics-db">Dynamics {formatDb(dynamicsDb)}</span>
-        <span data-testid="export-limiter-percent">Limiter {formatPercent(analysis.limitedPercent)}</span>
+        <span data-testid="export-headroom-db">{t("mix.panel.meter.headroom")} {formatDb(analysis.headroomDb)}</span>
+        <span data-testid="export-dynamics-db">{t("mix.panel.meter.dynamics")} {formatDb(dynamicsDb)}</span>
+        <span data-testid="export-limiter-percent">{t("mix.panel.meter.limiter")} {formatPercent(analysis.limitedPercent)}</span>
         <span>{analysis.durationSeconds.toFixed(1)} sec</span>
       </div>
     </div>
@@ -871,13 +888,18 @@ export function MixCoach({
   onApplyFix: (preset: MixFixPreset) => void;
   onFocusCheck: (check: MixCoachCheck) => void;
 }): ReactElement {
+  const { t } = useLocalization();
   const priority = createMixCoachPriority(checks);
+  const warningCount = checks.filter((check) => check.tone !== "good").length;
+  const summaryLabel = warningCount === 0
+    ? t("mix.panel.coach.readyChecks")
+    : t("mix.panel.coach.reviewCount", { count: warningCount });
 
   return (
     <div className="mix-coach" data-testid="mix-coach">
       <div className="mix-coach-heading">
-        <span>Mix Coach</span>
-        <strong data-testid="mix-coach-summary">{mixCoachSummary(checks)}</strong>
+        <span>{t("mix.panel.coach.title")}</span>
+        <strong data-testid="mix-coach-summary">{summaryLabel}</strong>
       </div>
       <div
         className={`mix-coach-focus-readout ${focusSummary.tone}`}
@@ -932,18 +954,18 @@ export function MixCoach({
                   className="mix-coach-focus-button"
                   data-testid={`mix-coach-focus-${check.id}`}
                   onClick={() => onFocusCheck(check)}
-                  title={`Focus ${check.label}: ${check.status}`}
+                  title={t("mix.panel.coach.focusTitle", { label: check.label, status: check.status })}
                   type="button"
                 >
                   <Target size={13} aria-hidden="true" />
-                  <span>{focused ? "Focused" : "Focus"}</span>
+                  <span>{focused ? t("mix.panel.coach.focused") : t("mix.panel.coach.focus")}</span>
                 </button>
               </div>
             </div>
           );
         })}
       </div>
-      <div className="mix-fix-row" aria-label="Mix fixes">
+      <div className="mix-fix-row" aria-label={t("mix.panel.coach.fixesAria")}>
         {fixes.map((fix) => (
           <button
             className={fix.tone}
@@ -1051,6 +1073,7 @@ function MixCoachFocusResultStrip({ result }: { result: MixCoachFocusResult }): 
 }
 
 function MixFixResultStrip({ result }: { result: MixFixResult }): ReactElement {
+  const { t } = useLocalization();
   return (
     <div
       className={`mix-fix-result ${result.tone}`}
@@ -1080,11 +1103,11 @@ function MixFixResultStrip({ result }: { result: MixFixResult }): ReactElement {
       </div>
       <div className="mix-fix-result-followup" data-testid="mix-fix-result-followup">
         <span>
-          <b>Audition</b>
+          <b>{t("mix.panel.audition")}</b>
           <em data-testid="mix-fix-result-audition">{result.auditionCue}</em>
         </span>
         <span>
-          <b>Next check</b>
+          <b>{t("mix.panel.nextCheck")}</b>
           <em data-testid="mix-fix-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
@@ -1099,6 +1122,7 @@ export function StemLevelMeter({
   trackId: StemTrackId;
   analysis: ExportAnalysis;
 }): ReactElement {
+  const { t } = useLocalization();
   const peakPercent = meterPercent(analysis.peakDb, analysis.ceilingDb);
   const rmsPercent = meterPercent(analysis.rmsDb, analysis.ceilingDb);
   const statusClass = analysis.status.toLowerCase().replace(/[^a-z]+/g, "-");
@@ -1106,15 +1130,15 @@ export function StemLevelMeter({
   return (
     <div className="stem-meter" data-testid={`stem-level-meter-${trackId}`}>
       <div className={`stem-meter-status ${statusClass}`}>
-        <span>Stem</span>
+        <span>{t("mix.panel.meter.stem")}</span>
         <strong data-testid={`stem-status-${trackId}`}>{analysis.status}</strong>
       </div>
       <div className="stem-meter-bars">
-        <MeterBar label="Pk" percent={peakPercent} value={formatDb(analysis.peakDb)} testId={`stem-peak-db-${trackId}`} />
+        <MeterBar label={t("mix.panel.meter.peakShort")} percent={peakPercent} value={formatDb(analysis.peakDb)} testId={`stem-peak-db-${trackId}`} />
         <MeterBar label="RMS" percent={rmsPercent} value={formatDb(analysis.rmsDb)} testId={`stem-rms-db-${trackId}`} />
       </div>
       <div className="stem-meter-stats">
-        <span data-testid={`stem-headroom-db-${trackId}`}>Headroom {formatDb(analysis.headroomDb)}</span>
+        <span data-testid={`stem-headroom-db-${trackId}`}>{t("mix.panel.meter.headroom")} {formatDb(analysis.headroomDb)}</span>
       </div>
     </div>
   );
@@ -1140,12 +1164,4 @@ function MeterBar({
       <strong data-testid={testId}>{value}</strong>
     </div>
   );
-}
-
-function mixCoachSummary(checks: MixCoachCheck[]): string {
-  const warningCount = checks.filter((check) => check.tone !== "good").length;
-  if (warningCount === 0) {
-    return "Ready checks";
-  }
-  return `${warningCount} check${warningCount === 1 ? "" : "s"} to review`;
 }

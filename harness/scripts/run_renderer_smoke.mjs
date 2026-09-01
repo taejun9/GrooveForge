@@ -7,6 +7,8 @@
  */
 
 import { readFileSync } from "node:fs";
+import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
@@ -41,6 +43,10 @@ const workflowNavigatorAnalysisPostureSource = readFileSync(
 );
 const workstationSource = readFileSync(new URL("../../src/domain/workstation.ts", import.meta.url), "utf8");
 const electronMainSource = readFileSync(new URL("../../electron/main.ts", import.meta.url), "utf8");
+const nativeDialogOptionsSource = readFileSync(
+  new URL("../../electron/nativeDialogOptions.ts", import.meta.url),
+  "utf8"
+);
 const electronPreloadSource = readFileSync(new URL("../../electron/preload.cts", import.meta.url), "utf8");
 const projectLibrarySource = readFileSync(new URL("../../electron/projectLibrary.ts", import.meta.url), "utf8");
 const projectWorkspaceSource = readFileSync(new URL("../../electron/projectWorkspace.ts", import.meta.url), "utf8");
@@ -60,6 +66,9 @@ const desktopManualQaSource = readFileSync(new URL("./run_desktop_manual_qa.mjs"
 const shellSource = readFileSync(new URL("../../src/ui/workstationShellPanels.tsx", import.meta.url), "utf8");
 const styleChangeDialogSource = readFileSync(new URL("../../src/ui/StyleChangeDialog.tsx", import.meta.url), "utf8");
 const styleChangePreviewSource = readFileSync(new URL("../../src/ui/styleChangePreview.ts", import.meta.url), "utf8");
+const localizationSource = readFileSync(new URL("../../src/ui/localization.tsx", import.meta.url), "utf8");
+const settingsDialogSource = readFileSync(new URL("../../src/ui/SettingsDialog.tsx", import.meta.url), "utf8");
+const modalFocusTrapSource = readFileSync(new URL("../../src/ui/useModalFocusTrap.ts", import.meta.url), "utf8");
 const launchBearingPackageSources = [
   "run_desktop_package_smoke.mjs",
   "run_desktop_adhoc_sign_smoke.mjs",
@@ -281,8 +290,8 @@ function validateStyleChangeSafety(styleChange) {
   check(
     appSource.includes("<StyleChangeDialog") &&
       appSource.includes('aria-describedby="style-change-behavior"') &&
-      appSource.includes("review before Apply") &&
-      !appSource.includes('aria-haspopup="dialog"') &&
+      localizationSource.includes("review before Apply") &&
+      !/data-testid="style-select"[^>]*aria-haspopup="dialog"[^>]*>/u.test(appSource) &&
       appSource.includes("styleChangeReturnFocusRef.current") &&
       appSource.includes("requestedTarget?.isConnected") &&
       appSource.includes("void selectStyle(event.target.value") &&
@@ -292,8 +301,8 @@ function validateStyleChangeSafety(styleChange) {
       styleChangeDialogSource.includes('data-testid="style-change-apply"') &&
       styleChangeDialogSource.includes('event.key === "Escape"') &&
       styleChangeDialogSource.includes("useModalFocusTrap(preview !== null") &&
-      styleChangeDialogSource.includes("Nothing has changed yet") &&
-      styleChangeDialogSource.includes("Undo restores the current beat") &&
+      localizationSource.includes("Nothing has changed yet") &&
+      localizationSource.includes("Undo restores the current beat") &&
       styleChangePreviewSource.includes("patterns: createStylePatternSet(styleId, project.key)"),
     "Style confirmation dialog should expose preview/apply/cancel, keyboard focus, and undo guidance"
   );
@@ -333,6 +342,81 @@ function validateStyleChangeSafety(styleChange) {
       appliedResult.status === "Applied",
     "Style Quick Actions should distinguish Cancel from Apply in post-run result feedback"
   );
+}
+
+function validateNativeDialogOptions(nativeDialogOptions) {
+  const projectsDirectory = path.join(process.cwd(), "qa-fixtures", "GrooveForge Projects");
+  const defaultName = "My Beat.grooveforge.json";
+  const expected = {
+    en: {
+      save: {
+        title: "Save GrooveForge Project",
+        buttonLabel: "Save",
+        defaultPath: path.join(projectsDirectory, defaultName),
+        filters: [{ name: "GrooveForge Project", extensions: ["json"] }]
+      },
+      open: {
+        title: "Open GrooveForge Project",
+        buttonLabel: "Open",
+        defaultPath: projectsDirectory,
+        filters: [{ name: "GrooveForge Project", extensions: ["json"] }],
+        properties: ["openFile"]
+      },
+      close: {
+        type: "warning",
+        buttons: ["Save and close", "Close without a project file", "Keep editing"],
+        defaultId: 0,
+        cancelId: 2,
+        title: "Unsaved GrooveForge work",
+        message: "Save this project before closing GrooveForge?",
+        detail:
+          "Save and close creates a durable .grooveforge.json project file. Newer edits or a recovery draft that has not been restored keep GrooveForge open for review.",
+        noLink: true
+      }
+    },
+    ko: {
+      save: {
+        title: "GrooveForge 프로젝트 저장",
+        buttonLabel: "저장",
+        defaultPath: path.join(projectsDirectory, defaultName),
+        filters: [{ name: "GrooveForge 프로젝트", extensions: ["json"] }]
+      },
+      open: {
+        title: "GrooveForge 프로젝트 열기",
+        buttonLabel: "열기",
+        defaultPath: projectsDirectory,
+        filters: [{ name: "GrooveForge 프로젝트", extensions: ["json"] }],
+        properties: ["openFile"]
+      },
+      close: {
+        type: "warning",
+        buttons: ["저장 후 닫기", "프로젝트 파일 없이 닫기", "계속 편집"],
+        defaultId: 0,
+        cancelId: 2,
+        title: "저장되지 않은 GrooveForge 작업",
+        message: "GrooveForge를 닫기 전에 이 프로젝트를 저장할까요?",
+        detail:
+          "저장 후 닫기를 선택하면 영구 보관되는 .grooveforge.json 프로젝트 파일을 만듭니다. 아직 복원하지 않은 최신 편집 내용이나 복구 초안이 있으면 검토할 수 있도록 GrooveForge를 계속 열어 둡니다.",
+        noLink: true
+      }
+    }
+  };
+
+  for (const locale of ["en", "ko"]) {
+    const actual = {
+      save: nativeDialogOptions.createNativeSaveProjectDialogOptions(
+        locale,
+        projectsDirectory,
+        defaultName
+      ),
+      open: nativeDialogOptions.createNativeOpenProjectDialogOptions(locale, projectsDirectory),
+      close: nativeDialogOptions.createNativeUnsavedCloseDialogOptions(locale)
+    };
+    check(
+      isDeepStrictEqual(actual, expected[locale]),
+      `${locale} native dialog factories should exactly match the independent title, buttons, paths, filters, properties, and close-copy contract`
+    );
+  }
 }
 
 function validateProjectCloseGuard(closeGuard) {
@@ -376,9 +460,13 @@ function validateProjectCloseGuard(closeGuard) {
   );
   check(
     createWindowSource.includes('win.webContents.on("will-prevent-unload"') &&
-      createWindowSource.includes('buttons: ["Save and close", "Close without a project file", "Keep editing"]') &&
-      createWindowSource.includes("defaultId: saveAndCloseChoiceId") &&
-      createWindowSource.includes("cancelId: keepEditingChoiceId") &&
+      createWindowSource.includes(
+        "dialog.showMessageBoxSync(win, createNativeUnsavedCloseDialogOptions(nativeMenuLocale))"
+      ) &&
+      nativeDialogOptionsSource.includes('saveAndClose: "Save and close"') &&
+      nativeDialogOptionsSource.includes('saveAndClose: "저장 후 닫기"') &&
+      nativeDialogOptionsSource.includes("defaultId: saveAndCloseChoiceId") &&
+      nativeDialogOptionsSource.includes("cancelId: keepEditingChoiceId") &&
       createWindowSource.includes('action === "save-and-close"') &&
       createWindowSource.includes('win.webContents.send(menuCommandChannel, "save-project-and-close")') &&
       /if \(action === "close-without-project-file"\) \{\s*event\.preventDefault\(\);/u.test(createWindowSource),
@@ -922,6 +1010,24 @@ function validateLocalDraftRecoveryDeferral(shell, helpers, draftLifecycle, work
     null,
     false
   );
+  const deferredKoreanSummary = helpers.createProjectSafetyReadoutSummary(
+    recovery,
+    true,
+    recovery.savedAt,
+    "Editable 8-bar foundation",
+    null,
+    false,
+    "ko"
+  );
+  const activeKoreanSummary = helpers.createProjectSafetyReadoutSummary(
+    recovery,
+    false,
+    recovery.savedAt,
+    "Editable 8-bar foundation",
+    null,
+    false,
+    "ko"
+  );
   const deferHandlerSource = printNamedFunction(appSource, "App.tsx", "deferLocalDraftRecovery");
   const restoreHistorySource = printNamedFunction(appSource, "App.tsx", "restoreProjectFromHistory");
   const replacementGate = draftLifecycle.resolveLocalDraftWriteGate(false, true);
@@ -948,6 +1054,17 @@ function validateLocalDraftRecoveryDeferral(shell, helpers, draftLifecycle, work
   check(
     activeSummary.statusLabel === "Draft found" && activeSummary.roleLabel === "Restore or clear",
     "active recovery should preserve the explicit Restore or Clear decision"
+  );
+  check(
+    deferredKoreanSummary.statusLabel === "복구본 보류됨" &&
+      deferredKoreanSummary.roleLabel === "현재 프로젝트 유지됨" &&
+      deferredKoreanSummary.detailLabel.includes("작업 메뉴에서 사용 가능") &&
+      activeKoreanSummary.statusLabel === "초안 발견됨" &&
+      activeKoreanSummary.roleLabel === "복원 또는 지우기" &&
+      !/(?:Recovery set aside|Current project kept|Draft found|Restore or clear|available in Actions)/u.test(
+        JSON.stringify({ deferredKoreanSummary, activeKoreanSummary })
+      ),
+    "Korean project-safety recovery states should localize visible and title copy while preserving the same recovery decisions"
   );
   check(
     deferHandlerSource.includes("setLocalDraftRecoveryDeferred(true)") &&
@@ -1087,7 +1204,8 @@ function validateWorkspaceCommandDockSource(html) {
       "workspace-command-dock-redo",
       "workspace-command-dock-save"
     ].every((testId) => appSource.includes(`data-testid="${testId}"`)) &&
-      appSource.includes('aria-label="Workspace command dock"') &&
+      appSource.includes('aria-label={t("core.commandDockAria")}') &&
+      localizationSource.includes('"core.commandDockAria": "Workspace command dock"') &&
       appSource.includes('role="toolbar"') &&
       appSource.includes('data-workspace-command-dock-visible={workspaceCommandDockVisible}'),
     "the workspace command dock should expose a labeled toolbar, live position, and stable essential-control hooks"
@@ -1484,8 +1602,10 @@ function validateQuickActionLoadStates(shell) {
   );
   check(
     styles.includes(".quick-actions-keyboard-selection") &&
-      styles.includes(".quick-action-row.keyboard-selected .quick-action-run"),
-    "Quick Actions keyboard selection should retain dedicated status and selected-row styling"
+      styles.includes(".quick-action-row.keyboard-selected .quick-action-run") &&
+      styles.includes("overflow-y: auto;") &&
+      styles.includes("min-height: 64px;"),
+    "Quick Actions should retain keyboard selection styling and a scrollable, nonzero result surface at the desktop minimum"
   );
 }
 
@@ -1554,11 +1674,13 @@ function validateWorkspaceFunctionTabs(html) {
   );
   check(
     appSource.includes("activeZone={activeWorkspaceZone}") &&
-      appSource.includes('className="workspace-tabpanels" data-active-workspace-zone={activeWorkspaceZone}'),
+      appSource.includes('className="workspace-tabpanels"') &&
+      appSource.includes("data-active-workspace-zone={activeWorkspaceZone}"),
     "App should share one active workspace zone between Workflow Navigator and the tabpanel container"
   );
 
-  const tablistLabelIndex = html.indexOf('aria-label="Workstation function tabs"');
+  const firstMainTabsLabelIndex = html.indexOf('aria-label="Main production tabs"');
+  const tablistLabelIndex = html.indexOf('aria-label="Main production tabs"', firstMainTabsLabelIndex + 1);
   const tablistTagStart = tablistLabelIndex >= 0 ? html.lastIndexOf("<div", tablistLabelIndex) : -1;
   const tablistTagEnd = tablistLabelIndex >= 0 ? html.indexOf(">", tablistLabelIndex) : -1;
   const tablistTag =
@@ -1572,7 +1694,7 @@ function validateWorkspaceFunctionTabs(html) {
     "Workflow Navigator should expose a labelled horizontal workstation function tablist"
   );
   const workspaceTabsSurfaceIndex = html.indexOf('data-testid="workspace-tabs-surface"');
-  const workspaceTabsHeadingIndex = html.indexOf("WORKSPACE TABS");
+  const workspaceTabsHeadingIndex = html.indexOf("MAIN TABS");
   check(
     workspaceTabsSurfaceIndex >= 0 &&
       workspaceTabsHeadingIndex > workspaceTabsSurfaceIndex &&
@@ -1580,7 +1702,7 @@ function validateWorkspaceFunctionTabs(html) {
       html.includes('data-active-workspace-tab="compose"') &&
       html.includes('id="workspace-tabs-title"') &&
       html.includes('class="workflow-tab-status" aria-hidden="true">ACTIVE</span>'),
-    "function tabs should live in a dedicated labelled WORKSPACE TABS surface with an explicit active-state badge"
+    "function tabs should live in a dedicated labelled MAIN TABS surface with an explicit active-state badge"
   );
 
   const tabTags = Object.fromEntries(
@@ -1590,12 +1712,19 @@ function validateWorkspaceFunctionTabs(html) {
     zones.map((zone) => [zone, openingTagById("section", `workspace-panel-${zone}`)])
   );
   const composePageIds = ["drums", "notes", "instruments"];
+  const arrangePageIds = ["timeline", "structure"];
   const mixPageIds = ["mixer", "master"];
   const composePageTabTags = Object.fromEntries(
     composePageIds.map((page) => [page, openingTagById("button", `compose-page-tab-${page}`)])
   );
   const composePagePanelTags = Object.fromEntries(
     composePageIds.map((page) => [page, openingTagById("section", `compose-page-panel-${page}`)])
+  );
+  const arrangePageTabTags = Object.fromEntries(
+    arrangePageIds.map((page) => [page, openingTagById("button", `arrange-page-tab-${page}`)])
+  );
+  const arrangePagePanelTags = Object.fromEntries(
+    arrangePageIds.map((page) => [page, openingTagById("section", `arrange-page-panel-${page}`)])
   );
   const mixPageTabTags = Object.fromEntries(
     mixPageIds.map((page) => [page, openingTagById("button", `mix-page-tab-${page}`)])
@@ -1644,7 +1773,7 @@ function validateWorkspaceFunctionTabs(html) {
   );
   check(
     html.includes('data-testid="compose-page-tabs"') &&
-      html.includes('aria-label="Compose editor pages"') &&
+      html.includes('aria-label="Compose sub tabs"') &&
       composePageIds.every(
         (page) =>
           composePageTabTags[page].includes('role="tab"') &&
@@ -1666,8 +1795,30 @@ function validateWorkspaceFunctionTabs(html) {
     "Compose should expose three labelled, roving, mutually exclusive full-width editor pages"
   );
   check(
+    html.includes('data-testid="arrange-page-tabs"') &&
+      html.includes('aria-label="Arrange sub tabs"') &&
+      arrangePageIds.every(
+        (page) =>
+          arrangePageTabTags[page].includes('role="tab"') &&
+          arrangePageTabTags[page].includes(`aria-controls="arrange-page-panel-${page}"`) &&
+          arrangePagePanelTags[page].includes('role="tabpanel"') &&
+          arrangePagePanelTags[page].includes(`aria-labelledby="arrange-page-tab-${page}"`) &&
+          arrangePagePanelTags[page].includes(`data-workspace-page="${page}"`)
+      ) &&
+      arrangePageTabTags.timeline.includes('aria-selected="true"') &&
+      arrangePageTabTags.timeline.includes('tabindex="0"') &&
+      !arrangePagePanelTags.timeline.includes('hidden=""') &&
+      arrangePageTabTags.structure.includes('aria-selected="false"') &&
+      arrangePageTabTags.structure.includes('tabindex="-1"') &&
+      arrangePagePanelTags.structure.includes('hidden=""') &&
+      arrangePagePanelTags.structure.includes('tabindex="-1"') &&
+      appSource.includes('activateArrangeWorkspacePage(page, true)') &&
+      appSource.includes('flushSync(() => activateArrangeWorkspacePage(page))'),
+    "Arrange should expose separate Timeline and Structure sub tabs with the shared reveal contract"
+  );
+  check(
     html.includes('data-testid="mix-page-tabs"') &&
-      html.includes('aria-label="Mix editor pages"') &&
+      html.includes('aria-label="Mix sub tabs"') &&
       mixPageIds.every(
         (page) =>
           mixPageTabTags[page].includes('role="tab"') &&
@@ -1965,7 +2116,7 @@ function validateProjectAudioAnalysisPerformance(html, helpers) {
       projectAudioAnalysisHookSource.includes("setRetryRequest") &&
       projectAudioAnalysisHookSource.includes("generation: current.generation + 1") &&
       appSource.includes('data-audio-analysis-state={projectAudioAnalysis.status}') &&
-      appSource.includes('"Audio meters unavailable"') &&
+      localizationSource.includes('"Audio meters unavailable"') &&
       appSource.includes('data-testid="audio-analysis-retry"') &&
       appSource.includes("onClick={retryCurrentProjectAudioAnalysis}") &&
       styles.includes(".session-meter .audio-analysis-retry:focus-visible"),
@@ -1993,10 +2144,16 @@ function validateProjectAudioAnalysisPerformance(html, helpers) {
     })
   );
   check(
-    analysisGateSource.includes('"Analyzing"') &&
-      analysisGateSource.includes('"Meters unavailable"') &&
-      workstationHelpersSource.includes("Meter values, readiness claims, and delivery actions stay hidden") &&
-      workstationHelpersSource.includes("Retry meters") &&
+    analysisGateSource.includes('t("analysis.analyzing")') &&
+      analysisGateSource.includes('t("analysis.metersUnavailable")') &&
+      workstationHelpersSource.includes('t("analysis.hiddenDetail")') &&
+      workstationHelpersSource.includes('t("analysis.retry")') &&
+      localizationSource.includes('"analysis.analyzing": "Analyzing"') &&
+      localizationSource.includes('"analysis.metersUnavailable": "Meters unavailable"') &&
+      localizationSource.includes(
+        '"analysis.hiddenDetail": "Meter values, readiness claims, and delivery actions stay hidden until analysis is exact."'
+      ) &&
+      localizationSource.includes('"analysis.retry": "Retry meters"') &&
       workstationHelpersSource.includes('data-testid={`audio-analysis-gate-${surface.toLowerCase()}`}') &&
       appSource.includes("exactProjectAudioAnalysisReady && isStemTrackId(channel.id)") &&
       appSource.includes("exactProjectAudioAnalysisReady ? (") &&
@@ -2157,6 +2314,7 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
   const workspaceActivationSource = printNamedFunction(appSource, "App.tsx", "activateWorkspaceZone");
   const workspaceScrollSource = printNamedFunction(appSource, "App.tsx", "scrollWorkspaceTargetIntoView");
   const workspaceRouteSource = printNamedFunction(appSource, "App.tsx", "routeWorkspaceTargetIntoView");
+  const workspaceRoutePageSource = printNamedFunction(appSource, "App.tsx", "activateWorkspaceRoutePage");
   const guidanceScrollSource = printNamedFunction(appSource, "App.tsx", "scrollGuidanceTargetIntoView");
   const beatPassportRouteSource = printNamedFunction(appSource, "App.tsx", "focusBeatPassportRouteReadout");
   const runQuickActionSource = printNamedFunction(appSource, "App.tsx", "runQuickAction");
@@ -2200,6 +2358,27 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
     route,
     source: printNamedFunction(appSource, "App.tsx", name)
   }));
+  const structureWorkspaceReadoutRoutes = [
+    "focusPatternChainReadout",
+    "focusChainExpandReadout",
+    "focusArrangementTemplateReadout",
+    "focusArrangementArcReadout",
+    "focusArrangementFocusReadout",
+    "focusSectionLocatorReadout",
+    "focusSongFormOverviewReadout",
+    "focusArrangementTransitionMapTransition",
+    "focusArrangementTransitionMapReadout"
+  ].map((name) => printNamedFunction(appSource, "App.tsx", name));
+  const timelineWorkspaceReadoutRoutes = [
+    "focusArrangementMoveReadout",
+    "focusPatternUseReadout",
+    "focusArrangementPlaybackReadout",
+    "focusSelectedArrangementBlockReadout",
+    "focusAudibleArrangementFollowReadout"
+  ].map((name) => printNamedFunction(appSource, "App.tsx", name));
+  const muteMapWorkspaceReadoutRoutes = ["focusArrangementMuteMapLane", "focusArrangementMuteMapReadout"].map(
+    (name) => printNamedFunction(appSource, "App.tsx", name)
+  );
   check(
     html.includes("Guided · opens the drum grid") &&
       html.includes("Studio · opens Review Queue") &&
@@ -2211,6 +2390,8 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
   );
   const zoneResolutionIndex = workspaceScrollSource.indexOf("zoneHint ?? workspaceZoneForTarget(initialTarget)");
   const zoneActivationIndex = workspaceScrollSource.indexOf("activateWorkspaceZone(zone)");
+  const routeZoneActivationIndex = workspaceRouteSource.indexOf("activateWorkspaceZone(zone)");
+  const routePageActivationIndex = workspaceRouteSource.indexOf("activateWorkspaceRoutePage(target)");
   const focusTransferIndex = workspaceScrollSource.indexOf("if (shouldTransferFocus)");
   const targetFocusIndex = workspaceScrollSource.indexOf("target.focus({ preventScroll: true })");
   const panelFocusFallbackIndex = workspaceScrollSource.indexOf(
@@ -2244,7 +2425,15 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       !workspaceScrollSource.includes("window.innerWidth < 1221") &&
       workspaceScrollSource.includes("navigator.getBoundingClientRect().bottom + 12") &&
       workspaceScrollSource.includes('window.scrollBy({ top: targetTop - desiredTop, behavior: "auto" })') &&
+      workspaceRouteSource.includes('target === "arrange-mute-map"') &&
+      workspaceRouteSource.includes(
+        'arrangeStructurePanelRef.current?.scrollIntoView({ block, behavior: "auto" })'
+      ) &&
+      workspaceRouteSource.includes("requestAnimationFrame(() => {") &&
+      workspaceRouteSource.includes("return;") &&
       workspaceRouteSource.includes("scrollWorkspaceTargetIntoView(() => workspaceRouteElement(target), block, zone)") &&
+      routeZoneActivationIndex >= 0 &&
+      routePageActivationIndex > routeZoneActivationIndex &&
       workspaceScrollSource.includes('document.getElementById(`workspace-panel-${zone}`)') &&
       coldWorkspaceRouteSources.every((source) => source.includes("routeWorkspaceTargetIntoView")) &&
       workflowJumpSource.includes("routeWorkspaceTargetIntoView(zone)") &&
@@ -2267,6 +2456,37 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
         appSource
       ),
     "cold Quick Action readouts should resolve functional-tab targets only after the destination Activity is activated"
+  );
+  check(
+    appSource.includes('| "arrange-structure"') &&
+      appSource.includes('| "arrange-mute-map"') &&
+      appSource.includes("const arrangeStructurePanelRef = useRef<HTMLElement | null>(null);") &&
+      appSource.includes("const arrangementMuteMapPanelRef = useRef<HTMLElement | null>(null);") &&
+      appSource.includes("ref={arrangeStructurePanelRef}") &&
+      appSource.includes("routeRef={arrangementMuteMapPanelRef}") &&
+      workstationHelpersSource.includes('aria-label={t("arrange.helper.muteMapAria")}') &&
+      workstationHelpersSource.includes("arrangement-mute-map arrangement-mute-map-route-target") &&
+      workstationHelpersSource.includes('data-arrangement-mute-map-route-target="true"') &&
+      workstationHelpersSource.includes("ref={routeRef}") &&
+      workstationHelpersSource.includes('role="region"') &&
+      workspaceRoutePageSource.includes('case "arrange-structure":') &&
+      workspaceRoutePageSource.includes('case "arrange-mute-map":') &&
+      workspaceRoutePageSource.includes('activateArrangeWorkspacePage("structure")') &&
+      workspaceRoutePageSource.includes("setArrangementToolsOpen(true)") &&
+      appSource.includes('if (target === "arrange-mute-map")') &&
+      appSource.includes("requestAnimationFrame(() => {") &&
+      styles.includes(".arrangement-mute-map-route-target") &&
+      styles.includes("scroll-margin-top: 164px;") &&
+      structureWorkspaceReadoutRoutes.every((source) =>
+        source.includes('routeWorkspaceTargetIntoView("arrange-structure", "start")')
+      ) &&
+      timelineWorkspaceReadoutRoutes.every((source) =>
+        source.includes('routeWorkspaceTargetIntoView("arrange", "start")')
+      ) &&
+      muteMapWorkspaceReadoutRoutes.every((source) =>
+        source.includes('routeWorkspaceTargetIntoView("arrange-mute-map", "start")')
+      ),
+    "Structure routes should reveal the Structure sub tab and its Arrangement Tools, with Mute Map routes landing on the visible map instead of falling back to Timeline or the panel top"
   );
   const guidanceRevealIndex = guidanceScrollSource.indexOf("flushSync(() => setGuidanceCenterOpen(true))");
   const guidanceFocusIndex = guidanceScrollSource.indexOf("target.focus({ preventScroll: true })");
@@ -2505,37 +2725,43 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
     "Review Queue should switch from its wide scan layout to readable wrapped rows from the component's own inline size"
   );
   check(
-    appSource.includes('aria-label="Move selected arrangement block left"') &&
-      appSource.includes('aria-label="Move selected arrangement block right"') &&
-      appSource.includes("<span>Move left</span>") &&
-      appSource.includes("<span>Move right</span>") &&
+    appSource.includes('aria-label={t("arrange.moveLeftAria")}') &&
+      appSource.includes('aria-label={t("arrange.moveRightAria")}') &&
+      appSource.includes('<span>{t("arrange.moveLeft")}</span>') &&
+      appSource.includes('<span>{t("arrange.moveRight")}</span>') &&
+      localizationSource.includes('"arrange.moveLeftAria": "Move selected arrangement block left"') &&
+      localizationSource.includes('"arrange.moveRightAria": "Move selected arrangement block right"') &&
       appSource.includes('data-testid="arrangement-move-left"') &&
       appSource.includes('data-testid="arrangement-move-right"'),
     "both arrangement move controls should expose complete directional labels and unique selected-block accessible names"
   );
   const chordToolAccessibleNames = [
-    "Audition selected chord",
-    "Move selected chord one step left",
-    "Move selected chord one step right",
-    "Duplicate selected chord to the next empty step",
-    "Duplicate selected chord to the previous beat",
-    "Duplicate selected chord to the next beat",
-    "Move selected chord voicing down",
-    "Move selected chord voicing up"
+    ["compose.panel.chords.auditionTitle", "Audition selected chord"],
+    ["compose.panel.chords.stepLeftTitle", "Move selected chord one step left"],
+    ["compose.panel.chords.stepRightTitle", "Move selected chord one step right"],
+    ["compose.panel.chords.duplicateTitle", "Duplicate selected chord to the next empty step"],
+    ["compose.panel.chords.duplicatePrevious", "Duplicate selected chord to the previous beat"],
+    ["compose.panel.chords.duplicateNext", "Duplicate selected chord to the next beat"],
+    ["compose.panel.chords.voiceDownTitle", "Move selected chord voicing down"],
+    ["compose.panel.chords.voiceUpTitle", "Move selected chord voicing up"]
   ];
   const chordToolVisibleLabels = [
-    "Audition",
-    "Step left",
-    "Step right",
-    "Duplicate",
-    "Prev beat",
-    "Next beat",
-    "Voice down",
-    "Voice up"
+    "compose.panel.audition",
+    "compose.panel.stepLeft",
+    "compose.panel.stepRight",
+    "compose.panel.duplicate",
+    "compose.panel.previousBeatShort",
+    "compose.panel.nextBeat",
+    "compose.panel.chords.voiceDown",
+    "compose.panel.chords.voiceUp"
   ];
   check(
-    chordToolAccessibleNames.every((label) => composePanelsSource.includes(`aria-label="${label}"`)) &&
-      chordToolVisibleLabels.every((label) => composePanelsSource.includes(`<span>${label}</span>`)) &&
+    chordToolAccessibleNames.every(
+      ([key, label]) =>
+        composePanelsSource.includes(`aria-label={t("${key}")}`) &&
+        localizationSource.includes(`"${key}": "${label}"`)
+    ) &&
+      chordToolVisibleLabels.every((key) => composePanelsSource.includes(`<span>{t("${key}")}</span>`)) &&
       composePanelsSource.includes('data-testid="chord-edit-tools"'),
     "all eight selected-chord actions should expose complete visible labels and unique directional accessible names"
   );
@@ -2550,33 +2776,38 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
     "the selected-chord toolbar should use a readable four-by-two layout when its own component is narrow"
   );
   const noteToolAccessibleNames = [
-    "Move selected note one step left",
-    "Move selected note one step right",
-    "Move selected note down in scale",
-    "Move selected note up in scale",
-    "Move selected note down an octave",
-    "Move selected note up an octave",
-    "Duplicate selected note to the next empty step",
-    "Duplicate selected note to the previous beat",
-    "Duplicate selected note to the next beat",
-    "Audition selected 808 or Synth note"
+    ["compose.panel.notes.stepLeftTitle", "Move selected note one step left"],
+    ["compose.panel.notes.stepRightTitle", "Move selected note one step right"],
+    ["compose.panel.notes.pitchDownTitle", "Move selected note down in scale"],
+    ["compose.panel.notes.pitchUpTitle", "Move selected note up in scale"],
+    ["compose.panel.notes.octaveDownTitle", "Move selected note down an octave"],
+    ["compose.panel.notes.octaveUpTitle", "Move selected note up an octave"],
+    ["compose.panel.notes.duplicateTitle", "Duplicate selected note to the next empty step"],
+    ["compose.panel.notes.duplicatePrevious", "Duplicate selected note to the previous beat"],
+    ["compose.panel.notes.duplicateNext", "Duplicate selected note to the next beat"],
+    ["compose.panel.notes.auditionTitle", "Audition selected 808 or Synth note"]
   ];
   const noteToolVisibleLabels = [
-    "Step left",
-    "Step right",
-    "Pitch down",
-    "Pitch up",
-    "Octave down",
-    "Octave up",
-    "Duplicate",
-    "Prev beat",
-    "Next beat",
-    "Audition"
+    "compose.panel.stepLeft",
+    "compose.panel.stepRight",
+    "compose.panel.notes.pitchDown",
+    "compose.panel.notes.pitchUp",
+    "compose.panel.notes.octaveDown",
+    "compose.panel.notes.octaveUp",
+    "compose.panel.duplicate",
+    "compose.panel.previousBeatShort",
+    "compose.panel.nextBeat",
+    "compose.panel.audition"
   ];
   check(
-    noteToolAccessibleNames.every((label) => composePanelsSource.includes(`aria-label="${label}"`)) &&
-      noteToolVisibleLabels.every((label) => composePanelsSource.includes(`<span>${label}</span>`)) &&
-      composePanelsSource.includes('aria-label="Selected note tools"'),
+    noteToolAccessibleNames.every(
+      ([key, label]) =>
+        composePanelsSource.includes(`aria-label={t("${key}")}`) &&
+        localizationSource.includes(`"${key}": "${label}"`)
+    ) &&
+      noteToolVisibleLabels.every((key) => composePanelsSource.includes(`<span>{t("${key}")}</span>`)) &&
+      composePanelsSource.includes('aria-label={t("compose.panel.notes.toolsAria")}') &&
+      localizationSource.includes('"compose.panel.notes.toolsAria": "Selected note tools"'),
     "all ten selected-note actions should expose complete visible labels and unique action-specific accessible names"
   );
   check(
@@ -2590,17 +2821,28 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
     "the selected-note toolbar should use a readable five-by-two layout when its own inspector is narrow"
   );
   const drumToolAccessibleNames = [
-    "Audition selected drum hit",
-    "Copy selected drum hit shape",
-    "Paste copied drum hit to the next empty step",
-    "Duplicate selected drum hit to the previous beat",
-    "Duplicate selected drum hit to the next beat"
+    ["compose.panel.drums.auditionHit", "Audition selected drum hit"],
+    ["compose.panel.drums.copyHitShape", "Copy selected drum hit shape"],
+    ["compose.panel.drums.pasteHitNext", "Paste copied drum hit to the next empty step"],
+    ["compose.panel.drums.duplicatePrevious", "Duplicate selected drum hit to the previous beat"],
+    ["compose.panel.drums.duplicateNext", "Duplicate selected drum hit to the next beat"]
   ];
-  const drumToolVisibleLabels = ["Audition", "Copy hit", "Paste next", "Previous beat", "Next beat"];
+  const drumToolVisibleLabels = [
+    "compose.panel.audition",
+    "compose.panel.drums.copyHit",
+    "compose.panel.drums.pasteNext",
+    "compose.panel.previousBeat",
+    "compose.panel.nextBeat"
+  ];
   check(
-    drumToolAccessibleNames.every((label) => composePanelsSource.includes(`aria-label="${label}"`)) &&
-      drumToolVisibleLabels.every((label) => composePanelsSource.includes(`<span>${label}</span>`)) &&
-      composePanelsSource.includes('aria-label="Selected drum hit tools"'),
+    drumToolAccessibleNames.every(
+      ([key, label]) =>
+        composePanelsSource.includes(`aria-label={t("${key}")}`) &&
+        localizationSource.includes(`"${key}": "${label}"`)
+    ) &&
+      drumToolVisibleLabels.every((key) => composePanelsSource.includes(`<span>{t("${key}")}</span>`)) &&
+      composePanelsSource.includes('aria-label={t("compose.panel.drums.hitToolsAria")}') &&
+      localizationSource.includes('"compose.panel.drums.hitToolsAria": "Selected drum hit tools"'),
     "all five selected-drum actions should expose complete visible labels and unique action-specific accessible names"
   );
   check(
@@ -2614,15 +2856,18 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
     "the selected-drum toolbar should keep five readable columns with comfortable wrapped controls"
   );
   check(
-    appSource.includes('aria-label={`Mute ${channel.name}`}') &&
-      appSource.includes('aria-label={`Solo ${channel.name}`}') &&
+    appSource.includes('aria-label={t("mix.muteAria", { channel: channel.name })}') &&
+      appSource.includes('aria-label={t("mix.soloAria", { channel: channel.name })}') &&
       appSource.includes("aria-pressed={channel.muted}") &&
       appSource.includes("aria-pressed={channel.solo}") &&
-      appSource.includes("<span>Mute</span>") &&
-      appSource.includes("<span>Solo</span>") &&
+      appSource.includes('<span>{t("mix.mute")}</span>') &&
+      appSource.includes('<span>{t("mix.solo")}</span>') &&
       appSource.includes('data-testid={`mixer-strip-${channel.id}`}') &&
       appSource.includes('data-testid={`mixer-toggles-${channel.id}`}') &&
-      appSource.includes('"Solo is unavailable on the Master channel"'),
+      appSource.includes('t("mix.soloUnavailableTitle")') &&
+      localizationSource.includes('"mix.muteAria": "Mute {channel}"') &&
+      localizationSource.includes('"mix.soloAria": "Solo {channel}"') &&
+      localizationSource.includes('"mix.soloUnavailableTitle": "Solo is unavailable on the Master channel"'),
     "all ten mixer toggles should expose complete labels, channel-specific names, pressed state, and an explicit disabled Master solo explanation"
   );
   check(
@@ -3329,7 +3574,7 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       "First Beat Path",
       "Beat Spine",
       "Composer Guide",
-      "Workflow navigator",
+      "Main production tabs",
       "Guided Focus",
       "Guided Session Pass"
     ],
@@ -4841,6 +5086,380 @@ function validateAudienceSessionAcceptanceQuickActionPalette(guidancePanels, pal
   check(runs.join(",") === "route,export:deliverables,handoff:receipt", "Audience Session Acceptance palette actions should run route and lane handlers");
 }
 
+function validateWorkflowNavigatorLocalization(localization, guidancePanels, workstationHelpers) {
+  const items = [
+    {
+      id: "compose",
+      label: "Compose",
+      value: "Pattern A",
+      detail: "compose-ready-detail",
+      tone: "good"
+    },
+    {
+      id: "arrange",
+      label: "Arrange",
+      value: "8 bars",
+      detail: "arrange-review-detail",
+      tone: "warn"
+    },
+    {
+      id: "mix",
+      label: "Mix",
+      value: "Blocked",
+      detail: "mix-blocker-detail",
+      tone: "danger"
+    },
+    {
+      id: "deliver",
+      label: "Deliver",
+      value: "Ready",
+      detail: "deliver-ready-detail",
+      tone: "good"
+    }
+  ];
+  const result = workstationHelpers.createWorkflowNavigatorJumpResult(items[2], items);
+  const renderNavigator = (locale) =>
+    renderToStaticMarkup(
+      React.createElement(
+        localization.LocalizationProvider,
+        { initialLocale: locale },
+        React.createElement(guidancePanels.WorkflowNavigator, {
+          activeZone: "mix",
+          items,
+          onJump() {},
+          result
+        })
+      )
+    );
+  const englishHtml = renderNavigator("en");
+  const koreanHtml = renderNavigator("ko");
+  const koreanResult = workstationHelpers.createWorkflowNavigatorJumpResult(items[2], items, "ko");
+
+  check(
+    englishHtml.includes('aria-label="Workflow review"') &&
+      englishHtml.includes('title="Workflow Spotlight recommends Jump Mix: mix-blocker-detail"') &&
+      englishHtml.includes('title="Jump to Mix: mix-blocker-detail"') &&
+      englishHtml.includes('title="Jump to Mix: Blocked"') &&
+      englishHtml.includes(
+        'aria-label="Next blocker / Mix: Blocked / mix-blocker-detail / 2 ready / 1 review / 1 blocker"'
+      ) &&
+      englishHtml.includes('data-testid="workflow-spotlight-decision-status">Workflow blocker</span>') &&
+      englishHtml.includes('data-testid="workflow-spotlight-decision-label">Jump Mix</strong>') &&
+      englishHtml.includes('data-testid="workflow-spotlight-status">Next blocker</span>') &&
+      englishHtml.includes('data-testid="workflow-spotlight-zone">Mix: Blocked</strong>') &&
+      englishHtml.includes('data-testid="workflow-spotlight-detail">Jump target: Mix / mix-blocker-detail</small>') &&
+      englishHtml.includes('data-testid="workflow-spotlight-count">2 ready / 1 review / 1 blocker</small>') &&
+      englishHtml.includes('data-testid="workflow-navigator-result-status">Jumped</span>') &&
+      englishHtml.includes('data-testid="workflow-navigator-result-title">Mix zone ready</strong>') &&
+      englishHtml.includes('data-testid="workflow-navigator-result-value">Workflow: 2/4 ready / 1 review / 1 blocker</strong>'),
+    "English Workflow Review should preserve its visible, title, aria, and jump-result contract"
+  );
+  check(
+    koreanHtml.includes('aria-label="작업 흐름 검토"') &&
+      koreanHtml.includes('title="작업 흐름 권장: 믹스 탭으로 이동 · 채널 밸런스, 공간감, 마스터 마무리"') &&
+      koreanHtml.includes('title="이동: 믹스 · 채널 밸런스, 공간감, 마스터 마무리"') &&
+      koreanHtml.includes('title="이동: 믹스 · 해결 필요"') &&
+      koreanHtml.includes(
+        'aria-label="다음 해결 항목 / 믹스: 해결 필요 / 채널 밸런스, 공간감, 마스터 마무리 / 준비 2개 / 검토 1개 / 차단 1개"'
+      ) &&
+      koreanHtml.includes('data-testid="workflow-spotlight-decision-status">작업 흐름 해결 필요</span>') &&
+      koreanHtml.includes('data-testid="workflow-spotlight-decision-label">믹스 탭으로 이동</strong>') &&
+      koreanHtml.includes('data-testid="workflow-spotlight-decision-detail">해결 필요: 채널 밸런스, 공간감, 마스터 마무리</small>') &&
+      koreanHtml.includes('data-testid="workflow-spotlight-status">다음 해결 항목</span>') &&
+      koreanHtml.includes('data-testid="workflow-spotlight-zone">믹스: 해결 필요</strong>') &&
+      koreanHtml.includes('data-testid="workflow-spotlight-detail">이동 대상: 믹스 / 채널 밸런스, 공간감, 마스터 마무리</small>') &&
+      koreanHtml.includes('data-testid="workflow-spotlight-count">준비 2개 / 검토 1개 / 차단 1개</small>') &&
+      koreanHtml.includes('data-testid="workflow-navigator-result-status">이동 완료</span>') &&
+      koreanHtml.includes('data-testid="workflow-navigator-result-title">믹스 탭 준비됨</strong>') &&
+      koreanHtml.includes('data-testid="workflow-navigator-result-value">작업 흐름: 전체 4개 중 2개 준비 / 검토 1개 / 차단 1개</strong>') &&
+      koreanHtml.includes("믹스나 마스터를 바꾸기 전에 스템 듣기와 믹스 코치를 확인하세요.") &&
+      koreanHtml.includes("헤드룸, 스템 밸런스, 저역, 마스터 방향이 준비되면 돌아오세요."),
+    "Korean Workflow Review should localize visible guidance, accessibility titles, and the full jump result"
+  );
+
+  for (const englishLiteral of [
+    "Workflow Spotlight recommends",
+    "Workflow blocker",
+    "Jump Mix",
+    "Next blocker",
+    "Jump target:",
+    "Mix zone ready",
+    "Use Stem Audition",
+    "Return after headroom"
+  ]) {
+    checkExcludes(koreanHtml, englishLiteral, "Korean Workflow Review");
+  }
+  check(
+    koreanResult.status === "이동 완료" &&
+      koreanResult.title === "믹스 탭 준비됨" &&
+      koreanResult.detail === "해결 필요 / 채널 밸런스, 공간감, 마스터 마무리" &&
+      koreanResult.metricLabel === "작업 흐름" &&
+      koreanResult.metricValue === "전체 4개 중 2개 준비 / 검토 1개 / 차단 1개" &&
+      koreanResult.auditionCue === "믹스나 마스터를 바꾸기 전에 스템 듣기와 믹스 코치를 확인하세요." &&
+      koreanResult.nextCheck === "헤드룸, 스템 밸런스, 저역, 마스터 방향이 준비되면 돌아오세요.",
+    "Workflow Navigator jump-result helpers should expose typed Korean copy without changing their routing identity"
+  );
+}
+
+function validateLocalization(localization, SettingsDialog, App) {
+  const desktopShortcutSource = printNamedFunction(appSource, "App.tsx", "handleDesktopShortcut");
+  const localizationProviderSource = printNamedFunction(
+    localizationSource,
+    "localization.tsx",
+    "LocalizationProvider"
+  );
+  const nativeMenuSource = printNamedFunction(appSource, "App.tsx", "handleNativeMenuCommand");
+  const settingsBackdropMouseDownIndex = settingsDialogSource.indexOf('onMouseDown={(event) => {');
+  const settingsBackdropTargetIndex = settingsDialogSource.indexOf(
+    "event.target === event.currentTarget",
+    settingsBackdropMouseDownIndex
+  );
+  const settingsBackdropPreventDefaultIndex = settingsDialogSource.indexOf(
+    "event.preventDefault();",
+    settingsBackdropTargetIndex
+  );
+  const settingsBackdropCloseIndex = settingsDialogSource.indexOf("onClose();", settingsBackdropTargetIndex);
+  const values = new Map();
+  const storage = {
+    getItem(key) {
+      return values.get(key) ?? null;
+    },
+    setItem(key, value) {
+      values.set(key, value);
+    }
+  };
+  const blockedStorage = {
+    getItem() {
+      throw new Error("blocked");
+    },
+    setItem() {
+      throw new Error("blocked");
+    }
+  };
+
+  check(
+    localization.normalizeAppLocale("en") === "en" &&
+      localization.normalizeAppLocale("ko") === "ko" &&
+      localization.normalizeAppLocale("fr") === "en",
+    "localization should accept only English and Korean and recover invalid values to English"
+  );
+  check(
+    localization.readStoredAppLocale(storage) === "en" &&
+      localization.writeStoredAppLocale(storage, "ko") &&
+      localization.readStoredAppLocale(storage) === "ko" &&
+      localization.persistAppLocale(storage, "en") === "device",
+    "localization should persist the selected locale in its dedicated device-local key"
+  );
+  values.set(localization.appLocaleStorageKey, "damaged");
+  const blockedPersistence = localization.persistAppLocale(blockedStorage, "ko");
+  const blockedPersistenceMessages = localization.localePersistenceMessageKeys(blockedPersistence);
+  check(
+      localization.readStoredAppLocale(storage) === "en" &&
+      localization.readStoredAppLocale(blockedStorage) === "en" &&
+      localization.writeStoredAppLocale(blockedStorage, "ko") === false &&
+      blockedPersistence === "session" &&
+      blockedPersistenceMessages.title === "settings.sessionOnly" &&
+      blockedPersistenceMessages.detail === "settings.sessionOnlyDetail" &&
+      localization.translate("en", blockedPersistenceMessages.title) === "Available for this session" &&
+      localization.translate("ko", blockedPersistenceMessages.title) === "이번 실행에서만 적용" &&
+      localizationSource.includes("setPersistence(persistAppLocale(browserLocaleStorage(), locale));") &&
+      localizationSource.includes('"settings.sessionOnly": "Available for this session"') &&
+      localizationSource.includes('"settings.sessionOnly": "이번 실행에서만 적용"'),
+    "localization should recover damaged or unavailable localStorage without changing the project"
+  );
+  check(
+    localization.translate("en", "nav.openSubTab", { label: "Drums", detail: "Pattern grid" }) ===
+      "Open Drums sub tab: Pattern grid" &&
+      localization.translate("ko", "nav.openSubTab", { label: "드럼", detail: "패턴 그리드" }) ===
+        "드럼 서브 탭 열기: 패턴 그리드" &&
+      localization.translate("en", "launch.activeProject", { title: "A$&B$$C$'D" }) ===
+        "A$&B$$C$'D active · reopen project choices",
+    "localization should interpolate matching English and Korean copy without interpreting replacement tokens in user text"
+  );
+
+  const renderSettings = (locale) =>
+    renderToStaticMarkup(
+      React.createElement(
+        localization.LocalizationProvider,
+        { initialLocale: locale },
+        React.createElement(SettingsDialog, { open: true, onClose() {} })
+      )
+    );
+  const englishSettings = renderSettings("en");
+  const koreanSettings = renderSettings("ko");
+  const sessionSettings = renderToStaticMarkup(React.createElement(SettingsDialog, { open: true, onClose() {} }));
+  const browserWindow = globalThis.window;
+  const localStorageDescriptor = Object.getOwnPropertyDescriptor(browserWindow, "localStorage");
+  let unavailableStorageSettings = "";
+  try {
+    Object.defineProperty(browserWindow, "localStorage", {
+      configurable: true,
+      get() {
+        throw new Error("blocked");
+      }
+    });
+    unavailableStorageSettings = renderSettings("ko");
+  } finally {
+    if (localStorageDescriptor) {
+      Object.defineProperty(browserWindow, "localStorage", localStorageDescriptor);
+    }
+  }
+  const koreanApp = renderToStaticMarkup(
+    React.createElement(
+      localization.LocalizationProvider,
+      { initialLocale: "ko" },
+      React.createElement(App)
+    )
+  );
+  const koreanSettingsEntryIndex = koreanApp.indexOf('data-testid="settings-open"');
+  const koreanWorkspaceTabpanelsIndex = koreanApp.indexOf('class="workspace-tabpanels"');
+  const koreanGuideQuickStartIndex = koreanApp.indexOf('data-testid="guide-quick-start"');
+  const koreanGuideQuickStartDetailsContentIndex = koreanApp.indexOf(
+    'data-testid="guide-quick-start-details-content"',
+    koreanGuideQuickStartIndex
+  );
+  const koreanGuideQuickStartVisibleMarkup =
+    koreanGuideQuickStartIndex >= 0 && koreanGuideQuickStartDetailsContentIndex > koreanGuideQuickStartIndex
+      ? koreanApp.slice(koreanGuideQuickStartIndex, koreanGuideQuickStartDetailsContentIndex)
+      : "";
+  const koreanGuideQuickStartAccessibleCopy = Array.from(
+    koreanGuideQuickStartVisibleMarkup.matchAll(/(?:aria-label|title)="([^"]*)"/gu),
+    (match) => match[1] ?? ""
+  );
+  const elementMarkupByTestId = (tagName, testId) => {
+    const markerIndex = koreanApp.indexOf(`data-testid="${testId}"`);
+    const start = markerIndex >= 0 ? koreanApp.lastIndexOf(`<${tagName}`, markerIndex) : -1;
+    const end = start >= 0 ? koreanApp.indexOf(`</${tagName}>`, markerIndex) : -1;
+    return start >= 0 && end >= markerIndex ? koreanApp.slice(start, end + tagName.length + 3) : "";
+  };
+  const koreanTransportPositionMarkup = elementMarkupByTestId("div", "transport-position-readout");
+  const koreanLocalDraftMarkup = elementMarkupByTestId("span", "local-draft-status");
+  const koreanProjectSafetyMarkup = elementMarkupByTestId("div", "project-safety-readout");
+
+  check(
+    englishSettings.includes('data-testid="settings-dialog"') &&
+      englishSettings.includes("Choose how GrooveForge appears on this device.") &&
+      englishSettings.includes("Show the app interface in Korean.") &&
+      englishSettings.includes('data-testid="settings-language-en"') &&
+      englishSettings.includes('data-testid="settings-language-ko"'),
+    "English Settings should expose one labelled dialog and both supported language choices"
+  );
+  check(
+    koreanSettings.includes("이 기기에서 GrooveForge가 표시되는 방식을 선택하세요.") &&
+      (koreanSettings.includes("언어 설정은 프로젝트, 오디오, 실행 취소 기록을 바꾸지 않습니다.") ||
+        koreanSettings.includes("기기 저장소를 사용할 수 없습니다.")),
+    "Korean Settings should localize the choice and truthfully describe device or session-only persistence"
+  );
+  check(
+    sessionSettings.includes('data-persistence="session"') &&
+      sessionSettings.includes("Available for this session") &&
+      sessionSettings.includes("Device storage is unavailable."),
+    "Settings should render the session-only warning when locale storage is unavailable"
+  );
+  check(
+    unavailableStorageSettings.includes('data-persistence="session"') &&
+      unavailableStorageSettings.includes("이번 실행에서만 적용") &&
+      unavailableStorageSettings.includes("기기 저장소를 사용할 수 없습니다."),
+    "LocalizationProvider should pass unavailable device storage through to Korean Settings session-only copy"
+  );
+  check(
+      koreanApp.includes('data-locale="ko"') &&
+      koreanApp.includes(">메인 탭<") &&
+      koreanApp.includes(">서브 탭<") &&
+      koreanSettingsEntryIndex >= 0 &&
+      koreanWorkspaceTabpanelsIndex > koreanSettingsEntryIndex,
+    "Korean App render should localize the main/sub tab hierarchy and keep its stable Settings entry point outside the production tabpanels"
+  );
+  check(
+    koreanTransportPositionMarkup.includes('title="곡 반복 대기 · 1마디 1박, 스텝 1, 전체 8마디."') &&
+      koreanTransportPositionMarkup.includes('<span data-testid="transport-position-status">곡 대기</span>') &&
+      koreanTransportPositionMarkup.includes('<strong data-testid="transport-position-label">1마디 1박</strong>') &&
+      koreanTransportPositionMarkup.includes('<small data-testid="transport-position-detail">Intro / 패턴 A</small>') &&
+      !/(?:Cued Song|Bar 1\.1|Step 1|Song loop is cued)/u.test(koreanTransportPositionMarkup) &&
+      koreanLocalDraftMarkup === '<span data-testid="local-draft-status">로컬 초안</span>' &&
+      !koreanLocalDraftMarkup.includes("Draft local") &&
+      koreanProjectSafetyMarkup.includes(
+        'title="편집 가능한 프로젝트 / 로컬 프로젝트만 / 지속 가능한 .grooveforge 프로젝트 파일로 유지하려면 저장하세요"'
+      ) &&
+      koreanProjectSafetyMarkup.includes('<span data-testid="project-safety-status">지금 편집 가능</span>') &&
+      koreanProjectSafetyMarkup.includes('<strong data-testid="project-safety-label">저장하여 유지</strong>') &&
+      koreanProjectSafetyMarkup.includes('<small data-testid="project-safety-detail">로컬 프로젝트만</small>') &&
+      !/(?:Editable now|Save to keep|Local project only|Use Save for a durable)/u.test(koreanProjectSafetyMarkup),
+    "Korean top transport and session meter should localize visible position, draft, project-safety, title, and accessibility presentation copy without changing project-domain values"
+  );
+  check(
+    localization.translate("en", "guide.quickStart.headline") === "Guide Quick Start" &&
+      localization.translate("ko", "guide.quickStart.headline") === "가이드 빠른 시작" &&
+      localization.translate("ko", "guide.quickStart.runSource", { source: "경로" }) === "경로 실행" &&
+      koreanGuideQuickStartVisibleMarkup.includes('aria-label="가이드 빠른 시작"') &&
+      koreanGuideQuickStartVisibleMarkup.includes(">가이드 빠른 시작<") &&
+      koreanGuideQuickStartVisibleMarkup.includes(">진행도와 경로<") &&
+      koreanGuideQuickStartVisibleMarkup.includes("이동 대상") &&
+      koreanGuideQuickStartVisibleMarkup.includes("병목") &&
+      !/(?:>|&gt;)[^<]*(?:Guide Quick Start|Beat path|Progress &amp; routes|Completion diagnostics|Run Path|Run Session|Run Workflow)[^<]*</u.test(
+        koreanGuideQuickStartVisibleMarkup
+      ) &&
+      koreanGuideQuickStartAccessibleCopy.every(
+        (copy) => !/(?:Guide Quick Start|Guide quick start|Beat path|Run Path|Run Session|Run Workflow|Destination|Metric|Context|Audition|Next)/u.test(copy)
+      ),
+    "Korean Guide Quick Start should localize its always-visible copy plus aria-label and title context without leaking core English literals"
+  );
+  check(
+    localizationSource.includes("document.documentElement.lang = locale;") &&
+      localizationSource.includes("window.grooveforge?.setLocale?.(locale);") &&
+      /const value = useMemo<LocalizationContextValue>\(\s*\(\) => \(\{\s*locale,\s*persistence,/u.test(
+        localizationProviderSource
+      ) &&
+      localizationProviderSource.includes("[locale, persistence, setLocale]") &&
+      localizationProviderSource.includes("setPersistence(persistAppLocale(browserLocaleStorage(), locale));") &&
+      localizationSource.includes('grooveforge.ui.locale.v1') &&
+      settingsDialogSource.includes('type="radio"') &&
+      settingsDialogSource.includes('role="dialog"') &&
+      settingsDialogSource.includes('data-persistence={persistence}') &&
+      settingsDialogSource.includes('data-testid="settings-persistence"') &&
+      settingsDialogSource.includes("localePersistenceMessageKeys(persistence)") &&
+      settingsDialogSource.includes("t(persistenceMessages.title)") &&
+      settingsDialogSource.includes("t(persistenceMessages.detail)") &&
+      settingsDialogSource.includes("useModalFocusTrap(open, dialogRef, selectedLanguageRef, true)") &&
+      settingsDialogSource.includes('event.key === "Escape"') &&
+      settingsBackdropMouseDownIndex >= 0 &&
+      settingsBackdropTargetIndex > settingsBackdropMouseDownIndex &&
+      settingsBackdropPreventDefaultIndex > settingsBackdropTargetIndex &&
+      settingsBackdropCloseIndex > settingsBackdropPreventDefaultIndex &&
+      modalFocusTrapSource.includes("const returnFocus = document.activeElement") &&
+      modalFocusTrapSource.includes("if (restoreFocus && returnFocus?.isConnected)") &&
+      modalFocusTrapSource.includes("returnFocus.focus({ preventScroll: true });") &&
+      appSource.includes('data-locale={locale}') &&
+      appSource.includes("data-redo-depth={redoStack.length}") &&
+      appSource.includes("data-undo-depth={undoStack.length}") &&
+      appSource.includes('href="#workspace-main"') &&
+      desktopShortcutSource.includes("if (styleChangePreview || settingsOpen)") &&
+      desktopShortcutSource.indexOf("if (styleChangePreview || settingsOpen)") <
+        desktopShortcutSource.indexOf("if (wantsCommandReference)") &&
+      desktopShortcutSource.indexOf("if (styleChangePreview || settingsOpen)") <
+        desktopShortcutSource.indexOf('if (event.code === "Space")') &&
+      nativeMenuSource.includes("if (styleChangePreview || settingsOpen)") &&
+      nativeMenuSource.indexOf("if (styleChangePreview || settingsOpen)") < nativeMenuSource.indexOf("switch (command)"),
+    "localization source should synchronize document language, use a versioned preference, and keep settings and skip navigation accessible"
+  );
+  check(
+    !localizationSource.includes("ProjectState") &&
+      !settingsDialogSource.includes("setProject") &&
+      !settingsDialogSource.includes("updateProject"),
+    "language preferences should remain outside project data and edit history"
+  );
+  check(
+    styles.includes("@media (max-width: 600px)") &&
+      styles.includes(".settings-language-options") &&
+      styles.includes("grid-template-columns: 1fr;") &&
+      styles.includes("@media (max-width: 620px)") &&
+      styles.includes('.app-shell[data-locale="ko"] .workspace-page-tabs-heading > span') &&
+      styles.includes("@media (prefers-reduced-motion: reduce)") &&
+      styles.includes("@media (forced-colors: active)"),
+    "localization layout should stack Settings at 390px and preserve Korean tab labels, reduced motion, and forced-color selection cues"
+  );
+}
+
 installBrowserMocks();
 
 const server = await createServer({
@@ -4852,9 +5471,12 @@ const server = await createServer({
 
 try {
   const { App } = await server.ssrLoadModule("/src/ui/App.tsx");
+  const localization = await server.ssrLoadModule("/src/ui/localization.tsx");
+  const { SettingsDialog } = await server.ssrLoadModule("/src/ui/SettingsDialog.tsx");
   const workstation = await server.ssrLoadModule("/src/domain/workstation.ts");
   validateProjectFileLoadErrorStatus(await server.ssrLoadModule("/src/ui/workstationUiModel.ts"));
   validateMasterCeilingDraftLifecycle(workstation);
+  validateNativeDialogOptions(await server.ssrLoadModule("/electron/nativeDialogOptions.ts"));
   validateProjectCloseGuard(await server.ssrLoadModule("/src/ui/projectCloseGuard.ts"));
   validateProjectReplacementGuard(await server.ssrLoadModule("/src/ui/projectReplacementGuard.ts"));
   validateStyleChangeSafety({
@@ -4867,6 +5489,12 @@ try {
   validateSqliteProjectStorage();
   const html = renderToStaticMarkup(React.createElement(App));
   validateFirstRunRenderer(html, workstation.styleProfiles.length);
+  validateLocalization(localization, SettingsDialog, App);
+  validateWorkflowNavigatorLocalization(
+    localization,
+    await server.ssrLoadModule("/src/ui/workstationGuidancePanels.tsx"),
+    await server.ssrLoadModule("/src/ui/workstationAppHelpers.tsx")
+  );
   validateProjectAudioAnalysisPerformance(
     html,
     await server.ssrLoadModule("/src/ui/workstationAppHelpers.tsx")

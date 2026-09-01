@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode, Ref } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { translate, type AppLocale } from "./localization";
 import { exportMidi, midiFileName } from "../audio/midi";
 import {
   analyzeExport,
@@ -2042,7 +2043,11 @@ export function arrangementStartBar(project: ProjectState, selectedIndex: number
     .reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
 }
 
-export function selectedArrangementBlockRoleSummary(project: ProjectState, selectedIndex: number): ArrangementBlockRoleSummary | null {
+export function selectedArrangementBlockRoleSummary(
+  project: ProjectState,
+  selectedIndex: number,
+  locale: AppLocale = "en"
+): ArrangementBlockRoleSummary | null {
   const boundedIndex = Math.min(Math.max(0, selectedIndex), project.arrangement.length - 1);
   const block = project.arrangement[boundedIndex];
   if (!block) {
@@ -2055,13 +2060,32 @@ export function selectedArrangementBlockRoleSummary(project: ProjectState, selec
   const energy = normalizeArrangementEnergy(block.energy);
   const mutedTracks = normalizeArrangementMutedTracks(block.mutedTracks);
   const mutedLabel =
-    mutedTracks.length === 0 ? "Full mix" : `${mutedTracks.map(arrangementMuteTrackLabel).join("/")} muted`;
+    mutedTracks.length === 0
+      ? translate(locale, "arrange.blockRoleFullMix")
+      : translate(locale, "arrange.blockRoleMuted", { tracks: mutedTracks.map(arrangementMuteTrackLabel).join("/") });
   const eventCount = patternEventTotal(project.patterns[block.pattern]);
+  const barLabel = translate(locale, bars === 1 ? "arrange.helper.oneBar" : "arrange.helper.barCount", { count: bars });
 
   return {
-    roleLabel: arrangementBlockRoleLabel(block.section, boundedIndex, project.arrangement.length, energy, mutedTracks.length),
-    timelineLabel: startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`,
-    detailLabel: `Pattern ${block.pattern} / ${barCountLabel(bars)} / ${percentLabel(energy)} energy / ${eventCount} events / ${mutedLabel}`,
+    roleLabel: arrangementBlockRoleLabel(
+      block.section,
+      boundedIndex,
+      project.arrangement.length,
+      energy,
+      mutedTracks.length,
+      locale
+    ),
+    timelineLabel:
+      startBar === endBar
+        ? translate(locale, "arrange.blockRoleBar", { bar: startBar })
+        : translate(locale, "arrange.blockRoleBars", { start: startBar, end: endBar }),
+    detailLabel: translate(locale, "arrange.blockRoleDetail", {
+      pattern: block.pattern,
+      bars: barLabel,
+      energy: Math.round(energy * 100),
+      events: eventCount,
+      muted: mutedLabel
+    }),
     isShaped: energy >= 0.82 || energy <= 0.48 || mutedTracks.length > 0 || bars >= 4
   };
 }
@@ -2071,44 +2095,51 @@ export function arrangementBlockRoleLabel(
   index: number,
   totalBlocks: number,
   energy: number,
-  mutedCount: number
+  mutedCount: number,
+  locale: AppLocale = "en"
 ): string {
   if (section === "Intro" || index === 0) {
-    return "Setup";
+    return translate(locale, "arrange.blockRoleSetup");
   }
   if (section === "Hook") {
-    return "Hook lift";
+    return translate(locale, "arrange.blockRoleHook");
   }
   if (section === "Outro" || index === totalBlocks - 1) {
-    return "Release";
+    return translate(locale, "arrange.blockRoleRelease");
   }
   if (section === "Bridge") {
-    return "Contrast";
+    return translate(locale, "arrange.blockRoleContrast");
   }
   if (mutedCount >= 2 || energy <= 0.38) {
-    return "Breakdown";
+    return translate(locale, "arrange.blockRoleBreakdown");
   }
   if (energy >= 0.88) {
-    return "Peak";
+    return translate(locale, "arrange.blockRolePeak");
   }
-  return "Pocket";
+  return translate(locale, "arrange.blockRolePocket");
 }
 
-export function mixerChannelRoleSummary(channel: MixerChannel): MixerChannelRoleSummary {
-  const stateParts = [channel.muted ? "Muted" : "Live", channel.solo ? "Solo" : null].filter(Boolean);
+export function mixerChannelRoleSummary(channel: MixerChannel, locale: AppLocale = "en"): MixerChannelRoleSummary {
+  const stateParts = [
+    translate(locale, channel.muted ? "mix.roleMuted" : "mix.roleLive"),
+    channel.solo ? translate(locale, "mix.roleSolo") : null
+  ].filter(Boolean);
   const toneParts =
     channel.id === "master"
-      ? [`trim ${formatDb(channel.volumeDb)}`, `pan ${panLabel(channel.pan)}`]
+      ? [
+          translate(locale, "mix.roleTrim", { value: formatDb(channel.volumeDb) }),
+          translate(locale, "mix.rolePan", { value: panLabel(channel.pan) })
+        ]
       : [
-          `cut ${percentLabel(channel.lowCut)}`,
-          `air ${percentLabel(channel.air)}`,
-          `drive ${percentLabel(channel.drive)}`,
-          `glue ${percentLabel(channel.glue)}`,
-          `space ${percentLabel(channel.send)}`
+          translate(locale, "mix.roleCut", { value: percentLabel(channel.lowCut) }),
+          translate(locale, "mix.roleAir", { value: percentLabel(channel.air) }),
+          translate(locale, "mix.roleDrive", { value: percentLabel(channel.drive) }),
+          translate(locale, "mix.roleGlue", { value: percentLabel(channel.glue) }),
+          translate(locale, "mix.roleSpace", { value: percentLabel(channel.send) })
         ];
 
   return {
-    roleLabel: mixerChannelRoleLabel(channel),
+    roleLabel: mixerChannelRoleLabel(channel, locale),
     levelLabel: `${formatDb(channel.volumeDb)} / ${panLabel(channel.pan)}`,
     detailLabel: [...stateParts, ...toneParts].join(" / "),
     isShaped:
@@ -2123,20 +2154,20 @@ export function mixerChannelRoleSummary(channel: MixerChannel): MixerChannelRole
   };
 }
 
-export function mixerChannelRoleLabel(channel: MixerChannel): string {
+export function mixerChannelRoleLabel(channel: MixerChannel, locale: AppLocale = "en"): string {
   switch (channel.id) {
     case "drum_rack":
-      return "Rhythm anchor";
+      return translate(locale, "mix.roleDrums");
     case "bass_808":
-      return "Low-end weight";
+      return translate(locale, "mix.roleBass");
     case "synth":
-      return "Hook color";
+      return translate(locale, "mix.roleSynth");
     case "chord":
-      return "Harmony bed";
+      return translate(locale, "mix.roleChords");
     case "master":
-      return "Output guard";
+      return translate(locale, "mix.roleMaster");
     default:
-      return "Mix lane";
+      return translate(locale, "mix.roleLane");
   }
 }
 
@@ -2191,32 +2222,58 @@ export function createTransportPositionReadoutSummary(
   scope: TransportLoopScope,
   selectedIndex: number,
   selectedStartBar: number,
-  transitionTarget: ArrangementTransitionLoopTarget | null = null
+  transitionTarget: ArrangementTransitionLoopTarget | null = null,
+  locale: AppLocale = "en"
 ): TransportPositionReadoutSummary {
-  const loopLabel = transportLoopLabel(scope);
+  const loopLabel = translate(
+    locale,
+    ({
+      arrangement: "transport.song",
+      block: "transport.block",
+      pattern: "transport.pattern",
+      transition: "transport.turn"
+    } as const)[scope]
+  );
+  const localizedBarCount = (count: number): string =>
+    count === 1
+      ? translate(locale, "transport.positionOneBar")
+      : translate(locale, "transport.positionBarCount", { count });
+  const barBeatLabel = (bar: number, beat: number): string =>
+    translate(locale, "transport.positionBarBeat", { bar, beat });
   if (isPlaying && playbackPosition) {
     const step = (playbackPosition.loopStep % 16) + 1;
     const loopStartBar =
       scope === "block" ? selectedStartBar : scope === "transition" && transitionTarget ? transitionTarget.startBar : 0;
     const songBar = playbackPosition.mode === "arrangement" ? loopStartBar + playbackPosition.bar : playbackPosition.bar;
     const sectionLabel =
-      playbackPosition.mode === "pattern" ? `Pattern ${playbackPosition.pattern}` : playbackPosition.section ?? "Arrangement";
+      playbackPosition.mode === "pattern"
+        ? translate(locale, "transport.positionPattern", { pattern: playbackPosition.pattern })
+        : playbackPosition.section ?? translate(locale, "transport.arrangement");
 
     return {
-      roleLabel: `Bar ${songBar}.${playbackPosition.beat}`,
-      statusLabel: `Playing ${loopLabel}`,
-      detailLabel: `${sectionLabel} / Step ${step}`,
-      detailTitle: `${loopLabel} loop is playing at song bar ${songBar}, beat ${playbackPosition.beat}, step ${step}, Pattern ${playbackPosition.pattern}.`,
+      roleLabel: barBeatLabel(songBar, playbackPosition.beat),
+      statusLabel: translate(locale, "transport.positionPlaying", { scope: loopLabel }),
+      detailLabel: translate(locale, "transport.positionStepDetail", { label: sectionLabel, step }),
+      detailTitle: translate(locale, "transport.positionPlayingTitle", {
+        scope: loopLabel,
+        bar: songBar,
+        beat: playbackPosition.beat,
+        step,
+        pattern: playbackPosition.pattern
+      }),
       tone: "good"
     };
   }
 
   if (scope === "pattern") {
     return {
-      roleLabel: "Bar 1.1",
-      statusLabel: "Cued Pattern",
-      detailLabel: `Pattern ${project.selectedPattern} / Step 1`,
-      detailTitle: `Pattern loop is cued at bar 1, beat 1, step 1 for Pattern ${project.selectedPattern}.`,
+      roleLabel: barBeatLabel(1, 1),
+      statusLabel: translate(locale, "transport.positionCuedPattern"),
+      detailLabel: translate(locale, "transport.positionStepDetail", {
+        label: translate(locale, "transport.positionPattern", { pattern: project.selectedPattern }),
+        step: 1
+      }),
+      detailTitle: translate(locale, "transport.positionPatternCuedTitle", { pattern: project.selectedPattern }),
       tone: "warn"
     };
   }
@@ -2226,10 +2283,10 @@ export function createTransportPositionReadoutSummary(
     const block = project.arrangement[boundedIndex];
     if (!block) {
       return {
-        roleLabel: "No block",
-        statusLabel: "Cued Block",
-        detailLabel: "Select an arrangement block",
-        detailTitle: "Block loop has no arrangement block to cue.",
+        roleLabel: translate(locale, "transport.positionNoBlock"),
+        statusLabel: translate(locale, "transport.positionCuedBlock"),
+        detailLabel: translate(locale, "transport.positionSelectBlock"),
+        detailTitle: translate(locale, "transport.positionBlockUnavailableTitle"),
         tone: "danger"
       };
     }
@@ -2237,10 +2294,19 @@ export function createTransportPositionReadoutSummary(
     const blockNumber = boundedIndex + 1;
     const blockStartBar = arrangementStartBar(project, boundedIndex);
     return {
-      roleLabel: `Bar ${blockStartBar + 1}.1`,
-      statusLabel: `Cued ${block.section}`,
-      detailLabel: `Block ${blockNumber} / Pattern ${block.pattern}`,
-      detailTitle: `Block loop is cued at song bar ${blockStartBar + 1}, beat 1, step 1 for ${block.section} block ${blockNumber}, Pattern ${block.pattern}, ${barCountLabel(block.bars)}.`,
+      roleLabel: barBeatLabel(blockStartBar + 1, 1),
+      statusLabel: translate(locale, "transport.positionCuedTarget", { target: block.section }),
+      detailLabel: translate(locale, "transport.positionBlockPattern", {
+        block: blockNumber,
+        pattern: block.pattern
+      }),
+      detailTitle: translate(locale, "transport.positionBlockCuedTitle", {
+        bar: blockStartBar + 1,
+        section: block.section,
+        block: blockNumber,
+        pattern: block.pattern,
+        bars: localizedBarCount(block.bars)
+      }),
       tone: "warn"
     };
   }
@@ -2248,31 +2314,39 @@ export function createTransportPositionReadoutSummary(
   if (scope === "transition") {
     if (!transitionTarget) {
       return {
-        roleLabel: "No transition",
-        statusLabel: "Cued Turn",
-        detailLabel: "Focus an adjacent handoff",
-        detailTitle: "Transition loop has no adjacent arrangement blocks to cue.",
+        roleLabel: translate(locale, "transport.positionNoTransition"),
+        statusLabel: translate(locale, "transport.positionCuedTurn"),
+        detailLabel: translate(locale, "transport.positionFocusHandoff"),
+        detailTitle: translate(locale, "transport.positionTransitionUnavailableTitle"),
         tone: "danger"
       };
     }
 
     return {
-      roleLabel: `Bar ${transitionTarget.startBar + 1}.1`,
-      statusLabel: "Cued Turn",
-      detailLabel: `${transitionTarget.transition.value} / ${barCountLabel(transitionTarget.bars)}`,
-      detailTitle: `Transition loop is cued at song bar ${transitionTarget.startBar + 1}, beat 1, step 1 across ${
-        transitionTarget.transition.value
-      }, ${barCountLabel(transitionTarget.bars)}.`,
+      roleLabel: barBeatLabel(transitionTarget.startBar + 1, 1),
+      statusLabel: translate(locale, "transport.positionCuedTurn"),
+      detailLabel: `${transitionTarget.transition.value} / ${localizedBarCount(transitionTarget.bars)}`,
+      detailTitle: translate(locale, "transport.positionTransitionCuedTitle", {
+        bar: transitionTarget.startBar + 1,
+        transition: transitionTarget.transition.value,
+        bars: localizedBarCount(transitionTarget.bars)
+      }),
       tone: "warn"
     };
   }
 
   const firstBlock = project.arrangement[0];
+  const songBars = localizedBarCount(arrangementTotalBars(project));
   return {
-    roleLabel: "Bar 1.1",
-    statusLabel: "Cued Song",
-    detailLabel: firstBlock ? `${firstBlock.section} / Pattern ${firstBlock.pattern}` : `${barCountLabel(arrangementTotalBars(project))} loop`,
-    detailTitle: `Song loop is cued at bar 1, beat 1, step 1 across ${barCountLabel(arrangementTotalBars(project))}.`,
+    roleLabel: barBeatLabel(1, 1),
+    statusLabel: translate(locale, "transport.positionCuedSong"),
+    detailLabel: firstBlock
+      ? translate(locale, "transport.positionSectionPattern", {
+          section: firstBlock.section,
+          pattern: firstBlock.pattern
+        })
+      : translate(locale, "transport.positionLoop", { bars: songBars }),
+    detailTitle: translate(locale, "transport.positionSongCuedTitle", { bars: songBars }),
     tone: "warn"
   };
 }
@@ -4767,14 +4841,18 @@ export function createMixBalancePadOptions(mixer: MixerChannel[]): MixBalancePad
   });
 }
 
-export function createMixBalancePreviewSummary(mixer: MixerChannel[], pads: MixBalancePadOption[]): MixBalancePreviewSummary {
+export function createMixBalancePreviewSummary(
+  mixer: MixerChannel[],
+  pads: MixBalancePadOption[],
+  locale: AppLocale = "en"
+): MixBalancePreviewSummary {
   const pad = pads.find((option) => option.changedCount > 0) ?? pads[0];
   if (!pad) {
     return {
       padId: "clean",
       changedChannels: 0,
       changedControls: 0,
-      statusLabel: "Balance aligned",
+      statusLabel: translate(locale, "mix.balanceAligned"),
       padLabel: "No balance target",
       channelLabel: "No channel target",
       auditionLabel: "No audition target",
@@ -4788,14 +4866,14 @@ export function createMixBalancePreviewSummary(mixer: MixerChannel[], pads: MixB
   const changedControls = mixBalanceChangedControlCount(mixer, transformed);
   const tone: MixCoachTone = changedControls === 0 ? "good" : pad.changedCount <= 2 ? "warn" : "danger";
   const channelLabel = mixBalancePreviewChannelLabel(pad);
-  const auditionLabel = createStemAuditionReadoutSummary(transformed).roleLabel;
+  const auditionLabel = createStemAuditionReadoutSummary(transformed, locale).roleLabel;
   const moveLabel = `${pad.changedCount} channels / ${changedControls} controls`;
 
   return {
     padId: pad.id,
     changedChannels: pad.changedCount,
     changedControls,
-    statusLabel: changedControls === 0 ? "Balance aligned" : "Suggested balance",
+    statusLabel: translate(locale, changedControls === 0 ? "mix.balanceAligned" : "mix.balanceSuggested"),
     padLabel: `${pad.label} balance`,
     channelLabel,
     auditionLabel,
@@ -4930,13 +5008,17 @@ export function createSpaceFxPadOptions(mixer: MixerChannel[]): SpaceFxPadOption
   });
 }
 
-export function createSpaceFxPreviewSummary(mixer: MixerChannel[], pads: SpaceFxPadOption[]): SpaceFxPreviewSummary {
+export function createSpaceFxPreviewSummary(
+  mixer: MixerChannel[],
+  pads: SpaceFxPadOption[],
+  locale: AppLocale = "en"
+): SpaceFxPreviewSummary {
   const pad = pads.find((option) => option.changedCount > 0) ?? pads[0];
   if (!pad) {
     return {
       padId: "dry",
       changedSends: 0,
-      statusLabel: "Space aligned",
+      statusLabel: translate(locale, "mix.spaceAligned"),
       padLabel: "No space target",
       sendLabel: "No send target",
       focusLabel: "No FX focus",
@@ -4951,7 +5033,7 @@ export function createSpaceFxPreviewSummary(mixer: MixerChannel[], pads: SpaceFx
   const sendLabel = spaceFxPreview(pad);
   const focusLabel = `${pad.label} / ${pad.detail}`;
   const changeLabel = `${changedSends} send${changedSends === 1 ? "" : "s"} before Apply`;
-  const statusLabel = changedSends === 0 ? "Space aligned" : "Suggested space";
+  const statusLabel = translate(locale, changedSends === 0 ? "mix.spaceAligned" : "mix.spaceSuggested");
   const tone: MixCoachTone = changedSends === 0 ? "good" : changedSends <= 2 ? "warn" : "danger";
 
   return {
@@ -5064,7 +5146,10 @@ export function stemAuditionPreview(pad: StemAuditionPadDefinition): string {
   return pad.trackId === null ? "All" : stemTrackLabel(pad.trackId);
 }
 
-export function createStemAuditionReadoutSummary(mixer: MixerChannel[]): StemAuditionReadoutSummary {
+export function createStemAuditionReadoutSummary(
+  mixer: MixerChannel[],
+  locale: AppLocale = "en"
+): StemAuditionReadoutSummary {
   const stemChannels = mixer.filter((channel): channel is MixerChannel & { id: StemTrackId } => isStemTrackId(channel.id));
   const soloActive = stemChannels.some((channel) => channel.solo);
   const audibleChannels = stemChannels.filter((channel) => !channel.muted && (!soloActive || channel.solo));
@@ -5075,25 +5160,25 @@ export function createStemAuditionReadoutSummary(mixer: MixerChannel[]): StemAud
       ? "Drums/808/Synth/Chords"
       : audibleChannels.length > 0
         ? audibleChannels.map((channel) => stemTrackLabel(channel.id)).join("/")
-        : "No stems";
+        : translate(locale, "mix.stemNoStems");
 
   if (audibleChannels.length === 0) {
-    const detailLabel = `${mutedCount} muted / ${soloCount} solo`;
+    const detailLabel = translate(locale, "mix.stemMutedSolo", { muted: mutedCount, solo: soloCount });
     return {
-      roleLabel: "Silent audition",
-      statusLabel: "No audible stems",
+      roleLabel: translate(locale, "mix.stemSilentRole"),
+      statusLabel: translate(locale, "mix.stemNoAudible"),
       detailLabel,
-      detailTitle: `No stem channels are currently audible / ${detailLabel}`,
+      detailTitle: translate(locale, "mix.stemNoAudibleTitle", { detail: detailLabel }),
       tone: "danger"
     };
   }
 
   if (!soloActive && mutedCount === 0) {
     return {
-      roleLabel: "Full mix audition",
-      statusLabel: "Hearing Full Mix",
-      detailLabel: `${audibleChannels.length} active stems`,
-      detailTitle: `Hearing the full mix / ${audibleLabel} / no muted or soloed stems`,
+      roleLabel: translate(locale, "mix.stemFullRole"),
+      statusLabel: translate(locale, "mix.stemHearingFull"),
+      detailLabel: translate(locale, "mix.stemActiveCount", { count: audibleChannels.length }),
+      detailTitle: translate(locale, "mix.stemFullTitle", { stems: audibleLabel }),
       tone: "good"
     };
   }
@@ -5101,20 +5186,24 @@ export function createStemAuditionReadoutSummary(mixer: MixerChannel[]): StemAud
   if (soloActive && audibleChannels.length === 1 && soloCount === 1 && mutedCount === 0) {
     const stemLabel = stemTrackLabel(audibleChannels[0].id);
     return {
-      roleLabel: `${stemLabel} solo`,
-      statusLabel: `Hearing ${stemLabel} Stem`,
-      detailLabel: "1 active stem",
-      detailTitle: `Hearing only the ${stemLabel} stem / mixer solo audition`,
+      roleLabel: translate(locale, "mix.stemSoloRole", { stem: stemLabel }),
+      statusLabel: translate(locale, "mix.stemHearing", { stem: stemLabel }),
+      detailLabel: translate(locale, "mix.stemActiveCount", { count: 1 }),
+      detailTitle: translate(locale, "mix.stemSoloTitle", { stem: stemLabel }),
       tone: "good"
     };
   }
 
-  const detailLabel = `${audibleLabel} audible / ${mutedCount} muted / ${soloCount} solo`;
+  const detailLabel = translate(locale, "mix.stemCustomDetail", {
+    stems: audibleLabel,
+    muted: mutedCount,
+    solo: soloCount
+  });
   return {
-    roleLabel: "Manual mixer state",
-    statusLabel: "Custom audition",
+    roleLabel: translate(locale, "mix.stemManualRole"),
+    statusLabel: translate(locale, "mix.stemCustomStatus"),
     detailLabel,
-    detailTitle: `Custom mixer audition / ${detailLabel}`,
+    detailTitle: translate(locale, "mix.stemCustomTitle", { detail: detailLabel }),
     tone: "warn"
   };
 }
@@ -5515,36 +5604,65 @@ export function masterAutomationEventSignature(event: AutomationEvent): string {
   return `${event.target}:${event.startStep}:${event.endStep}:${event.startValue}:${event.endValue}:${event.curve}`;
 }
 
-export function createMasterOutputRoleSummary(project: ProjectState, analysis: ExportAnalysis): MasterOutputRoleSummary {
+export function createMasterOutputRoleSummary(
+  project: ProjectState,
+  analysis: ExportAnalysis,
+  locale: AppLocale = "en"
+): MasterOutputRoleSummary {
   const outputDb = masterChannelVolumeDb(project.mixer);
-  const limitedLabel = analysis.limitedSamples > 0 ? `limiter ${formatPercent(analysis.limitedPercent)}` : "limiter clear";
+  const limitedLabel =
+    analysis.limitedSamples > 0
+      ? translate(locale, "master.limiterValue", { value: formatPercent(analysis.limitedPercent) })
+      : translate(locale, "master.limiterClear");
+  const statusLabel = translate(
+    locale,
+    analysis.status === "Ready"
+      ? "master.analysisReady"
+      : analysis.status === "Hot"
+        ? "master.analysisHot"
+        : analysis.status === "Limiter active"
+          ? "master.analysisLimiter"
+          : "master.analysisSilent"
+  );
+  const levelLabel = translate(locale, "master.outputLevel", {
+    ceiling: formatDb(project.masterCeilingDb),
+    output: formatDb(outputDb)
+  });
+  const detailLabel = translate(locale, "master.outputDetail", {
+    headroom: formatDb(analysis.headroomDb),
+    limiter: limitedLabel
+  });
 
   return {
-    roleLabel: masterOutputRoleLabel(project.masterPreset, analysis),
-    statusLabel: `${project.masterPreset} / ${analysis.status}`,
-    levelLabel: `${formatDb(project.masterCeilingDb)} ceiling / ${formatDb(outputDb)} output`,
-    detailLabel: `${formatDb(analysis.headroomDb)} headroom / ${limitedLabel}`,
-    detailTitle: `${project.masterPreset} / ${analysis.status} / ${formatDb(project.masterCeilingDb)} ceiling / ${formatDb(outputDb)} output / ${formatDb(analysis.headroomDb)} headroom / ${limitedLabel}`,
+    roleLabel: masterOutputRoleLabel(project.masterPreset, analysis, locale),
+    statusLabel: translate(locale, "master.outputStatus", { preset: project.masterPreset, status: statusLabel }),
+    levelLabel,
+    detailLabel,
+    detailTitle: `${translate(locale, "master.outputStatus", { preset: project.masterPreset, status: statusLabel })} / ${levelLabel} / ${detailLabel}`,
     isAtRisk: analysis.status !== "Ready" || analysis.headroomDb < 0.5 || analysis.limitedSamples > 0
   };
 }
 
-export function masterOutputRoleLabel(preset: MasterPreset, analysis: ExportAnalysis): string {
+export function masterOutputRoleLabel(
+  preset: MasterPreset,
+  analysis: ExportAnalysis,
+  locale: AppLocale = "en"
+): string {
   if (analysis.status === "Silent") {
-    return "No signal";
+    return translate(locale, "master.roleNoSignal");
   }
   if (analysis.status === "Hot" || analysis.status === "Limiter active" || analysis.headroomDb < 0.5) {
-    return "Headroom watch";
+    return translate(locale, "master.roleHeadroomWatch");
   }
   switch (preset) {
     case "Headroom for Vocal":
-      return "Vocal handoff";
+      return translate(locale, "master.roleVocal");
     case "Streaming Safe":
-      return "Balanced store";
+      return translate(locale, "master.roleBalanced");
     case "Clean Demo":
-      return "Demo output";
+      return translate(locale, "master.roleDemo");
     default:
-      return "Output guard";
+      return translate(locale, "master.roleOutput");
   }
 }
 

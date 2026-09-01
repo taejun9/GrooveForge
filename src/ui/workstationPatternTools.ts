@@ -13,6 +13,7 @@ import {
   downloadProjectFile as downloadBrowserProjectFile,
   downloadTextFile as downloadBrowserTextFile
 } from "../platform/downloads";
+import { translate, type AppLocale } from "./localization";
 import {
   ArrangementBlock,
   ArrangementMovePreset,
@@ -638,26 +639,44 @@ export function createKeyboardCapturePostureSummary(
   defaults: KeyboardCaptureDefaults,
   nextStep: number,
   stepMode: KeyboardCaptureStepMode,
-  playheadStep: number | null = null
+  playheadStep: number | null = null,
+  locale: AppLocale = "en"
 ): KeyboardCapturePostureSummary {
-  const targetLabel = target === "bass" ? "Bass" : "Synth";
-  const statusLabel = enabled ? "Capture armed" : "Capture off";
-  const stepModeLabel = stepMode === "next-free" ? "Next" : stepMode === "replace-selected" ? "Replace" : "Overdub";
-  const stepLabel = stepMode === "playhead" && playheadStep === null ? "Waiting for Pattern play" : `Step ${(playheadStep ?? nextStep) + 1}`;
+  const targetLabel = translate(locale, target === "bass" ? "compose.captureBass" : "compose.captureSynth");
+  const statusLabel = translate(locale, enabled ? "compose.captureArmed" : "compose.captureOff");
+  const stepModeLabel = translate(
+    locale,
+    stepMode === "next-free"
+      ? "compose.captureNext"
+      : stepMode === "replace-selected"
+        ? "compose.captureReplace"
+        : "compose.captureOverdub"
+  );
+  const stepLabel =
+    stepMode === "playhead" && playheadStep === null
+      ? translate(locale, "compose.captureWaiting")
+      : translate(locale, "compose.captureStep", { step: (playheadStep ?? nextStep) + 1 });
   const detailLabel =
     target === "bass"
-      ? `${stepLabel} / ${stepModeLabel} / Oct ${defaults.octave} / Len ${defaults.length} / ${
-          defaults.glide ? "Glide on" : "Glide off"
-        }`
-      : `${stepLabel} / ${stepModeLabel} / Oct ${defaults.octave} / Len ${defaults.length} / Vel ${Math.round(
-          defaults.velocity * 100
-        )}%`;
+      ? `${stepLabel} / ${stepModeLabel} / ${translate(locale, "compose.captureOctave", {
+          octave: defaults.octave
+        })} / ${translate(locale, "compose.captureLength", { length: defaults.length })} / ${translate(
+          locale,
+          defaults.glide ? "compose.captureGlideOn" : "compose.captureGlideOff"
+        )}`
+      : `${stepLabel} / ${stepModeLabel} / ${translate(locale, "compose.captureOctave", {
+          octave: defaults.octave
+        })} / ${translate(locale, "compose.captureLength", { length: defaults.length })} / ${translate(
+          locale,
+          "compose.captureVelocity",
+          { velocity: Math.round(defaults.velocity * 100) }
+        )}`;
 
   return {
-    roleLabel: `${targetLabel} keys`,
+    roleLabel: translate(locale, "compose.captureKeys", { target: targetLabel }),
     statusLabel,
     detailLabel,
-    detailTitle: `${statusLabel} / ${targetLabel} target / ${detailLabel}`,
+    detailTitle: translate(locale, "compose.captureTitle", { status: statusLabel, target: targetLabel, detail: detailLabel }),
     tone: enabled ? "good" : "warn"
   };
 }

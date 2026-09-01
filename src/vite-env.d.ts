@@ -496,6 +496,7 @@ interface Window {
     loadProjectRecovery?: () => Promise<{ contents: string; savedAt: string } | null>;
     clearProjectRecovery?: () => Promise<{ cleared: boolean }>;
     closeWindow?: () => void;
+    setLocale?: (locale: "en" | "ko") => void;
     openProject?: () => Promise<{ canceled: boolean; filePath?: string; contents?: string }>;
     onMenuCommand?: (callback: (command: NativeMenuCommand) => void) => () => void;
   };

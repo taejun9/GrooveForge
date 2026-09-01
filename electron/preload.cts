@@ -64,6 +64,11 @@ contextBridge.exposeInMainWorld("grooveforge", {
   clearProjectRecovery: () =>
     ipcRenderer.invoke("grooveforge:clear-project-recovery") as Promise<{ cleared: boolean }>,
   closeWindow: () => ipcRenderer.send("grooveforge:close-window"),
+  setLocale: (locale: "en" | "ko") => {
+    if (locale === "en" || locale === "ko") {
+      ipcRenderer.send("grooveforge:set-locale", locale);
+    }
+  },
   openProject: () =>
     ipcRenderer.invoke("grooveforge:open-project") as Promise<{ canceled: boolean; filePath?: string; contents?: string }>,
   onMenuCommand: (callback: (command: NativeMenuCommand) => void) => {
