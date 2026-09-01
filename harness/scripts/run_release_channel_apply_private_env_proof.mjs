@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 비공개 환경 적용 후 대상 설정과 receipt가 일치한다는 redacted proof를 생성한다.
+ * 흐름: 적용 receipt와 현재 로컬 설정을 재읽어 키 존재·대상·시간·해시를 검증하고 증거 파일을 기록한다.
+ * 개인정보 경계: 실제 값 대신 존재/해시만 남기며 불일치는 proof 생성 실패로 처리하고 추가 외부 변경은 하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";

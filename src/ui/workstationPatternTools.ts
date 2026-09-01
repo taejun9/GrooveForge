@@ -1,3 +1,8 @@
+/**
+ * 패턴·편곡·전달 작업에서 반복되는 불변 변환, 값 정규화, 표시 포맷과 파일 다운로드 연결을 제공한다.
+ * 도메인 규칙을 조합해 새 ProjectState 또는 설명 모델을 만들고 브라우저 다운로드는 플랫폼 어댑터에 위임한다.
+ * 스텝·속도·확률·길이를 허용 범위로 고정하고 파일명/텍스트를 정규화해 손상된 편집값과 위험한 출력 경로를 막는다.
+ */
 import {
   createHandoffSheet as createAudioHandoffSheet,
   exportDynamicsDb as audioExportDynamicsDb,

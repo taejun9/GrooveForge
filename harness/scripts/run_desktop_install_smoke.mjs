@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 패키지된 데스크톱 앱의 설치·복사·재실행 기본 흐름이 로컬 macOS 환경에서 성립하는지 검사한다.
+ * 흐름: 검증된 패키지를 격리 설치 경로에 복사하고 구조·서명·실행 결과를 확인한 뒤 테스트 자산을 정리한다.
+ * 안전 경계: 소유권이 확인된 임시 설치 대상만 변경하며 기존 사용자 앱이나 프로젝트는 덮어쓰지 않는다.
+ */
+
 import { spawn } from "node:child_process";
 import { constants, existsSync, readdirSync, readFileSync } from "node:fs";
 import { access, cp, lstat, mkdir, readFile, rm, stat } from "node:fs/promises";

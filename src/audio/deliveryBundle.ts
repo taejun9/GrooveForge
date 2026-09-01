@@ -1,3 +1,8 @@
+/**
+ * 한 프로젝트의 편집 원본, 믹스·스템 WAV, MIDI, 검토 문서를 하나의 전달 ZIP으로 조립한다.
+ * 모든 산출물은 메모리에서 생성하고 CRC-32가 포함된 무압축 ZIP으로 직렬화한 뒤에만 다운로드하며,
+ * 외부 업로드·네트워크 검사·실사용자 음원 수집을 수행했다는 의미를 manifest에 부여하지 않는다.
+ */
 import {
   activeDeliveryTarget,
   arrangementTotalBars,
@@ -81,6 +86,7 @@ type BundleSourceEntry = {
 };
 
 const encoder = new TextEncoder();
+// 표 생성은 한 번만 수행한다. 각 파일의 CRC 계산은 이 읽기 전용 테이블을 공유해 결과가 입력 바이트에만 의존한다.
 const crcTable = createCrcTable();
 
 export function deliveryBundleZipFileName(project: ProjectState): string {
@@ -105,6 +111,7 @@ function bytesFromMidi(project: ProjectState): Uint8Array {
 }
 
 function createCrcTable(): Uint32Array {
+  // ZIP 명세가 사용하는 역방향 CRC-32 다항식(0xEDB88320)을 8비트 조회표로 전개한다.
   const table = new Uint32Array(256);
   for (let index = 0; index < 256; index += 1) {
     let value = index;
@@ -117,6 +124,7 @@ function createCrcTable(): Uint32Array {
 }
 
 export function crc32(bytes: Uint8Array): number {
+  // 시작/종료 XOR를 포함한 표준 ZIP CRC-32 계산이다. JavaScript 비트 연산의 부호를 >>> 0으로 제거한다.
   let value = 0xffffffff;
   for (const byte of bytes) {
     value = crcTable[(value ^ byte) & 0xff] ^ (value >>> 8);
@@ -129,6 +137,7 @@ export function formatCrc32(value: number): string {
 }
 
 function writeUint16(target: Uint8Array, offset: number, value: number): void {
+  // ZIP 헤더의 정수 필드는 little-endian이므로 낮은 바이트부터 기록한다.
   target[offset] = value & 0xff;
   target[offset + 1] = (value >>> 8) & 0xff;
 }
@@ -152,6 +161,7 @@ function concatBytes(parts: Uint8Array[]): Uint8Array {
 }
 
 function zipDosTime(): { time: number; date: number } {
+  // 실행 시각을 넣지 않고 DOS 최소 날짜를 고정해 같은 프로젝트에서 재생성한 ZIP 바이트를 재현 가능하게 한다.
   return {
     time: 0,
     date: (1 << 5) | 1
@@ -159,6 +169,8 @@ function zipDosTime(): { time: number; date: number } {
 }
 
 function createLocalHeader(nameBytes: Uint8Array, entryBytes: Uint8Array, entryCrc32: number): Uint8Array {
+  // 압축 방식 0(Store)을 사용하므로 압축 크기와 원본 크기가 동일하다.
+  // 브라우저 내 구현을 단순하게 유지하고 WAV처럼 이미 큰 데이터의 불필요한 CPU 사용을 피한다.
   const header = new Uint8Array(30 + nameBytes.byteLength);
   const { time, date } = zipDosTime();
   writeUint32(header, 0, 0x04034b50);
@@ -182,6 +194,8 @@ function createCentralHeader(
   entryCrc32: number,
   localHeaderOffset: number
 ): Uint8Array {
+  // 중앙 디렉터리는 같은 파일 메타데이터와 로컬 헤더의 절대 오프셋을 다시 기록한다.
+  // 오프셋은 앞선 로컬 헤더와 페이로드 길이만 누적해 계산한다.
   const header = new Uint8Array(46 + nameBytes.byteLength);
   const { time, date } = zipDosTime();
   writeUint32(header, 0, 0x02014b50);
@@ -233,6 +247,7 @@ export function createStoredZip(entries: BundleSourceEntry[]): Blob {
   }
 
   const centralDirectory = concatBytes(centralParts);
+  // ZIP 구조는 [각 로컬 헤더+데이터] → [중앙 디렉터리] → [종료 레코드] 순서를 지켜야 한다.
   const end = createEndOfCentralDirectory(entries.length, centralDirectory.byteLength, offset);
   const zipBytes = concatBytes([...localParts, centralDirectory, end]);
   const payload = new ArrayBuffer(zipBytes.byteLength);
@@ -252,6 +267,7 @@ async function createBaseBundleEntries(
   const mixBlob = createMixWavBlob(project);
   const stemFiles = stemWavFileNames(project);
   const stemEntries = await Promise.all(
+    // 스템 Blob의 ArrayBuffer 변환은 독립적이므로 병렬화하되, map 순서로 파일 목록의 결정성을 유지한다.
     stemTrackIds.map(async (track: StemTrackId, index) => ({
       path: `${root}/stems/${stemFiles[index]}`,
       label: `${stemTrackLabel(track)} stem WAV`,
@@ -300,6 +316,8 @@ export function createDeliveryBundleManifest(
   bundleFileName: string,
   entries: BundleSourceEntry[]
 ): DeliveryBundleManifest {
+  // manifest 자신을 제외한 기본 산출물의 크기와 체크섬을 먼저 고정한다.
+  // `artifactCount + 2`는 뒤에서 추가되는 JSON/Markdown manifest 두 파일을 포함한 전체 개수다.
   const manifestEntries = entries.map((entry) => ({
     path: entry.path,
     label: entry.label,
@@ -327,6 +345,8 @@ export function createDeliveryBundleManifest(
     entries: manifestEntries,
     localFirst: true,
     samplingSecondary: true,
+    // 아래 값은 이 로컬 생성 코드가 하지 않은 일을 명확히 표현하는 안전 경계다.
+    // 권리·외부 배포 여부를 자동으로 추론하거나 성공했다고 주장해서는 안 된다.
     privateValuesRecorded: false,
     realUserAudioRecorded: false,
     networkProbeAttempted: false,
@@ -402,6 +422,8 @@ export async function exportDeliveryBundleZip(
   analysis: ExportAnalysis,
   stemAnalyses: StemExportAnalyses
 ): Promise<DeliveryBundleZipResult> {
+  // 모든 비동기 산출물과 manifest가 완성된 뒤 단 한 번 다운로드를 시작한다.
+  // 생성 중간 실패 시 불완전한 ZIP을 사용자 저장소에 남기지 않는다.
   const result = await createDeliveryBundleZipBlob(project, analysis, stemAnalyses);
   downloadBlob(result.blob, result.fileName);
   return result;

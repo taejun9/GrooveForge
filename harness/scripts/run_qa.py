@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Validate the GrooveForge project base."""
+"""GrooveForge 저장소의 문서·계획·명령·구조 불변식을 폭넓게 검사한다.
+
+저장소 파일을 읽어 계획 위치, 문서 링크, package 명령, 품질 체크 목록을 누적하고 strict 모드에서 더 강한 계약을 적용한다.
+검사 오류는 모두 보고한 뒤 실패 코드로 종료하며, 소스 수정·네트워크 접근·개인정보 수집은 수행하지 않는다.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +16,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PLAN_RE = re.compile(r"plan-\d{3,}-[a-z0-9][a-z0-9-]*\.md$")
+JS_TRIVIA_PATTERN = r"(?:\s|/\*[\s\S]*?\*/|//[^\n]*(?:\n|$))*"
+MATH_RANDOM_REFERENCE_RE = re.compile(
+    rf"\bMath{JS_TRIVIA_PATTERN}\.{JS_TRIVIA_PATTERN}random\b"
+)
 
 QUALITY_COMMAND_BLOCK_REQUIRED = [
     "npm run delivery:bundle-zip-smoke",
@@ -29503,13 +29511,13 @@ TEXT_EXPECTATIONS = {
         "createRenderNoiseSeed",
         "seededNoiseSample",
         "renderNoiseSeedSalt",
-        "Event-local inputs keep an unchanged noise source stable across unrelated project and mixer edits.",
+        "이벤트 로컬 입력을 seed로 사용해 관련 없는 프로젝트·믹서 편집 전후에도 같은 노이즈 이벤트를 유지한다.",
         "hashNumbers",
         "minimumExportTailSeconds",
         "exportTailSteps",
         "terminalFadeSeconds",
         "exportTailDurationSeconds",
-        "Six tempo-scaled steps cover the longest current event overhang; the floor keeps fast projects safe for Space feedback.",
+        "템포에 비례한 6스텝은 현재 가장 긴 음의 잔향을 덮고, 최소값은 빠른 프로젝트의 Space 피드백도 잘리지 않게 한다.",
         "terminalFadeGain",
         "normalizeArrangementBars",
         "normalizePatternEventCollections",
@@ -30064,7 +30072,16 @@ def check_strict_todos(errors: list[str]) -> None:
 
 def check_offline_render_determinism(errors: list[str]) -> None:
     render_text = (ROOT / "src/audio/render.ts").read_text(encoding="utf-8")
-    if "Math.random" in render_text:
+    # 별칭에 담아 호출하는 경우까지 막기 위해 호출 괄호가 아니라 금지 난수 API 참조 자체를 검사한다.
+    forbidden_reference_fixtures = (
+        "Math.random()",
+        "const rng = Math.random; rng()",
+        "Math . random",
+        "Math /* 설명 */ . random /* 설명 */ (",
+    )
+    if not all(MATH_RANDOM_REFERENCE_RE.search(fixture) for fixture in forbidden_reference_fixtures):
+        errors.append("offline render Math.random reference guard fixtures must all be detected")
+    if MATH_RANDOM_REFERENCE_RE.search(render_text):
         errors.append("src/audio/render.ts must not use Math.random in the offline render path")
 
 
@@ -30168,6 +30185,8 @@ def check_first_read_framing(errors: list[str]) -> None:
 
 
 def run_checks(strict: bool = False) -> list[str]:
+    # 각 검사는 즉시 종료하지 않고 같은 오류 목록에 누적한다. 한 번의 실행으로 저장소 계약의
+    # 전체 위반 지점을 보여 주되, 하나라도 남으면 호출자가 성공으로 오해하지 않도록 한다.
     errors: list[str] = []
     check_required_paths(errors)
     check_tracked_text_sources_are_binary_free(errors)
@@ -30185,6 +30204,7 @@ def run_checks(strict: bool = False) -> list[str]:
     check_composition_first_ui_copy(errors)
     check_first_read_framing(errors)
     if strict:
+        # strict 전용 TODO 검사는 템플릿·빌드 산출물을 제외한 지속 문서만 대상으로 삼는다.
         check_strict_todos(errors)
     return errors
 
@@ -30194,6 +30214,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--strict", action="store_true", help="Fail on TODO markers outside templates.")
     args = parser.parse_args(argv)
 
+    # 출력 형식과 종료 코드는 CI·quality gate가 공유하므로 오류를 모두 인쇄한 뒤 한 번만 실패한다.
     errors = run_checks(strict=args.strict)
     if errors:
         print("QA failed:")

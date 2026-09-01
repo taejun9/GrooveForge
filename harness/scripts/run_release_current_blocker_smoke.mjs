@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 여러 릴리스 실패 중 현재 가장 먼저 해결할 blocker를 결정하는 우선순위 규칙을 검사한다.
+ * 흐름: 다양한 blocker fixture를 평가해 선택된 원인, 설명, owner action, 후속 명령을 기대값과 비교한다.
+ * 안전 경계: 모호하거나 증거 없는 상태는 blocker 없음으로 숨기지 않으며 외부 작업을 직접 실행하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";

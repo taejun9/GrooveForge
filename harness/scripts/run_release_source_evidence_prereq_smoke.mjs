@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: release source evidence를 만들기 전에 필요한 commit·build·QA·manifest 선행 조건을 검사한다.
+ * 흐름: 준비/누락 fixture를 평가해 prerequisite 목록, blocker, 증거 경로와 종료 코드를 대조한다.
+ * 안전 경계: 선행 조건이 하나라도 없으면 다음 단계로 진행하지 않으며 소스·git·외부 서비스를 변경하지 않는다.
+ */
+
 import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: macOS DMG가 기대한 앱·Applications 링크·볼륨 메타데이터를 포함하고 안전하게 다시 열리는지 검사한다.
+ * 흐름: 로컬 패키지 산출물로 DMG를 만들고 attach한 뒤 내용·서명·해시를 확인하고 detach한다.
+ * 안전 경계: 명시된 빌드/임시 볼륨만 다루며 mount나 검증 실패 시 중단하고 외부 배포는 수행하지 않는다.
+ */
+
 import { spawn } from "node:child_process";
 import { constants, existsSync, readdirSync, readFileSync } from "node:fs";
 import { access, cp, lstat, mkdir, readFile, rm, stat, symlink } from "node:fs/promises";

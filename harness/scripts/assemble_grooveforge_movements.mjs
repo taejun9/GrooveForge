@@ -1,3 +1,8 @@
+/**
+ * 역할: 여러 GrooveForge 악장 WAV와 메타데이터를 순서대로 결합해 하나의 검증 가능한 장곡 산출물을 만든다.
+ * 흐름: 명령행 사양을 읽고 입력 해시·PCM 형식을 확인한 뒤 구간을 조립하고 결과 매니페스트와 해시를 기록한다.
+ * 안전 경계: 입력이나 형식이 기대와 다르면 산출을 중단하며, 지정된 로컬 출력 경로 밖의 파일이나 외부 서비스는 변경하지 않는다.
+ */
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -32,6 +37,8 @@ function sha256(bytes) {
 }
 
 function parsePcm24Wave(bytes, label) {
+  // 고정 44-byte header를 가정하지 않고 chunk를 순회하되, 최종 합성에는 canonical PCM24 형식과
+  // 완전한 stereo frame만 허용한다.
   if (bytes.length < 44 || bytes.toString("ascii", 0, 4) !== "RIFF" || bytes.toString("ascii", 8, 12) !== "WAVE") {
     throw new Error(`${label} is not a RIFF/WAVE file.`);
   }
@@ -213,6 +220,8 @@ function createDcBlockState() {
   return { priorInput: Array(channels).fill(0), priorOutput: Array(channels).fill(0) };
 }
 
+// DC block과 terminal fade를 동일한 상태 전이로 두 번 통과시킨다. 첫 pass는 안전 gain만 계산하고,
+// 둘째 pass에서 결정론적 dither와 함께 PCM을 인코딩해 target peak를 넘지 않게 한다.
 let preGainPeak = 0;
 const peakPassState = createDcBlockState();
 for (let frame = 0; frame < outputFrames; frame += 1) {
@@ -282,6 +291,8 @@ for (let frame = outputFrames - 1; frame >= 0; frame -= 1) {
   terminalZeroFrames += 1;
 }
 
+// 이 저수준 조립기는 호출자가 준 경로를 writeFile로 갱신할 수 있다. 상위 작업은 반드시 plan-owned
+// 새 출력 경로를 넘겨야 하며, 여기서는 네트워크나 입력 WAV 자체를 수정하지 않는다.
 await mkdir(path.dirname(outputPath), { recursive: true });
 await mkdir(path.dirname(reportPath), { recursive: true });
 await writeFile(outputPath, output);

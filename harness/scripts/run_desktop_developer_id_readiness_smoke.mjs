@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: Developer ID 서명에 필요한 신원·도구·번들 설정이 갖춰졌는지 실제 서명 전 단계에서 확인한다.
+ * 흐름: 로컬 환경과 키체인 조회 결과를 정규화하고 준비/미준비 fixture의 보고서·종료 코드를 검증한다.
+ * 개인정보 경계: 인증서 세부값과 비밀 입력은 원문 출력하지 않으며, 준비 증거가 없으면 서명 가능으로 판정하지 않는다.
+ */
+
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";

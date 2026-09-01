@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 배포용 로컬 환경 템플릿이 필수 키와 안전한 placeholder를 빠짐없이 제공하는지 검사한다.
+ * 흐름: 템플릿을 격리 경로에 생성·파싱하고 키 순서, 기본 설명, 실제 값 비포함 계약을 대조한다.
+ * 개인정보 경계: 템플릿에 자격 증명이나 운영 URL이 섞이면 실패하며 외부 환경이나 사용자 파일은 수정하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

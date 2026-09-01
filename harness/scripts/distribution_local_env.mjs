@@ -1,3 +1,8 @@
+/**
+ * 역할: 로컬 배포용 비공개 환경 파일을 읽고 필수 키·placeholder·승인 플래그를 정규화해 후속 릴리스 검사에 제공한다.
+ * 흐름: 허용된 파일 경로를 해석하고 key/value를 파싱한 뒤 공개 가능한 요약과 누락·placeholder 진단을 분리한다.
+ * 개인정보 경계: 비밀 값은 로그나 증거에 원문으로 싣지 않고 키별 상태만 반환하며, 이 모듈 자체는 외부 작업을 수행하지 않는다.
+ */
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -84,6 +89,8 @@ export async function loadDistributionLocalEnv(options = {}) {
   const malformedLines = [];
   const presentFiles = [];
 
+  // 파일에 적힌 값보다 이미 주입된 프로세스 환경을 우선한다. 운영자가 셸에서 승인한 비밀을
+  // 로컬 파일이 조용히 덮어쓰지 못하게 하고, 보고서에는 값 대신 키 단위 처리 결과만 남긴다.
   for (const filePath of files) {
     if (!existsSync(filePath)) {
       continue;
@@ -111,6 +118,7 @@ export async function loadDistributionLocalEnv(options = {}) {
         skippedExistingKeys.push(key);
         continue;
       }
+      // placeholder·미허용 키·형식 오류를 모두 걸러낸 뒤에만 현재 자식 프로세스 범위에 반영한다.
       process.env[key] = value;
       loadedKeys.push(key);
     }

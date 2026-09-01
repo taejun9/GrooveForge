@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: release channel 설정을 사람이 안전하게 편집할 수 있는 packet의 내용·경로·검증 안내를 검사한다.
+ * 흐름: fixture packet을 생성해 대상 파일, placeholder, diff 범위, 후속 proof 명령과 redaction을 확인한다.
+ * 안전 경계: packet은 편집을 대신 수행하지 않고 비밀 원문을 포함하지 않으며 운영 파일에는 쓰지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";

@@ -1,3 +1,8 @@
+/**
+ * 앱 전역 퀵 액션 팔레트에 노출할 명령 그래프를 현재 프로젝트·분석·UI 상태에서 조립한다.
+ * 각 명령은 검색 메타데이터, 목적 페이지, 실행 콜백을 함께 가져 팔레트 선택이 정확한 화면과 작업으로 이어진다.
+ * 숨겨진 페이지나 준비되지 않은 분석에 의존하는 명령은 생성 단계에서 제한해 잘못된 실행 가능성을 줄인다.
+ */
 import {
   ArrowDown,
   ArrowLeft,
@@ -7430,8 +7435,8 @@ export type EditorAuditionReadoutSummary = {
   keywords: string;
 };
 
-// These graph-local pure helpers deliberately mirror the first-render exports.
-// Renderer smoke compares their TypeScript AST output so either copy cannot drift unnoticed.
+// 이 그래프 내부 순수 함수는 첫 렌더용 export와 의도적으로 같은 계산을 유지한다.
+// 렌더러 smoke가 두 구현의 TypeScript AST 출력을 비교해 어느 한쪽의 규칙 변경도 놓치지 않게 한다.
 export function patternCueSwitchSelectedBlockPlacement(
   project: ProjectState,
   selectedArrangementIndex: number,

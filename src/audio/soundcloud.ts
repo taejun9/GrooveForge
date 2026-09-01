@@ -1,3 +1,8 @@
+/**
+ * GrooveForge 프로젝트를 SoundCloud 비공개 우선 업로드용 Markdown 체크리스트로 변환한다.
+ * 메타데이터 초안과 기술 형식을 정리하지만 실제 서비스 접속·업로드·권리 판정은 하지 않으며,
+ * 비어 있는 권리자·아티스트 값은 공개 전에 교체해야 할 자리표시자로 남긴다.
+ */
 import {
   activeDeliveryTarget,
   getStyle,
@@ -20,6 +25,8 @@ function uploadValue(value: string, fallback: string): string {
 }
 
 function soundCloudTags(project: ProjectState): string[] {
+  // 사용자가 다시 입력하지 않아도 되는 로컬 프로젝트 정보만 태그 후보로 사용한다.
+  // 외부 유행어·계정 정보는 조회하거나 추정하지 않는다.
   const style = getStyle(project);
   const target = activeDeliveryTarget(project);
   return [style.name, "Instrumental", "Beat", `${projectBpm(project)} BPM`, target.name, "Original"];
@@ -39,6 +46,8 @@ export function createSoundCloudUploadSheet(project: ProjectState): string {
   const mood = uploadValue(brief.vibe, `${style.name} / focused / original instrumental`);
   const background = uploadValue(brief.notes, "Created locally from editable GrooveForge musical events and built-in synthesis.");
 
+  // 이 문서는 복사 가능한 초안이지 배포 승인이 아니다. 따라서 Private/Downloads Off를 기본 절차로 고정하고
+  // 권리·아트워크·트랜스코딩 청취처럼 자동 분석으로 보증할 수 없는 항목을 사람의 확인 단계로 명시한다.
   return [
     "# SoundCloud Upload Sheet",
     "",

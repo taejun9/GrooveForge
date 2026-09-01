@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 사용자 지원용 진단 artifact가 문제 해결에 필요한 정보만 포함하고 민감정보를 제거하는지 검사한다.
+ * 흐름: fixture 진단 묶음을 생성해 파일 구성·크기·redaction·해시와 안내 문서를 대조한다.
+ * 개인정보 경계: 토큰·홈 경로·프로젝트 원문 누출을 실패로 처리하며 artifact를 외부 지원 채널에 전송하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

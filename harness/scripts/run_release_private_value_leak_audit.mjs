@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: release 문서·보고서·증거 bundle에 비공개 값이나 로컬 식별 정보가 누출됐는지 전수 감사한다.
+ * 흐름: 알려진 비밀 fingerprint와 금지 패턴을 수집해 허용된 산출물 범위를 스캔하고 위치별 진단을 출력한다.
+ * 개인정보 경계: 값 자체를 재출력하지 않고 누출 후보가 하나라도 있으면 실패하며 파일을 자동 삭제·수정하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";

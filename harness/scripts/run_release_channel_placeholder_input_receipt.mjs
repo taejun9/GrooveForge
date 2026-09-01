@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 아직 채워지지 않은 release channel 입력을 명시적으로 기록하는 placeholder receipt를 만든다.
+ * 흐름: 템플릿과 현재 상태를 읽어 누락 키·담당 작업·다음 검증 명령을 구조화된 문서로 출력한다.
+ * 개인정보 경계: 실제 비밀을 요구하거나 추정하지 않고 placeholder 상태를 준비 완료로 표시하지 않으며 외부 변경을 하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

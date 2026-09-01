@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 로컬 패키지 앱을 종료 후 다시 열어 프로젝트·창 상태·핵심 기능이 유지되는지 검사한다.
+ * 흐름: 소유된 임시 프로젝트로 첫 실행과 재실행을 순차 구동하고 구조화된 결과와 저장 파일을 비교한다.
+ * 안전 경계: 명시된 앱/fixture만 실행하고 GUI 제한·timeout·예상 밖 종료는 실패로 처리하며 사용자 세션에는 개입하지 않는다.
+ */
+
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";

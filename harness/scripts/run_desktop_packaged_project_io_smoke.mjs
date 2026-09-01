@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 패키지 앱 번들이 프로젝트 저장·열기·SQLite 복구를 production 경로에서 보존하는지 검사한다.
+ * 흐름: 격리 프로젝트와 앱을 실행해 native I/O를 왕복하고 source/rendered fingerprint와 파일 내용을 비교한다.
+ * 안전 경계: 임시 프로젝트 경로만 사용하고 GUI 제한·timeout·데이터 불일치는 실패 처리하며 사용자 파일은 열지 않는다.
+ */
+
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";

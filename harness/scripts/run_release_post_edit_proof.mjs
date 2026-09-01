@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: release 설정을 편집한 뒤 실제 파일 상태가 계획된 변경과 일치한다는 post-edit proof를 만든다.
+ * 흐름: edit receipt와 대상 파일을 다시 읽어 허용 키·값 존재·해시·비변경 영역을 검증하고 redacted 결과를 기록한다.
+ * 개인정보 경계: 원문 비밀은 proof에 넣지 않고 불일치 시 실패하며 추가 편집이나 외부 요청은 수행하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

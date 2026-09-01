@@ -1,3 +1,8 @@
+/**
+ * 파일 역할: Vite가 주입하는 클라이언트 환경 타입을 TypeScript 전체 렌더러 코드에 연결한다.
+ * 주요 흐름: 아래 triple-slash 지시자가 `import.meta.env`와 정적 자산 모듈 선언을 컴파일러에 노출한다.
+ * 유지보수 주의: 실행 코드는 없으며, 참조 지시자는 타입 검사 전에 해석되어야 하므로 삭제하거나 일반 import로 임의 변경하지 않는다.
+ */
 /// <reference types="vite/client" />
 
 type NativeMenuCommand =

@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 운영자가 최종 완료 여부를 판단할 completion brief의 증거·명령·잔여 위험을 검사한다.
+ * 흐름: 완료/차단 fixture에서 brief를 생성해 상태, 체크리스트, proof 링크, rollback 안내와 redaction을 대조한다.
+ * 안전 경계: 근거 없는 승인이나 비밀 포함은 실패하며 운영 결정을 대신 내리거나 외부 작업을 실행하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

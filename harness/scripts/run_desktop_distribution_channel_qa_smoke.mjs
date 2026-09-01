@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 데스크톱 배포 채널별 QA 승인·산출물·지원 URL 계약이 release gate에 맞는지 통합 검사한다.
+ * 흐름: 로컬 채널 환경과 증거 파일을 fixture로 구성하고 QA 명령을 실행해 성공·차단 상태를 대조한다.
+ * 개인정보 경계: 승인이나 비공개 값이 누락되면 실패 폐쇄하며, 실제 채널 게시나 원격 API 호출은 수행하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

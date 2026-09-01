@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: macOS Gatekeeper 배포 준비에 필요한 서명·공증 ticket·assessment 증거가 일치하는지 검사한다.
+ * 흐름: 로컬 앱/DMG와 fixture 결과를 대상으로 codesign·spctl 계열 진단을 수집하고 기대 계약을 대조한다.
+ * 안전 경계: 검증 실패나 도구 부재는 준비 실패로 처리하며 시스템 Gatekeeper 설정이나 사용자 정책은 변경하지 않는다.
+ */
+
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, stat, writeFile } from "node:fs/promises";

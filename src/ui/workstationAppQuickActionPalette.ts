@@ -1,3 +1,8 @@
+/**
+ * 퀵 액션 검색·범위 필터·최근 실행·고정 항목·추천 결과를 만드는 순수 팔레트 모델 계층이다.
+ * 활성 페이지에서만 비용 큰 명령 목록을 구체화하고, 사용자 질의는 정규화된 검색 토큰과 범위에 적용한다.
+ * 사라진 명령 id는 최근/고정 목록에서 걸러 오래된 저장 상태가 실행 불가능한 항목을 노출하지 않게 한다.
+ */
 import { analyzeExport, analyzeStemExports } from "../audio/render";
 import type { ProjectState } from "../domain/workstation";
 import type {

@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: release channel blocker를 해소하는 로컬 절차가 상태·증거·다음 gate를 정확히 갱신하는지 검사한다.
+ * 흐름: 차단 fixture에 remediation을 적용하고 blocker 전후, proof 경로, 종료 코드와 비변경 영역을 대조한다.
+ * 안전 경계: 합성 fixture만 변경하며 증거가 부족하면 차단 상태를 유지하고 실제 운영 채널은 건드리지 않는다.
+ */
+
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

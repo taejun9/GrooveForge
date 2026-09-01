@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 비공개 배포 환경 preflight가 누락·placeholder·미승인 입력을 확실히 차단하는지 검사한다.
+ * 흐름: 의도적으로 불완전한 fixture를 실행해 blocker 목록, 비적용 보장, redacted 진단을 대조한다.
+ * 안전 경계: 차단 사례가 성공하거나 파일을 변경하면 실패하며 운영 자격 증명과 외부 채널은 사용하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";

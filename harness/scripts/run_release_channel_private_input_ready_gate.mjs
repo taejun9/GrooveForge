@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: release channel 비공개 입력이 모두 유효하고 승인됐을 때만 후속 외부 검사를 허용하는 gate다.
+ * 흐름: env·receipt·proof를 읽어 누락, placeholder, redaction, 신선도를 평가하고 준비 상태와 blocker를 출력한다.
+ * 개인정보/외부 경계: 원문 값은 출력하지 않고 모호한 입력은 차단하며 gate 자체는 네트워크나 채널 변경을 수행하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

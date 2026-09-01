@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 데스크톱 배포 완료 감사 문서가 필수 증거·상태·후속 조치를 일관되게 인용하는지 검증한다.
+ * 흐름: fixture와 생성기를 실행해 완료/차단 조합의 산출물을 읽고 스키마·문구·참조 경로를 대조한다.
+ * 안전 경계: 누락되거나 오래된 증거는 완료로 승격하지 않으며, 실제 배포 채널이나 자격 증명은 변경하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

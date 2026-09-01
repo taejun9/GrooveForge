@@ -1,3 +1,8 @@
+/**
+ * 렌더 분석·스템 미터·세션 목표를 Mix 검토 카드, 스냅샷 비교, 레퍼런스 정렬 요약으로 변환한다.
+ * 입력 프로젝트를 변경하지 않는 순수 파생 계층이며 위험/경고/양호 중 가장 약한 판정을 상위 요약으로 전파한다.
+ * 비가청 스템과 불완전 세션 정보는 임의 수치로 채우지 않고 null/경고 상태로 남겨 잘못된 전달 준비 판정을 막는다.
+ */
 import type { StemExportAnalyses, StemTrackId } from "../audio/render";
 import { stemTrackIds } from "../audio/render";
 import type { ExportAnalysis } from "../audio/render";

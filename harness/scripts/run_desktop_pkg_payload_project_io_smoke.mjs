@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: macOS PKG payload에서 추출한 앱이 프로젝트 I/O 계약을 그대로 만족하는지 검사한다.
+ * 흐름: PKG를 격리 디렉터리에 확장하고 payload 앱 경로를 검증한 뒤 저장·재열기 smoke와 파일 비교를 실행한다.
+ * 안전 경계: 시스템 설치를 수행하지 않고 임시 payload만 다루며 예상 밖 경로나 추출 실패는 즉시 차단한다.
+ */
+
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";

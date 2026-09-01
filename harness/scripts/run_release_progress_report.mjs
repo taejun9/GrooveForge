@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 릴리스 gate와 라이브 채널 증거를 갱신한 뒤 현재 진행 상태를 집계하는 로컬 오케스트레이터다.
+ * 흐름: 모드에 따라 `release:check`를 실행하고 persona·channel live check를 거쳐 checkpoint를 읽은 뒤 build JSON/Markdown을 쓴다.
+ * 안전 경계: 승인·유효 URL이 있으면 live check가 제한된 HTTP 읽기를 할 수 있지만 업로드·게시·원격 쓰기는 하지 않고 비공개 값은 redaction한다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";

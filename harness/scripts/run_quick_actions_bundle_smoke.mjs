@@ -1,3 +1,8 @@
+/**
+ * 역할: Quick Actions가 별도 번들로 지연 로딩되면서도 필수 명령·크기·소스 경계를 유지하는지 검사한다.
+ * 흐름: production build 파일을 찾아 chunk 목록과 import 참조를 읽고 허용 크기·명령 coverage·중복 포함 여부를 검증한다.
+ * 안전 경계: 읽기 전용 정적 검사로 동작하며 번들이 없거나 경계가 무너지면 실패하고 앱 실행·네트워크 작업은 하지 않는다.
+ */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

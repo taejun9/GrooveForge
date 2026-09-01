@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 수동 전달에서 자동 업데이트 채널로 넘어가는 release 상태 전이가 필수 증거를 요구하는지 검사한다.
+ * 흐름: 전이 전후 fixture를 평가해 feed·서명·QA·rollback 준비와 상태 요약을 대조한다.
+ * 안전 경계: 어떤 증거라도 비어 있으면 전이를 차단하며 실제 feed 활성화나 클라이언트 업데이트는 실행하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

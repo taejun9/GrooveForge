@@ -1,3 +1,11 @@
+/**
+ * GrooveForge 프로젝트의 정규 도메인 모델과 모든 결정적 음악 편집 규칙을 정의한다.
+ * 스타일·패턴·편곡·믹서·자동화·스냅샷·파일 형식을 한곳에서 정규화해 UI, 실시간 재생, 오프라인 렌더가
+ * 같은 불변식을 공유하도록 한다. 이 모듈은 DOM·AudioContext·파일 시스템·네트워크 부작용을 만들지 않는다.
+ */
+
+// ── 프로젝트의 정규 데이터 계약 ──────────────────────────────────────────────
+// 아래 타입은 저장 파일에도 쓰이므로 필드 변경 시 parse/normalize의 이전 버전 호환 경로를 함께 검토해야 한다.
 export type SkillMode = "guided" | "studio";
 
 export type TrackType = "drum_rack" | "bass_808" | "synth" | "chord" | "fx_return" | "master";
@@ -263,6 +271,8 @@ export type ProjectFile = {
 
 export type AudienceStarterProjectId = "beginner" | "producer";
 
+// ── 입력·저장 안전 상한과 고정 열거값 ─────────────────────────────────────────
+// 사용자가 가져온 JSON도 이 한계 안으로 정규화해 렌더 메모리, 이벤트 순회, 파일명 길이를 예측 가능하게 유지한다.
 export const steps = Array.from({ length: 16 }, (_, index) => index);
 export const stepsPerBar = 16;
 export const projectTimeSignature = "4/4" as const;
@@ -302,6 +312,8 @@ const defaultRequiredMixerChannels: Record<RequiredMixerChannelId, MixerChannel>
   chord: { id: "chord", name: "Chord", volumeDb: -10, pan: 16, lowCut: 0.12, air: 0.28, drive: 0.06, glue: 0.18, send: 0.32, muted: false, solo: false, accent: "#d58cff" },
   master: { id: "master", name: "Master", volumeDb: -1, pan: 0, lowCut: 0, air: 0, drive: 0, glue: 0, send: 0, muted: false, solo: false, accent: "#f0c36a" }
 };
+
+// UI 선택지와 생성 규칙이 같은 ID 집합을 공유하도록 label/preset 카탈로그를 도메인에 둔다.
 export const projectKeys = ["F minor", "F# minor", "A minor", "C minor", "D minor", "E minor", "G minor", "C major", "D dorian"] as const;
 export const maxProjectSnapshots = 6;
 export const maxProjectSnapshotIdLength = 64;
@@ -455,6 +467,8 @@ export const soundPresetLabels: Record<SoundPresetId, string> = {
   custom: "Custom"
 };
 
+// ── 장르별 시작점과 음색 카탈로그 ─────────────────────────────────────────────
+// 블루프린트는 완성 오디오가 아니라 사용자가 계속 편집할 수 있는 이벤트·믹서·편곡 기본값이다.
 export const beatBlueprints: BeatBlueprint[] = [
   {
     id: "ballad_canvas",
@@ -802,6 +816,7 @@ export const soundPresetDefaults: Record<(typeof soundPresetIds)[number], SoundD
 
 const sharpNotes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const flatNotes = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+// 같은 pitch class라도 입력 키의 표기 체계에 맞춰 sharp/flat 이름을 보존하기 위한 기준표다.
 const tonicIndex: Record<string, number> = {
   C: 0,
   "C#": 1,
@@ -1191,6 +1206,8 @@ export function beatBlueprintFocus(id: BeatBlueprintId): string {
 }
 
 export function applyBeatBlueprint(project: ProjectState, blueprintId: BeatBlueprintId): ProjectState {
+  // 제목·모드·사용자 세션 메모·스냅샷은 유지하고 음악 시작점에 해당하는 필드만 한 번에 교체한다.
+  // 반환은 새 객체이므로 호출자가 기존 undo/snapshot 상태를 안전하게 보존할 수 있다.
   const blueprint = beatBlueprintForId(blueprintId);
   const style = styleProfiles.find((profile) => profile.id === blueprint.styleId) ?? styleProfiles[0];
   return {
@@ -1240,6 +1257,7 @@ export function activeDeliveryTarget(project: Pick<ProjectCoreState, "deliveryTa
 }
 
 export function applyDeliveryTarget(project: ProjectState, targetId: DeliveryTargetId): ProjectState {
+  // 전달 목표는 실제 업로드를 의미하지 않는다. 목표 길이/마스터/믹스 자세를 로컬 프로젝트에 적용할 뿐이다.
   const target = deliveryTargetForId(targetId, project.customDeliveryTarget);
   return {
     ...project,
@@ -1252,6 +1270,7 @@ export function applyDeliveryTarget(project: ProjectState, targetId: DeliveryTar
 }
 
 export function createAudienceStarterProject(starterId: AudienceStarterProjectId): ProjectState {
+  // 첫 사용자와 숙련 사용자의 진입점은 같은 ProjectState 계약을 사용하되 안내 밀도와 초기 편곡만 달리한다.
   return starterId === "producer" ? createProfessionalProducerStarterProject() : createFirstTimeComposerStarterProject();
 }
 
@@ -1361,6 +1380,7 @@ function applyBeatBlueprintMixer(
   sourceMixer: MixerChannel[],
   mixerUpdates: BeatBlueprint["mixer"]
 ): MixerChannel[] {
+  // 블루프린트가 지정하지 않은 채널 속성은 원본을 유지하고 모든 수치는 공용 정규화 범위로 제한한다.
   return sourceMixer.map((channel) => {
     const update = mixerUpdates[channel.id] ?? {};
     return {
@@ -1457,6 +1477,7 @@ export function arrangementMovePresetLabel(preset: ArrangementMovePreset): strin
 }
 
 export function createArrangementTemplate(template: ArrangementTemplateId): ArrangementBlock[] {
+  // 상수 템플릿 객체를 외부에서 변형하지 못하도록 mutedTracks까지 정규화한 새 객체로 복제한다.
   return arrangementTemplateBlocks[template].map((block) => ({
     ...block,
     energy: normalizeArrangementEnergy(block.energy),
@@ -1475,6 +1496,7 @@ export function createPatternChain(chain: PatternChainId): ArrangementBlock[] {
 }
 
 export function expandPatternChainArrangement(arrangement: ArrangementBlock[]): ArrangementBlock[] {
+  // 입력 체인의 Pattern 순서는 순환 재사용하되, 16마디 섹션·에너지·뮤트 곡선은 확장 프리셋으로 새로 만든다.
   const source = arrangement.length > 0 ? arrangement : createPatternChain("eight_bar");
   return chainExpandSections.map((section, index) => {
     const sourceBlock = source[index % source.length] ?? source[0];
@@ -1565,6 +1587,7 @@ function boundedArrangementTotalBars(arrangement: Pick<ArrangementBlock, "bars">
 }
 
 export function normalizeArrangementPlaybackRange(bars: unknown, startBar: unknown): { bars: number; startBar: number } {
+  // 재생 시작점이 뒤로 이동하면 허용 길이도 줄여 저장·렌더 상한인 64마디를 넘지 않게 한다.
   const normalizedStartBar = Number.isFinite(startBar)
     ? Math.min(maxProjectArrangementBars - 1, Math.max(0, Math.round(Number(startBar))))
     : 0;
@@ -1579,6 +1602,7 @@ export function createMasterAutomationPreset(
   project: Pick<ProjectCoreState, "arrangement">,
   preset: MasterAutomationPresetId
 ): AutomationEvent[] {
+  // 프리셋은 편곡 전체의 절대 step 좌표를 사용하며 none은 완전한 빈 자동화로 표현한다.
   if (preset === "none") {
     return [];
   }
@@ -1623,6 +1647,7 @@ export function masterAutomationGainAtStep(project: Pick<ProjectCoreState, "auto
 }
 
 export function masterAutomationGainForEvents(events: readonly AutomationEvent[], absoluteStep: number): number {
+  // 겹치는 master_volume 이벤트는 각 구간 gain을 곱해 합성한다. 현재는 선형 curve만 저장 계약에서 허용한다.
   let gain = 1;
   for (const event of events) {
     if (event.target === "master_volume") {
@@ -1774,6 +1799,7 @@ export function drumStepShouldPlay(pattern: PatternData, lane: DrumLane, step: n
   if (probability <= 0) {
     return false;
   }
+  // 난수 상태가 아니라 lane/step/absoluteStep 해시를 써 실시간 재생, MIDI, WAV가 같은 이벤트를 선택하게 한다.
   return probabilityGateValue(lane, step, absoluteStep) < probability;
 }
 
@@ -1809,6 +1835,8 @@ export function sidechainGainForStep(pattern: PatternData, step: number, amount:
     return 1;
   }
 
+  // 현재 kick과 앞선 세 스텝의 영향을 감쇠 곡선으로 훑어 짧은 release를 근사한다.
+  // 마디 앞부분에서는 positiveModulo로 이전 마디 끝의 kick까지 자연스럽게 이어진다.
   const releaseShape = [1, 0.58, 0.26, 0.08];
   const strongestKick = releaseShape.reduce((strongest, shape, offset) => {
     const kickStep = positiveModulo(step - offset, stepsPerBar);
@@ -1850,6 +1878,7 @@ export function applyDrumGroovePreset(pattern: PatternData, preset: DrumGroovePr
 }
 
 export function createPatternVariation(pattern: PatternData, preset: PatternVariationPreset): PatternData {
+  // variation helper는 내부에서 배열을 수정하므로 먼저 깊은 음악 이벤트 복제본을 만들어 원본 Pattern을 보호한다.
   const variation = clonePatternData(pattern);
   if (preset === "subtle") {
     applySubtleVariation(variation);
@@ -2060,6 +2089,7 @@ function applyMelodyTurn(pattern: PatternData, key: string): void {
 }
 
 function clearPatternTail(pattern: PatternData): void {
+  // 마지막 4스텝을 비울 때 12 이전에 시작한 긴 음도 경계를 넘어가지 않도록 길이를 함께 자른다.
   drumLanes.forEach((lane) => {
     [12, 13, 14, 15].forEach((step) => setDrumStep(pattern, lane, step, false));
   });
@@ -2105,6 +2135,7 @@ export function normalizePatternEventLength(length: unknown, step: unknown): num
     return 1;
   }
   const normalizedStep = normalizeStep(Number(step));
+  // 모든 이벤트는 최소 한 스텝을 가지며 16스텝 Pattern 경계를 넘지 않는다.
   return Math.min(stepsPerBar - normalizedStep, Math.max(1, Math.round(Number(length))));
 }
 
@@ -2137,6 +2168,7 @@ function defaultDrumProbabilities(): DrumProbabilities {
 }
 
 function probabilityGateValue(lane: DrumLane | NoteTrack | "chord", step: number, absoluteStep: number): number {
+  // lane별 salt와 절대 위치를 32비트로 혼합한 결정적 0..1 값이다. 암호학적 난수 목적은 아니다.
   const laneSalt: Record<DrumLane | NoteTrack | "chord", number> = { kick: 11, clap: 23, hat: 37, perc: 53, bass: 71, melody: 89, chord: 107 };
   let hash = Math.imul(absoluteStep + 1, 1103515245) ^ Math.imul(step + 1, 12345) ^ Math.imul(laneSalt[lane], 265443576);
   hash = Math.imul(hash ^ (hash >>> 16), 2246822507);
@@ -2344,6 +2376,7 @@ export function styleSoundPreset(styleId: StyleId): (typeof soundPresetIds)[numb
 }
 
 export function createStylePatternSet(styleId: StyleId, key: string): Record<PatternSlot, PatternData> {
+  // 스타일의 A/B/C 청사진을 선택 키의 실제 음정으로 확장한 서로 독립적인 Pattern 객체로 만든다.
   const [patternA, patternB, patternC] = stylePatternBlueprints[styleId];
   return {
     A: patternFromBlueprint(key, patternA),
@@ -2391,6 +2424,7 @@ function blueprint(
 }
 
 function patternFromBlueprint(key: string, pattern: PatternBlueprint): PatternData {
+  // scale degree를 실제 pitch 문자열로 바꾸고 렌더러가 기대하는 dynamics·확률 컬렉션을 기본값으로 채운다.
   const drums = drumPattern(pattern.kick, pattern.clap, pattern.hat, pattern.perc);
   return withDrumDynamics({
     drumPattern: drums,
@@ -2471,6 +2505,7 @@ function hatRepeatOverrides(hatSteps: number[]): Partial<Record<number, number>>
 }
 
 function pitchFromDegree(key: string, degree: number, octave: number): string {
+  // degree가 스케일 길이를 넘어가면 octave를 올리며 음수 degree도 양의 나머지로 안전하게 감싼다.
   const names = scalePitchNames(key);
   return `${names[positiveModulo(degree, names.length)]}${octave + Math.floor(degree / names.length)}`;
 }
@@ -2524,6 +2559,7 @@ export function patternForSlot(project: ProjectState, slot: PatternSlot): Patter
 }
 
 export function clonePatternData(pattern: PatternData): PatternData {
+  // 모든 중첩 배열과 이벤트 객체를 복제해 variation·snapshot 편집이 원본과 참조를 공유하지 않게 한다.
   return {
     drumPattern: {
       kick: [...pattern.drumPattern.kick],
@@ -2603,6 +2639,7 @@ function projectSnapshotIdWithSuffix(base: string, suffix: number): string {
 }
 
 export function normalizeProjectSnapshotIdentities(snapshots: readonly ProjectSnapshot[]): ProjectSnapshot[] {
+  // 가져온 파일의 중복/비정상 ID는 순서를 유지한 고유 suffix로 고쳐 삭제·복원 대상의 모호성을 없앤다.
   const safeAuthoredIds = new Set(
     snapshots
       .map((snapshot) => snapshot.id)
@@ -2631,6 +2668,7 @@ export function normalizeProjectSnapshotIdentities(snapshots: readonly ProjectSn
 }
 
 export function createProjectSnapshot(project: ProjectState, createdAt = new Date().toISOString()): ProjectSnapshot {
+  // 스냅샷 안에는 다시 snapshots를 넣지 않는 ProjectCoreState만 복제해 재귀 데이터와 파일 크기 폭증을 방지한다.
   const normalizedProject = normalizeProjectCoreState(project);
   return {
     id: projectSnapshotId(project, createdAt),
@@ -2656,6 +2694,7 @@ export function restoreProjectSnapshot(project: ProjectState, snapshotId: string
   if (!snapshot) {
     return snapshots === project.snapshots ? project : { ...project, snapshots: cloneProjectSnapshots(snapshots) };
   }
+  // 복원 뒤에도 현재 스냅샷 목록은 유지하며 음악·메타 상태만 선택 시점으로 되돌린다.
   return {
     ...cloneProjectCore(normalizeProjectCoreState(snapshot.project)),
     snapshots: cloneProjectSnapshots(snapshots)
@@ -2781,6 +2820,7 @@ const unsafeProjectTitleCharacters =
   /[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u200b\u200e\u200f\u2028-\u202e\u2060-\u206f\ufeff]/gu;
 
 export function sanitizeProjectTitleInput(value: string): string {
+  // NFKC 정규화 후 제어·방향 제어 문자를 공백으로 바꾸되 다국어 글자 자체는 보존한다.
   const visible = value.normalize("NFKC").replace(unsafeProjectTitleCharacters, " ").replace(/\s/gu, " ");
   return Array.from(visible).slice(0, maxProjectTitleLength).join("");
 }
@@ -2801,6 +2841,7 @@ function utf8ByteLength(value: string): number {
 }
 
 function truncateUtf8(value: string, maxBytes: number): string {
+  // 파일 시스템 제한은 문자 수가 아닌 UTF-8 바이트 기준이다. code point 단위 순회로 surrogate pair 중간을 자르지 않는다.
   let result = "";
   for (const character of value) {
     if (utf8ByteLength(result + character) > maxBytes) {
@@ -2820,6 +2861,7 @@ export function projectFileStem(project: Pick<ProjectState, "title">): string {
   if (!/[\p{L}\p{N}]/u.test(bounded)) {
     return "grooveforge-project";
   }
+  // Windows 예약 장치명은 다른 OS에서 만든 번들을 옮겨도 안전하도록 접두사를 붙인다.
   return reservedWindowsFileStem.test(bounded) ? `grooveforge-${bounded}` : bounded;
 }
 
@@ -2828,6 +2870,7 @@ export function projectFileName(project: ProjectState): string {
 }
 
 export function serializeProjectFile(project: ProjectState): string {
+  // 저장 직전에 전체 상태를 정규화해 일시적 편집값이나 비정상 외부 입력이 파일 계약을 벗어나지 않게 한다.
   const durableProject = normalizeProjectState(project);
   if (!durableProject) {
     throw new Error("Invalid GrooveForge project state.");
@@ -2846,12 +2889,14 @@ export function serializeProjectFile(project: ProjectState): string {
 }
 
 export function parseProjectFile(contents: string): ProjectState {
+  // 문자 수 상한을 JSON.parse보다 먼저 확인해 과도한 입력의 파싱·할당 비용을 제한한다.
   if (contents.length > maxProjectFileCharacters) {
     throw new Error(`GrooveForge project file exceeds the ${maxProjectFileCharacters.toLocaleString("en-US")} character safety limit.`);
   }
   const parsed: unknown = JSON.parse(contents);
   let candidate = parsed;
   if (isRecord(parsed) && parsed.app === "GrooveForge") {
+    // 외피가 있는 현재 파일은 app/version을 엄격히 확인하고, 이전의 외피 없는 프로젝트 객체도 아래 정규화에서 수용한다.
     if (parsed.fileVersion !== projectFileVersion) {
       throw new Error(`Unsupported GrooveForge project file version: ${String(parsed.fileVersion ?? "missing")}.`);
     }
@@ -2860,6 +2905,7 @@ export function parseProjectFile(contents: string): ProjectState {
     }
     candidate = parsed.project;
   }
+  // 타입 단언에 의존하지 않고 모든 중첩 구조와 수치 범위를 검사·정규화한다.
   const project = normalizeProjectState(candidate);
   if (!project) {
     throw new Error("Invalid GrooveForge project file.");
@@ -2931,10 +2977,12 @@ export function resolveMasterCeilingDraft(
 }
 
 export function dbToGain(db: number): number {
+  // dB는 진폭 비로 쓰이므로 10^(dB/20)으로 변환한다.
   return Math.pow(10, db / 20);
 }
 
 export function stepDurationSeconds(bpm: number): number {
+  // 한 Pattern 스텝은 4분음표의 1/4, 즉 16분음표다.
   return 60 / normalizeProjectBpm(bpm) / 4;
 }
 
@@ -2943,6 +2991,7 @@ export function projectStepDurationSeconds(project: ProjectState): number {
 }
 
 export function projectSwingOffsetSteps(project: Pick<ProjectState, "swing">, absoluteStep: number): number {
+  // 짝수 스텝은 그리드에 두고 홀수 16분음표만 뒤로 밀어 기본 스윙 쌍을 만든다.
   if (!Number.isFinite(absoluteStep) || Math.abs(Math.trunc(absoluteStep)) % 2 === 0) {
     return 0;
   }
@@ -2982,6 +3031,7 @@ export function scalePitches(key: string, startOctave: number): string[] {
   let previousIndex = root;
   const pitches = intervals.map((interval, index) => {
     const pitchIndex = (root + interval) % 12;
+    // pitch class가 다시 낮아지는 지점은 다음 옥타브로 넘어간 것으로 해석한다.
     if (index > 0 && pitchIndex < previousIndex) {
       octave += 1;
     }
@@ -3019,6 +3069,7 @@ export function retargetPitchToKey(pitch: string, sourceKey: string, targetKey: 
     return pitch;
   }
 
+  // 단순 반음 이동이 아니라 원래 스케일 degree와 register를 보존해 새 키의 대응 음으로 옮긴다.
   const sourceDegreeOctaveOffset = scaleDegreeOctaveOffset(sourceKey, degree);
   const targetStartOctave = parts.octave - sourceDegreeOctaveOffset;
   return scalePitches(targetKey, targetStartOctave)[degree] ?? pitch;
@@ -3076,6 +3127,7 @@ export function melodyPitchLanes(key: string): string[] {
 }
 
 export function noteToFrequency(note: string): number {
+  // MIDI 69(A4)=440Hz를 기준으로 12평균율 주파수를 계산한다.
   const midi = projectPitchMidiNumber(normalizeProjectPitch(note)) ?? 69;
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
@@ -3096,6 +3148,7 @@ export function normalizeProjectPitch(value: unknown): string {
     return "A4";
   }
   if (Number.isFinite(midi) && midi >= minProjectMidiNote && midi <= maxProjectMidiNote) {
+    // 유효 범위 안에서는 사용자가 고른 #/b 표기를 보존하고 옥타브 숫자만 정규화한다.
     const match = /^([A-G])(#|b)?(-?\d+)$/.exec(value);
     const [, letter = "A", accidental = "", octaveText = "4"] = match ?? [];
     return `${letter}${accidental}${String(Number(octaveText))}`;
@@ -3120,6 +3173,7 @@ function rawProjectPitchMidiNumber(value: unknown): number | null {
 }
 
 export function chordPitches(chord: ChordEvent, octave = 3): string[] {
+  // root 표기에 맞는 sharp/flat 이름으로 품질 interval을 펼친 뒤 inversion 음만 한 옥타브 올린다.
   const root = tonicIndex[chord.root] ?? 0;
   const names = chord.root.includes("b") ? flatNotes : sharpNotes;
   const pitches = chordIntervals[chord.quality].map((interval) => {
@@ -3151,6 +3205,7 @@ function nearestScaleDegree(pitchName: string, key: string): number | null {
     return exactDegree;
   }
 
+  // 비다이어토닉 음은 12음 원형에서 가장 가까운 degree로 붙여 키 변경 후에도 음악적 위치를 최대한 유지한다.
   return scalePitchClasses.reduce(
     (best, candidate, degree) => {
       const distance = circularPitchDistance(pitchClass, candidate);
@@ -3185,6 +3240,7 @@ function shiftPitchOctave(pitch: string, octaves: number): string {
 }
 
 function normalizePatternData(pattern: PatternDataInput): PatternData {
+  // 이전 파일에서 누락될 수 있는 dynamics 컬렉션을 채우고 모든 이벤트를 공용 상한 안으로 정리한다.
   const drumPattern = pattern.drumPattern;
   return {
     drumPattern,
@@ -3238,6 +3294,8 @@ function normalizeMixerChannel(channel: MixerChannelInput): MixerChannel {
 }
 
 function normalizeMixerChannels(channels: MixerChannelInput[]): MixerChannel[] {
+  // 알 수 없는/중복 채널은 버리고 필수 채널을 정해진 순서로 한 번씩만 구성한다.
+  // 빠진 채널은 안전한 기본값으로 복구해 렌더러가 토폴로지를 가정할 수 있게 한다.
   const firstChannelById = new Map<TrackType, MixerChannel>();
   for (const channel of channels) {
     if (!requiredMixerChannelIds.includes(channel.id as RequiredMixerChannelId)) {
@@ -3267,6 +3325,7 @@ export function normalizeMixerChannelTopology(channels: MixerChannel[]): MixerCh
 }
 
 export function normalizeProjectArrangement(arrangement: ArrangementBlockInput[]): ArrangementBlock[] {
+  // 블록별 bars를 정규화하면서 누적 64마디 상한에서 마지막 블록을 잘라 렌더 메모리를 제한한다.
   const normalized: ArrangementBlock[] = [];
   let remainingBars = maxProjectArrangementBars;
   for (const block of arrangement) {
@@ -3327,6 +3386,7 @@ function normalizeDrumProbabilities(value: DrumProbabilities | undefined): DrumP
 }
 
 function normalizeBassNotes(notes: BassNoteInput[]): BassNote[] {
+  // 같은 step/pitch의 중복 음을 첫 항목만 보존하고 이벤트 개수 상한에 도달하면 입력 순회도 중단한다.
   const normalized: BassNote[] = [];
   const acceptedLocations = new Set<string>();
   for (const note of notes) {
@@ -3440,6 +3500,7 @@ export function normalizeSoundDesignControls(sound: SoundDesign): SoundDesign {
 }
 
 export function normalizeProjectAutomationEvents(events: readonly AutomationEventInput[] | undefined): AutomationEvent[] {
+  // 잘못된 구간과 완전 중복 이벤트를 제거하고 저장 가능한 자동화 수를 제한한다.
   const normalized: AutomationEvent[] = [];
   const acceptedEvents = new Set<string>();
   for (const source of events ?? []) {
@@ -3493,6 +3554,7 @@ function normalizeAutomationValue(value: unknown): number {
 }
 
 function normalizeProjectCoreState(value: ProjectCoreStateInput): ProjectCoreState {
+  // 파일/스냅샷/런타임 어느 출처든 모든 하위 모델을 동일한 정규화 파이프라인으로 통과시킨다.
   return {
     ...value,
     title: normalizeProjectTitle(value.title),
@@ -3577,6 +3639,7 @@ function normalizeBriefText(value: unknown, maxLength: number): string {
 }
 
 function normalizeProjectSnapshots(snapshots: ProjectSnapshotInput[] | undefined): ProjectSnapshot[] {
+  // 가장 앞의 허용 개수만 읽어 중첩 프로젝트 정규화 비용과 저장 파일 크기를 제한한다.
   const normalized =
     snapshots
       ?.slice(0, maxProjectSnapshots)
@@ -3598,6 +3661,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
   }
 
   if (isLegacyProjectState(value)) {
+    // 단일 Pattern 구형 파일은 음악을 잃지 않도록 같은 Pattern을 A/B/C로 깊은 복제해 현재 모델로 승격한다.
     const legacyPattern = normalizePatternData({
       drumPattern: value.drumPattern,
       bassNotes: value.bassNotes,
@@ -3679,6 +3743,8 @@ type ProjectStateInput = ProjectCoreStateInput & {
   snapshots?: ProjectSnapshotInput[];
 };
 
+// ── 신뢰할 수 없는 프로젝트 JSON의 구조 검증 ──────────────────────────────────
+// 타입 가드는 필수 구조와 유한 수치 여부만 확인하고, 정확한 범위·중복·개수 제한은 위 정규화 단계가 담당한다.
 function isProjectStateShape(value: unknown): value is ProjectStateInput {
   if (!isProjectCoreStateShape(value) || !isRecord(value)) {
     return false;

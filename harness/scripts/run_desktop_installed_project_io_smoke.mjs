@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 설치 위치의 GrooveForge 앱이 프로젝트를 저장·다시 열고 동일한 데이터로 복원하는지 실제 앱으로 검사한다.
+ * 흐름: 격리 프로젝트와 설치 앱을 준비하고 native I/O smoke를 실행한 뒤 파일 해시·UI fingerprint·복구 상태를 검증한다.
+ * 안전 경계: 전용 임시 작업공간만 읽고 쓰며 사용자 프로젝트를 선택하거나 네트워크 동기화를 수행하지 않는다.
+ */
+
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";

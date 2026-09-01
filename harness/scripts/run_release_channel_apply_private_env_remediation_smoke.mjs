@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 비공개 환경 적용이 차단됐을 때 remediation 안내가 원인별 안전한 복구 순서를 제시하는지 검사한다.
+ * 흐름: 누락·placeholder·승인 오류 fixture를 실행해 수정 대상, 재검증 명령, 비적용 상태를 확인한다.
+ * 안전 경계: 복구 안내만 검증하고 비밀을 생성·추정·출력하지 않으며 운영 설정을 자동 수정하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";

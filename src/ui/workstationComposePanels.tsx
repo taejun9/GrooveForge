@@ -1,3 +1,8 @@
+/**
+ * Compose 페이지의 드럼·베이스·멜로디·코드·사운드 디자인 편집 패널을 모은 프레젠테이션 계층이다.
+ * ProjectState를 직접 소유하지 않고 선택값·미리보기·콜백을 받아 그리드, 인스펙터, 패드와 결과 스트립을 렌더링한다.
+ * 그리드 키보드 탐색, MIDI/컴퓨터 키보드 캡처, 중첩 버튼 이벤트의 포커스 경계를 지키는 것이 주요 상호작용 책임이다.
+ */
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Drum, ListChecks, Music2, Play, Plus, RotateCcw, Save, SlidersHorizontal, Trash2, Waves, X } from "lucide-react";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactElement, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";

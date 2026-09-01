@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: release channel 설정에 필요한 비공개 입력·승인·검증 순서를 한눈에 보는 setup brief로 만든다.
+ * 흐름: 현재 readiness와 템플릿 경로를 읽어 담당자 행동, 차단 항목, 실행 명령, 증거 위치를 정리한다.
+ * 개인정보 경계: 상태와 키 이름만 문서화하고 비밀 값은 포함하지 않으며 실제 설정 변경이나 연락 전송은 하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

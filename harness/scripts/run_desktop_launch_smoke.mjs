@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: production 빌드를 실제 Electron 앱 화면으로 실행해 렌더링·탭·입력·접근성·시각 증거를 종합 검증한다.
+ * 흐름: 격리 환경과 timeout을 구성하고 앱의 구조화된 진행/결과 로그를 수집한 뒤 PNG·DOM·native 입력 계약을 교차 확인한다.
+ * 안전 경계: GUI 제한 환경과 시간 초과를 실패 폐쇄하며, 임시 증거 밖의 사용자 파일·계정·외부 서비스는 조작하지 않는다.
+ */
+
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -1623,6 +1629,8 @@ if (blockDetails) {
   fail("Refusing to start Electron in a restricted macOS GUI context.", blockDetails);
 }
 
+// 이전 실행의 격리 프로젝트와 화면 증거를 제거한 뒤, 이번 실행만의 경로를 만든다. 일반 Electron
+// userData나 사용자의 프로젝트 디렉터리는 이 정리 대상에 포함되지 않는다.
 rmSync(smokeWorkspaceRoot, { recursive: true, force: true });
 rmSync(functionalTabsEvidenceRoot, { recursive: true, force: true });
 mkdirSync(smokeWorkspaceRoot, { recursive: true, mode: 0o700 });
@@ -1633,6 +1641,7 @@ const env = {
   GROOVEFORGE_DESKTOP_WORKSPACE_ROOT: smokeWorkspaceRoot,
   NO_COLOR: "1"
 };
+// launch smoke가 production main/file URL 경로를 검증하도록 상속된 개발 모드 스위치를 제거한다.
 delete env.ELECTRON_RUN_AS_NODE;
 delete env.VITE_DEV_SERVER_URL;
 
@@ -1689,6 +1698,8 @@ child.on("exit", (code, signal) => {
   settled = true;
   clearTimeout(timeout);
 
+  // 프로세스가 0으로 끝났더라도 고유 prefix의 구조화 영수증이 없으면 renderer 검증을 수행한 것으로
+  // 간주할 수 없으므로 실패 폐쇄한다.
   const combinedOutput = `${stdout}\n${stderr}`;
   const result = parseSmokeResult(combinedOutput);
   if (!result) {
@@ -1703,6 +1714,7 @@ child.on("exit", (code, signal) => {
     fail(`Electron launch smoke returned a failing result (code ${code ?? "null"}, signal ${signal ?? "null"}).`, details);
   }
 
+  // 임시 프로젝트 workspace는 종료 즉시 지우고, 기능 탭 PNG는 후속 시각 감사용 전용 evidence 경로에 남긴다.
   rmSync(smokeWorkspaceRoot, { recursive: true, force: true });
   check(!existsSync(smokeWorkspaceRoot), "launch smoke workspace should be removed after Electron exits");
   checkResult(result);

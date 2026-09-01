@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 외부 배포 readiness ledger가 각 선행 조건의 증거·신선도·소유자를 정확히 집계하는지 검사한다.
+ * 흐름: 준비/차단 fixture를 ledger 생성기에 넣고 행 수, 상태, 출처, 다음 행동을 대조한다.
+ * 안전 경계: 출처가 없거나 오래된 증거는 준비로 표시하지 않으며 외부 시스템의 실제 상태는 변경하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

@@ -1,3 +1,8 @@
+/**
+ * GrooveForge 렌더러의 최상위 오케스트레이터다. 프로젝트 편집 상태와 재생·분석·저장 상태를 소유하고,
+ * 도메인 계산 모듈에서 파생값을 만든 뒤 Compose/Arrange/Mix/Deliver 페이지와 대화상자에 전달한다.
+ * 비동기 저장·내보내기·Worker 분석의 최신성, React 배치 업데이트, 네이티브 메뉴/창 닫기 연동이 중요한 부수효과 경계다.
+ */
 import {
   ArrowDown,
   ArrowLeft,
@@ -2422,6 +2427,7 @@ export function App(): ReactElement {
       return;
     }
 
+    // 비동기 DB 응답이 언마운트 뒤나 사용자가 이미 편집을 시작한 뒤 도착하면 현재 작업 위에 복구본을 올리지 않는다.
     let active = true;
     void loadProjectRecovery()
       .then((nativeRecovery) => {
@@ -2458,6 +2464,7 @@ export function App(): ReactElement {
       localDraftReadyRef.current = true;
       return;
     }
+    // 프로젝트 교체 직후 effect 한 회차는 건너뛰어 방금 연 새 프로젝트가 이전 복구 초안을 즉시 덮지 않게 한다.
     const writeGate = resolveLocalDraftWriteGate(localDraftWriteArmed, localDraftSkipNextWriteRef.current);
     localDraftSkipNextWriteRef.current = writeGate.skipNextWrite;
     if (!writeGate.shouldWrite) {
@@ -2475,6 +2482,7 @@ export function App(): ReactElement {
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent): void => {
+      // React 입력 초안은 DOM이 사라지기 전에 프로젝트에 반영하고 로컬/네이티브 복구 저장을 가능한 즉시 갱신한다.
       flushActiveMetadataDraft("commit");
       commitMasterCeilingDraft();
       const closeGuard = resolveProjectCloseGuard(
@@ -3034,10 +3042,9 @@ export function App(): ReactElement {
   }
 
   /**
-   * Title and Session Brief edits are durable project changes, but they do not
-   * invalidate musical edit results. Keep their urgent input path out of the
-   * generic mutation fan-out while preserving the same ref, undo, dirty, and
-   * serialization boundary used by Save and close protection.
+   * 제목과 Session Brief 편집은 영속 프로젝트 변경이지만 음악 편집 결과 자체를 무효화하지는 않는다.
+   * 빠른 입력 경로를 일반 변경 파급 처리에서 분리하되 저장·닫기 보호가 사용하는 ref, 실행 취소,
+   * 미저장 표시와 직렬화 경계는 그대로 공유한다.
    */
   function updateProjectMetadata(
     update: (current: ProjectState) => ProjectState,
@@ -3623,6 +3630,7 @@ export function App(): ReactElement {
     if (!window.grooveforge?.saveProjectRecovery) {
       return;
     }
+    // 연속 편집 중에는 마지막 스냅샷만 SQLite로 보내되, 닫기 경로에서는 별도 flush가 타이머를 앞질러 실행한다.
     cancelScheduledNativeProjectRecovery();
     nativeRecoveryWriteTimerRef.current = window.setTimeout(() => {
       nativeRecoveryWriteTimerRef.current = null;
@@ -3700,6 +3708,7 @@ export function App(): ReactElement {
       return;
     }
 
+    // clear IPC가 끝나는 동안 프로젝트/복구본이 바뀔 수 있으므로 요청 번호와 시작 객체를 함께 고정한다.
     const requestId = ++localDraftClearRequestIdRef.current;
     const recovery = localDraftRecovery;
     const projectAtStart = projectRef.current;
@@ -4220,8 +4229,8 @@ export function App(): ReactElement {
       return;
     }
 
-    // Re-selecting the active loop scope is a UI posture no-op. Avoid a full
-    // workstation reconciliation between successive Pattern auditions.
+    // 이미 활성인 루프 범위를 다시 선택하는 것은 UI 자세를 바꾸지 않는다.
+    // 연속 Pattern 오디션 사이에 전체 워크스테이션 재조정을 유발하지 않는다.
     if (!isPlaying && scope === transportLoopScope) {
       return;
     }
@@ -7867,6 +7876,7 @@ export function App(): ReactElement {
       requestId = ++projectSaveRequestIdRef.current;
       const projectToSave = projectRef.current;
       const contents = serializeProjectFile(projectToSave);
+      // 저장 대화상자가 열린 동안 새 편집이나 다른 저장이 발생할 수 있어 요청 id와 불변 프로젝트 스냅샷을 함께 보관한다.
       const defaultName = projectFileName(projectToSave);
       const result = await window.grooveforge?.saveProject?.(contents, defaultName);
       if (result) {
@@ -7880,6 +7890,7 @@ export function App(): ReactElement {
           return "canceled";
         }
 
+        // 성공한 파일이 최신 요청인지, 그 사이 프로젝트가 바뀌지 않았는지 구분해 미저장 표시와 닫기 결정을 보수적으로 유지한다.
         const completion = resolveProjectSaveCompletion(
           requestId,
           projectSaveRequestIdRef.current,
@@ -8752,6 +8763,7 @@ export function App(): ReactElement {
     const zone = workspaceZoneForTarget(pageRoot ?? target);
     if (zone === "compose" && (page === "drums" || page === "notes" || page === "instruments")) {
       if (activeComposeWorkspacePageRef.current !== page) {
+        // 탭 DOM을 즉시 교체해야 이어지는 포커스/측정이 숨은 이전 페이지를 읽지 않으므로 이 경계만 동기 커밋한다.
         flushSync(() => activateComposeWorkspacePage(page));
       }
       return;
@@ -8766,6 +8778,7 @@ export function App(): ReactElement {
       return;
     }
 
+    // 상태 ref와 렌더된 탭을 한 커밋에 맞춰 같은 이벤트 안의 후속 라우팅이 최신 페이지를 보게 한다.
     flushSync(() => {
       activeWorkspaceZoneRef.current = zone;
       setActiveWorkspaceZone(zone);
@@ -8888,6 +8901,7 @@ export function App(): ReactElement {
     block: ScrollLogicalPosition = "start"
   ): void {
     const zone = workspaceRouteZone(target);
+    // 먼저 목적 하위 탭을 실제 DOM에 드러낸 다음 요소를 조회해야 동일 영역 내 숨은 페이지로 잘못 스크롤하지 않는다.
     flushSync(() => activateWorkspaceRoutePage(target));
     if (target === "sound" && !soundDesignOpen) {
       flushSync(() => setSoundDesignOpen(true));
@@ -8925,6 +8939,7 @@ export function App(): ReactElement {
       return;
     }
 
+    // 같은 페이지 안에서 사용자가 유지하던 입력 포커스는 빼앗지 않고, 모달 종료나 페이지 전환 때만 목적지로 옮긴다.
     if (shouldTransferFocus) {
       if (dismissedModalFocus && !target.matches('a[href], button, input, select, textarea, [tabindex]')) {
         target.tabIndex = -1;
@@ -9621,15 +9636,13 @@ export function App(): ReactElement {
   }
 
   function selectWorkflowNavigatorTab(item: WorkflowNavigatorItem): void {
-    // A direct functional-tab choice foregrounds the workspace. Guide routes
-    // continue to use jumpToWorkflowNavigatorItem so they can intentionally
-    // keep the Guide open while revealing their destination.
+    // 사용자가 기능 탭을 직접 고르면 작업 공간을 전경으로 둔다. Guide 경로는 목적지를 보여 주면서도
+    // 안내 패널을 의도적으로 유지할 수 있도록 jumpToWorkflowNavigatorItem 흐름을 계속 사용한다.
     if (guidanceCenterRef.current?.open) {
       flushSync(() => setGuidanceCenterOpen(false));
     }
-    // A user returning through the outer Compose/Mix tab keeps the inner page
-    // they were editing. Intentional routes use compose/notes/sound or
-    // mix/master targets and can still reveal an exact destination page.
+    // 바깥 Compose/Mix 탭으로 돌아오면 마지막으로 편집한 안쪽 페이지를 유지한다.
+    // 명시적 경로는 compose/notes/sound 또는 mix/master 목적지를 사용해 정확한 하위 페이지를 열 수 있다.
     scrollWorkspaceTargetIntoView(
       () => document.getElementById(`workspace-panel-${item.id}`),
       "start",

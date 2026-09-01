@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 새 증거를 반영하는 release progress refresh가 상태·완료율·blocker를 일관되게 갱신하는지 검사한다.
+ * 흐름: 이전 progress와 최신 fixture를 입력해 refresh 결과의 diff, timestamp, 인용, 다음 행동을 검증한다.
+ * 안전 경계: 유효하지 않은 proof는 반영하지 않으며 smoke는 격리 파일만 사용하고 외부 릴리스 상태를 변경하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

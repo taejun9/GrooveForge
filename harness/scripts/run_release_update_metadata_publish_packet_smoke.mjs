@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: update metadata를 게시할 운영 packet이 artifact·URL·digest·검증 순서를 완전하게 담는지 검사한다.
+ * 흐름: release fixture에서 packet을 생성해 업로드 대상, 명령, 예상 응답, rollback, live proof 절차를 확인한다.
+ * 개인정보/외부 경계: packet은 비밀을 포함하지 않고 게시 명령을 대신 실행하지 않으며 불완전한 입력은 차단한다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";

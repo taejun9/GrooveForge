@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 소스나 build가 바뀐 뒤 release source evidence refresh가 해시와 인용을 최신화하는지 검사한다.
+ * 흐름: 이전/현재 fixture를 비교해 변경 감지, 새 digest, stale 표시 제거, 다음 proof 연결을 검증한다.
+ * 안전 경계: 불일치한 소스를 그대로 승인하지 않으며 fixture 밖 파일·git 상태·외부 저장소는 수정하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";

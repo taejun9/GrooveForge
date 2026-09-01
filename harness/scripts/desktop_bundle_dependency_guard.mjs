@@ -1,3 +1,8 @@
+/**
+ * 역할: 패키지된 macOS 앱 번들이 Electron 프레임워크 의존성을 빠짐없이 포함하고 올바르게 연결했는지 검사한다.
+ * 흐름: 번들 파일을 찾고 otool 계열 진단을 실행해 필수 프레임워크·로더 경로를 수집한 뒤 구조화된 보고서를 반환한다.
+ * 안전 경계: 진단 명령 실패나 누락 의존성을 ready로 승격하지 않으며, 앱 서명·번들 내용 자체는 수정하지 않는다.
+ */
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -196,6 +201,7 @@ function parseCodeSignatureDetails(output, code) {
 }
 
 function redactedSignatureSummary(signature) {
+  // Team ID·Authority 원문은 증거에 복사하지 않고 존재 여부와 서명 성격만 공개한다.
   return {
     displayReady: signature.displayReady === true,
     identifierPresent: signature.identifierPresent === true,
@@ -243,6 +249,8 @@ export function formatFrameworkDependencyRows(rows) {
 export async function electronFrameworkDependencyReport(appPath, { root, timeoutMs = 120000 } = {}) {
   const electronFrameworkBinary = electronFrameworkBinaryPath(appPath);
   const appExecutable = appExecutablePath(appPath);
+  // 개별 진단 명령은 실패를 수집하도록 허용하지만, 아래 최종 집계는 누락된 증거를 ready로 승격하지 않는다.
+  // 이 방식으로 손상된 번들에서도 모든 후보의 실패 원인을 한 번에 보고할 수 있다.
   const appSignatureDisplay = await runCommand("codesign", ["--display", "--verbose=4", appPath], {
     cwd: root,
     timeoutMs,
@@ -267,6 +275,8 @@ export async function electronFrameworkDependencyReport(appPath, { root, timeout
   const installNames = otool.code === 0 ? parseOtoolInstallNames(otool.stdout) : [];
   const electronFrameworkRpaths = otoolLoadCommands.code === 0 ? parseOtoolRpaths(otoolLoadCommands.stdout) : [];
   const appExecutableRpaths = appExecutableLoadCommands.code === 0 ? parseOtoolRpaths(appExecutableLoadCommands.stdout) : [];
+  // Electron Framework와 앱 실행 파일은 서로 다른 loader 기준을 가질 수 있으므로 출처와 loaderDir을
+  // 함께 보존한다. 진단용 fallback 경로는 실제 LC_RPATH 증거와 구분된다.
   const rpathRows = [
     ...electronFrameworkRpaths.map((rpath) => ({
       source: "Electron Framework",
@@ -288,6 +298,8 @@ export async function electronFrameworkDependencyReport(appPath, { root, timeout
     const candidateRows = [];
     let resolvedCandidate = candidates[candidates.length - 1];
 
+    // 단순히 파일이 존재하는 후보보다 앱과 서명 체인이 호환되는 후보를 우선한다. 후보별 실패 증거는
+    // 버리지 않아 dyld가 어떤 경로를 거부할지 보고서에서 추적할 수 있다.
     for (const candidate of candidates) {
       const present = existsSync(candidate.path);
       const frameworkRoot = frameworkRootFor(candidate.path);
@@ -361,6 +373,7 @@ export async function electronFrameworkDependencyReport(appPath, { root, timeout
     const resolvedCandidateRow = candidateRows.find((candidate) => candidate.path === relativePath(root, resolvedPath));
     const signatureVerified = resolvedCandidateRow?.signatureVerified === true;
     const signatureCompatible = resolvedCandidateRow?.signatureCompatible === true;
+    // fallback 위치에 정상 파일이 있어도 실제 load command에서 도달하지 못하면 loadable로 보지 않는다.
     const dyldLoadable =
       installNames.includes(installName) &&
       candidateRows.some(

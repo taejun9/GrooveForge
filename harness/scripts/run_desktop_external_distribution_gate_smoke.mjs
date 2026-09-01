@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 외부 데스크톱 배포 gate가 서명·공증·QA·채널 입력 증거를 모두 갖춘 경우에만 열리는지 검사한다.
+ * 흐름: 차단·준비 fixture로 gate 명령을 실행하고 판정, blocker, 공개 가능한 증거 묶음을 대조한다.
+ * 안전 경계: 증거 누락은 항상 차단으로 귀결되며 smoke 자체는 실제 게시·업로드·계정 작업을 수행하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

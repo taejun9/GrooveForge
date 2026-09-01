@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 유효한 release 편집이 post-edit proof 성공으로 판정되고 비변경 영역을 보존하는지 검사한다.
+ * 흐름: 격리 fixture를 편집한 뒤 proof 생성기를 실행해 적용 키, 해시, receipt, redaction과 exit code를 비교한다.
+ * 개인정보 경계: 합성 비밀만 사용하고 원문 누출·범위 밖 변경·검증 누락은 실패로 처리한다.
+ */
+
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

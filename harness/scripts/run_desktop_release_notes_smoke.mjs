@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 데스크톱 release notes가 버전·설치 안내·변경 사항·알려진 제한을 정확히 담는지 검사한다.
+ * 흐름: 로컬 릴리스 증거로 notes를 생성하고 필수 절, 링크, 버전 일치, placeholder 부재를 검증한다.
+ * 안전 경계: 실제 게시나 URL 접근 없이 문서만 확인하며 근거 없는 완료/지원 표현은 실패로 처리한다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

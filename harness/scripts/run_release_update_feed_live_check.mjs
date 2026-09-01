@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 공개 update feed와 metadata/artifact URL이 실제로 접근 가능하고 release 계약과 일치하는지 확인한다.
+ * 흐름: 승인된 URL에 제한된 읽기 요청을 보내 status·redirect·content type·digest를 기록하고 기대 metadata와 비교한다.
+ * 개인정보/외부 경계: 유효한 승인과 URL 없이는 요청하지 않고 비밀을 로그에 남기지 않으며 원격 쓰기·게시를 하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";

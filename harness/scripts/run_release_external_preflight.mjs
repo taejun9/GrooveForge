@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 외부 릴리스 작업 전에 로컬 증거·자격 입력 준비 여부·승인 상태를 집계하는 비접속 사전 점검이다.
+ * 흐름: 이미 생성된 로컬 설정과 manifest를 읽어 실행 가능 여부와 blocker를 JSON·Markdown 보고서로 정리한다.
+ * 개인정보/외부 경계: 조건 충족 여부와 관계없이 네트워크 probe·요청·업로드·서명·공증은 수행하지 않고 비공개 원문도 기록하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

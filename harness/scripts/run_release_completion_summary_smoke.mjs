@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: release completion summary가 모든 gate의 상태와 남은 blocker를 정확히 축약하는지 검사한다.
+ * 흐름: 대표 readiness fixture를 요약기에 넣고 완료율, 핵심 증거, 다음 행동, 상태 코드를 대조한다.
+ * 안전 경계: 누락·오래된 입력은 완료로 세지 않으며 문서 생성 외의 배포·서명 작업은 수행하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

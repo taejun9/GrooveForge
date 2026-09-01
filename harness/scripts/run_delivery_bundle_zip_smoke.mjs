@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 배포 번들 ZIP의 파일 구성·메타데이터·해시가 재현 가능한 전달 계약을 만족하는지 검사한다.
+ * 흐름: 로컬 패키지 산출물을 조립·압축하고 다시 열어 필수 파일, 경로 안전성, 매니페스트 일치 여부를 확인한다.
+ * 안전 경계: 예상 밖 항목·누락·해시 차이는 실패로 모으며, 네트워크 업로드 없이 빌드 디렉터리의 테스트 산출물만 다룬다.
+ */
+
 import { createHash } from "node:crypto";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";

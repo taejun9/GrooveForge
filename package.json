@@ -56,6 +56,7 @@
     "desktop:external-operator-runbook-smoke": "node harness/scripts/run_desktop_external_operator_runbook_smoke.mjs",
     "desktop:external-readiness-ledger-smoke": "node harness/scripts/run_desktop_external_readiness_ledger_smoke.mjs",
     "desktop:completion-progress-smoke": "node harness/scripts/run_desktop_completion_progress_smoke.mjs",
+    "comments:ko:check": "node harness/scripts/run_korean_comment_coverage.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "qa": "python3 harness/scripts/run_qa.py",
     "harness:smoke": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_runtime_smoke.mjs",

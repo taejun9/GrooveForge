@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 릴리스 완료 전에 요구되는 10개 계획 체크포인트가 증거와 함께 충족됐는지 검사한다.
+ * 흐름: 격리된 계획/리뷰 fixture를 집계 명령에 넣고 완료 수, 누락 목록, 인용 경로를 대조한다.
+ * 안전 경계: 계획이나 리뷰 근거가 없으면 체크하지 않으며 문서를 자동 완료 처리하거나 외부 시스템을 변경하지 않는다.
+ */
+
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";

@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 합성 비공개 환경 fixture로 배포 환경 적용 전 키·URL·승인·대상 준비 검사를 회귀 검증한다.
+ * 흐름: 계획 소유 임시 루트에 env fixture를 쓰고 preflight 자식 명령을 실행해 redacted 보고서와 차단 상태를 대조한다.
+ * 개인정보/외부 경계: 실제 비공개 env·배포 채널은 수정하거나 접속하지 않으며 합성 값도 자식 출력·보고서에 남지 않아야 한다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

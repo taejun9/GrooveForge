@@ -1,3 +1,8 @@
+/*
+ * GrooveForge 렌더러 전체의 색상 토큰, 앱 셸, 작업 탭, 편집 그리드, 모달과 반응형 배치를 정의한다.
+ * 기본 데스크톱 레이아웃 위에 페이지/컴포넌트별 규칙과 좁은 화면 미디어 쿼리를 순서대로 덮어쓴다.
+ * 상태 의미는 data/aria 속성·클래스와 네이티브 의사 상태에서 받아 표현하며, 숨은 탭이 공간을 차지하거나 포커스 표시가 사라지지 않게 한다.
+ */
 :root {
   color: #f4efe7;
   background: #11100f;
@@ -605,11 +610,9 @@ textarea {
 }
 
 /*
- * The Guide Center intentionally keeps every diagnostic in the DOM for
- * search, ARIA relationships, and state preservation. Let Chromium skip
- * layout/paint for distant guide cards until they approach the viewport so
- * opening the disclosure or jumping to a later form does not cold-layout the
- * entire multi-screen document.
+ * Guide Center는 검색·ARIA 연결·상태 보존을 위해 모든 진단을 의도적으로 DOM에 유지한다.
+ * 멀리 있는 카드는 뷰포트에 가까워질 때까지 Chromium이 layout/paint를 건너뛰게 해,
+ * 세부 영역을 열거나 뒤쪽 폼으로 이동할 때 여러 화면 분량 전체를 한꺼번에 배치하지 않게 한다.
  */
 .guidance-center-content > * {
   content-visibility: auto;

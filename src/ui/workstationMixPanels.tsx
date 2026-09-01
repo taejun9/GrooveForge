@@ -1,3 +1,8 @@
+/**
+ * Mix 페이지의 밸런스·공간계·스템 오디션·마스터 자동화·스냅샷 비교 패널을 렌더링한다.
+ * 계산된 미리보기/결과와 상위 콜백만 받아 현재 믹서 상태를 시각화하며 프로젝트 변경은 App에 위임한다.
+ * 정확 분석이 없는 경우 수치를 확정적으로 표현하지 않고, 적용 전후를 별도 카드로 보여 파괴적 조정을 예방한다.
+ */
 import { Copy, Gauge, RotateCcw, Save, SlidersHorizontal, Target, X } from "lucide-react";
 import type { ReactElement } from "react";
 import type { ExportAnalysis, StemTrackId } from "../audio/render";

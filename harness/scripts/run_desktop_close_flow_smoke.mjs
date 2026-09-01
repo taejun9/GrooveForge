@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 수정된 데스크톱 프로젝트를 닫을 때 저장·버리기·취소 선택과 복구 데이터 수명이 올바른지 실제 앱으로 검사한다.
+ * 흐름: 격리 작업공간에서 Electron을 실행하고 native 입력과 종료 이벤트를 구동한 뒤 파일·SQLite·프로세스 증거를 비교한다.
+ * 안전 경계: 임시 경로 소유권을 확인한 범위만 정리하며, 확인되지 않은 사용자 프로젝트나 외부 서비스에는 접근하지 않는다.
+ */
+
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";

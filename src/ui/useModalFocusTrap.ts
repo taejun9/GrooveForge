@@ -1,3 +1,8 @@
+/**
+ * 열려 있는 모달 안에 키보드 포커스를 가두고 닫힐 때 이전 포커스를 복원하는 공용 React 훅이다.
+ * 렌더 완료 다음 프레임에 선호 컨트롤을 포커스하고, 문서 수준 Tab/Shift+Tab을 첫·마지막 요소 사이로 순환시킨다.
+ * 정리 함수에서 이벤트와 예약 프레임을 반드시 해제해 닫힌 모달이 이후 키 입력을 가로채지 않게 한다.
+ */
 import { useEffect, type RefObject } from "react";
 
 const focusableSelector = [
@@ -25,6 +30,7 @@ export function useModalFocusTrap(
       return;
     }
 
+    // DOM이 실제로 배치된 다음 프레임에 포커스해야 조건부 렌더링 직후의 null ref를 피할 수 있다.
     const frame = window.requestAnimationFrame(() => {
       const dialog = dialogRef.current;
       if (!dialog) {
@@ -48,6 +54,7 @@ export function useModalFocusTrap(
         return;
       }
       const elements = focusableElements(dialog);
+      // 포커스 가능한 자식이 없어도 대화상자 자체에 머물러 배경 컨트롤로 빠지지 않게 한다.
       if (elements.length === 0) {
         event.preventDefault();
         dialog.focus();

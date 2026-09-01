@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 여러 release 설정의 post-edit proof를 하나의 감사 가능한 bundle로 조립한다.
+ * 흐름: 개별 proof의 스키마·해시·신선도를 확인하고 매니페스트, blocker 요약, 다음 live check를 생성한다.
+ * 개인정보 경계: redaction이 확인된 증거만 포함하고 비밀 원문이나 외부 응답을 복사하지 않으며 업로드는 하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

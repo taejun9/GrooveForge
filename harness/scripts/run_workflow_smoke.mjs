@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: Compose→Arrange→Mix→Deliver로 이어지는 첫 8-bar beat workflow의 domain 상태 전이를 검사한다.
+ * 흐름: 대표 프로젝트를 단계별로 편집하고 패턴·클립·mixer·render readiness·export 결과를 기대 불변식과 비교한다.
+ * 안전 경계: 순수 로컬 fixture만 사용하고 프로젝트/오디오 계약 위반을 모두 실패로 모으며 외부 작업은 수행하지 않는다.
+ */
+
 const failures = [];
 
 function check(condition, message) {

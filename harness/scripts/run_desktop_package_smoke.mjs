@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: GrooveForge production 데스크톱 앱 번들을 조립하고 구조·의존성·서명·재현성의 기본 계약을 검사한다.
+ * 흐름: build 입력과 Electron 런타임을 확인하고 전용 패키지 트리에 복사한 뒤 필수 파일·권한·해시 smoke를 실행한다.
+ * 안전 경계: 고정된 build 패키지 경로만 교체하고 의존성/도구가 불완전하면 중단하며 외부 배포는 수행하지 않는다.
+ */
+
 import { spawn } from "node:child_process";
 import { constants, existsSync, readFileSync, readdirSync } from "node:fs";
 import { access, cp, mkdir, readFile, rm, rename, writeFile } from "node:fs/promises";
@@ -613,6 +619,8 @@ async function packageMacApp() {
     return null;
   }
 
+  // 고정된 build/desktop 패키지 산출물만 새로 조립한다. Electron 템플릿의 심볼릭 링크는 macOS
+  // framework 구조의 일부이므로 그대로 복사하되, 앱 리소스에는 production 산출물과 최소 manifest만 넣는다.
   await mkdir(outputRoot, { recursive: true });
   await rm(packagedApp, { force: true, recursive: true });
   await cp(electronApp, packagedApp, { recursive: true, verbatimSymlinks: true });
@@ -708,6 +716,8 @@ async function inspectPackagedRuntime(paths) {
 }
 
 async function signPackagedAppForLocalLaunch(paths) {
+  // 이 서명은 GUI smoke를 위한 로컬 ad-hoc 서명이다. Developer ID 배포 승인을 가장하지 않도록
+  // identifier·runtime flag·Authority 부재를 별도로 다시 확인한다.
   const signArgs = ["--force", "--deep", "--options", "runtime", "--entitlements", entitlementsPath, "--sign", "-", paths.packagedApp];
   const verifyArgs = ["--verify", "--deep", "--strict", "--verbose=2", paths.packagedApp];
 
@@ -851,6 +861,7 @@ async function launchPackagedApp(paths) {
     GROOVEFORGE_DESKTOP_LAUNCH_SMOKE: "1",
     NO_COLOR: "1"
   };
+  // 부모 셸의 Node 모드나 Vite 개발 서버 주소가 production 번들 실행 경로를 우회하지 못하게 한다.
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.VITE_DEV_SERVER_URL;
 
@@ -907,6 +918,7 @@ async function launchPackagedApp(paths) {
       settled = true;
       clearTimeout(timeout);
 
+      // 종료 코드뿐 아니라 main process가 내보낸 구조화 결과가 있어야 GUI 실행 성공으로 인정한다.
       const combinedOutput = `${stdout}\n${stderr}`;
       const result = parseSmokeResult(combinedOutput);
       if (!result) {
@@ -933,6 +945,7 @@ if (process.platform !== "darwin") {
 }
 
 checkBuiltArtifacts();
+// 단계별 checkpoint 사이에서 누적 실패를 즉시 차단해, 불완전한 번들을 다음 서명·GUI 단계에 넘기지 않는다.
 if (failures.length > 0) {
   fail("Built artifact preflight failed.", failures.map((failure) => `- ${failure}`).join("\n"));
 }

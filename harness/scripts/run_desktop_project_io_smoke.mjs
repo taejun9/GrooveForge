@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 개발/production Electron 앱의 프로젝트 저장·열기·복구 bridge가 파일 내용을 정확히 왕복하는지 검사한다.
+ * 흐름: 격리 작업공간과 기준 프로젝트를 만들고 앱을 실행해 native 버튼·IPC·SQLite 결과와 UI fingerprint를 비교한다.
+ * 안전 경계: 전용 임시 파일만 읽고 쓰며 사용자 선택 대화상자와 외부 동기화는 사용하지 않고 mismatch는 즉시 실패한다.
+ */
+
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";

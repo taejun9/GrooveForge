@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 비공개 release 설정 편집을 엄격하게 재감사해 허용 키·대상·redaction·신선도를 증명한다.
+ * 흐름: edit receipt와 대상 파일을 읽어 전체 허용 목록, 해시, 비변경 영역, 후속 gate 조건을 검증한다.
+ * 개인정보 경계: 원문 비밀은 출력하지 않고 하나라도 불일치하면 proof를 실패시키며 외부 작업은 수행하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";

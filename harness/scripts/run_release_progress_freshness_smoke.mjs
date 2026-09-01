@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: release progress가 최신 proof만 반영하고 오래된 증거를 명확히 차단하는지 검사한다.
+ * 흐름: timestamp가 다른 fixture를 집계해 freshness 상태, blocker, refresh 명령, 완료율을 비교한다.
+ * 안전 경계: 기준 시간을 넘긴 증거는 완료로 인정하지 않으며 실제 보고서나 외부 상태를 자동 갱신하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

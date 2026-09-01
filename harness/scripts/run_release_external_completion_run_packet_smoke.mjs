@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 외부 운영자가 릴리스 완료 작업을 실행할 run packet의 순서·입력·증거 계약을 검사한다.
+ * 흐름: readiness fixture에서 packet을 생성해 사전 조건, 명령, 예상 receipt, 실패 복구, 완료 기준을 확인한다.
+ * 개인정보/외부 경계: 운영 비밀은 placeholder로만 표현하고 packet 검증 중 실제 명령·업로드·계정 작업은 실행하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

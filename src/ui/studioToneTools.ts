@@ -1,3 +1,8 @@
+/**
+ * 사운드 디자인 노브의 기준값, 현재 드리프트, 개별 재설정 결과를 사람이 읽을 수 있는 요약으로 변환한다.
+ * 프리셋 또는 사용자가 캡처한 기준 SoundDesign과 현재 값을 비교하며 프로젝트를 직접 변경하지 않는다.
+ * 작은 부동소수점 흔들림을 의미 있는 편집으로 표시하지 않도록 임계값과 퍼센트 표기를 한곳에서 관리한다.
+ */
 import type { SoundDesign } from "../domain/workstation";
 import { soundPresetDesign, soundPresetLabel } from "../domain/workstation";
 import { percentLabel } from "./workstationPatternTools";

@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 중단된 외부 릴리스 완료 작업을 안전하게 재개하기 위한 resume packet 계약을 검사한다.
+ * 흐름: 부분 실행 receipt와 blocker fixture에서 packet을 만들어 재개 지점·멱등 키·검증 명령·잔여 작업을 대조한다.
+ * 안전 경계: 이전 성공 단계를 재실행하도록 지시하지 않고 비밀을 포함하지 않으며 실제 외부 작업은 수행하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

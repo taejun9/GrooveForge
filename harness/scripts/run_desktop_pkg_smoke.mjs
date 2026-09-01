@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: macOS 설치용 PKG를 로컬 앱 번들에서 만들고 서명·payload·매니페스트 준비 상태를 검증한다.
+ * 흐름: package identifier와 설치 위치를 확인해 pkgbuild/productbuild를 실행하고 결과 구조와 해시를 검사한다.
+ * 안전 경계: 지정된 build 산출물만 입력으로 사용하며 Installer 실행이나 외부 업로드는 하지 않고 명령 실패를 숨기지 않는다.
+ */
+
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createReadStream, existsSync, readFileSync } from "node:fs";

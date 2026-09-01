@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: update feed 설정 편집 후 URL·metadata 경로·채널 값이 계획과 일치한다는 proof를 만든다.
+ * 흐름: edit receipt와 현재 설정을 다시 읽어 허용 필드, digest, 비변경 영역, live check 준비를 검증한다.
+ * 개인정보 경계: URL/비밀 원문은 필요한 공개 범위만 남기고 불일치 시 실패하며 원격 feed를 변경하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";

@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 모든 릴리스 gate 결과를 최종 운영 handoff 문서와 파일 묶음으로 정리한다.
+ * 흐름: completion summary·manifest·proof를 재검증하고 설치/지원/rollback 안내와 blocker를 구조화해 출력한다.
+ * 안전 경계: 필수 증거가 없으면 완료 handoff를 만들지 않고 비밀을 redaction하며 전송·게시 자체는 수행하지 않는다.
+ */
+
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

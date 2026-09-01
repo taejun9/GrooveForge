@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * 역할: 프로젝트 작업공간 생성·저장·복구 디렉터리와 파일 소유권 경계가 안전하게 유지되는지 검사한다.
+ * 흐름: 격리 root에서 workspace를 초기화하고 필수 디렉터리·SQLite·원자적 파일 작업을 왕복 검증한다.
+ * 안전 경계: 허용 root 밖 경로와 symlink 탈출을 거부하며 사용자 홈이나 외부 저장소를 변경하지 않는다.
+ */
+
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
