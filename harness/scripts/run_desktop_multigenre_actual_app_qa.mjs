@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * 역할: 실제 Electron 앱 화면에서 여러 장르 프로젝트를 순차 검수하고 90~150초 SoundCloud 전달용 WAV·보고서를 조립한다.
- * 흐름: 장르별 fixture를 준비해 visible UI QA를 실행하고 PCM24·길이·peak·스크린샷·재열기 증거를 검증한 뒤 전달 묶음을 만든다.
+ * 역할: 실제 Electron 앱 화면에서 대표 6장르 또는 전체 16장르 프로젝트를 순차 검수하고 SoundCloud 전달용 WAV·보고서를 조립한다.
+ * 흐름: 기본 90~150초 대표 모드와 opt-in 90~180초 전체 장르 모드의 fixture를 준비해 visible UI QA와 PCM24·재열기 증거를 검증한다.
  * 안전 경계: 생성 음원은 로컬 원본 합성만 사용하고 외부 업로드는 하지 않으며, 경로·해시·신호 검증 실패 시 패키징을 중단한다.
  */
 
@@ -22,11 +22,11 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const desktopBuildRoot = path.join(root, "build", "desktop");
-const planId = "plan-1528-desktop-app-multigenre-ui-qa";
-const ownerMarker = "GrooveForge plan-1528 multi-genre actual-app QA";
+let planId = "plan-1528-desktop-app-multigenre-ui-qa";
+let ownerMarker = "GrooveForge plan-1528 multi-genre actual-app QA";
 const fixedSourceSavedAt = "2026-08-31T00:00:00.000Z";
 const minimumDurationSeconds = 90;
-const maximumDurationSeconds = 150;
+let maximumDurationSeconds = 150;
 const maximumSoundCloudBytes = 4_000_000_000;
 const expectedWav = {
   audioFormat: 1,
@@ -40,7 +40,7 @@ const expectedWav = {
 const workstation = await import("../../src/domain/workstation.ts");
 const render = await import("../../src/audio/render.ts");
 
-const genreCases = [
+const representativeGenreCases = [
   {
     arrangement: [
       { bars: 4, energy: 0.34, mutedTracks: ["drum_rack", "bass_808"], pattern: "C", section: "Intro" },
@@ -168,6 +168,252 @@ const genreCases = [
   }
 ];
 
+// 전체 장르 모드는 검증된 대표 여섯 곡을 그대로 앞에 두고, 누락된 열 스타일만 전용 블루프린트와 장곡 편곡으로 확장한다.
+const additionalGenreCases = [
+  {
+    arrangement: [
+      { bars: 8, energy: 0.32, mutedTracks: ["drum_rack", "bass_808"], pattern: "C", section: "Intro" },
+      { bars: 12, energy: 0.7, mutedTracks: ["chord"], pattern: "A", section: "Verse" },
+      { bars: 12, energy: 0.96, mutedTracks: [], pattern: "B", section: "Hook" },
+      { bars: 8, energy: 0.48, mutedTracks: ["drum_rack"], pattern: "C", section: "Bridge" },
+      { bars: 16, energy: 1, mutedTracks: [], pattern: "B", section: "Hook" },
+      { bars: 8, energy: 0.38, mutedTracks: ["synth", "chord"], pattern: "A", section: "Outro" }
+    ],
+    bassStyle: "808",
+    blueprintId: "dark_808",
+    bpm: 142,
+    id: "drill",
+    masterAutomation: "intro_outro",
+    mood: "빙점, 긴장, 어둠, 추진력",
+    order: 7,
+    styleName: "Drill",
+    tags: ["drill", "808", "dark", "instrumental", "original"],
+    title: "빙점의 궤적",
+    vibe: "미끄러지는 808과 어두운 공간, 절제된 드럼 전환이 긴장을 쌓는 드릴"
+  },
+  {
+    arrangement: [
+      { bars: 4, energy: 0.36, mutedTracks: ["synth"], pattern: "C", section: "Intro" },
+      { bars: 8, energy: 0.68, mutedTracks: [], pattern: "A", section: "Verse" },
+      { bars: 8, energy: 0.9, mutedTracks: [], pattern: "B", section: "Hook" },
+      { bars: 8, energy: 0.58, mutedTracks: ["chord"], pattern: "C", section: "Verse" },
+      { bars: 8, energy: 0.86, mutedTracks: [], pattern: "B", section: "Hook" },
+      { bars: 8, energy: 0.4, mutedTracks: ["drum_rack", "synth"], pattern: "A", section: "Outro" }
+    ],
+    bassStyle: "walking",
+    blueprintId: "boom_bap_knock",
+    bpm: 92,
+    id: "boom_bap",
+    masterAutomation: "intro_outro",
+    mood: "먼지, 계단, 묵직함, 여유",
+    order: 8,
+    styleName: "Boom Bap",
+    tags: ["boom-bap", "swing", "warm", "instrumental", "original"],
+    title: "먼지 낀 계단",
+    vibe: "스윙 드럼과 걷는 베이스, 따뜻한 코드가 고전적인 포켓을 만드는 붐뱁"
+  },
+  {
+    arrangement: [
+      { bars: 4, energy: 0.26, mutedTracks: ["drum_rack", "bass_808"], pattern: "C", section: "Intro" },
+      { bars: 8, energy: 0.52, mutedTracks: [], pattern: "A", section: "Verse" },
+      { bars: 8, energy: 0.76, mutedTracks: [], pattern: "B", section: "Hook" },
+      { bars: 8, energy: 0.38, mutedTracks: ["drum_rack"], pattern: "C", section: "Bridge" },
+      { bars: 8, energy: 0.72, mutedTracks: ["synth"], pattern: "B", section: "Hook" },
+      { bars: 4, energy: 0.28, mutedTracks: ["bass_808", "synth"], pattern: "A", section: "Outro" }
+    ],
+    bassStyle: "minimal",
+    blueprintId: "warm_loop",
+    bpm: 82,
+    id: "lofi",
+    masterAutomation: "intro_outro",
+    mood: "종이, 오후, 포근함, 흐릿함",
+    order: 9,
+    styleName: "Lo-fi",
+    tags: ["lo-fi", "warm", "study", "instrumental", "original"],
+    title: "종이별의 오후",
+    vibe: "부드러운 스윙과 최소한의 베이스, 따뜻한 화음이 느린 오후를 그리는 로파이"
+  },
+  {
+    arrangement: [
+      { bars: 4, energy: 0.34, mutedTracks: ["drum_rack"], pattern: "C", section: "Intro" },
+      { bars: 8, energy: 0.62, mutedTracks: [], pattern: "A", section: "Verse" },
+      { bars: 12, energy: 0.88, mutedTracks: [], pattern: "B", section: "Hook" },
+      { bars: 8, energy: 0.52, mutedTracks: ["chord"], pattern: "C", section: "Verse" },
+      { bars: 8, energy: 0.84, mutedTracks: ["synth"], pattern: "B", section: "Hook" },
+      { bars: 4, energy: 0.32, mutedTracks: ["drum_rack", "bass_808"], pattern: "A", section: "Outro" }
+    ],
+    bassStyle: "sub",
+    blueprintId: "seoul_pocket",
+    bpm: 94,
+    id: "k_hiphop_rnb",
+    masterAutomation: "intro_outro",
+    mood: "서울, 잔상, 세련됨, 밤",
+    order: 10,
+    styleName: "K-Hip-Hop/R&B",
+    tags: ["k-hip-hop", "rnb", "seoul", "instrumental", "original"],
+    title: "서울의 잔상",
+    vibe: "정돈된 포켓과 깨끗한 서브 베이스, 넓은 코드가 도시의 밤을 남기는 K-힙합/R&B"
+  },
+  {
+    arrangement: [
+      { bars: 4, energy: 0.4, mutedTracks: ["bass_808"], pattern: "C", section: "Intro" },
+      { bars: 12, energy: 0.7, mutedTracks: [], pattern: "A", section: "Verse" },
+      { bars: 12, energy: 0.92, mutedTracks: [], pattern: "B", section: "Hook" },
+      { bars: 8, energy: 0.56, mutedTracks: ["drum_rack"], pattern: "C", section: "Bridge" },
+      { bars: 12, energy: 0.9, mutedTracks: ["chord"], pattern: "B", section: "Hook" },
+      { bars: 4, energy: 0.38, mutedTracks: ["synth"], pattern: "A", section: "Outro" }
+    ],
+    bassStyle: "pluck",
+    blueprintId: "afro_swing",
+    bpm: 104,
+    id: "afrobeats",
+    masterAutomation: "intro_outro",
+    mood: "햇빛, 보폭, 온기, 리듬",
+    order: 11,
+    styleName: "Afrobeats",
+    tags: ["afrobeats", "syncopation", "warm", "instrumental", "original"],
+    title: "햇빛의 보폭",
+    vibe: "엇갈린 퍼커션과 구르는 플럭 베이스가 따뜻한 움직임을 만드는 아프로비츠"
+  },
+  {
+    arrangement: [
+      { bars: 8, energy: 0.34, mutedTracks: ["bass_808"], pattern: "C", section: "Intro" },
+      { bars: 12, energy: 0.64, mutedTracks: [], pattern: "A", section: "Verse" },
+      { bars: 12, energy: 0.9, mutedTracks: [], pattern: "B", section: "Hook" },
+      { bars: 8, energy: 0.46, mutedTracks: ["drum_rack", "synth"], pattern: "C", section: "Bridge" },
+      { bars: 12, energy: 0.86, mutedTracks: ["chord"], pattern: "B", section: "Hook" },
+      { bars: 4, energy: 0.3, mutedTracks: ["drum_rack", "bass_808"], pattern: "A", section: "Outro" }
+    ],
+    bassStyle: "pluck",
+    blueprintId: "amapiano_log_bass",
+    bpm: 112,
+    id: "amapiano",
+    masterAutomation: "intro_outro",
+    mood: "낮은 파문, 공기, 셔플, 깊이",
+    order: 12,
+    styleName: "Amapiano",
+    tags: ["amapiano", "log-bass", "shuffle", "instrumental", "original"],
+    title: "낮은 파문",
+    vibe: "깊은 로그 베이스와 셔플 퍼커션, 열린 코드가 파문처럼 번지는 아마피아노"
+  },
+  {
+    arrangement: [
+      { bars: 4, energy: 0.38, mutedTracks: ["synth"], pattern: "C", section: "Intro" },
+      { bars: 12, energy: 0.7, mutedTracks: [], pattern: "A", section: "Verse" },
+      { bars: 12, energy: 0.94, mutedTracks: [], pattern: "B", section: "Hook" },
+      { bars: 8, energy: 0.54, mutedTracks: ["bass_808"], pattern: "C", section: "Bridge" },
+      { bars: 8, energy: 0.9, mutedTracks: ["chord"], pattern: "B", section: "Hook" },
+      { bars: 4, energy: 0.36, mutedTracks: ["drum_rack", "synth"], pattern: "A", section: "Outro" }
+    ],
+    bassStyle: "pluck",
+    blueprintId: "reggaeton_dembow",
+    bpm: 98,
+    id: "reggaeton",
+    masterAutomation: "intro_outro",
+    mood: "호박빛, 회전, 열기, 탄력",
+    order: 13,
+    styleName: "Reggaeton",
+    tags: ["reggaeton", "dembow", "latin", "instrumental", "original"],
+    title: "호박빛 회전",
+    vibe: "뎀보우 리듬과 짧은 플럭 베이스, 선명한 훅이 원을 그리는 레게톤"
+  },
+  {
+    arrangement: [
+      { bars: 8, energy: 0.42, mutedTracks: ["bass_808"], pattern: "C", section: "Intro" },
+      { bars: 12, energy: 0.74, mutedTracks: ["chord"], pattern: "A", section: "Verse" },
+      { bars: 16, energy: 1, mutedTracks: [], pattern: "B", section: "Hook" },
+      { bars: 8, energy: 0.58, mutedTracks: ["drum_rack"], pattern: "C", section: "Bridge" },
+      { bars: 12, energy: 0.98, mutedTracks: ["synth"], pattern: "B", section: "Hook" },
+      { bars: 8, energy: 0.4, mutedTracks: ["drum_rack", "chord"], pattern: "A", section: "Outro" }
+    ],
+    bassStyle: "sub",
+    blueprintId: "jersey_drive",
+    bpm: 140,
+    id: "jersey",
+    masterAutomation: "intro_outro",
+    mood: "보도블록, 전압, 속도, 번쩍임",
+    order: 14,
+    styleName: "Jersey Club",
+    tags: ["jersey-club", "club", "bounce", "instrumental", "original"],
+    title: "보도블록 전압",
+    vibe: "잘게 끊긴 킥과 밝은 훅, 빠른 서브 스탭이 튀어 오르는 저지 클럽"
+  },
+  {
+    arrangement: [
+      { bars: 8, energy: 0.36, mutedTracks: ["drum_rack"], pattern: "C", section: "Intro" },
+      { bars: 12, energy: 0.7, mutedTracks: [], pattern: "A", section: "Verse" },
+      { bars: 16, energy: 0.96, mutedTracks: [], pattern: "B", section: "Hook" },
+      { bars: 8, energy: 0.5, mutedTracks: ["bass_808"], pattern: "C", section: "Bridge" },
+      { bars: 12, energy: 0.92, mutedTracks: ["chord"], pattern: "B", section: "Hook" },
+      { bars: 4, energy: 0.34, mutedTracks: ["drum_rack", "synth"], pattern: "A", section: "Outro" }
+    ],
+    bassStyle: "808",
+    blueprintId: "phonk_cruise",
+    bpm: 132,
+    id: "phonk",
+    masterAutomation: "intro_outro",
+    mood: "크롬, 그림자, 질주, 거침",
+    order: 15,
+    styleName: "Phonk",
+    tags: ["phonk", "distorted", "dark", "instrumental", "original"],
+    title: "크롬 그림자",
+    vibe: "왜곡된 808과 구르는 드럼, 어두운 반복이 야간 질주를 만드는 퐁크"
+  },
+  {
+    arrangement: [
+      { bars: 8, energy: 0.34, mutedTracks: ["bass_808"], pattern: "C", section: "Intro" },
+      { bars: 16, energy: 0.68, mutedTracks: [], pattern: "A", section: "Verse" },
+      { bars: 16, energy: 0.94, mutedTracks: [], pattern: "B", section: "Hook" },
+      { bars: 8, energy: 0.52, mutedTracks: ["drum_rack"], pattern: "C", section: "Bridge" },
+      { bars: 12, energy: 0.9, mutedTracks: ["chord"], pattern: "B", section: "Hook" },
+      { bars: 4, energy: 0.32, mutedTracks: ["synth"], pattern: "A", section: "Outro" }
+    ],
+    bassStyle: "pluck",
+    blueprintId: "garage_skip",
+    bpm: 132,
+    id: "garage",
+    masterAutomation: "intro_outro",
+    mood: "비, 차선, 셔플, 반사광",
+    order: 16,
+    styleName: "Garage",
+    tags: ["garage", "shuffle", "club", "instrumental", "original"],
+    title: "비의 차선",
+    vibe: "셔플 드럼과 플럭 베이스, 깨끗한 신스가 젖은 차선을 가르는 개러지"
+  }
+];
+
+const requiredBassStyles = ["808", "minimal", "pluck", "reese", "sub", "walking"];
+const allGenreCases = [...representativeGenreCases, ...additionalGenreCases];
+let genreCases = representativeGenreCases;
+let allGenresMode = false;
+let outputRootPrefix = "plan-1528-";
+
+function configureGenreMode(requestAllGenres) {
+  allGenresMode = requestAllGenres;
+  if (!allGenresMode) return;
+  genreCases = allGenreCases;
+  planId = "plan-1531-install-all-genre-soundcloud";
+  ownerMarker = "GrooveForge plan-1531 all-genre actual-app QA";
+  maximumDurationSeconds = 180;
+  outputRootPrefix = "plan-1531-";
+}
+
+function durationRangeLabel() {
+  return `${minimumDurationSeconds}-${maximumDurationSeconds}`;
+}
+
+function expectedGenreCount() {
+  return allGenresMode ? workstation.styleProfiles.length : representativeGenreCases.length;
+}
+
+function runPlanMode() {
+  return allGenresMode ? "visible-native-sequential-all-genres" : "visible-native-sequential-multigenre";
+}
+
+function ownershipSentinelName() {
+  return allGenresMode ? ".grooveforge-plan-1531-owned.json" : ".grooveforge-plan-1528-owned.json";
+}
+
 function fail(message) {
   throw new Error(message);
 }
@@ -224,6 +470,7 @@ function isInside(base, candidate) {
 
 function parseArguments(argv) {
   const parsed = {
+    allGenres: false,
     audioSelfTest: false,
     fromExisting: false,
     outputRoot: null,
@@ -233,7 +480,8 @@ function parseArguments(argv) {
   };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
-    if (argument === "--audio-self-test") parsed.audioSelfTest = true;
+    if (argument === "--all-genres") parsed.allGenres = true;
+    else if (argument === "--audio-self-test") parsed.audioSelfTest = true;
     else if (argument === "--from-existing") parsed.fromExisting = true;
     else if (argument === "--prepare-only") parsed.prepareOnly = true;
     else if (argument === "--self-test") parsed.selfTest = true;
@@ -261,7 +509,8 @@ function timestampId() {
 }
 
 function defaultOutputRoot() {
-  return path.join(desktopBuildRoot, `plan-1528-multigenre-actual-app-qa-${timestampId()}-${process.pid}`);
+  const runName = allGenresMode ? "plan-1531-all-genres-actual-app-qa" : "plan-1528-multigenre-actual-app-qa";
+  return path.join(desktopBuildRoot, `${runName}-${timestampId()}-${process.pid}`);
 }
 
 function assertPlanOutputRoot(outputRoot) {
@@ -269,7 +518,10 @@ function assertPlanOutputRoot(outputRoot) {
   // 저장소나 홈 디렉터리를 산출물 root로 사용할 수 없다.
   check(path.isAbsolute(outputRoot), "Multi-genre output root must be absolute.");
   check(isInside(desktopBuildRoot, outputRoot), `Output root must remain below ${desktopBuildRoot}.`);
-  check(path.basename(outputRoot).startsWith("plan-1528-"), "Output root basename must start with plan-1528-.");
+  check(
+    path.basename(outputRoot).startsWith(outputRootPrefix),
+    `Output root basename must start with ${outputRootPrefix} for the selected genre mode.`
+  );
 }
 
 async function lstatOrNull(filePath) {
@@ -404,17 +656,38 @@ function createMovementSpec(config, absoluteSourcePath) {
 }
 
 function validateGenreMatrix() {
-  check(genreCases.length === 6, "The actual-app matrix must contain exactly six genres.");
+  const expectedCount = expectedGenreCount();
+  check(genreCases.length === expectedCount, `The selected actual-app matrix must contain exactly ${expectedCount} genres.`);
   check(new Set(genreCases.map((entry) => entry.id)).size === genreCases.length, "Genre ids must be unique.");
   check(new Set(genreCases.map((entry) => entry.order)).size === genreCases.length, "Genre orders must be unique.");
   check(
-    canonicalJson(genreCases.map((entry) => entry.bassStyle).sort()) ===
-      canonicalJson(["808", "minimal", "pluck", "reese", "sub", "walking"]),
-    "The six cases must cover every Bass Voice family exactly once."
+    canonicalJson(genreCases.map((entry) => entry.order)) ===
+      canonicalJson(Array.from({ length: genreCases.length }, (_, index) => index + 1)),
+    "Genre orders must be contiguous and match the actual execution/delivery order."
   );
+  check(new Set(genreCases.map((entry) => entry.title)).size === genreCases.length, "Genre titles must be unique.");
+  check(new Set(genreCases.map((entry) => entry.blueprintId)).size === genreCases.length, "Genre Beat Blueprint ids must be unique.");
+  check(
+    canonicalJson([...new Set(genreCases.map((entry) => entry.bassStyle))].sort()) === canonicalJson(requiredBassStyles),
+    "The selected cases must cover the complete Bass Voice family set."
+  );
+  if (!allGenresMode) {
+    check(
+      canonicalJson(genreCases.map((entry) => entry.bassStyle).sort()) === canonicalJson(requiredBassStyles),
+      "The six representative cases must cover every Bass Voice family exactly once."
+    );
+  } else {
+    const selectedStyleIds = genreCases.map((entry) => entry.id).sort();
+    const supportedStyleIds = workstation.styleProfiles.map((profile) => profile.id).sort();
+    check(canonicalJson(selectedStyleIds) === canonicalJson(supportedStyleIds), "All-genre mode must cover every current StyleProfile exactly once.");
+  }
   for (const config of genreCases) {
     const profile = workstation.styleProfiles.find((candidate) => candidate.id === config.id);
+    const blueprint = workstation.beatBlueprints.find((candidate) => candidate.id === config.blueprintId);
     check(Boolean(profile), `${config.id}: style profile is missing.`);
+    check(Boolean(blueprint), `${config.id}: dedicated Beat Blueprint ${config.blueprintId} is missing.`);
+    check(blueprint?.styleId === config.id, `${config.id}: Beat Blueprint style identity does not match.`);
+    check(blueprint?.bpm === config.bpm, `${config.id}: Beat Blueprint BPM does not match the case matrix.`);
     check(profile.bassStyle === config.bassStyle, `${config.id}: expected ${config.bassStyle} Bass Voice, got ${profile.bassStyle}.`);
     check(profile.defaultBpm === config.bpm, `${config.id}: case BPM must match the style default.`);
     const bars = arrangementBars(config);
@@ -423,14 +696,14 @@ function validateGenreMatrix() {
     const duration = expectedDuration(config);
     check(
       duration >= minimumDurationSeconds && duration <= maximumDurationSeconds,
-      `${config.id}: expected duration ${duration}s is outside 90-150 seconds.`
+      `${config.id}: expected duration ${duration}s is outside ${durationRangeLabel()} seconds.`
     );
     const source = createSourceProject(config);
     const sourceText = deterministicProjectFile(source);
     const reopened = workstation.parseProjectFile(sourceText);
     check(reopened.styleId === config.id && reopened.bpm === config.bpm, `${config.id}: deterministic source did not reopen exactly.`);
     check(new Set(["A", "B", "C"].map((slot) => sha256(canonicalJson(reopened.patterns[slot])))).size === 3, `${config.id}: Pattern A/B/C must be distinct.`);
-    const spec = createMovementSpec(config, path.join(desktopBuildRoot, "plan-1528-self-test", `${config.id}.grooveforge.json`));
+    const spec = createMovementSpec(config, path.join(desktopBuildRoot, `${outputRootPrefix}self-test`, `${config.id}.grooveforge.json`));
     check(workstation.normalizeProjectTitle(spec.title) === spec.title, `${config.id}: final title is not durable.`);
     check(canonicalJson(workstation.projectSessionBrief({ sessionBrief: spec.sessionBrief })) === canonicalJson(spec.sessionBrief), `${config.id}: Session Brief would normalize during QA.`);
   }
@@ -449,7 +722,7 @@ async function prepareOutput(outputRoot) {
     plan: planId,
     schemaVersion: 1
   };
-  await writeExclusive(path.join(outputRoot, ".grooveforge-plan-1528-owned.json"), `${JSON.stringify(sentinel, null, 2)}\n`);
+  await writeExclusive(path.join(outputRoot, ownershipSentinelName()), `${JSON.stringify(sentinel, null, 2)}\n`);
   const entries = [];
   for (const config of genreCases) {
     const inputRoot = path.dirname(sourceProjectPath(outputRoot, config));
@@ -463,6 +736,7 @@ async function prepareOutput(outputRoot) {
     entries.push({
       arrangementBars: arrangementBars(config),
       bassStyle: config.bassStyle,
+      ...(allGenresMode ? { blueprintId: config.blueprintId } : {}),
       bpm: config.bpm,
       expectedDurationSeconds: round(expectedDuration(config)),
       id: config.id,
@@ -485,7 +759,7 @@ async function prepareOutput(outputRoot) {
   const runPlan = {
     command: "desktop:movement-qa",
     generatedAt: new Date().toISOString(),
-    mode: "visible-native-sequential-multigenre",
+    mode: runPlanMode(),
     networkOperationRequested: false,
     plan: planId,
     schemaVersion: 1,
@@ -498,12 +772,13 @@ async function prepareOutput(outputRoot) {
 async function loadPreparedOutput(outputRoot) {
   assertPlanOutputRoot(outputRoot);
   await assertNoSymlinkComponents(desktopBuildRoot, outputRoot);
-  const sentinel = await readJson(path.join(outputRoot, ".grooveforge-plan-1528-owned.json"));
+  const sentinel = await readJson(path.join(outputRoot, ownershipSentinelName()));
   check(sentinel.owner === ownerMarker && sentinel.plan === planId && sentinel.schemaVersion === 1, "Output root ownership sentinel is invalid.");
   check(path.resolve(sentinel.outputRoot) === outputRoot, "Output root ownership sentinel path does not match.");
   const runPlan = await readJson(path.join(outputRoot, "run-plan.json"));
   check(runPlan.plan === planId && runPlan.schemaVersion === 1 && Array.isArray(runPlan.entries), "Prepared run-plan contract is invalid.");
-  check(runPlan.entries.length === genreCases.length, "Prepared run-plan must contain all six genres.");
+  check(runPlan.mode === runPlanMode(), "Prepared run-plan mode does not match the selected genre mode.");
+  check(runPlan.entries.length === genreCases.length, `Prepared run-plan must contain all ${genreCases.length} selected genres.`);
   const entries = [];
   for (const config of genreCases) {
     const sourcePath = sourceProjectPath(outputRoot, config);
@@ -518,6 +793,8 @@ async function loadPreparedOutput(outputRoot) {
     check(actualSpec.equals(Buffer.from(expectedSpec)), `${config.id}: prepared movement spec differs from the strict contract.`);
     const recorded = runPlan.entries.find((entry) => objectValue(entry)?.id === config.id);
     check(Boolean(recorded), `${config.id}: run-plan row is missing.`);
+    check(recorded.order === config.order, `${config.id}: run-plan order mismatch.`);
+    if (allGenresMode) check(recorded.blueprintId === config.blueprintId, `${config.id}: run-plan Beat Blueprint mismatch.`);
     check(recorded.sourceProject?.sha256 === sha256(actualSource), `${config.id}: run-plan source SHA-256 mismatch.`);
     check(recorded.spec?.sha256 === sha256(actualSpec), `${config.id}: run-plan spec SHA-256 mismatch.`);
     check(path.resolve(recorded.workspaceRoot) === workspacePath(outputRoot, config), `${config.id}: run-plan workspace path mismatch.`);
@@ -550,7 +827,7 @@ async function runActualAppSequence(outputRoot, skipBuild) {
   for (const config of genreCases) {
     const workspaceRoot = workspacePath(outputRoot, config);
     check(!(await lstatOrNull(workspaceRoot)), `${config.id}: workspace must be fresh and absent before actual-app QA: ${workspaceRoot}`);
-    console.log(`검증: [${config.order}/6] ${config.styleName} / ${config.title} actual-app QA를 실행합니다.`);
+    console.log(`검증: [${config.order}/${genreCases.length}] ${config.styleName} / ${config.title} actual-app QA를 실행합니다.`);
     const result = await runCommand(
       npmCommand(),
       ["run", "desktop:movement-qa", "--", "--movement-spec", movementSpecPath(outputRoot, config)],
@@ -825,7 +1102,10 @@ async function auditGenre(outputRoot, config) {
   const durationTolerance = 1 / expectedWav.sampleRate + Number.EPSILON;
   check(decoded.frames === expectedFrameCount(config), `${config.id}: exact WAV frame count mismatch.`);
   check(Math.abs(decoded.durationSeconds - expectedDuration(config)) <= durationTolerance, `${config.id}: WAV duration differs by more than one frame.`);
-  check(decoded.durationSeconds >= minimumDurationSeconds && decoded.durationSeconds <= maximumDurationSeconds, `${config.id}: WAV is outside 90-150 seconds.`);
+  check(
+    decoded.durationSeconds >= minimumDurationSeconds && decoded.durationSeconds <= maximumDurationSeconds,
+    `${config.id}: WAV is outside ${durationRangeLabel()} seconds.`
+  );
   check(decoded.nonZeroSamples > 0 && decoded.nonZeroPercent >= 0.01, `${config.id}: WAV is silent or unexpectedly sparse.`);
   check(decoded.lowerByteActivePercent >= 50, `${config.id}: WAV may contain zero-padded 16-bit samples.`);
   check(decoded.channelNonZeroSamples.every((count) => count > 0), `${config.id}: both stereo channels must contain audio.`);
@@ -923,7 +1203,7 @@ function buildSoundCloudSheet(audit, project) {
     `6. 수익화·배급·Content ID는 별도의 권리 확인 뒤 결정합니다.\n\n` +
     `## 기술 한계\n\n` +
     `이 시트의 peak/RMS는 로컬 sample 측정이며 LUFS, true peak, 전문 마스터링 또는 플랫폼 승인 보장이 아닙니다. 실제 업로드·공개·계정 변경은 수행하지 않았습니다.\n\n` +
-    `## SoundCloud 공식 참고 자료 (2026-08-31 확인)\n\n` +
+    `## SoundCloud 공식 참고 자료 (2026-09-03 확인)\n\n` +
     `- Upload requirements: https://help.soundcloud.com/hc/en-us/articles/360039171614-Upload-Requirements\n` +
     `- Privacy settings: https://help.soundcloud.com/hc/en-us/articles/46020211210523-Edit-your-track-s-privacy-settings\n` +
     `- Track permissions: https://help.soundcloud.com/hc/en-us/articles/31423603670043-Manage-your-track-s-permissions\n`;
@@ -954,6 +1234,8 @@ async function assembleDelivery(outputRoot, audits) {
   // 기존 delivery를 덮어쓰지 않으며, 원본과 복사본의 해시를 즉시 비교한 뒤 공개용 보고서만 sanitize한다.
   check(!(await lstatOrNull(deliveryRoot)), `Delivery root already exists: ${deliveryRoot}`);
   await mkdir(deliveryRoot, { recursive: true, mode: 0o700 });
+  const uploadSelectionRoot = allGenresMode ? path.join(deliveryRoot, "00-SoundCloud-WAV") : null;
+  if (uploadSelectionRoot) await mkdir(uploadSelectionRoot, { recursive: true, mode: 0o700 });
   const manifestRows = [];
   for (const audit of audits) {
     const { config } = audit;
@@ -968,6 +1250,20 @@ async function assembleDelivery(outputRoot, audits) {
     const wavCopied = await copyEvidenceFile(audit.wav.path, wavTarget);
     const projectCopied = await copyEvidenceFile(audit.savedProject.path, projectTarget);
     check(wavCopied.sha256 === audit.wav.sha256 && projectCopied.sha256 === audit.savedProject.sha256, `${config.id}: copied user artifacts changed.`);
+    let soundCloudBatchWav = null;
+    if (uploadSelectionRoot) {
+      const batchTarget = path.join(uploadSelectionRoot, `${caseDirectoryName(config)}-soundcloud.wav`);
+      const batchCopied = await copyEvidenceFile(wavTarget, batchTarget);
+      check(
+        batchCopied.bytes === wavCopied.bytes && batchCopied.sha256 === wavCopied.sha256,
+        `${config.id}: top-level SoundCloud WAV copy is not byte-identical.`
+      );
+      soundCloudBatchWav = {
+        bytes: batchCopied.bytes,
+        path: relativeTo(deliveryRoot, batchTarget),
+        sha256: batchCopied.sha256
+      };
+    }
     const project = workstation.parseProjectFile((await readFile(projectTarget)).toString("utf8"));
     const sheet = buildSoundCloudSheet(audit, project);
     await writeExclusive(sheetTarget, sheet);
@@ -1024,11 +1320,12 @@ async function assembleDelivery(outputRoot, audits) {
         terminalZeroFrames: audit.decoded.terminalZeroFrames
       },
       bassStyle: config.bassStyle,
+      ...(allGenresMode ? { blueprintId: config.blueprintId } : {}),
       bpm: config.bpm,
       checks: {
         actualApp: "passed",
         deterministicRerender: "passed",
-        duration90To150Seconds: "passed",
+        [allGenresMode ? "duration90To180Seconds" : "duration90To150Seconds"]: "passed",
         pcm24Stereo44100: "passed",
         privateFirstPackage: "prepared",
         soundCloudUploadPerformed: false
@@ -1053,6 +1350,7 @@ async function assembleDelivery(outputRoot, audits) {
       },
       styleName: config.styleName,
       title: config.title,
+      ...(soundCloudBatchWav ? { soundCloudBatchWav } : {}),
       wav: {
         bytes: audit.wav.bytes,
         path: relativeTo(deliveryRoot, wavTarget),
@@ -1073,16 +1371,49 @@ async function assembleDelivery(outputRoot, audits) {
     });
   }
 
+  check(manifestRows.length === genreCases.length, `Delivery manifest must contain all ${genreCases.length} selected genres.`);
+  check(
+    canonicalJson(manifestRows.map((row) => row.id).sort()) === canonicalJson(genreCases.map((config) => config.id).sort()),
+    "Delivery manifest StyleProfile coverage does not match the selected genre matrix."
+  );
+  check(
+    canonicalJson(manifestRows.map((row) => [row.order, row.id])) ===
+      canonicalJson(genreCases.map((config) => [config.order, config.id])),
+    "Delivery manifest order must match the actual execution order."
+  );
   check(new Set(manifestRows.map((row) => row.wav.sha256)).size === genreCases.length, "Every genre WAV must have a distinct SHA-256.");
   const screenshotHashes = manifestRows.flatMap((row) => Object.values(row.actualApp.screenshots).map((entry) => entry.sha256));
-  check(new Set(screenshotHashes).size === genreCases.length * 3, "All 18 actual-app page screenshots must be distinct.");
+  check(
+    new Set(screenshotHashes).size === genreCases.length * 3,
+    `All ${genreCases.length * 3} actual-app page screenshots must be distinct.`
+  );
+  if (allGenresMode) {
+    check(
+      canonicalJson(manifestRows.map((row) => row.blueprintId).sort()) === canonicalJson(genreCases.map((config) => config.blueprintId).sort()),
+      "Delivery manifest Beat Blueprint coverage does not match the selected genre matrix."
+    );
+    const batchEntries = await readdir(uploadSelectionRoot, { withFileTypes: true });
+    check(batchEntries.length === genreCases.length, `Top-level SoundCloud WAV folder must contain exactly ${genreCases.length} files.`);
+    check(batchEntries.every((entry) => entry.isFile() && !entry.isSymbolicLink() && entry.name.endsWith("-soundcloud.wav")), "Top-level SoundCloud WAV folder contains an unexpected entry.");
+    check(manifestRows.every((row) => row.soundCloudBatchWav?.sha256 === row.wav.sha256), "A top-level SoundCloud WAV differs from its genre-folder source.");
+  }
   const readmeRows = manifestRows.map((row) =>
     `| ${String(row.order).padStart(2, "0")} | ${row.styleName} | ${row.title} | ${row.bpm} | ${row.bassStyle} | ${row.audio.durationSeconds.toFixed(3)}초 | ${row.audio.peakDb.toFixed(2)} dBFS | ${row.audio.rmsDb.toFixed(2)} dBFS | 통과 |`
   ).join("\n");
-  const readme = `# GrooveForge 6장르 실제 앱 SoundCloud 준비 패키지\n\n` +
+  const readmeTitle = allGenresMode
+    ? `# GrooveForge 전체 ${genreCases.length}장르 실제 앱 SoundCloud 준비 패키지\n\n`
+    : `# GrooveForge 6장르 실제 앱 SoundCloud 준비 패키지\n\n`;
+  const resultSummary = allGenresMode
+    ? `실제 production Electron 앱 화면에서 현재 지원하는 ${genreCases.length}개 StyleProfile 전체를 각각 Open → native UI 편곡 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 ${durationRangeLabel()}초, stereo 44.1kHz signed PCM 24-bit이며 여섯 Bass Voice family(808, sub, walking, pluck, reese, minimal)를 모두 다룹니다.\n\n`
+    : `실제 production Electron 앱 화면에서 여섯 장르를 각각 Open → native UI 편곡 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 90~150초, stereo 44.1kHz signed PCM 24-bit이며 여섯 Bass Voice(808, sub, walking, pluck, reese, minimal)를 한 번씩 다룹니다.\n\n`;
+  const uploadSelectionGuide = allGenresMode
+    ? `## SoundCloud WAV 한 번에 선택\n\nSoundCloud 파일 선택기에서 이 패키지의 \`00-SoundCloud-WAV/\` 폴더를 열고 순번과 장르가 표시된 WAV ${genreCases.length}개를 모두 선택하면 됩니다. 이 파일들은 각 장르 폴더의 원본 WAV와 byte-identical하며 두 사본 모두 \`checksums.sha256\` 검증 대상입니다.\n\n`
+    : "";
+  const readme = readmeTitle +
     `## 결과\n\n` +
-    `실제 production Electron 앱 화면에서 여섯 장르를 각각 Open → native UI 편곡 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 90~150초, stereo 44.1kHz signed PCM 24-bit이며 여섯 Bass Voice(808, sub, walking, pluck, reese, minimal)를 한 번씩 다룹니다.\n\n` +
+    resultSummary +
     `| 순서 | 장르 | 제목 | BPM | Bass Voice | 길이 | Sample peak | RMS | Actual-app |\n|---:|---|---|---:|---|---:|---:|---:|---|\n${readmeRows}\n\n` +
+    uploadSelectionGuide +
     `## 폴더 사용법\n\n` +
     `각 장르 폴더에는 SoundCloud에 올릴 WAV, 다시 편집할 수 있는 GrooveForge 프로젝트, 한글 private-first 업로드 시트, 기술 QA JSON, Arrange/Mix/Deliver 실제 화면 PNG와 경로를 비식별화한 actual-app 보고서가 있습니다. 전체 파일 무결성은 \`manifest.json\`과 \`checksums.sha256\`으로 확인합니다.\n\n` +
     `macOS Terminal에서 이 폴더로 이동한 뒤 \`shasum -a 256 -c checksums.sha256\`를 실행하면 모든 전달 파일을 다시 검증할 수 있습니다. 체크섬은 무결성 확인용이며 배포자 서명은 아닙니다.\n\n` +
@@ -1105,14 +1436,29 @@ async function assembleDelivery(outputRoot, audits) {
     },
     plan: planId,
     rows: manifestRows,
-    schemaVersion: 1,
-    scope: "six-genre visible native actual-app QA and SoundCloud private-first preparation",
+    schemaVersion: allGenresMode ? 2 : 1,
+    scope: allGenresMode
+      ? "all-current-style visible native actual-app QA and SoundCloud private-first preparation"
+      : "six-genre visible native actual-app QA and SoundCloud private-first preparation",
     soundCloudUploadPerformed: false,
-    technicalContract: {
-      bassVoices: ["minimal", "walking", "808", "sub", "pluck", "reese"],
-      durationSeconds: { maximum: 150, minimum: 90 },
-      wav: expectedWav
-    }
+    technicalContract: allGenresMode
+      ? {
+          bassVoices: requiredBassStyles,
+          blueprintCount: new Set(manifestRows.map((row) => row.blueprintId)).size,
+          blueprintIdsInDeliveryOrder: manifestRows.map((row) => row.blueprintId),
+          durationSeconds: { maximum: maximumDurationSeconds, minimum: minimumDurationSeconds },
+          soundCloudBatchFolder: "00-SoundCloud-WAV",
+          soundCloudBatchWavCount: manifestRows.length,
+          styleCount: manifestRows.length,
+          styleIdsInDeliveryOrder: manifestRows.map((row) => row.id),
+          supportedStyleCount: workstation.styleProfiles.length,
+          wav: expectedWav
+        }
+      : {
+          bassVoices: representativeGenreCases.map((config) => config.bassStyle),
+          durationSeconds: { maximum: 150, minimum: minimumDurationSeconds },
+          wav: expectedWav
+        }
   };
   const manifestPath = path.join(deliveryRoot, "manifest.json");
   await writeExclusive(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
@@ -1181,17 +1527,19 @@ async function runSelfTest() {
     rejectedUnknownLocalPath = true;
   }
   check(rejectedUnknownLocalPath, "Unknown local absolute-path privacy gate self-test failed.");
-  console.log("GrooveForge multi-genre actual-app QA self-test passed.");
-  console.log("- Genres: 6/6");
-  console.log("- Bass Voice coverage: minimal, walking, 808, sub, pluck, reese");
-  console.log("- Duration range: 90-150 seconds");
+  console.log(`GrooveForge ${allGenresMode ? "all-genre" : "multi-genre"} actual-app QA self-test passed.`);
+  console.log(`- Genres: ${genreCases.length}/${expectedGenreCount()}`);
+  console.log(`- StyleProfile coverage: ${new Set(genreCases.map((config) => config.id)).size}/${expectedGenreCount()}`);
+  console.log(`- Beat Blueprint coverage: ${new Set(genreCases.map((config) => config.blueprintId)).size}/${expectedGenreCount()}`);
+  console.log(`- Bass Voice family coverage: ${requiredBassStyles.join(", ")}`);
+  console.log(`- Duration range: ${durationRangeLabel()} seconds`);
   console.log("- PCM parser, deterministic source, strict spec, and path sanitization contracts passed");
 }
 
 async function runAudioSelfTest() {
   validateGenreMatrix();
   for (const config of genreCases) {
-    const spec = createMovementSpec(config, path.join(desktopBuildRoot, "plan-1528-audio-self-test", `${config.id}.grooveforge.json`));
+    const spec = createMovementSpec(config, path.join(desktopBuildRoot, `${outputRootPrefix}audio-self-test`, `${config.id}.grooveforge.json`));
     const source = createSourceProject(config);
     const arranged = workstation.applyMasterAutomationPreset(
       {
@@ -1220,23 +1568,25 @@ async function runAudioSelfTest() {
       `- ${config.id}: ${decoded.durationSeconds.toFixed(6)}s / peak ${decoded.peakDb.toFixed(2)} dBFS / RMS ${decoded.rmsDb.toFixed(2)} dBFS / max delta ${decoded.maxAdjacentDelta.toFixed(6)}`
     );
   }
-  console.log("GrooveForge six-genre long-form offline audio self-test passed.");
+  console.log(`GrooveForge ${genreCases.length}-genre long-form offline audio self-test passed.`);
 }
 
 function printPreparedCommands(outputRoot) {
-  console.log("GrooveForge multi-genre actual-app inputs are ready.");
+  console.log(`GrooveForge ${allGenresMode ? "all-genre" : "multi-genre"} actual-app inputs are ready.`);
   console.log(`- Output root: ${outputRoot}`);
-  console.log("- Run these six commands from the repository worktree after npm run build:");
+  console.log(`- Run these ${genreCases.length} commands from the repository worktree after npm run build:`);
   for (const config of genreCases) {
     console.log(
       `  GROOVEFORGE_DESKTOP_WORKSPACE_ROOT=${workspacePath(outputRoot, config)} npm run desktop:movement-qa -- --movement-spec ${movementSpecPath(outputRoot, config)}`
     );
   }
-  console.log(`- Then assemble/audit: node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_multigenre_actual_app_qa.mjs --from-existing --output-root ${outputRoot}`);
+  const resumeCommand = allGenresMode ? "npm run desktop:all-genres-qa --" : "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_multigenre_actual_app_qa.mjs";
+  console.log(`- Then assemble/audit: ${resumeCommand} --from-existing --output-root ${outputRoot}`);
 }
 
 async function main() {
   const args = parseArguments(process.argv.slice(2));
+  configureGenreMode(args.allGenres);
   if (args.selfTest) {
     await runSelfTest();
     return;
@@ -1254,8 +1604,8 @@ async function main() {
     printPreparedCommands(outputRoot);
     return;
   }
-  // --from-existing은 실제 앱을 다시 실행하지 않고 이미 준비된 증거를 재감사한다. 정상 경로에서만
-  // build와 여섯 번의 visible native QA를 수행하며, 어떤 경로도 SoundCloud 외부 작업을 호출하지 않는다.
+  // --from-existing은 실제 앱을 다시 실행하지 않고 선택 모드와 ownership이 일치하는 증거만 재감사한다.
+  // 정상 경로에서만 build와 선택된 수만큼 visible native QA를 수행하며 외부 SoundCloud 작업은 호출하지 않는다.
   if (!args.fromExisting) await runActualAppSequence(outputRoot, args.skipBuild);
   const audits = [];
   for (const config of genreCases) {
@@ -1263,14 +1613,14 @@ async function main() {
     audits.push(await auditGenre(outputRoot, config));
   }
   const delivery = await assembleDelivery(outputRoot, audits);
-  console.log("GrooveForge 6장르 actual-app QA와 SoundCloud 준비 패키지가 완료되었습니다.");
+  console.log(`GrooveForge ${genreCases.length}장르 actual-app QA와 SoundCloud 준비 패키지가 완료되었습니다.`);
   console.log(`- Delivery: ${delivery.deliveryRoot}`);
-  console.log(`- Genres: ${delivery.manifestRows.length}/6`);
+  console.log(`- Genres: ${delivery.manifestRows.length}/${expectedGenreCount()}`);
   console.log(`- Artifacts: ${delivery.artifactCount}`);
   console.log("- Actual SoundCloud login/upload/publication: not performed");
 }
 
 await main().catch((error) => {
-  console.error(`GrooveForge multi-genre actual-app QA failed: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(`GrooveForge ${allGenresMode ? "all-genre" : "multi-genre"} actual-app QA failed: ${error instanceof Error ? error.message : String(error)}`);
   process.exitCode = 1;
 });

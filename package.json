@@ -15,6 +15,7 @@
     "desktop:manual-qa": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_manual_qa.mjs",
     "desktop:movement-qa": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_manual_qa.mjs --auto-movement-qa",
     "desktop:multigenre-qa": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_multigenre_actual_app_qa.mjs",
+    "desktop:all-genres-qa": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_multigenre_actual_app_qa.mjs --all-genres",
     "desktop:smoke": "node harness/scripts/run_desktop_entry_smoke.mjs",
     "desktop:crash-report-regression-smoke": "node harness/scripts/run_desktop_crash_report_regression_smoke.mjs",
     "desktop:launch-smoke": "node harness/scripts/run_desktop_launch_smoke.mjs",

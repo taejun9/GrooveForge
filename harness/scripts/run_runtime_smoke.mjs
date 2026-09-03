@@ -198,6 +198,7 @@ async function validateAllGenreBassVoiceRuntime() {
 
   const uploadSheet = soundcloud.createSoundCloudUploadSheet(baseProject);
   check(uploadSheet.includes("# SoundCloud Upload Sheet"), "soundcloud-sheet: title must be present");
+  check(uploadSheet.includes("Official SoundCloud references (checked 2026-09-03)"), "soundcloud-sheet: official-reference review date must be current");
   check(uploadSheet.includes("Initial privacy: Private") && uploadSheet.includes("Downloads: Off"), "soundcloud-sheet: private-first defaults must be present");
   check(uploadSheet.includes("[RIGHTSHOLDER NAME — replace before upload]"), "soundcloud-sheet: rightsholder placeholder must be explicit");
   check(!/oauth|access token|upload complete/i.test(uploadSheet), "soundcloud-sheet: local sheet must not claim credential or upload completion state");

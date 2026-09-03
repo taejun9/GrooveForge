@@ -716,6 +716,24 @@ npm run desktop:multigenre-qa
 
 Ballad, Hip-Hop, Trap, R&B, House, and Experimental each produce a checked 90–150 second stereo 44.1 kHz signed PCM 24-bit WAV. The ignored `build/desktop/plan-1528-multigenre-actual-app-qa-*/delivery/` tree contains each WAV, reopenable project, Korean upload sheet, actual-app screenshots, technical QA, manifest, and SHA-256 checksums. The command does not log in to, upload to, or publish on SoundCloud.
 
+### Exhaustive all-genre actual-app and SoundCloud QA
+
+Run every current `styleProfiles` entry through the same visible production Electron workflow and assemble long-form, private-first SoundCloud preparation packages:
+
+```sh
+npm run desktop:all-genres-qa
+```
+
+This exhaustive command is separate from, and does not replace, the six-genre representative regression. It opens all 16 style projects one by one, edits metadata, arrangement, and master automation through native UI input, visits Arrange, Mix, and Deliver, exports WAV, then saves and reopens each project. Every track must be 90–180 seconds of canonical stereo 44.1 kHz signed PCM 24-bit audio. The ignored `build/desktop/plan-1531-all-genres-actual-app-qa-*/delivery/` tree contains each WAV, reopenable project, Korean private-first upload sheet, actual-app screenshots, technical QA, plus a top-level manifest and SHA-256 checksums.
+
+| Command | Coverage | Audio and workflow contract |
+|---|---|---|
+| `npm run genre-rotation:delivery` | 16/16 styles | Fast eight-bar direct-render rotation; not long-form actual-app coverage |
+| `npm run desktop:multigenre-qa` | 6 representative styles | Visible Electron Open/edit/Arrange/Mix/Deliver/WAV/Save/reopen; 90–150 seconds |
+| `npm run desktop:all-genres-qa` | 16/16 current styles | Visible Electron Open/edit/Arrange/Mix/Deliver/WAV/Save/reopen; 90–180 seconds and one private-first package per style |
+
+The exhaustive audio audit validates PCM headers and complete frames, real lower-byte and stereo activity, signal level, ceiling, tail, terminal zero, deterministic rerendering, distinct full-mix hashes, saved-project reopen, screenshots, manifest paths, and checksums. It remains local-only: it does not log in, upload, publish, enable downloads, monetize, distribute, or change Content ID settings. Automated checks also do not replace full-track listening, LUFS/true-peak review, transcoded-stream listening, or human approval of metadata, artwork, and rights.
+
 Run a visible, isolated QA app without touching the normal user project database or recovery draft:
 
 ```sh
@@ -744,6 +762,7 @@ npm run persona:smoke
 npm run harness:smoke
 npm run sample-audio:qa
 npm run genre-rotation:delivery
+npm run desktop:all-genres-qa
 npm run desktop:local-delivery-package-smoke
 npm run desktop:local-package-reopen-smoke
 npm run desktop:local-delivery-zip-smoke

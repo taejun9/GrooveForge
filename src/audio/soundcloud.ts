@@ -94,7 +94,7 @@ export function createSoundCloudUploadSheet(project: ProjectState): string {
     "",
     `This ${wavBitDepth}-bit / ${wavSampleRate / 1000} kHz WAV is a lossless source within SoundCloud's current WAV and 16-bit / 44.1 kHz-or-higher guidance, not a claim that SoundCloud requires ${wavBitDepth}-bit audio or that the file is professionally mastered. GrooveForge's local peak/RMS checks are not LUFS, true-peak, platform acceptance, or mastering guarantees.`,
     "",
-    "## Official SoundCloud references (checked 2026-07-29)",
+    "## Official SoundCloud references (checked 2026-09-03)",
     "",
     "- Upload requirements: https://help.soundcloud.com/hc/en-us/articles/360039171614-Upload-Requirements",
     "- Getting started with uploading: https://help.soundcloud.com/hc/en-us/articles/46021990888219-Getting-started-with-Uploading",

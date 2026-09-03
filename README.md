@@ -154,6 +154,16 @@ npm run desktop:multigenre-qa
 
 Ballad, Hip-Hop, Trap, R&B, House, Experimental을 다루며 각 결과 WAV는 90~150초, stereo 44.1kHz signed PCM 24-bit 계약을 검사합니다. 생성되는 ignored `build/desktop/plan-1528-multigenre-actual-app-qa-*/delivery/`에는 장르별 WAV, 재편집 프로젝트, 한글 업로드 시트, 실제 앱 화면 증거, 기술 QA, manifest와 SHA-256 checksums가 들어갑니다. 이 명령은 SoundCloud 로그인·업로드·공개를 수행하지 않습니다.
 
+## 전체 16장르 실제 앱·SoundCloud QA
+
+현재 `styleProfiles`의 16개 스타일을 빠짐없이 실제 production Electron UI에서 검수하고 장곡 전달 패키지를 만듭니다.
+
+```sh
+npm run desktop:all-genres-qa
+```
+
+이 exhaustive 명령은 기존 `desktop:multigenre-qa`의 대표 6장르 회귀를 대체하지 않습니다. 16개 프로젝트를 각각 Open하고 native UI로 메타데이터·편곡·마스터 자동화를 편집한 뒤 Arrange, Mix, Deliver를 거쳐 WAV를 내보내고 Save·reopen합니다. 각 곡은 90~180초의 canonical stereo 44.1kHz signed PCM 24-bit WAV이며, ignored `build/desktop/plan-1531-all-genres-actual-app-qa-*/delivery/`에 장르별 WAV, 다시 열 수 있는 프로젝트, 한글 SoundCloud private-first 업로드 시트, 실제 앱 화면, 기술 QA, 최상위 manifest와 SHA-256 checksums를 모읍니다. 이 명령도 로그인·업로드·공개·수익화·배급을 수행하지 않습니다.
+
 ## 핵심 검증 명령
 
 | 명령 | 확인 범위 |
@@ -168,6 +178,7 @@ Ballad, Hip-Hop, Trap, R&B, House, Experimental을 다루며 각 결과 WAV는 9
 | `npm run desktop:app` | 빌드, branded `.app` 조립, ad-hoc 서명, 구조 검증 |
 | `npm run desktop:dmg` | 앱 생성과 로컬 unsigned DMG 검증 |
 | `npm run desktop:multigenre-qa` | 6장르 실제 앱 편집·WAV·Save/reopen과 SoundCloud 준비 패키지 |
+| `npm run desktop:all-genres-qa` | 16/16장르 실제 앱 Open/edit/Arrange/Mix/Deliver/WAV/Save/reopen과 90~180초 SoundCloud private-first 패키지 |
 | `npm run desktop:smoke` | Electron entry, preload와 빌드 자산 |
 | `npm run desktop:launch-smoke` | 실제 프로덕션 Electron UI와 접근성 |
 | `npm run project-workspace:smoke` | 임시 사용자 홈의 SQLite3 schema·복구·catalog·원자 저장 |
@@ -198,6 +209,12 @@ npm run sample-audio:qa
 npm run genre-rotation:delivery
 ```
 
+현재 16개 스타일 모두를 90~180초 장곡으로 만들고 실제 Electron UI 작업 흐름과 재열기까지 exhaustive 검증하는 명령:
+
+```sh
+npm run desktop:all-genres-qa
+```
+
 전체 검증은 실제 Electron 실행, 로컬 패키지, 프로젝트 재열기와 릴리스 증거 생성을 포함하므로 시간이 오래 걸릴 수 있습니다.
 
 ```sh
@@ -226,6 +243,8 @@ npm run verify
 생성 파일은 `build/desktop/` 아래에 있으며 Git에 포함되지 않습니다. 자동 수치 검증은 사람의 최종 청취 판단을 대신하지 않습니다.
 
 `npm run genre-rotation:delivery`는 현재 16개 스타일을 정확히 한 번씩 순환하고 각 장르의 프로젝트·full-mix WAV·SoundCloud 업로드 시트를 만듭니다. 발라드·힙합·R&B에는 11개 artifact Delivery Bundle ZIP도 포함하며, 최상위 `manifest.json`과 `checksums.sha256`로 결과를 재검증할 수 있습니다.
+
+`npm run desktop:all-genres-qa`는 이 빠른 8마디 장르 순환과 대표 6장르 `desktop:multigenre-qa`보다 넓은 exhaustive 실제 앱 검증입니다. 16/16 스타일 각각을 90~180초로 편곡하고 production Electron의 Open/edit/Arrange/Mix/Deliver/WAV/Save/reopen 흐름을 거친 뒤, PCM 24-bit 헤더·프레임·하위 바이트·신호·ceiling·tail·결정성, 저장 프로젝트 재열기, 실제 앱 화면, manifest와 SHA-256을 검사합니다. 결과는 권리자·아티스트 자리표시자, Private-first, Downloads Off를 유지하는 로컬 SoundCloud 준비 패키지이며 자동 검사는 사람의 전곡 청취, LUFS/true-peak 확인, 메타데이터·아트워크·권리 승인 또는 실제 업로드를 대신하지 않습니다.
 
 ## 데스크톱과 배포 범위
 
