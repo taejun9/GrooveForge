@@ -726,11 +726,20 @@ npm run desktop:all-genres-qa
 
 This exhaustive command is separate from, and does not replace, the six-genre representative regression. It opens all 16 style projects one by one, edits metadata, arrangement, and master automation through native UI input, visits Arrange, Mix, and Deliver, exports WAV, then saves and reopens each project. Every track must be 90–180 seconds of canonical stereo 44.1 kHz signed PCM 24-bit audio. The ignored `build/desktop/plan-1531-all-genres-actual-app-qa-*/delivery/` tree contains each WAV, reopenable project, Korean private-first upload sheet, actual-app screenshots, technical QA, plus a top-level manifest and SHA-256 checksums.
 
+Run the opt-in seven-track, 3+2+2 high-level hip-hop production-lane suite with distinct existing profiles and blueprints:
+
+```sh
+npm run desktop:requested-hiphop-qa
+```
+
+This local-only suite creates sample-free 90–180 second PCM24 tracks across dry-grit rap, dark minimal split-verse, and synth-drive punk-rap pockets. Every track follows the same visible production Electron Open/edit/Arrange/Mix/Deliver/WAV/Save/reopen path and adds a Korean production brief, private-first upload sheet, top-level `00-SoundCloud-WAV` copy, exact manifest, and checksums. Public metadata excludes named references and imitation, affiliation, or unverified-rights claims; no upload, publication, monetization, distribution, or Content ID action is performed.
+
 | Command | Coverage | Audio and workflow contract |
 |---|---|---|
 | `npm run genre-rotation:delivery` | 16/16 styles | Fast eight-bar direct-render rotation; not long-form actual-app coverage |
 | `npm run desktop:multigenre-qa` | 6 representative styles | Visible Electron Open/edit/Arrange/Mix/Deliver/WAV/Save/reopen; 90–150 seconds |
 | `npm run desktop:all-genres-qa` | 16/16 current styles | Visible Electron Open/edit/Arrange/Mix/Deliver/WAV/Save/reopen; 90–180 seconds and one private-first package per style |
+| `npm run desktop:requested-hiphop-qa` | 7 distinct styles in 3+2+2 lanes | Visible Electron Open/edit/Arrange/Mix/Deliver/WAV/Save/reopen; 90–180 seconds, production briefs, and one upload-selection folder |
 
 The exhaustive audio audit validates PCM headers and complete frames, real lower-byte and stereo activity, signal level, ceiling, tail, terminal zero, deterministic rerendering, distinct full-mix hashes, saved-project reopen, screenshots, manifest paths, and checksums. It remains local-only: it does not log in, upload, publish, enable downloads, monetize, distribute, or change Content ID settings. Automated checks also do not replace full-track listening, LUFS/true-peak review, transcoded-stream listening, or human approval of metadata, artwork, and rights.
 
@@ -763,6 +772,7 @@ npm run harness:smoke
 npm run sample-audio:qa
 npm run genre-rotation:delivery
 npm run desktop:all-genres-qa
+npm run desktop:requested-hiphop-qa
 npm run desktop:local-delivery-package-smoke
 npm run desktop:local-package-reopen-smoke
 npm run desktop:local-delivery-zip-smoke
