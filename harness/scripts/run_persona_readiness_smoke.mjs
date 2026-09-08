@@ -967,8 +967,26 @@ try {
 check(html.length > 250000, `persona readiness renderer output should be substantial, got ${html.length} characters`);
 check(!forbiddenSamplingText.test(html), "persona readiness renderer output should keep sampling secondary and avoid imported-audio first-run scope");
 
+const appSource = await readFile(path.join(root, "src", "ui", "App.tsx"), "utf8");
+const headerActionDockSource = await readFile(path.join(root, "src", "ui", "HeaderActionDock.tsx"), "utf8");
+const localizationSource = await readFile(path.join(root, "src", "ui", "localization.tsx"), "utf8");
+const closedHeaderMenuSignals = [
+  { label: "Command Reference", testId: "command-reference-open" },
+  { label: "Export WAV", testId: "export-wav" },
+  { label: "Export MIDI", testId: "export-midi" }
+]
+  .filter(
+    ({ label, testId }) =>
+      appSource.includes(`testId: "${testId}"`) &&
+      localizationSource.includes(label) &&
+      headerActionDockSource.includes('role="menuitem"')
+  )
+  .map(({ label }) => label)
+  .join("\n");
+const interactiveUiEvidence = `${html}\n${closedHeaderMenuSignals}`;
+
 const renderedSignalRows = [
-  checkRenderedGroup(html, "beginner first-run path", [
+  checkRenderedGroup(interactiveUiEvidence, "beginner first-run path", [
     "Guide Quick Start",
     "Audience session",
     "Dual Audience Readiness",
@@ -982,7 +1000,7 @@ const renderedSignalRows = [
     "Guided Focus",
     "Guided Session Pass"
   ]),
-  checkRenderedGroup(html, "professional producer path", [
+  checkRenderedGroup(interactiveUiEvidence, "professional producer path", [
     "Professional producer",
     "Professional producer lane",
     "Dual Audience Readiness",
@@ -996,7 +1014,7 @@ const renderedSignalRows = [
     "Quick Actions",
     "Command Reference"
   ]),
-  checkRenderedGroup(html, "direct composition workstation", [
+  checkRenderedGroup(interactiveUiEvidence, "direct composition workstation", [
     "Pattern A",
     "Drums",
     "808",

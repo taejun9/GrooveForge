@@ -4518,6 +4518,9 @@ export type ExportPreflightFocusResult = {
 
 export type WorkflowZoneId = "compose" | "arrange" | "mix" | "deliver";
 
+// Overview는 제작 단계의 준비도 계산에는 포함하지 않고 최상위 탐색에서만 함께 노출한다.
+export type WorkspaceMainTabId = "overview" | WorkflowZoneId;
+
 export type WorkflowNavigatorItem = {
   id: WorkflowZoneId;
   label: string;

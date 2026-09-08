@@ -19,9 +19,10 @@ const resultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const progressPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_PROGRESS ";
 const smokeWorkspaceRoot = path.join(root, "build", "desktop", "GrooveForge-launch-smoke-workspace");
 const functionalTabsEvidenceRoot = path.join(root, "build", "desktop", "functional-tabs-launch-smoke");
+const focusedWorkspacePagesEvidenceRoot = path.join(root, "build", "desktop", "focused-workspace-pages-launch-smoke");
 const timeoutMs = 1820000;
 const failures = [];
-const functionalTabZones = ["compose", "arrange", "mix", "deliver"];
+const functionalTabZones = ["overview", "compose", "arrange", "mix", "deliver"];
 const expectedLiveTestIds = [
   "workflow-target-transport",
   "workflow-target-compose",
@@ -72,8 +73,6 @@ const expectedLiveTestIds = [
   "session-pass-mode",
   "mode-guided",
   "mode-studio",
-  "quick-actions-open",
-  "command-reference-open",
   "style-select",
   "pattern-tab-A",
   "pattern-lab",
@@ -81,19 +80,29 @@ const expectedLiveTestIds = [
   "transport-status-controls",
   "transport-essential-controls",
   "transport-play",
-  "project-essential-controls",
-  "project-open",
-  "project-save",
+  "header-action-dock",
+  "header-utility-trigger",
+  "header-export-trigger",
   "transport-session-tools",
   "transport-session-toggle",
-  "transport-export-tools",
-  "transport-export-toggle",
-  "export-wav",
+  "workspace-command-dock",
+  "workspace-command-dock-play",
+  "workspace-command-dock-actions",
+  "workspace-command-dock-undo",
+  "workspace-command-dock-redo",
+  "workspace-command-dock-save",
   "workflow-navigator",
+  "workflow-jump-overview",
   "workflow-jump-compose",
   "workflow-jump-arrange",
   "workflow-jump-mix",
   "workflow-jump-deliver",
+  "workflow-target-overview",
+  "overview-page-tabs",
+  "overview-player",
+  "overview-full-song-play",
+  "overview-song-progress",
+  "deliver-page-tabs",
   "note-editor-panel",
   "capture-ideas",
   "instrument-direct-chords",
@@ -119,9 +128,6 @@ const expectedLiveTestIds = [
   "handoff-status-toggle",
   "handoff-audit-tools",
   "handoff-audit-toggle",
-  "export-stems",
-  "export-midi",
-  "export-handoff-sheet",
   "pattern-chain-current",
   "master-ceiling"
 ];
@@ -232,23 +238,23 @@ function checkResult(result) {
   check(
     Array.isArray(functionalTabs?.traversal) &&
       functionalTabs.traversal.map(({ input, zone }) => `${input}:${zone}`).join("|") ===
-        "initial:compose|native-click:arrange|ArrowRight:mix|End:deliver|Home:compose|ArrowLeft:deliver|ArrowRight:compose",
-    "live desktop functional tabs should traverse all four surfaces with native click plus Arrow/Home/End input"
+        "initial:compose|native-click:arrange|ArrowRight:mix|End:deliver|Home:overview|ArrowLeft:deliver|ArrowRight:overview|ArrowRight:compose",
+    "live desktop functional tabs should traverse Overview plus all four production surfaces with native click and Arrow/Home/End input"
   );
   for (const zone of functionalTabZones) {
     const state = functionalTabs?.states?.[zone];
     check(
       state?.activeZone === zone &&
-        state?.tabCount === 4 &&
-        state?.tabPanelCount === 4 &&
+        state?.tabCount === 5 &&
+        state?.tabPanelCount === 5 &&
         state?.selectedTabCount === 1 &&
         state?.tabStopCount === 1 &&
         state?.visiblePanelCount === 1 &&
         state?.ariaConnectionsReady === true &&
-        state?.inactiveHiddenPanelCount === 3 &&
-        state?.inactiveZeroRectPanelCount === 3 &&
+        state?.inactiveHiddenPanelCount === 4 &&
+        state?.inactiveZeroRectPanelCount === 4 &&
         state?.inactiveFocusableControlCount === 0,
-      `live desktop ${zone} tab should have one ARIA-connected active panel and three hidden, zero-rect, unreachable panels`
+      `live desktop ${zone} tab should have one ARIA-connected active panel and four hidden, zero-rect, unreachable panels`
     );
   }
   check(
@@ -257,18 +263,24 @@ function checkResult(result) {
   );
   const workspacePages = functionalTabs?.workspacePages;
   check(
-    workspacePages?.composeTraversal?.map(({ input, page }) => `${input}:${page}`).join("|") ===
+    workspacePages?.overviewTraversal?.map(({ input, page }) => `${input}:${page}`).join("|") ===
+      "initial:snapshot|native-click:song-map|ArrowRight:readiness|Home:snapshot|ArrowLeft:readiness|ArrowRight:snapshot" &&
+      workspacePages?.composeTraversal?.map(({ input, page }) => `${input}:${page}`).join("|") ===
       "initial:drums|native-click:notes|ArrowRight:instruments|Home:drums|ArrowLeft:instruments|ArrowRight:drums" &&
       workspacePages?.arrangeTraversal?.map(({ input, page }) => `${input}:${page}`).join("|") ===
         "initial:timeline|native-click:structure|ArrowLeft:timeline|End:structure|Home:timeline|ArrowRight:structure" &&
       workspacePages?.mixTraversal?.map(({ input, page }) => `${input}:${page}`).join("|") ===
-        "initial:mixer|native-click:master|ArrowLeft:mixer|End:master|Home:mixer|ArrowRight:master",
-    "live desktop nested Compose, Arrange, and Mix pages should traverse with native click plus Arrow/Home/End input"
+        "initial:mixer|native-click:master|ArrowLeft:mixer|End:master|Home:mixer|ArrowRight:master" &&
+      workspacePages?.deliverTraversal?.map(({ input, page }) => `${input}:${page}`).join("|") ===
+        "initial:exports|native-click:checks|ArrowLeft:exports|End:checks|Home:exports|ArrowRight:checks",
+    "live desktop nested Overview, Compose, Arrange, Mix, and Deliver pages should traverse with native click and Arrow/Home/End input"
   );
   for (const [group, pages] of [
+    ["overview", ["snapshot", "song-map", "readiness"]],
     ["compose", ["drums", "notes", "instruments"]],
     ["arrange", ["timeline", "structure"]],
-    ["mix", ["mixer", "master"]]
+    ["mix", ["mixer", "master"]],
+    ["deliver", ["exports", "checks"]]
   ]) {
     for (const page of pages) {
       const state = workspacePages?.[`${group}States`]?.[page];
@@ -279,8 +291,10 @@ function checkResult(result) {
           state?.selectedTabCount === 1 &&
           state?.tabStopCount === 1 &&
           state?.visiblePanelCount === 1 &&
+          state?.activeScrollOwner === true &&
           state?.ariaConnectionsReady === true &&
           state?.fullWidthReady === true &&
+          state?.documentVerticalOverflow === 0 &&
           state?.activePanelHorizontalOverflow <= 1 &&
           state?.inactiveHiddenPanelCount === pages.length - 1 &&
           state?.inactiveZeroRectPanelCount === pages.length - 1 &&
@@ -290,10 +304,64 @@ function checkResult(result) {
     }
   }
   check(
-    workspacePages?.pageStatePreservedAcrossOuterTabs?.arrange === true &&
+    workspacePages?.pageStatePreservedAcrossOuterTabs?.overview === true &&
+      workspacePages?.pageStatePreservedAcrossOuterTabs?.arrange === true &&
       workspacePages?.pageStatePreservedAcrossOuterTabs?.compose === true &&
-      workspacePages?.pageStatePreservedAcrossOuterTabs?.mix === true,
+      workspacePages?.pageStatePreservedAcrossOuterTabs?.mix === true &&
+      workspacePages?.pageStatePreservedAcrossOuterTabs?.deliver === true,
     "live desktop nested page selection should survive outer workspace tab round trips"
+  );
+  const focusedWorkspacePagePixelDigests = new Set();
+  for (const [group, pages] of [
+    ["overview", ["snapshot", "song-map", "readiness"]],
+    ["deliver", ["exports", "checks"]]
+  ]) {
+    for (const page of pages) {
+      const capture = workspacePages?.captures?.[group]?.[page];
+      const expectedArtifact = `build/desktop/focused-workspace-pages-launch-smoke/${group}-${page}.png`;
+      check(
+        capture?.artifact === expectedArtifact &&
+          capture?.pngBytes >= 20000 &&
+          capture?.bitmapBytes >= capture?.width * capture?.height * 4 &&
+          capture?.sampledPixels >= 1000 &&
+          capture?.nonBackgroundSamples >= 100 &&
+          /^[a-f0-9]{64}$/u.test(capture?.pixelDigest ?? "") &&
+          /^[a-f0-9]{64}$/u.test(capture?.pngDigest ?? "") &&
+          existsSync(path.join(root, expectedArtifact)),
+        `live desktop ${group}/${page} page should persist a substantial non-empty PNG with pixel and PNG digests`
+      );
+      focusedWorkspacePagePixelDigests.add(capture?.pixelDigest);
+    }
+  }
+  check(
+    focusedWorkspacePagePixelDigests.size === 5,
+    "live desktop focused Overview and Deliver page screenshots should have five distinct pixel digests"
+  );
+  const overviewPlayback = functionalTabs?.overviewPlayback;
+  check(
+    overviewPlayback?.activeZone === "overview" &&
+      overviewPlayback?.activePage === "snapshot" &&
+      overviewPlayback?.initialProgressValue === 0 &&
+      overviewPlayback?.startedProgressValue >= 1 &&
+      overviewPlayback?.startedProgressValue <= Math.min(4, overviewPlayback?.progressMax) &&
+      overviewPlayback?.advancedProgressValue > overviewPlayback?.startedProgressValue &&
+      overviewPlayback?.progressMax > 0 &&
+      overviewPlayback?.startedAtBeginning === true &&
+      overviewPlayback?.playbackAdvanced === true &&
+      overviewPlayback?.overviewPlaying === true &&
+      overviewPlayback?.transportPlaying === true &&
+      overviewPlayback?.transportArrangementSelected === true &&
+      overviewPlayback?.otherPlaybackArbitrated === true &&
+      overviewPlayback?.buttonActionChangedDuringPlayback === true &&
+      overviewPlayback?.overviewStopped === true &&
+      overviewPlayback?.transportStopped === true &&
+      overviewPlayback?.progressReset === true &&
+      overviewPlayback?.buttonActionRestoredAfterStop === true &&
+      overviewPlayback?.projectFingerprintPreserved === true &&
+      overviewPlayback?.composeFingerprintPreserved === true &&
+      overviewPlayback?.dirtyPosturePreserved === true &&
+      overviewPlayback?.historyDepthPreserved === true,
+    `live desktop Overview should start the shared full-arrangement transport at bar one, advance and reset progress, then stop without mutating project or edit history (${JSON.stringify(overviewPlayback ?? null)})`
   );
   check(
     functionalTabs?.arrangeStructureRoute?.activeZone === "arrange" &&
@@ -329,7 +397,7 @@ function checkResult(result) {
     "live desktop tab round trip should preserve Compose edit, Pattern, disclosure, Undo/Redo, dirty, playback, and capture posture"
   );
   check(
-    ["arrange", "mix", "deliver"].every((zone) =>
+    ["overview", "arrange", "mix", "deliver"].every((zone) =>
       ["1", "2", "3", "Delete", "A"].every(
         (key) => functionalTabs?.hiddenComposeGuards?.[zone]?.[key] === true
       )
@@ -453,7 +521,7 @@ function checkResult(result) {
       ) &&
       functionalTabs?.reviewQueueQuickActionReveal?.projectFingerprintPreserved === true &&
       functionalTabs?.reviewQueueQuickActionReveal?.disclosurePostureRestored === true,
-    `live desktop native Quick Actions Review Queue route should reveal both closed disclosures in the same Mix viewport, clear the sticky navigator, preserve Compose, and restore disclosure posture (${JSON.stringify(functionalTabs?.reviewQueueQuickActionReveal ?? null)})`
+    `live desktop native Quick Actions Review Queue route should reveal both closed disclosures in the same Mix viewport, clear the compact navigator, preserve Compose, and restore disclosure posture (${JSON.stringify(functionalTabs?.reviewQueueQuickActionReveal ?? null)})`
   );
   check(
     functionalTabs?.minimumWindow?.viewportWidth >= 1000 &&
@@ -463,25 +531,6 @@ function checkResult(result) {
       functionalTabs?.minimumWindow?.maximumActivePanelHorizontalOverflow === 0,
     `live desktop functional tabs should have zero horizontal overflow at the 1180 minimum window (${JSON.stringify(functionalTabs?.minimumWindow ?? null)})`
   );
-  for (const zone of ["arrange", "mix", "deliver"]) {
-    const sticky = functionalTabs?.stickyNavigatorAfterDeepScroll?.[zone];
-    check(
-      sticky?.activeZone === zone &&
-        sticky?.viewportWidth >= 1000 &&
-        sticky?.viewportWidth <= 1180 &&
-        sticky?.documentScrollable === true &&
-        sticky?.maximumScrollY >= 240 &&
-        sticky?.scrollY >= 240 &&
-        sticky?.deepScrollReached === true &&
-        sticky?.navigatorPosition === "sticky" &&
-        sticky?.configuredTop === 8 &&
-        sticky?.stickyTopAligned === true &&
-        sticky?.navigatorFullyVisible === true &&
-        sticky?.tabListFullyVisible === true &&
-        sticky?.activeTabFullyVisible === true,
-      `live desktop ${zone} deep-work screen should keep the compact functional navigator, tablist, and active tab fully visible at 1180px (${JSON.stringify(sticky ?? null)})`
-    );
-  }
   const functionalTabPixelDigests = new Set();
   for (const zone of functionalTabZones) {
     const capture = functionalTabs?.captures?.[zone];
@@ -499,7 +548,7 @@ function checkResult(result) {
     );
     functionalTabPixelDigests.add(capture?.pixelDigest);
   }
-  check(functionalTabPixelDigests.size === 4, "live desktop functional tab screenshots should have four distinct pixel digests");
+  check(functionalTabPixelDigests.size === 5, "live desktop functional tab screenshots should have five distinct pixel digests");
   check(functionalTabs?.restoredCompose === true, "live desktop functional tab evidence should restore Compose posture");
   check(
     evidence?.modalFocus?.closedDetails?.totalCount === 24 &&
@@ -570,16 +619,16 @@ function checkResult(result) {
     "live desktop modals should focus search, select and run Quick Actions with native arrow keys and Enter, wrap real Tab/Shift+Tab, close on Escape, restore openers, and preserve the original opener across dialog handoff"
   );
   check(
-    evidence?.modalFocus?.dockInitialHidden === true &&
+    evidence?.modalFocus?.dockBaselineVisible === true &&
       evidence?.modalFocus?.dockVisible === true &&
-      evidence?.modalFocus?.dockReturnedHidden === true &&
+      evidence?.modalFocus?.dockPersistentVisible === true &&
       evidence?.modalFocus?.dockViewportReady === true &&
-      evidence?.modalFocus?.dockControlCount === 5,
-    "live desktop workspace command dock should appear only after the full header leaves view and remain fully viewport-contained"
+      evidence?.modalFocus?.dockControlCount >= 5 &&
+      evidence?.modalFocus?.dockRequiredControlsReady === true,
+    "live desktop bottom workspace player should be present at baseline, remain present, and stay fully viewport-contained"
   );
   check(
-      evidence?.modalFocus?.dockPositionMirrorsHeader === true &&
-      evidence?.modalFocus?.dockUndoRedoParity === true &&
+    evidence?.modalFocus?.dockUndoRedoParity === true &&
       evidence?.modalFocus?.dockShortcutMetadataReady === true &&
       evidence?.modalFocus?.dockFocusReady === true &&
       evidence?.modalFocus?.dockSharedPlayReady === true &&
@@ -588,7 +637,33 @@ function checkResult(result) {
       evidence?.modalFocus?.dockPostureRestored === true &&
       evidence?.modalFocus?.dockActionsOpened === true &&
       evidence?.modalFocus?.dockActionsFocusRestored === true,
-    "live desktop workspace command dock should mirror header state and reuse Play plus Quick Actions through native pointer/Escape input"
+    "live desktop bottom workspace player should preserve Undo/Redo state and reuse Play plus Quick Actions through native pointer/Escape input"
+  );
+  check(
+    evidence?.modalFocus?.headerActionMenus?.actionDockFixed === true &&
+      evidence?.modalFocus?.headerActionMenus?.actionDockViewportReady === true &&
+      evidence?.modalFocus?.headerActionMenus?.triggerAriaReady === true &&
+      evidence?.modalFocus?.headerActionMenus?.clickUtilityOpened === true &&
+      evidence?.modalFocus?.headerActionMenus?.clickExportOpened === true &&
+      evidence?.modalFocus?.headerActionMenus?.clickSingleOpen === true &&
+      evidence?.modalFocus?.headerActionMenus?.hoverUtilityOpened === true &&
+      evidence?.modalFocus?.headerActionMenus?.hoverExportOpened === true &&
+      evidence?.modalFocus?.headerActionMenus?.hoverSingleOpen === true &&
+      evidence?.modalFocus?.headerActionMenus?.keyboardEnterOpened === true &&
+      evidence?.modalFocus?.headerActionMenus?.keyboardSpaceOpened === true &&
+      evidence?.modalFocus?.headerActionMenus?.keyboardArrowNavigationReady === true &&
+      evidence?.modalFocus?.headerActionMenus?.keyboardHomeEndReady === true &&
+      evidence?.modalFocus?.headerActionMenus?.keyboardDisabledSkipReady === true &&
+      evidence?.modalFocus?.headerActionMenus?.keyboardEscapeFocusRestored === true &&
+      evidence?.modalFocus?.headerActionMenus?.keyboardTabExitReady === true &&
+      evidence?.modalFocus?.headerActionMenus?.modalLayeringReady === true &&
+      evidence?.modalFocus?.headerActionMenus?.openMenusViewportContained === true &&
+      evidence?.modalFocus?.headerActionMenus?.escapeClosed === true &&
+      evidence?.modalFocus?.headerActionMenus?.outsideClosed === true &&
+      evidence?.modalFocus?.headerActionMenus?.projectFingerprintPreserved === true &&
+      evidence?.modalFocus?.headerActionMenus?.utilityActionIdsReady === true &&
+      evidence?.modalFocus?.headerActionMenus?.exportActionIdsReady === true,
+    `live desktop fixed Utility/Export menus should support native pointer plus Enter/Space/Arrow/Home/End/Escape/Tab, skip disabled items, stay viewport-contained below modal overlays, preserve project state, expose project/export actions, and close outside (${JSON.stringify(evidence?.modalFocus?.headerActionMenus ?? null)})`
   );
   check(
     evidence?.modalFocus?.settingsLocalization?.backdropClosed === true &&
@@ -651,7 +726,7 @@ function checkResult(result) {
     minimumKoreanLayout?.viewportWidth === 1180 &&
       minimumKoreanLayout?.documentOverflowX <= 1 &&
       minimumKoreanLayout?.appOverflowX <= 1 &&
-      minimumKoreanLayout?.mainTabCount === 4 &&
+      minimumKoreanLayout?.mainTabCount === 5 &&
       minimumKoreanLayout?.subTabCount === 3 &&
       minimumKoreanLayout?.mainTabListContained === true &&
       minimumKoreanLayout?.subTabListContained === true &&
@@ -659,23 +734,25 @@ function checkResult(result) {
       minimumKoreanLayout?.subTabListScrollOverflow <= 1 &&
       minimumKoreanLayout?.mainSelectedFullyVisible === true &&
       minimumKoreanLayout?.subSelectedFullyVisible === true &&
-      minimumKoreanLayout?.mainTabMinimumHeight >= 64 &&
-      minimumKoreanLayout?.subTabMinimumHeight >= 64 &&
-      minimumKoreanLayout?.mainTabMinimumLabelFontSize >= 14 &&
-      minimumKoreanLayout?.subTabMinimumLabelFontSize >= 14 &&
+      minimumKoreanLayout?.mainTabMinimumHeight >= 36 &&
+      minimumKoreanLayout?.mainTabMinimumHeight <= 44 &&
+      minimumKoreanLayout?.subTabMinimumHeight >= 36 &&
+      minimumKoreanLayout?.subTabMinimumHeight <= 44 &&
+      minimumKoreanLayout?.mainTabMinimumLabelFontSize >= 9 &&
+      minimumKoreanLayout?.subTabMinimumLabelFontSize >= 10 &&
       minimumKoreanLayout?.settingsContained === true &&
       minimumKoreanLayout?.settingsHorizontalOverflow <= 1 &&
       minimumKoreanLayout?.settingsOptionCount === 2 &&
       minimumKoreanLayout?.settingsColumnCount === 2 &&
       minimumKoreanLayout?.settingsMinimumOptionHeight >= 78,
-    `Korean main/sub tabs and Settings should remain readable without horizontal clipping at the 1180px desktop minimum (${JSON.stringify(minimumKoreanLayout ?? null)})`
+    `Korean main/sub tabs should stay compact and Settings should remain readable without horizontal clipping at the 1180px desktop minimum (${JSON.stringify(minimumKoreanLayout ?? null)})`
   );
   const narrowKoreanLayout = settingsLocalization?.koreanLayout?.narrow;
   check(
     narrowKoreanLayout?.viewportWidth === 390 &&
       narrowKoreanLayout?.documentOverflowX <= 1 &&
       narrowKoreanLayout?.appOverflowX <= 1 &&
-      narrowKoreanLayout?.mainTabCount === 4 &&
+      narrowKoreanLayout?.mainTabCount === 5 &&
       narrowKoreanLayout?.subTabCount === 3 &&
       narrowKoreanLayout?.mainTabListContained === true &&
       narrowKoreanLayout?.subTabListContained === true &&
@@ -777,16 +854,46 @@ function checkResult(result) {
       evidence?.layout?.minimumWindowViewportWidth <= 1180,
     `live desktop minimum window should keep setup, horizontal audience choices, and every direct action including readable Play target copy inside the viewport without horizontal overflow (viewport ${evidence?.layout?.minimumWindowViewportWidth}, height ${evidence?.layout?.minimumWindowTransportHeight}, overflow ${evidence?.layout?.minimumWindowHorizontalOverflow}, transport ${evidence?.layout?.minimumWindowTransportReady}, setup ${evidence?.layout?.minimumWindowSetupReady}, choices ${evidence?.layout?.minimumWindowLaunchpadHorizontalReady}, actions ${evidence?.layout?.minimumWindowDirectActionsReady}, play ${evidence?.layout?.minimumWindowTransportPlaybackWidth}x${evidence?.layout?.minimumWindowTransportPlaybackHeight}, play readable ${evidence?.layout?.minimumWindowTransportPlaybackReadable}, play overflow ${evidence?.layout?.minimumWindowTransportPlaybackInternalOverflow})`
   );
+  for (const [frameName, expectedWidth] of [
+    ["edge901", 901],
+    ["compact", 1024],
+    ["minimum", 1180],
+    ["wide", 1440]
+  ]) {
+    const frame = evidence?.layout?.desktopFrames?.[frameName];
+    check(
+      frame?.viewportWidth === expectedWidth &&
+        frame?.viewportHeight >= 760 &&
+        frame?.documentVerticalOverflow === 0 &&
+        frame?.headerControlsClear === true &&
+        frame?.mainTabCount === 5 &&
+        frame?.subTabCount === 3 &&
+        frame?.mainTabListHeight > 0 &&
+        frame?.mainTabListHeight <= 60 &&
+        frame?.subTabListHeight > 0 &&
+        frame?.subTabListHeight <= 54 &&
+        frame?.mainTabMaximumHeight > 0 &&
+        frame?.mainTabMaximumHeight <= 44 &&
+        frame?.subTabMaximumHeight > 0 &&
+        frame?.subTabMaximumHeight <= 44 &&
+        frame?.mainTabListViewportContained === true &&
+        frame?.subTabListViewportContained === true &&
+        frame?.activePanelViewportContained === true &&
+        frame?.actionDockFixed === true &&
+        frame?.actionDockViewportContained === true &&
+        frame?.bottomPlayerFixed === true &&
+        frame?.bottomPlayerViewportContained === true &&
+        frame?.playerClearsActivePanel === true,
+      `live desktop ${expectedWidth}px frame should have zero document vertical overflow, compact contained tabs and active panel, plus non-overlapping viewport-contained fixed action/player docks (${JSON.stringify(frame ?? null)})`
+    );
+  }
   check(
-    evidence?.layout?.minimumWindowWideStudioAutoExpandReady === true &&
-      evidence?.layout?.minimumWindowStudioResizeCollapseReady === true &&
-      evidence?.layout?.minimumWindowStudioCompactEntryReady === true &&
-      evidence?.layout?.minimumWindowStudioManualReopenReady === true &&
-      evidence?.layout?.minimumWindowStudioHorizontalOverflow === 0 &&
-      evidence?.layout?.minimumWindowStudioCompactHeight > 0 &&
-      evidence?.layout?.minimumWindowStudioExpandedHeight > evidence?.layout?.minimumWindowStudioCompactHeight &&
-      evidence?.layout?.minimumWindowStudioCompactHeight <= evidence?.layout?.minimumWindowTransportHeight + 1,
-    `live desktop Studio transport should auto-expand wide, collapse after resize and compact entry, remain manually reopenable, and preserve workspace height at 1180px (wide ${evidence?.layout?.minimumWindowWideStudioAutoExpandReady}, resize ${evidence?.layout?.minimumWindowStudioResizeCollapseReady}, compact ${evidence?.layout?.minimumWindowStudioCompactEntryReady}, manual ${evidence?.layout?.minimumWindowStudioManualReopenReady}, compact height ${evidence?.layout?.minimumWindowStudioCompactHeight}, expanded height ${evidence?.layout?.minimumWindowStudioExpandedHeight}, overflow ${evidence?.layout?.minimumWindowStudioHorizontalOverflow})`
+    evidence?.layout?.headerActionDockFixed === true &&
+      evidence?.layout?.headerActionDockViewportContained === true &&
+      evidence?.layout?.headerActionMenusClosedAtBaseline === true &&
+      evidence?.layout?.headerActionTriggerCount === 2 &&
+      evidence?.layout?.headerActionTriggersVisible === true,
+    "live desktop header action dock should stay fixed and viewport-contained with two closed menu triggers at baseline"
   );
   check(evidence?.layout?.patternLabOpen === false, "live desktop Pattern Lab should start collapsed");
   check(
@@ -809,6 +916,7 @@ function checkResult(result) {
   );
   check(
     evidence?.starterLanding?.beginner?.projectTitle === "First Guided Beat" &&
+      evidence?.starterLanding?.beginner?.viewportWidth === 1180 &&
       evidence?.starterLanding?.beginner?.focusTestId === "workflow-target-compose" &&
       evidence?.starterLanding?.beginner?.inViewport === true &&
       evidence?.starterLanding?.beginner?.clearOfNavigator === true &&
@@ -915,6 +1023,7 @@ function checkResult(result) {
   );
   check(
     evidence?.starterLanding?.producer?.projectTitle === "Producer Fast Pass" &&
+      evidence?.starterLanding?.producer?.viewportWidth === 1180 &&
       evidence?.starterLanding?.producer?.focusTestId === "review-queue" &&
       evidence?.starterLanding?.producer?.inViewport === true &&
       evidence?.starterLanding?.producer?.clearOfNavigator === true &&
@@ -969,35 +1078,26 @@ function checkResult(result) {
       evidence?.layout?.workflowNavigatorBeforeWorkspace === true &&
       evidence?.layout?.workflowNavigatorComposeJumpReady === true &&
       evidence?.layout?.workflowNavigatorDeliverJumpReady === true &&
-      evidence?.layout?.workflowNavigatorStageCount === 4 &&
-      evidence?.layout?.workflowNavigatorSticky === true,
-    `live desktop Workflow Navigator should be visible outside optional guidance, sticky before the workstation, expose four stage actions, and jump to Compose and Deliver (present ${evidence?.layout?.workflowNavigatorPresent}, visible ${evidence?.layout?.workflowNavigatorVisible}, outside ${evidence?.layout?.workflowNavigatorOutsideGuidance}, before ${evidence?.layout?.workflowNavigatorBeforeWorkspace}, sticky ${evidence?.layout?.workflowNavigatorSticky}, stages ${evidence?.layout?.workflowNavigatorStageCount}, compose jump ${evidence?.layout?.workflowNavigatorComposeJumpReady}, deliver jump ${evidence?.layout?.workflowNavigatorDeliverJumpReady})`
+      evidence?.layout?.workflowNavigatorStageCount === 5 &&
+      evidence?.layout?.workflowNavigatorCompact === true &&
+      evidence?.layout?.workflowNavigatorViewportContained === true,
+    `live desktop Workflow Navigator should be visible outside optional guidance, compact and viewport-contained before the workstation, expose five main tabs, and jump to Compose and Deliver (present ${evidence?.layout?.workflowNavigatorPresent}, visible ${evidence?.layout?.workflowNavigatorVisible}, outside ${evidence?.layout?.workflowNavigatorOutsideGuidance}, before ${evidence?.layout?.workflowNavigatorBeforeWorkspace}, compact ${evidence?.layout?.workflowNavigatorCompact}, contained ${evidence?.layout?.workflowNavigatorViewportContained}, tabs ${evidence?.layout?.workflowNavigatorStageCount}, compose jump ${evidence?.layout?.workflowNavigatorComposeJumpReady}, deliver jump ${evidence?.layout?.workflowNavigatorDeliverJumpReady})`
   );
   check(
     evidence?.layout?.transportStatusBeforeEssentials === true &&
-      evidence?.layout?.transportEssentialsBeforeProject === true &&
-      evidence?.layout?.transportProjectBeforeSession === true &&
-      evidence?.layout?.transportSessionBeforeExports === true &&
-      evidence?.layout?.transportPlayDirectVisible === true &&
-      evidence?.layout?.transportSaveDirectVisible === true &&
-      evidence?.layout?.transportExportsContainWav === true,
-    "live desktop transport should keep direct Play and project safety before Session Context and Exports"
+      evidence?.layout?.transportPlayDirectVisible === true,
+    "live desktop transport should keep direct Play after its status controls"
   );
   check(
     evidence?.layout?.transportSessionOpen === false &&
-      evidence?.layout?.transportExportsOpen === false &&
-      evidence?.layout?.transportSessionToggleVisible === true &&
-      evidence?.layout?.transportExportsToggleVisible === true,
-    "live desktop Guided mode should keep Session Context and Exports compact with visible toggles"
+      evidence?.layout?.transportSessionToggleVisible === true,
+    "live desktop Guided mode should keep Session Context compact with a visible toggle"
   );
   check(
     evidence?.palette?.transportTools?.guidedSessionOpen === false &&
-      evidence?.palette?.transportTools?.guidedExportsOpen === false &&
-      evidence?.palette?.transportTools?.studioSessionOpen === true &&
-      evidence?.palette?.transportTools?.studioExportsOpen === true &&
-      evidence?.palette?.transportTools?.resetSessionOpen === false &&
-      evidence?.palette?.transportTools?.resetExportsOpen === false,
-    "live desktop transport secondary tools should expand for Studio and reset compactly for Guided"
+      evidence?.palette?.transportTools?.studioSessionOpen === false &&
+      evidence?.palette?.transportTools?.resetSessionOpen === false,
+    "live desktop Session Context should stay compact in Guided and Studio until the user opens it"
   );
   check(
     evidence?.layout?.essentialShortcutMetadataReady === true &&
@@ -1171,9 +1271,11 @@ function checkResult(result) {
   check(
     evidence?.layout?.deliveryStatusOpen === false &&
       evidence?.layout?.deliveryAuditOpen === false &&
-      evidence?.layout?.deliveryStatusToggleVisible === true &&
-      evidence?.layout?.deliveryAuditToggleVisible === true,
-    "live desktop Guided mode should show compact Delivery Status & Receipt and Format & Package Proof toggles"
+      evidence?.testIds?.["handoff-status-toggle"] === true &&
+      evidence?.testIds?.["handoff-audit-toggle"] === true &&
+      evidence?.layout?.deliveryStatusToggleVisible === false &&
+      evidence?.layout?.deliveryAuditToggleVisible === false,
+    "live desktop Guided mode should keep compact Delivery proof toggles mounted but contained inside the inactive Checks sub-tab"
   );
   check(
     evidence?.palette?.deliveryTools?.guidedStatusOpen === false &&
@@ -1798,6 +1900,7 @@ if (blockDetails) {
 // userData나 사용자의 프로젝트 디렉터리는 이 정리 대상에 포함되지 않는다.
 rmSync(smokeWorkspaceRoot, { recursive: true, force: true });
 rmSync(functionalTabsEvidenceRoot, { recursive: true, force: true });
+rmSync(focusedWorkspacePagesEvidenceRoot, { recursive: true, force: true });
 mkdirSync(smokeWorkspaceRoot, { recursive: true, mode: 0o700 });
 const env = {
   ...process.env,
@@ -1905,7 +2008,7 @@ child.on("exit", (code, signal) => {
     `- Audience Session: actions direct ${result.evidence.layout.audienceSessionActionsDirectVisible ? "yes" : "no"}, proof compact ${!result.evidence.layout.audienceSessionProofOpen && result.evidence.layout.audienceSessionProofContentHidden ? "yes" : "no"}, native open/close ${result.evidence.layout.audienceSessionProofInteractionReady ? "yes" : "no"}, proof rows ${result.evidence.layout.audienceSessionProofRowsPreserved ? "10/10" : "missing"}`
   );
   console.log(
-    `- Workspace navigation: outside Guide ${result.evidence.layout.workflowNavigatorOutsideGuidance ? "yes" : "no"}, before workstation ${result.evidence.layout.workflowNavigatorBeforeWorkspace ? "yes" : "no"}, sticky ${result.evidence.layout.workflowNavigatorSticky ? "yes" : "no"}, Compose/Deliver jumps ${result.evidence.layout.workflowNavigatorComposeJumpReady && result.evidence.layout.workflowNavigatorDeliverJumpReady ? "yes" : "no"}, stages ${result.evidence.layout.workflowNavigatorStageCount}`
+    `- Workspace navigation: outside Guide ${result.evidence.layout.workflowNavigatorOutsideGuidance ? "yes" : "no"}, before workstation ${result.evidence.layout.workflowNavigatorBeforeWorkspace ? "yes" : "no"}, compact/contained ${result.evidence.layout.workflowNavigatorCompact && result.evidence.layout.workflowNavigatorViewportContained ? "yes" : "no"}, Compose/Deliver jumps ${result.evidence.layout.workflowNavigatorComposeJumpReady && result.evidence.layout.workflowNavigatorDeliverJumpReady ? "yes" : "no"}, stages ${result.evidence.layout.workflowNavigatorStageCount}`
   );
   console.log(
     `- Functional tabs: Compose initial, native click + Arrow/Home/End traversal, one visible/selected/Tab-stop panel, keyboard/native-menu hidden mutation guards, visible cross-tab focus transfer, and ${result.evidence.functionalTabs.minimumWindow.viewportWidth}px zero-overflow posture ready`
@@ -1916,7 +2019,7 @@ child.on("exit", (code, signal) => {
       .join(", ")} in build/desktop/functional-tabs-launch-smoke/`
   );
   console.log(
-    `- Transport essentials: Play direct ${result.evidence.layout.transportPlayDirectVisible ? "yes" : "no"}, Save direct ${result.evidence.layout.transportSaveDirectVisible ? "yes" : "no"}, Guided helpers ${result.evidence.layout.transportSessionOpen || result.evidence.layout.transportExportsOpen ? "open" : "collapsed"}, Studio auto-expand ${result.evidence.palette.transportTools.studioSessionOpen && result.evidence.palette.transportTools.studioExportsOpen ? "yes" : "no"}`
+    `- Transport essentials: Play direct ${result.evidence.layout.transportPlayDirectVisible ? "yes" : "no"}, Session Context ${result.evidence.layout.transportSessionOpen ? "open" : "collapsed"}, fixed Utility/Export dock ${result.evidence.layout.headerActionDockViewportContained ? "contained" : "not contained"}`
   );
   console.log(
     `- Shortcut discovery: essential metadata ${result.evidence.layout.essentialShortcutMetadataReady ? "yes" : "no"}, tooltip hints ${result.evidence.layout.essentialShortcutTitlesReady ? "yes" : "no"}, Pattern 1/2/3 ${result.evidence.layout.patternShortcutMetadataReady ? "yes" : "no"}, Play state ${result.evidence.layout.playPressedStateReady ? "yes" : "no"}`
@@ -1931,13 +2034,14 @@ child.on("exit", (code, signal) => {
     `- Minimum window: ${result.evidence.layout.minimumWindowViewportWidth}px viewport, ${result.evidence.layout.minimumWindowTransportHeight}px header, ${result.evidence.layout.minimumWindowHorizontalOverflow}px horizontal overflow, Play ${result.evidence.layout.minimumWindowTransportPlaybackWidth}x${result.evidence.layout.minimumWindowTransportPlaybackHeight}px readable, all direct actions visible`
   );
   console.log(
-    `- Minimum Studio transport: ${result.evidence.layout.minimumWindowStudioCompactHeight}px compact vs ${result.evidence.layout.minimumWindowStudioExpandedHeight}px manual expansion, wide auto-expand and resize collapse ready`
+    `- Fixed frames: ${["edge901", "compact", "minimum", "wide"].map((name) => `${result.evidence.layout.desktopFrames[name].viewportWidth}px/${result.evidence.layout.desktopFrames[name].documentVerticalOverflow}px vertical overflow`).join(", ")}`
   );
   console.log("- Modal focus: Quick Actions and Command Reference search entry, Tab/Shift+Tab wrap, Escape restore, and cross-dialog handoff ready");
   console.log("- Settings locale: native Korean switch, renderer/native-menu parity, persistence reload, focus restore, project/history guard, and corrupt-value English fallback ready");
   console.log(
-    `- Workspace command dock: conditional show/hide ready, ${result.evidence.modalFocus.dockControlCount} controls, focusable with native Play and Actions, viewport contained`
+    `- Bottom workspace player: baseline/persistent, ${result.evidence.modalFocus.dockControlCount} controls, focusable with native Play and Actions, viewport contained`
   );
+  console.log("- Header action menus: native click/hover and complete keyboard navigation, disabled-item skip, focus restore, viewport containment, modal layering, state preservation, and dismissal ready");
   console.log(
     `- Quick Actions keyboard selection: arrows/Home/End retained search focus; Enter ran ${result.evidence.modalFocus.quickKeyboardSelectedTitle}`
   );

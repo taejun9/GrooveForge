@@ -56,6 +56,7 @@ import type {
   WorkflowNavigatorItem,
   WorkflowNavigatorJumpResult,
   WorkflowSpotlightSummary,
+  WorkspaceMainTabId,
   WorkflowZoneId
 } from "./workstationUiModel";
 
@@ -3960,14 +3961,16 @@ export function WorkflowNavigator({
   activeZone,
   items,
   onJump,
+  onOpenOverview,
   result,
   sectionRef
 }: {
-  activeZone: WorkflowZoneId;
+  activeZone: WorkspaceMainTabId;
   items: WorkflowNavigatorItem[];
   result: WorkflowNavigatorJumpResult | null;
   sectionRef?: Ref<HTMLElement>;
   onJump: (item: WorkflowNavigatorItem) => void;
+  onOpenOverview: () => void;
 }): ReactElement {
   const { locale, t } = useLocalization();
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -3987,29 +3990,44 @@ export function WorkflowNavigator({
     mix: t("nav.mixTabDetail"),
     deliver: t("nav.deliverTabDetail")
   };
+  const mainTabIds: WorkspaceMainTabId[] = ["overview", ...items.map((item) => item.id)];
 
   useEffect(() => {
-    const activeIndex = items.findIndex((item) => item.id === activeZone);
+    const activeIndex = mainTabIds.indexOf(activeZone);
     const activeTab = activeIndex >= 0 ? tabRefs.current[activeIndex] : null;
     const tablist = tablistRef.current;
-    if (!activeTab || !tablist || tablist.scrollWidth <= tablist.clientWidth + 1) {
+    if (!activeTab || !tablist) {
       return;
     }
 
-    const tablistRect = tablist.getBoundingClientRect();
-    const activeTabRect = activeTab.getBoundingClientRect();
-    if (activeTabRect.left < tablistRect.left || activeTabRect.right > tablistRect.right) {
-      const nearestScrollLeft =
-        tablist.scrollLeft +
-        (activeTabRect.left < tablistRect.left
-          ? activeTabRect.left - tablistRect.left
-          : activeTabRect.right - tablistRect.right);
-      tablist.scrollTo({
-        behavior: "auto",
-        left: Math.max(0, Math.min(nearestScrollLeft, tablist.scrollWidth - tablist.clientWidth))
-      });
+    const revealActiveTab = (): void => {
+      if (tablist.scrollWidth <= tablist.clientWidth + 1) {
+        return;
+      }
+      const tablistRect = tablist.getBoundingClientRect();
+      const activeTabRect = activeTab.getBoundingClientRect();
+      if (activeTabRect.left < tablistRect.left || activeTabRect.right > tablistRect.right) {
+        const nearestScrollLeft =
+          tablist.scrollLeft +
+          (activeTabRect.left < tablistRect.left
+            ? activeTabRect.left - tablistRect.left
+            : activeTabRect.right - tablistRect.right);
+        tablist.scrollTo({
+          behavior: "auto",
+          left: Math.max(0, Math.min(nearestScrollLeft, tablist.scrollWidth - tablist.clientWidth))
+        });
+      }
+    };
+
+    revealActiveTab();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", revealActiveTab);
+      return () => window.removeEventListener("resize", revealActiveTab);
     }
-  }, [activeZone, items]);
+    const resizeObserver = new ResizeObserver(revealActiveTab);
+    resizeObserver.observe(tablist);
+    return () => resizeObserver.disconnect();
+  }, [activeZone, items.length]);
 
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, currentIndex: number): void {
     if (event.key === " " || event.key === "Enter") {
@@ -4020,16 +4038,16 @@ export function WorkflowNavigator({
     let nextIndex: number;
     switch (event.key) {
       case "ArrowLeft":
-        nextIndex = (currentIndex - 1 + items.length) % items.length;
+        nextIndex = (currentIndex - 1 + mainTabIds.length) % mainTabIds.length;
         break;
       case "ArrowRight":
-        nextIndex = (currentIndex + 1) % items.length;
+        nextIndex = (currentIndex + 1) % mainTabIds.length;
         break;
       case "Home":
         nextIndex = 0;
         break;
       case "End":
-        nextIndex = items.length - 1;
+        nextIndex = mainTabIds.length - 1;
         break;
       default:
         return;
@@ -4037,13 +4055,20 @@ export function WorkflowNavigator({
 
     event.preventDefault();
     event.stopPropagation();
-    const nextItem = items[nextIndex];
-    if (!nextItem) {
+    const nextId = mainTabIds[nextIndex];
+    if (!nextId) {
       return;
     }
 
     tabRefs.current[nextIndex]?.focus();
-    onJump(nextItem);
+    if (nextId === "overview") {
+      onOpenOverview();
+      return;
+    }
+    const nextItem = items.find((item) => item.id === nextId);
+    if (nextItem) {
+      onJump(nextItem);
+    }
   }
 
   return (
@@ -4069,6 +4094,35 @@ export function WorkflowNavigator({
           ref={tablistRef}
           role="tablist"
         >
+          <button
+            aria-controls="workspace-panel-overview"
+            aria-selected={activeZone === "overview"}
+            className="workflow-navigator-card overview"
+            data-testid="workflow-jump-overview"
+            id="workspace-tab-overview"
+            onClick={onOpenOverview}
+            onKeyDown={(event) => handleTabKeyDown(event, 0)}
+            onKeyUp={(event) => {
+              if (event.key === " " || event.key === "Enter") {
+                event.stopPropagation();
+              }
+            }}
+            ref={(node) => {
+              tabRefs.current[0] = node;
+            }}
+            role="tab"
+            tabIndex={activeZone === "overview" ? 0 : -1}
+            title={t("nav.jumpTo", { label: t("nav.overview") })}
+            type="button"
+          >
+            <Gauge size={15} aria-hidden="true" />
+            <span className="workflow-tab-label">{t("nav.overview")}</span>
+            <span className="workflow-tab-status" aria-hidden="true">
+              {activeZone === "overview" ? t("nav.active") : "00"}
+            </span>
+            <strong>{t("nav.overviewSnapshotMeta")}</strong>
+            <small>{t("nav.overviewTabDetail")}</small>
+          </button>
           {items.map((item, index) => {
             const selected = item.id === activeZone;
             const localizedLabel = localizedTabLabels[item.id];
@@ -4089,14 +4143,14 @@ export function WorkflowNavigator({
                 id={`workspace-tab-${item.id}`}
                 key={item.id}
                 onClick={() => onJump(item)}
-                onKeyDown={(event) => handleTabKeyDown(event, index)}
+                onKeyDown={(event) => handleTabKeyDown(event, index + 1)}
                 onKeyUp={(event) => {
                   if (event.key === " " || event.key === "Enter") {
                     event.stopPropagation();
                   }
                 }}
                 ref={(node) => {
-                  tabRefs.current[index] = node;
+                  tabRefs.current[index + 1] = node;
                 }}
                 role="tab"
                 tabIndex={selected ? 0 : -1}
@@ -4115,7 +4169,16 @@ export function WorkflowNavigator({
           })}
         </div>
       </section>
-      <section className="workflow-review-surface" aria-label={t("nav.workflowReview")}>
+      <details className="workflow-review-disclosure" data-testid="workflow-review-disclosure">
+        <summary className="workflow-review-toggle" data-testid="workflow-review-toggle">
+          <ArrowRight size={15} aria-hidden="true" />
+          <span>
+            <strong>{t("nav.nextCheck")}</strong>
+            <small>{spotlight.decisionLabel}</small>
+          </span>
+          <ArrowDown size={14} aria-hidden="true" />
+        </summary>
+      <section className="workflow-review-surface" aria-label={t("nav.workflowReview")} data-testid="workflow-review-content">
         <div className="workflow-navigator-heading">
           <div>
             <ArrowRight size={16} aria-hidden="true" />
@@ -4184,6 +4247,7 @@ export function WorkflowNavigator({
           <small data-testid="workflow-spotlight-count">{spotlight.countLabel}</small>
         </button>
       </section>
+      </details>
       {result && <WorkflowNavigatorJumpResultStrip items={items} result={result} />}
     </nav>
   );

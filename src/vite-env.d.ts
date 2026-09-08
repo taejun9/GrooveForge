@@ -208,6 +208,7 @@ type GrooveforgeLaunchSmokeStarterLandingRouteEvidence = {
   reviewQueueInternalOverflow: number;
   reviewQueueReadableFieldCount: number;
   reviewQueueStackedRowCount: number;
+  viewportWidth: number;
 };
 
 type GrooveforgeLaunchSmokeStarterLandingEvidence = {

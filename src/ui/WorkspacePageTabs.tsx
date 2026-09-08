@@ -40,14 +40,29 @@ export function WorkspacePageTabs<PageId extends string>({
     // items 배열은 호출자가 인라인으로 다시 만들 수 있으므로 선택 인덱스만 의존해 불필요한 스크롤 effect를 막는다.
     const activeTab = activeIndex >= 0 ? tabRefs.current[activeIndex] : null;
     const tablist = tablistRef.current;
-    if (!activeTab || !tablist || tablist.scrollWidth <= tablist.clientWidth + 1) {
+    if (!activeTab || !tablist) {
       return;
     }
-    const listRect = tablist.getBoundingClientRect();
-    const tabRect = activeTab.getBoundingClientRect();
-    if (tabRect.left < listRect.left || tabRect.right > listRect.right) {
-      activeTab.scrollIntoView({ behavior: "auto", block: "nearest", inline: "nearest" });
+
+    const revealActiveTab = (): void => {
+      if (tablist.scrollWidth <= tablist.clientWidth + 1) {
+        return;
+      }
+      const listRect = tablist.getBoundingClientRect();
+      const tabRect = activeTab.getBoundingClientRect();
+      if (tabRect.left < listRect.left || tabRect.right > listRect.right) {
+        activeTab.scrollIntoView({ behavior: "auto", block: "nearest", inline: "nearest" });
+      }
+    };
+
+    revealActiveTab();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", revealActiveTab);
+      return () => window.removeEventListener("resize", revealActiveTab);
     }
+    const resizeObserver = new ResizeObserver(revealActiveTab);
+    resizeObserver.observe(tablist);
+    return () => resizeObserver.disconnect();
   }, [activeIndex]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, currentIndex: number): void {

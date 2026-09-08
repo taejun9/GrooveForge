@@ -7058,6 +7058,7 @@ export type HandoffPackageCheckPriority = {
 };
 
 export function HandoffPack({
+  activePage,
   analysis,
   exportReceipt,
   exportFormatResult,
@@ -7082,6 +7083,7 @@ export function HandoffPack({
   onToggleStatus,
   onToggleAudit
 }: {
+  activePage: "exports" | "checks";
   analysis: ExportAnalysis;
   exportReceipt: HandoffExportReceipt | null;
   exportFormatResult: HandoffExportFormatFocusResult | null;
@@ -7174,6 +7176,7 @@ export function HandoffPack({
   return (
     <section
       className={`handoff-pack ${tone}`}
+      data-active-deliver-page={activePage}
       data-testid="handoff-pack"
       aria-label={t("deliver.helper.packAria")}
       ref={sectionRef}
@@ -7201,7 +7204,16 @@ export function HandoffPack({
           <small data-testid="handoff-pack-route-file">{routeSummary.fileLabel}</small>
         </div>
       </div>
-      <div className="handoff-pack-direct" data-testid="handoff-pack-direct">
+      <div
+        aria-labelledby="deliver-page-tab-exports"
+        className="handoff-pack-direct workspace-page-panel"
+        data-testid="handoff-pack-direct"
+        data-workspace-page="exports"
+        hidden={activePage !== "exports"}
+        id="deliver-page-panel-exports"
+        role="tabpanel"
+        tabIndex={activePage === "exports" ? 0 : -1}
+      >
         <div className="handoff-pack-direct-heading">
           <span>{t("handoff.choose")}</span>
           <strong>{t("handoff.exportDirect")}</strong>
@@ -7240,6 +7252,16 @@ export function HandoffPack({
           ))}
         </div>
       </div>
+      <div
+        aria-labelledby="deliver-page-tab-checks"
+        className="handoff-pack-checks workspace-page-panel"
+        data-testid="handoff-pack-checks"
+        data-workspace-page="checks"
+        hidden={activePage !== "checks"}
+        id="deliver-page-panel-checks"
+        role="tabpanel"
+        tabIndex={activePage === "checks" ? 0 : -1}
+      >
       <details className="handoff-status-tools" data-testid="handoff-status-tools" open={statusOpen}>
         <summary
           data-testid="handoff-status-toggle"
@@ -7498,6 +7520,7 @@ export function HandoffPack({
       </div>
         </div>
       </details>
+      </div>
     </section>
   );
 }

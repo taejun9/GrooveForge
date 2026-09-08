@@ -1265,8 +1265,19 @@ async function auditScreenshot(zoneEvidence, expectedPath, zone) {
   check(zoneEvidence.screenshotBytes === bytes.byteLength, `${zone}: screenshot byte count mismatch.`);
   check(zoneEvidence.screenshotSha256 === sha256(bytes), `${zone}: screenshot SHA-256 mismatch.`);
   check(zoneEvidence.activeZone === zone, `${zone}: wrong active workspace page.`);
-  check(zoneEvidence.tabCount === 4 && zoneEvidence.tabPanelCount === 4, `${zone}: expected four tabs and tabpanels.`);
+  check(
+    zoneEvidence.tabCount === 5 && zoneEvidence.tabPanelCount === 5,
+    `${zone}: expected five Overview, Compose, Arrange, Mix, and Deliver tabs and tabpanels.`
+  );
+  check(zoneEvidence.activeZoneCount === 1, `${zone}: active workspace tabpanel identity is missing or duplicated.`);
   check(zoneEvidence.selectedTabCount === 1 && zoneEvidence.tabStopCount === 1, `${zone}: tab selection/roving stop contract failed.`);
+  check(
+    Array.isArray(zoneEvidence.selectedTabLabels) &&
+      zoneEvidence.selectedTabLabels.length === 1 &&
+      typeof zoneEvidence.selectedTabLabels[0] === "string" &&
+      zoneEvidence.selectedTabLabels[0].trim().length > 0,
+    `${zone}: the single aria-selected tab must expose a non-empty accessible label.`
+  );
   check(zoneEvidence.visiblePanelCount === 1 && zoneEvidence.documentHorizontalOverflow === 0, `${zone}: visible page or overflow contract failed.`);
   if (zone === "mix" || zone === "deliver") {
     check(zoneEvidence.audioAnalysisState === "ready" && zoneEvidence.audioAnalysisStatus === "Audio meters ready", `${zone}: exact audio analysis was not ready.`);

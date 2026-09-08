@@ -59,6 +59,18 @@ const guidancePanelsSource = readFileSync(
   new URL("../../src/ui/workstationGuidancePanels.tsx", import.meta.url),
   "utf8"
 );
+const workspaceOverviewSource = readFileSync(
+  new URL("../../src/ui/WorkspaceOverview.tsx", import.meta.url),
+  "utf8"
+);
+const workspacePageTabsSource = readFileSync(
+  new URL("../../src/ui/WorkspacePageTabs.tsx", import.meta.url),
+  "utf8"
+);
+const headerActionDockSource = readFileSync(
+  new URL("../../src/ui/HeaderActionDock.tsx", import.meta.url),
+  "utf8"
+);
 const graphSource = readFileSync(new URL("../../src/ui/workstationAppQuickActionGraph.ts", import.meta.url), "utf8");
 const quickActionSource = readFileSync(new URL("../../src/ui/workstationAppQuickActions.tsx", import.meta.url), "utf8");
 const desktopLaunchSmokeSource = readFileSync(new URL("./run_desktop_launch_smoke.mjs", import.meta.url), "utf8");
@@ -1186,13 +1198,12 @@ function validateLazyQuickActionGraphSource(graph) {
 }
 
 function validateWorkspaceCommandDockSource(html) {
+  const stopPlaybackSource = printNamedFunction(appSource, "App.tsx", "stopPlayback");
   check(
-    appSource.includes("const [workspaceCommandDockVisible, setWorkspaceCommandDockVisible] = useState(false)") &&
-      appSource.includes('typeof IntersectionObserver === "undefined"') &&
-      appSource.includes("setWorkspaceCommandDockVisible(!entry.isIntersecting)") &&
-      appSource.includes("observer.observe(transport)") &&
-      appSource.includes("return () => observer.disconnect()"),
-    "the workspace command dock should derive one local visibility state from the full transport header intersection"
+    appSource.includes("const [workspaceCommandDockVisible, setWorkspaceCommandDockVisible] = useState(true)") &&
+      !appSource.includes("setWorkspaceCommandDockVisible(false)") &&
+      !appSource.includes("setWorkspaceCommandDockVisible(!entry.isIntersecting)"),
+    "the workspace command dock should stay enabled independently of transport-header intersection"
   );
   check(
     [
@@ -1222,38 +1233,40 @@ function validateWorkspaceCommandDockSource(html) {
     "dock controls should reuse the existing Play, Actions, Undo, Redo, and Save handlers and disabled states"
   );
   check(
-    appSource.includes(
-      "playbackSessionRef.current += 1;\n      activePlaybackModeRef.current = null;\n      controllerRef.current?.stop();\n      controllerRef.current = null;\n      updatePlaybackPosition(null);\n      setIsPlaying(false);\n      return;"
-    ),
+    stopPlaybackSource.includes(
+      "playbackSessionRef.current += 1;\n    activePlaybackModeRef.current = null;\n    controllerRef.current?.stop();\n    controllerRef.current = null;\n    updatePlaybackPosition(null);\n    setIsPlaying(false);"
+    ) &&
+      printNamedFunction(appSource, "App.tsx", "togglePlayback").includes("stopPlayback();"),
     "explicit Stop should update shared header and dock playback state immediately while the audio controller closes"
   );
   check(
     styles.includes(".workspace-command-dock {\n  position: fixed;") &&
-      styles.includes("width: min(660px, calc(100vw - 32px));") &&
-      styles.includes('.app-shell[data-workspace-command-dock-visible="true"] {') &&
-      styles.includes("padding-bottom: 92px;") &&
-      styles.includes('.app-shell[data-workspace-command-dock-visible="true"] :focus-visible') &&
-      styles.includes("scroll-margin-bottom: 92px;"),
-    "the fixed dock should remain viewport-bounded and reserve focus/scroll clearance in the workspace"
+      styles.includes("width: min(720px, calc(100vw - 24px));") &&
+      styles.includes("inset-block-end: 10px;") &&
+      styles.includes("min-height: 54px;") &&
+      styles.includes("padding: 10px 10px 74px;"),
+    "the always-visible player should remain fixed, viewport-bounded, and have permanent shell clearance"
   );
   check(
-    !html.includes('data-testid="workspace-command-dock"'),
-    "the workspace command dock should stay absent from the first render while the full transport is visible"
+    html.includes('data-testid="workspace-command-dock"') &&
+      html.includes('data-workspace-command-dock-visible="true"'),
+    "the global player should be present and enabled on the first render"
   );
 }
 
 function validateCompactStudioTransportSource() {
+  const modeAwareToolPanelsSource = printNamedFunction(appSource, "App.tsx", "updateModeAwareToolPanels");
   check(
-    appSource.includes("function isCompactTransportViewport(): boolean") &&
-      appSource.includes('window.matchMedia("(max-width: 1220px)").matches') &&
-      appSource.includes("window.innerWidth <= 1220"),
-    "compact Studio transport behavior should share the existing 1220px responsive layout boundary"
+    modeAwareToolPanelsSource.includes("setTransportSessionOpen(false)") &&
+      !modeAwareToolPanelsSource.includes("setTransportSessionOpen(advancedOpen)") &&
+      appSource.includes("const [transportSessionOpen, setTransportSessionOpen] = useState(false)"),
+    "Session Context should stay on-demand in every workspace mode"
   );
   check(
-    appSource.includes("const transportAdvancedOpen = advancedOpen && !isCompactTransportViewport()") &&
-      appSource.includes("setTransportSessionOpen(transportAdvancedOpen)") &&
-      appSource.includes("setTransportExportsOpen(transportAdvancedOpen)"),
-    "Studio mode should auto-expand transport disclosures only outside the compact viewport"
+    modeAwareToolPanelsSource.includes("const advancedOpen = mode === \"studio\"") &&
+      modeAwareToolPanelsSource.includes("setMasterReviewQueueOpen(false)") &&
+      modeAwareToolPanelsSource.includes("setTransportSessionOpen(false)"),
+    "mode changes should preserve Studio guidance behavior without auto-opening Session Context"
   );
   check(
     appSource.includes('const compactTransport = window.matchMedia("(max-width: 1220px)")') &&
@@ -1261,7 +1274,7 @@ function validateCompactStudioTransportSource() {
       appSource.includes('compactTransport.addEventListener("change", handleTransportViewportChange)') &&
       appSource.includes('compactTransport.removeEventListener("change", handleTransportViewportChange)') &&
       appSource.includes("collapseTransportTools()"),
-    "crossing into the compact viewport should close both transport disclosures with a cleaned-up media listener"
+    "crossing into the compact viewport should close Session Context with a cleaned-up media listener"
   );
   check(
     appSource.includes("setModeAwareToolPanels: (mode) =>") &&
@@ -1270,10 +1283,11 @@ function validateCompactStudioTransportSource() {
     "production launch smoke should have a bounded UI-only hook for wide, resized, compact, and reset transport evidence"
   );
   check(
-    styles.includes("@media (min-width: 901px) and (max-width: 1220px)") &&
-      styles.includes(".command-strip .transport-session-tools") &&
-      styles.includes(".command-strip .transport-export-tools"),
-    "compact Studio behavior should retain the existing minimum-window disclosure layout and manual toggles"
+    styles.includes(".command-strip .transport-session-tools") &&
+      styles.includes(".command-strip .transport-session-tools > .transport-tools-content") &&
+      styles.includes("width: min(620px, calc(100vw - 24px));") &&
+      !appSource.includes('data-testid="transport-export-tools"'),
+    "Session Context should retain a viewport-bounded manual disclosure while exports move to the header dock"
   );
   check(
     launchBearingPackageSources.every(
@@ -1289,6 +1303,159 @@ function validateCompactStudioTransportSource() {
     electronMainSource.includes('const launchSmokeProgressPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_PROGRESS ";') &&
       electronMainSource.includes('updateProgress({ phase: "collecting-modal-focus", step'),
     "production launch smoke should expose concise phase and long modal-focus substep progress"
+  );
+}
+
+function validateHeaderActionDockSource(html) {
+  const dockIndex = html.indexOf('data-testid="header-action-dock"');
+  const utilityTriggerIndex = html.indexOf('data-testid="header-utility-trigger"');
+  const exportTriggerIndex = html.indexOf('data-testid="header-export-trigger"');
+  const workspaceIndex = html.indexOf('class="workspace-tabpanels"');
+  check(
+    dockIndex >= 0 &&
+      utilityTriggerIndex > dockIndex &&
+      exportTriggerIndex > utilityTriggerIndex &&
+      workspaceIndex > exportTriggerIndex &&
+      html.includes('aria-controls="header-utility-menu"') &&
+      html.includes('aria-controls="header-export-menu"') &&
+      (html.match(/aria-expanded="false"/gu)?.length ?? 0) >= 2 &&
+      (html.match(/aria-haspopup="menu"/gu)?.length ?? 0) >= 2 &&
+      !html.includes('data-testid="header-utility-menu"') &&
+      !html.includes('data-testid="header-export-menu"'),
+    "the fixed header toolbar should expose two closed, labelled ARIA menu triggers before the workspace"
+  );
+  check(
+    headerActionDockSource.includes('type HeaderMenuState = { id: HeaderMenuId; reason: "hover" | "pinned" } | null;') &&
+      headerActionDockSource.includes("const [menuState, setMenuState] = useState<HeaderMenuState>(null);") &&
+      headerActionDockSource.includes('event.pointerType !== "mouse"') &&
+      headerActionDockSource.includes('{ id, reason: "hover" }') &&
+      headerActionDockSource.includes("}, 180);") &&
+      headerActionDockSource.includes('menuState?.id === id && menuState.reason === "pinned"') &&
+      headerActionDockSource.includes('setMenuState({ id, reason: "pinned" });') &&
+      headerActionDockSource.includes('document.addEventListener("pointerdown", dismissOutside, true)') &&
+      headerActionDockSource.includes("useEffect(() => () => clearCloseTimer(), []);"),
+    "header menus should share one exclusive hover-or-pinned state, delay mouse leave, and dismiss safely outside"
+  );
+  check(
+      headerActionDockSource.includes('event.key === "ArrowDown" || event.key === "ArrowUp"') &&
+      headerActionDockSource.includes('pinMenu(id, "first");') &&
+      headerActionDockSource.includes('event.key === "ArrowDown" ? "first" : "last"') &&
+      headerActionDockSource.includes('event.key === "Home"') &&
+      headerActionDockSource.includes('event.key === "End"') &&
+      headerActionDockSource.includes('event.key === "Escape"') &&
+      headerActionDockSource.includes('event.key === "Tab"') &&
+      headerActionDockSource.includes("closeMenu(true);") &&
+      headerActionDockSource.includes("closeMenuAndMoveFocus(id, event.shiftKey);") &&
+      headerActionDockSource.includes('document.addEventListener("keydown", dismissMenuWithEscape)') &&
+      headerActionDockSource.includes("enabledMenuItems(menuRefs.current[id])") &&
+      headerActionDockSource.includes("items[nextIndex].focus();") &&
+      headerActionDockSource.includes("const pendingFocusRef = useRef") &&
+      headerActionDockSource.includes("useLayoutEffect(() => {") &&
+      headerActionDockSource.includes('items[pendingFocus.edge === "first" ? 0 : items.length - 1]?.focus();'),
+    "header menus should support trigger edges, wrapped arrows, Home/End, Escape focus return, and untrapped Tab"
+  );
+  check(
+    headerActionDockSource.includes('aria-controls={`header-${id}-menu`}') &&
+      headerActionDockSource.includes('aria-expanded={open}') &&
+      headerActionDockSource.includes('aria-haspopup="menu"') &&
+      headerActionDockSource.includes('role="menu"') &&
+      headerActionDockSource.includes('role="menuitem"') &&
+      headerActionDockSource.includes("aria-keyshortcuts={item.keyShortcuts}") &&
+      headerActionDockSource.includes("disabled={item.disabled}") &&
+      headerActionDockSource.includes("triggerRefs.current[menuId]?.focus();") &&
+      headerActionDockSource.includes("item.onSelect();"),
+    "header menu triggers and items should preserve ARIA ownership, shortcuts, disabled state, and durable action focus"
+  );
+  check(
+    ['project-open', 'project-save', 'quick-actions-open', 'command-reference-open', 'guidance-center-open', 'settings-open'].every(
+      (testId) => appSource.includes(`testId: "${testId}"`)
+    ) &&
+      ['export-wav', 'export-stems', 'export-midi', 'export-handoff-sheet', 'export-delivery-bundle'].every((testId) =>
+        appSource.includes(`testId: "${testId}"`)
+      ) &&
+      [
+        "handleOpenProject()",
+        "handleSaveProject()",
+        "openQuickActions",
+        "openCommandReference",
+        "setGuidanceCenterOpen(true)",
+        "setSettingsOpen(true)",
+        "handleExportWav",
+        "handleExportStems",
+        "handleExportMidi",
+        "handleExportHandoffSheet",
+        "handleExportDeliveryBundle"
+      ].every((handler) => appSource.includes(handler)) &&
+      appSource.includes('keyShortcuts: "Control+O Meta+O"') &&
+      appSource.includes('keyShortcuts: "Control+S Meta+S"') &&
+      appSource.includes('keyShortcuts: "Control+K Meta+K"') &&
+      appSource.includes('keyShortcuts: "? Control+/ Meta+/"'),
+    "closed Utility and Export menus should retain every project, help, settings, and delivery action contract in source"
+  );
+  check(
+    (() => {
+      const dockStart = styles.indexOf(".header-action-dock {\n  position: fixed;");
+      const dockEnd = dockStart >= 0 ? styles.indexOf("\n}", dockStart) : -1;
+      const dockStyles = dockStart >= 0 && dockEnd > dockStart ? styles.slice(dockStart, dockEnd) : "";
+      return dockStyles.includes("inset-block-start: 12px;") &&
+        dockStyles.includes("inset-inline-end: 12px;") &&
+        dockStyles.includes("z-index: 22;");
+    })() &&
+      styles.includes(".header-action-menu-popover {\n  position: absolute;") &&
+      styles.includes("width: min(340px, calc(100vw - 24px));") &&
+      styles.includes("max-height: calc(100dvh - 88px);") &&
+      styles.includes("overflow: auto;") &&
+      styles.includes(".project-change-overlay,\n.quick-actions-overlay {\n  position: fixed;\n  z-index: 30;") &&
+      styles.includes(".project-change-overlay {\n  z-index: 40;"),
+    "the HeaderActionDock and its popover should stay fixed above the workspace, bounded inside the viewport, and below modal overlays"
+  );
+}
+
+function validateDesktopFixedFrameSource() {
+  const fixedMediaStart = styles.indexOf("@media (min-width: 901px) and (min-height: 640px)");
+  const fixedMediaEnd = fixedMediaStart >= 0 ? styles.indexOf("\n@media (max-width: 900px)", fixedMediaStart) : -1;
+  const fixedFrameStyles =
+    fixedMediaStart >= 0 && fixedMediaEnd > fixedMediaStart
+      ? styles.slice(fixedMediaStart, fixedMediaEnd)
+      : "";
+  check(
+    fixedFrameStyles.includes("html,\n  body,\n  #root {") &&
+      fixedFrameStyles.includes("height: 100%;") &&
+      fixedFrameStyles.includes("overflow: hidden;") &&
+      fixedFrameStyles.includes(".app-shell,\n  .app-shell[data-workspace-command-dock-visible=\"true\"] {") &&
+      fixedFrameStyles.includes("height: 100dvh;") &&
+      fixedFrameStyles.includes("grid-template-rows: 130px 38px 58px minmax(0, 1fr);") &&
+      fixedFrameStyles.includes("padding: 10px 10px 74px;"),
+    "901px+ desktop should bound html, body, root, and the app shell to one overflow-hidden viewport"
+  );
+  check(
+    fixedFrameStyles.includes('.transport-band {') &&
+      fixedFrameStyles.includes('"brand setup"\n      "commands commands";') &&
+      fixedFrameStyles.includes("grid-template-rows: 55px 48px;") &&
+      fixedFrameStyles.includes(".app-shell > .workflow-navigator {\n    position: relative;\n    top: auto;") &&
+      fixedFrameStyles.includes("height: 58px;") &&
+      !fixedFrameStyles.includes(".app-shell > .workflow-navigator {\n    position: sticky;"),
+    "desktop transport should use two compact rows and main tabs should remain a non-sticky in-frame row"
+  );
+  check(
+    fixedFrameStyles.includes(".workspace-tabpanels {\n    grid-row: 4;") &&
+      fixedFrameStyles.includes("height: 100%;") &&
+      fixedFrameStyles.includes(".workspace-zone-panel:not([hidden]) {") &&
+      fixedFrameStyles.includes("grid-template-rows: 52px minmax(0, 1fr);") &&
+      fixedFrameStyles.includes(".workspace-zone-panel:not([hidden]) > .workspace-page-panel:not([hidden]),\n  .workspace-deliver-panel > .handoff-pack {") &&
+      fixedFrameStyles.includes("max-height: 100%;") &&
+      fixedFrameStyles.includes("overflow: auto;") &&
+      fixedFrameStyles.includes("overscroll-behavior: contain;") &&
+      !fixedFrameStyles.includes("\n  .workspace-page-panel:not([hidden]),\n"),
+    "only the active direct page, or Deliver handoff owner, should scroll inside the overflow-hidden desktop frame"
+  );
+  check(
+    fixedFrameStyles.includes(".guidance-center {\n    position: fixed;") &&
+      fixedFrameStyles.includes("max-height: calc(100dvh - 148px);") &&
+      fixedFrameStyles.includes(".guidance-center-content {") &&
+      fixedFrameStyles.includes("max-height: calc(100dvh - 198px);") &&
+      fixedFrameStyles.includes("overscroll-behavior: contain;"),
+    "Guide content should open as a viewport-bounded overlay with its own internal scroller"
   );
 }
 
@@ -1475,9 +1642,9 @@ function validateClosedDetailsContainment(html) {
   const expectedDisclosures = [
     "first-run-launchpad",
     "transport-session-tools",
-    "transport-export-tools",
     "guide-quick-start-details",
     "guidance-center",
+    "workflow-review-disclosure",
     "audience-session-proof-details",
     "pattern-lab",
     "capture-ideas",
@@ -1641,12 +1808,25 @@ function installBrowserMocks() {
 }
 
 function validateWorkspaceFunctionTabs(html) {
-  const zones = ["compose", "arrange", "mix", "deliver"];
+  const zones = ["overview", "compose", "arrange", "mix", "deliver"];
+  const zoneLabels = {
+    overview: "Overview",
+    compose: "Compose",
+    arrange: "Arrange",
+    mix: "Mix",
+    deliver: "Deliver"
+  };
   const openingTagById = (tagName, id) => {
     const idIndex = html.indexOf(`id="${id}"`);
     const tagStart = idIndex >= 0 ? html.lastIndexOf(`<${tagName}`, idIndex) : -1;
     const tagEnd = tagStart >= 0 ? html.indexOf(">", idIndex) : -1;
     return tagStart >= 0 && tagEnd >= idIndex ? html.slice(tagStart, tagEnd + 1) : "";
+  };
+  const elementMarkupById = (tagName, id) => {
+    const idIndex = html.indexOf(`id="${id}"`);
+    const tagStart = idIndex >= 0 ? html.lastIndexOf(`<${tagName}`, idIndex) : -1;
+    const tagEnd = tagStart >= 0 ? html.indexOf(`</${tagName}>`, idIndex) : -1;
+    return tagStart >= 0 && tagEnd >= idIndex ? html.slice(tagStart, tagEnd + `</${tagName}>`.length) : "";
   };
   const cssRuleBody = (selector) => {
     const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
@@ -1666,11 +1846,11 @@ function validateWorkspaceFunctionTabs(html) {
     modeRowIndex >= 0 &&
       modeRowCloseIndex > modeRowIndex &&
       workflowNavigatorTagIndex === modeRowCloseIndex + "</section>".length &&
-      quickStartIndex > workflowNavigatorIndex &&
-      guidanceCenterIndex > quickStartIndex &&
-      feedbackAnchorIndex > guidanceCenterIndex &&
+      guidanceCenterIndex > workflowNavigatorIndex &&
+      quickStartIndex > guidanceCenterIndex &&
+      feedbackAnchorIndex > quickStartIndex &&
       workspaceTabpanelsIndex > feedbackAnchorIndex,
-    "first-run hierarchy should place Workflow Navigator immediately after Mode, then Guide Quick Start, Guidance Center, feedback, and core workspace"
+    "first-run hierarchy should place compact main tabs after Mode, Guide Quick Start inside Guidance Center, then feedback and the core workspace"
   );
   check(
     appSource.includes("activeZone={activeWorkspaceZone}") &&
@@ -1708,12 +1888,23 @@ function validateWorkspaceFunctionTabs(html) {
   const tabTags = Object.fromEntries(
     zones.map((zone) => [zone, openingTagById("button", `workspace-tab-${zone}`)])
   );
+  const tabMarkup = Object.fromEntries(
+    zones.map((zone) => [zone, elementMarkupById("button", `workspace-tab-${zone}`)])
+  );
   const panelTags = Object.fromEntries(
     zones.map((zone) => [zone, openingTagById("section", `workspace-panel-${zone}`)])
   );
+  const overviewPageIds = ["snapshot", "song-map", "readiness"];
   const composePageIds = ["drums", "notes", "instruments"];
   const arrangePageIds = ["timeline", "structure"];
   const mixPageIds = ["mixer", "master"];
+  const deliverPageIds = ["exports", "checks"];
+  const overviewPageTabTags = Object.fromEntries(
+    overviewPageIds.map((page) => [page, openingTagById("button", `overview-page-tab-${page}`)])
+  );
+  const overviewPagePanelTags = Object.fromEntries(
+    overviewPageIds.map((page) => [page, openingTagById("section", `overview-page-panel-${page}`)])
+  );
   const composePageTabTags = Object.fromEntries(
     composePageIds.map((page) => [page, openingTagById("button", `compose-page-tab-${page}`)])
   );
@@ -1732,6 +1923,22 @@ function validateWorkspaceFunctionTabs(html) {
   const mixPagePanelTags = Object.fromEntries(
     mixPageIds.map((page) => [page, openingTagById("section", `mix-page-panel-${page}`)])
   );
+  const deliverPageTabTags = Object.fromEntries(
+    deliverPageIds.map((page) => [page, openingTagById("button", `deliver-page-tab-${page}`)])
+  );
+  const deliverPagePanelTags = Object.fromEntries(
+    deliverPageIds.map((page) => [page, openingTagById("div", `deliver-page-panel-${page}`)])
+  );
+  check(
+    isDeepStrictEqual(
+      [...html.matchAll(/id="workspace-tab-([^" ]+)"/gu)].map((match) => match[1]),
+      zones
+    ) &&
+      zones.every((zone) =>
+        tabMarkup[zone].includes(`<span class="workflow-tab-label">${zoneLabels[zone]}</span>`)
+      ),
+    "Workflow Navigator should render exactly five ordered main tabs labelled Overview, Compose, Arrange, Mix, and Deliver"
+  );
   check(
     zones.every(
       (zone) =>
@@ -1739,7 +1946,7 @@ function validateWorkspaceFunctionTabs(html) {
         tabTags[zone].includes(`aria-controls="workspace-panel-${zone}"`) &&
         tabTags[zone].includes(`data-testid="workflow-jump-${zone}"`)
     ),
-    "Compose, Arrange, Mix, and Deliver controls should preserve workflow jump test ids and own their matching tabpanels"
+    "Overview, Compose, Arrange, Mix, and Deliver controls should preserve workflow jump test ids and own their matching tabpanels"
   );
   check(
     tabTags.compose.includes('aria-selected="true"') &&
@@ -1769,7 +1976,54 @@ function validateWorkspaceFunctionTabs(html) {
       zones
         .filter((zone) => zone !== "compose")
         .every((zone) => panelTags[zone].includes('hidden=""') && panelTags[zone].includes('tabindex="-1"')),
-    "first render should expose only the Compose tabpanel and keep Arrange, Mix, and Deliver hidden and untabbable"
+    "first render should expose only the Compose tabpanel and keep Overview, Arrange, Mix, and Deliver hidden and untabbable"
+  );
+  check(
+    html.includes('data-testid="overview-page-tabs"') &&
+      html.includes('aria-label="Overview sub tabs"') &&
+      overviewPageIds.every(
+        (page) =>
+          overviewPageTabTags[page].includes('role="tab"') &&
+          overviewPageTabTags[page].includes(`aria-controls="overview-page-panel-${page}"`) &&
+          overviewPagePanelTags[page].includes('role="tabpanel"') &&
+          overviewPagePanelTags[page].includes(`aria-labelledby="overview-page-tab-${page}"`) &&
+          overviewPagePanelTags[page].includes(`data-workspace-page="${page}"`)
+      ) &&
+      overviewPageTabTags.snapshot.includes('aria-selected="true"') &&
+      overviewPageTabTags.snapshot.includes('tabindex="0"') &&
+      !overviewPagePanelTags.snapshot.includes('hidden=""') &&
+      ["song-map", "readiness"].every(
+        (page) =>
+          overviewPageTabTags[page].includes('aria-selected="false"') &&
+          overviewPageTabTags[page].includes('tabindex="-1"') &&
+          overviewPagePanelTags[page].includes('hidden=""') &&
+          overviewPagePanelTags[page].includes('tabindex="-1"')
+      ),
+    "Overview should expose At a glance, Song map, and Readiness as three labelled, roving, mutually exclusive pages"
+  );
+  const overviewPlaybackSource = printNamedFunction(appSource, "App.tsx", "toggleOverviewSongPlayback");
+  const sharedPlaybackStartSource = printNamedFunction(appSource, "App.tsx", "startPlaybackTarget");
+  const overviewArrangementSelectionIndex = overviewPlaybackSource.indexOf(
+    'selectTransportLoopScope("arrangement", false)'
+  );
+  const overviewArrangementStartIndex = overviewPlaybackSource.indexOf(
+    'startPlaybackTarget({ mode: "arrangement", startBar: 0 })'
+  );
+  check(
+    workspaceOverviewSource.includes('data-testid="overview-full-song-play"') &&
+      workspaceOverviewSource.includes('data-testid="overview-song-progress"') &&
+      workspaceOverviewSource.includes("onClick={onToggleFullSongPlayback}") &&
+      appSource.includes("isFullSongPlaying={isFullSongPlaying}") &&
+      appSource.includes("onToggleFullSongPlayback={toggleOverviewSongPlayback}") &&
+      appSource.includes("playbackPosition={playbackPosition}") &&
+      overviewPlaybackSource.includes("if (isPlaying)") &&
+      overviewPlaybackSource.includes("stopPlayback();") &&
+      overviewArrangementSelectionIndex >= 0 &&
+      overviewArrangementStartIndex > overviewArrangementSelectionIndex &&
+      sharedPlaybackStartSource.includes("stopMixPreview();") &&
+      sharedPlaybackStartSource.includes("auditionControllerRef.current?.stop();") &&
+      sharedPlaybackStartSource.includes("controllerRef.current = startRealtimePlayback(projectRef.current"),
+    "Overview full-song audition should reuse the shared arrangement transport, expose progress, and stop competing preview engines"
   );
   check(
     html.includes('data-testid="compose-page-tabs"') &&
@@ -1834,7 +2088,51 @@ function validateWorkspaceFunctionTabs(html) {
     "Mix should expose separate labelled Mixer and Master pages instead of compressing both side by side"
   );
   check(
+    html.includes('data-testid="deliver-page-tabs"') &&
+      html.includes('aria-label="Deliver sub tabs"') &&
+      deliverPageIds.every(
+        (page) =>
+          deliverPageTabTags[page].includes('role="tab"') &&
+          deliverPageTabTags[page].includes(`aria-controls="deliver-page-panel-${page}"`) &&
+          deliverPagePanelTags[page].includes('role="tabpanel"') &&
+          deliverPagePanelTags[page].includes(`aria-labelledby="deliver-page-tab-${page}"`) &&
+          deliverPagePanelTags[page].includes(`data-workspace-page="${page}"`)
+      ) &&
+      deliverPageTabTags.exports.includes('aria-selected="true"') &&
+      deliverPageTabTags.exports.includes('tabindex="0"') &&
+      !deliverPagePanelTags.exports.includes('hidden=""') &&
+      deliverPagePanelTags.exports.includes('data-testid="handoff-pack-direct"') &&
+      deliverPageTabTags.checks.includes('aria-selected="false"') &&
+      deliverPageTabTags.checks.includes('tabindex="-1"') &&
+      deliverPagePanelTags.checks.includes('hidden=""') &&
+      deliverPagePanelTags.checks.includes('tabindex="-1"') &&
+      deliverPagePanelTags.checks.includes('data-testid="handoff-pack-checks"'),
+    "Deliver should expose Exports and Checks & package as two labelled pages while keeping the Handoff Pack mounted"
+  );
+  check(
+    workspacePageTabsSource.includes('data-testid={`${idPrefix}-page-tabs`}') &&
+      workspacePageTabsSource.includes('aria-controls={`${idPrefix}-page-panel-${item.id}`}') &&
+      ["ArrowLeft", "ArrowRight", "Home", "End"].every((key) =>
+        workspacePageTabsSource.includes(`case "${key}":`)
+      ) &&
+      workspacePageTabsSource.indexOf("onSelect(nextItem.id);") <
+        workspacePageTabsSource.indexOf("tabRefs.current[nextIndex]?.focus();") &&
+      guidancePanelsSource.includes(
+        'const mainTabIds: WorkspaceMainTabId[] = ["overview", ...items.map((item) => item.id)];'
+      ),
+    "main and sub tabs should retain shared Arrow/Home/End roving focus and tab-to-panel ownership contracts"
+  );
+  check(
     [
+      "overview-page-snapshot",
+      "overview-player",
+      "overview-full-song-play",
+      "overview-song-progress",
+      "overview-metrics",
+      "overview-mini-timeline",
+      "overview-arrangement-list",
+      "overview-readiness-grid",
+      "workflow-target-overview",
       "workflow-target-compose",
       "workflow-target-arrange",
       "workflow-target-mix",
@@ -1842,7 +2140,7 @@ function validateWorkspaceFunctionTabs(html) {
       "review-queue",
       "handoff-pack"
     ].every((testId) => html.includes(`data-testid="${testId}"`)),
-    "functional tab grouping should preserve existing workspace landing and review/export test ids"
+    "functional tab grouping should preserve Overview, workspace landing, and review/export test ids"
   );
 
   const hiddenRule = cssRuleBody('.workspace-zone-panel[hidden]');
@@ -1855,7 +2153,10 @@ function validateWorkspaceFunctionTabs(html) {
   const selectedBadgeRule = cssRuleBody('.workflow-navigator-card[aria-selected="true"] .workflow-tab-status');
   const appShellRule = cssRuleBody(".app-shell");
   const tabsSurfaceRule = cssRuleBody(".workspace-tabs-surface");
+  const navigatorGridRule = cssRuleBody(".workflow-navigator-grid");
+  const navigatorValueRule = cssRuleBody(".workflow-navigator-card strong");
   const workspaceGridRule = cssRuleBody(".workspace-grid");
+  const overviewRule = cssRuleBody(".workspace-overview-panel");
   const composeRule = cssRuleBody(".workspace-compose-panel");
   const arrangeRule = cssRuleBody(".workspace-arrange-panel");
   const mixRule = cssRuleBody(".workspace-mix-panel");
@@ -1878,8 +2179,11 @@ function validateWorkspaceFunctionTabs(html) {
       selectedBadgeRule.includes("background: #82d7ff;") &&
       selectedBadgeRule.includes("color: #071317;") &&
       tabsSurfaceRule.includes("border: 1px solid rgba(130, 215, 255, 0.54);") &&
-      tabsSurfaceRule.includes("box-shadow:"),
-    "inactive panels should stay hidden while the selected tab has a high-contrast badge, underline, and independent surface"
+      tabsSurfaceRule.includes("box-shadow:") &&
+      navigatorGridRule.includes("grid-template-columns: repeat(5, minmax(0, 1fr));") &&
+      navigatorValueRule.includes("overflow-wrap: anywhere;") &&
+      navigatorValueRule.includes("white-space: normal;"),
+    "five main tabs should fit one explicit grid while inactive panels stay hidden, key status values wrap, and the selected tab remains high contrast"
   );
   check(
     guidancePanelsSource.includes("const tablistRef = useRef<HTMLDivElement | null>(null);") &&
@@ -1890,7 +2194,18 @@ function validateWorkspaceFunctionTabs(html) {
     "external mobile workspace routes should reveal an offscreen active tab with nearest horizontal tablist scrolling only"
   );
   check(
-    panelTags.compose.includes("workspace-grid workspace-zone-panel workspace-compose-panel") &&
+    styles.includes(".workflow-navigator-grid {\n    grid-template-columns: repeat(2, minmax(0, 1fr));") &&
+      styles.includes(".workspace-page-tablist {\n    display: flex;") &&
+      styles.includes("overflow-x: auto;") &&
+      styles.includes(".workspace-page-tab {\n    flex: 0 0 min(78vw, 280px);") &&
+      styles.includes("@media (max-width: 620px) {\n  .workspace-page-tab,\n  .workflow-navigator-card {") &&
+      styles.includes("min-height: 68px;"),
+    "responsive main and sub tabs should wrap or scroll deliberately while preserving large narrow-screen hit targets"
+  );
+  check(
+    panelTags.overview.includes("workspace-grid workspace-zone-panel workspace-overview-panel") &&
+      overviewRule.includes("grid-template-columns: minmax(0, 1fr);") &&
+      panelTags.compose.includes("workspace-grid workspace-zone-panel workspace-compose-panel") &&
       workspaceGridRule.includes("grid-template-columns:") &&
       composeRule.includes("grid-template-columns: minmax(0, 1fr);") &&
       pageHiddenRule.includes("display: none !important;") &&
@@ -1906,8 +2221,9 @@ function validateWorkspaceFunctionTabs(html) {
       mixMasterRule.includes("grid-column: 1;") &&
       panelTags.deliver.includes("workspace-zone-panel workspace-deliver-panel") &&
       deliverRule.includes("display: grid;") &&
+      styles.includes(".workspace-deliver-panel > .workspace-page-tabs,") &&
       desktopDeliverHandoffRule.includes("grid-template-columns: 250px minmax(0, 1fr);"),
-    "Compose and Mix should use full-width nested pages while Arrange and Deliver retain readable purpose-built layouts"
+    "Overview, Compose, Arrange, Mix, and Deliver should retain full-width nested-page layouts with a readable Handoff Pack"
   );
   check(
     styles.includes("@media (max-width: 1600px) {") &&
@@ -1938,10 +2254,12 @@ function validateWorkspaceFunctionTabs(html) {
 function validateProjectAudioAnalysisPerformance(html, helpers) {
   check(
     appSource.includes("const projectAudioAnalysis = useProjectAudioAnalysis(") &&
-      appSource.includes("projectAudioAnalysisCommitEnabledForZone(activeWorkspaceZone)") &&
+      appSource.includes(
+        'projectAudioAnalysisCommitEnabledForZone(activeWorkspaceZone === "overview" ? "mix" : activeWorkspaceZone)'
+      ) &&
       !appSource.includes("const exportAnalysis = useMemo(() => analyzeExport(project), [project]);") &&
       !appSource.includes("const stemAnalyses = useMemo(() => analyzeStemExports(project), [project]);"),
-    "App render should route exact PCM meter work through the off-main-thread hook and gate commits by functional tab"
+    "App render should route exact PCM meter work through the off-main-thread hook and give Overview the same commit posture as Mix"
   );
   const modeSwitchSource = printNamedFunction(appSource, "App.tsx", "switchProjectMode");
   const loopScopeSource = printNamedFunction(appSource, "App.tsx", "selectTransportLoopScope");
@@ -2182,11 +2500,18 @@ function validateProjectAudioAnalysisPerformance(html, helpers) {
       workstationHelpersSource.includes('surface="Guide"'),
     "Guide pending and error states should keep creative brief controls available while hiding stale meter, dB, and readiness result cards"
   );
+  const workflowRetryNavigationIndex = retrySource.indexOf("activateWorkspaceZone(retryZone)");
+  const workflowRetryRequestIndex = retrySource.indexOf(
+    "projectAudioAnalysis.retry()",
+    workflowRetryNavigationIndex
+  );
   check(
-    retrySource.includes("projectAudioAnalysisRetryZone(sourceZone)") &&
-      retrySource.includes("activateWorkspaceZone(retryZone)") &&
-      retrySource.indexOf("activateWorkspaceZone(retryZone)") < retrySource.indexOf("projectAudioAnalysis.retry()"),
-    "Retry from Compose or Arrange should navigate to a commit-enabled review zone before requesting exact meters"
+    retrySource.includes('if (sourceZone === "overview")') &&
+      retrySource.includes("Retrying exact audio meters in Overview") &&
+      retrySource.includes("projectAudioAnalysisRetryZone(sourceZone)") &&
+      workflowRetryNavigationIndex >= 0 &&
+      workflowRetryRequestIndex > workflowRetryNavigationIndex,
+    "Retry should stay in commit-enabled Overview while Compose or Arrange first navigates to a commit-enabled review zone"
   );
   check(
     projectAudioAnalysisWorkerSource.includes("analyzeProjectAudio(project)") &&
@@ -2217,27 +2542,30 @@ function validateProjectAudioAnalysisPerformance(html, helpers) {
   const expandZoneSource = printNamedFunction(appSource, "App.tsx", "expandStudioWorkspaceZone");
   const activateZoneSource = printNamedFunction(appSource, "App.tsx", "activateWorkspaceZone");
   check(
-    modePanelsSource.includes("expandStudioWorkspaceZone(activeWorkspaceZoneRef.current)") &&
+    modePanelsSource.includes("const activeZone = activeWorkspaceZoneRef.current;") &&
+      modePanelsSource.includes('if (activeZone !== "overview")') &&
+      modePanelsSource.includes("expandStudioWorkspaceZone(activeZone)") &&
       !modePanelsSource.includes("setArrangementToolsOpen(advancedOpen)") &&
       !modePanelsSource.includes("Object.fromEntries(projectRef.current.mixer") &&
       expandZoneSource.includes('zone === "compose"') &&
       expandZoneSource.includes('zone === "arrange"') &&
       expandZoneSource.includes('zone === "mix"') &&
       activateZoneSource.includes('projectRef.current.mode === "studio"') &&
+      activateZoneSource.includes('zone !== "overview"') &&
       activateZoneSource.includes("expandStudioWorkspaceZone(zone)"),
-    "Studio mode should expand only the active workspace zone immediately and materialize each inactive zone once on first activation"
+    "Studio mode should skip read-only Overview and materialize each production zone only when it becomes active"
   );
   check(
     appSource.includes('import { Activity, startTransition, useEffect, useMemo, useRef, useState } from "react";') &&
       appSource.includes('function workspaceActivityMode(visible: boolean): "visible" | "hidden"') &&
       appSource.includes('typeof document === "undefined" || visible') &&
       appSource.includes('<Activity mode={workspaceActivityMode(guidanceCenterOpen)} name="guide-review-center">') &&
-      ["compose", "arrange", "mix", "deliver"].every((zone) =>
+      ["overview", "compose", "arrange", "mix", "deliver"].every((zone) =>
         appSource.includes(
           `<Activity mode={workspaceActivityMode(activeWorkspaceZone === "${zone}")} name="workspace-${zone}">`
         )
       ),
-    "closed Guide content and inactive functional tab bodies should use React Activity to defer hidden updates while preserving their DOM and local state"
+    "closed Guide content and all five inactive main-tab bodies should use React Activity to defer hidden updates while preserving their DOM and local state"
   );
 }
 
@@ -2412,7 +2740,9 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       audienceStarterLandingSource.includes("focus({ preventScroll: true })") &&
       createAudienceStarterSource.includes("focusAudienceStarterLanding(starterId)") &&
       workspaceZoneSource.includes('[data-workspace-zone]') &&
-      ['compose', 'arrange', 'mix', 'deliver'].every((zone) => workspaceZoneSource.includes(`zone === "${zone}"`)) &&
+      ['overview', 'compose', 'arrange', 'mix', 'deliver'].every((zone) =>
+        workspaceZoneSource.includes(`zone === "${zone}"`)
+      ) &&
       workspaceActivationSource.includes("activeWorkspaceZoneRef.current === zone") &&
       workspaceActivationSource.includes("flushSync") &&
       workspaceActivationSource.includes("activeWorkspaceZoneRef.current = zone") &&
@@ -2421,10 +2751,6 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       zoneActivationIndex > zoneResolutionIndex &&
       targetScrollIndex > zoneActivationIndex &&
       workspaceScrollSource.includes('target.scrollIntoView({ block, behavior: "auto" })') &&
-      workspaceScrollSource.includes('getComputedStyle(navigator).position !== "sticky"') &&
-      !workspaceScrollSource.includes("window.innerWidth < 1221") &&
-      workspaceScrollSource.includes("navigator.getBoundingClientRect().bottom + 12") &&
-      workspaceScrollSource.includes('window.scrollBy({ top: targetTop - desiredTop, behavior: "auto" })') &&
       workspaceRouteSource.includes('target === "arrange-mute-map"') &&
       workspaceRouteSource.includes(
         'arrangeStructurePanelRef.current?.scrollIntoView({ block, behavior: "auto" })'
@@ -2448,7 +2774,7 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       mixTabpanelIndex >= 0 &&
       reviewQueueIndex > mixTabpanelIndex &&
       reviewQueueIndex < deliverTabpanelIndex,
-    "direct functional-tab selection should collapse Guide Activity, preserve the active nested page, and reveal the workspace while internal Guide routes keep their exact-route behavior"
+    "direct functional-tab selection should collapse Guide Activity, preserve the active nested page, and reveal targets inside the page-owned scroller"
   );
   check(
     coldWorkspaceReadoutRoutes.every(({ route, source }) => source.includes(route)) &&
@@ -2503,16 +2829,14 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       guidanceScrollSource.includes("target.tabIndex = -1") &&
       guidanceFocusIndex > guidanceRevealIndex &&
       guidanceScrollIndex > guidanceFocusIndex &&
-      guidanceScrollSource.includes("getComputedStyle(navigator).position !== \"sticky\"") &&
-      guidanceScrollSource.includes("navigator.getBoundingClientRect().bottom + 12") &&
       beatPassportRouteSource.includes('scrollGuidanceTargetIntoView(() => beatPassportPanelRef.current, "start")') &&
       html.includes('data-testid="beat-passport" tabindex="-1"') &&
       runQuickActionSource.includes('action.group === "Project" || action.group === "Export"') &&
       runQuickActionSource.includes("flushSync(() => setGuidanceCenterOpen(true))"),
-    "central guidance reveal should open its target before scroll, make non-control routes programmatically focusable after modal dismissal, clear the sticky navigator, and preserve synchronous Project/Export Guide disclosure"
+    "central guidance reveal should open its target before internal scroll, make non-control routes focusable after modal dismissal, and preserve synchronous Project/Export disclosure"
   );
   check(
-    appSource.includes("const activeWorkspaceZoneRef = useRef<WorkflowZoneId>(activeWorkspaceZone);") &&
+    appSource.includes("const activeWorkspaceZoneRef = useRef<WorkspaceMainTabId>(activeWorkspaceZone);") &&
       appSource.includes("activeWorkspaceZoneRef.current = activeWorkspaceZone;") &&
       appSource.includes(
         "const activeComposeWorkspacePageRef = useRef<ComposeWorkspacePageId>(activeComposeWorkspacePage);"
@@ -2646,7 +2970,7 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.reviewQueueInViewport === true") &&
       desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.reviewQueueClearOfNavigator === true") &&
       desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.disclosurePostureRestored === true"),
-    "Electron and its external runner should contract native Finish and same-Mix Review Queue shortcut viewport, sticky-clearance, preservation, and restoration evidence"
+    "Electron and its external runner should contract native Finish and same-Mix Review Queue viewport clearance, preservation, and restoration evidence"
   );
   check(
     electronMainSource.includes(
@@ -2671,7 +2995,7 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       desktopLaunchSmokeSource.includes("guidanceBeatPassportQuickActionReveal?.passportClearOfNavigator === true") &&
       desktopLaunchSmokeSource.includes("guidanceBeatPassportQuickActionReveal?.projectFingerprintPreserved === true") &&
       desktopLaunchSmokeSource.includes("guidanceBeatPassportQuickActionReveal?.guidancePostureRestored === true"),
-    "Electron and its external runner should contract the native closed-Guide Beat Passport shortcut, exact keyboard target, focus, viewport, sticky-clearance, preservation, posture restoration, and bounded timeout evidence"
+    "Electron and its external runner should contract the native closed-Guide Beat Passport shortcut, exact keyboard target, focus, viewport clearance, preservation, posture restoration, and bounded timeout evidence"
   );
   check(
     electronMainSource.includes(
@@ -2708,10 +3032,10 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
     "Electron and its external runner should contract native First Beat Path Setup routing to focus visible Transport outside tabs while Compose, project data, modal closure, Guide restoration, and timeout stay bounded"
   );
   check(
-    styles.includes(".workspace-grid > .panel,") &&
-      styles.includes(".review-queue,") &&
-      styles.includes("scroll-margin-top: 148px;"),
-    "desktop workspace landing targets should clear the sticky Workflow Navigator"
+    styles.includes(".workspace-zone-panel:not([hidden]) {") &&
+      styles.includes("grid-template-rows: 52px minmax(0, 1fr);") &&
+      styles.includes("scroll-margin-top: 0;"),
+    "desktop workspace landing targets should start below the in-flow main and sub tab rows"
   );
   check(
     styles.includes("container-name: review-queue;") &&
@@ -2967,49 +3291,29 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
     "the low-specificity button foundation should theme formerly native first-viewport and deep-workflow controls without replacing component styles"
   );
   check(
-    styles.includes('"brand setup commands"') &&
-      styles.includes('"launch launch commands"') &&
-      styles.includes("grid-template-columns: 220px minmax(0, 1fr) 340px;") &&
-      styles.includes(".brand-start {\n    display: contents;") &&
-      styles.includes("grid-template-columns: minmax(100px, 127px) minmax(56px, 68px) 96px minmax(84px, 100px) 72px minmax(125px, 1fr);") &&
-      styles.includes("grid-template-columns: minmax(180px, 0.85fr) repeat(2, minmax(190px, 1fr));") &&
-      styles.includes(".command-strip .transport-essential-controls,") &&
-      styles.includes("grid-template-columns: repeat(4, minmax(0, 1fr));") &&
+    styles.includes("@media (min-width: 901px) and (min-height: 640px) {") &&
+      styles.includes('"brand setup"\n      "commands commands";') &&
+      styles.includes("grid-template-rows: 55px 48px;") &&
+      styles.includes("grid-template-columns: minmax(180px, 0.35fr) minmax(470px, 1fr) minmax(142px, 0.25fr);") &&
       html.includes('data-testid="first-run-start-beat"') &&
       html.includes('data-testid="first-run-producer-pass"') &&
       html.includes('data-testid="first-run-open-project"'),
-    "desktop first run should use a compact two-row transport with horizontal audience choices and preserved direct project actions"
+    "fixed desktop should use a two-row transport while preserving all three project-start actions"
   );
   check(
-    styles.includes("@media (min-width: 901px) and (max-width: 1220px) {") &&
-      styles.includes('"brand setup"') &&
-      styles.includes('"launch launch"') &&
-      styles.includes('"commands commands"') &&
-      styles.includes("grid-template-columns: 200px minmax(0, 1fr);") &&
-      styles.includes("grid-template-columns: minmax(110px, 140px) minmax(56px, 64px) 96px minmax(84px, 100px) 72px minmax(125px, 1fr);") &&
-      styles.includes("grid-template-columns: minmax(180px, 0.8fr) repeat(2, minmax(190px, 1fr));") &&
-      styles.includes(".command-strip .transport-essential-controls {") &&
-      styles.includes("grid-column: 2 / 4;") &&
-      styles.includes(".command-strip .transport-session-tools {") &&
-      styles.includes("grid-column: 1 / 3;") &&
-      styles.includes(".command-strip .transport-export-tools {") &&
-      styles.includes("grid-column: 3 / 5;"),
-    "the reachable minimum desktop width should use an intermediate transport layout without hiding setup, audience, command, or disclosure surfaces"
+    styles.includes("@media (max-width: 900px) {") &&
+      styles.includes(".header-action-menu-trigger span {\n    display: none;") &&
+      styles.includes(".header-action-menu-trigger {\n    width: 38px;") &&
+      styles.includes("width: min(340px, calc(100vw - 24px));"),
+    "below the fixed-frame boundary, both header menus should retain compact triggers and a viewport-bounded popover"
   );
   check(
-    styles.includes(".workspace-tabs-surface {\n    grid-template-columns: minmax(180px, 0.22fr) minmax(0, 1fr);") &&
-      styles.includes(
-        ".workflow-review-surface {\n    grid-template-columns: minmax(145px, 0.18fr) minmax(280px, 0.36fr) minmax(240px, 0.46fr);"
-      ) &&
-      styles.includes(".app-shell > .workflow-navigator {\n    position: sticky;\n    top: 8px;") &&
-      styles.includes(
-        ".workspace-zone-panel,\n  .workspace-grid > .panel,\n  .guidance-center-content > *,\n  .review-queue,\n  .handoff-pack {\n    scroll-margin-top: 176px;"
-      ) &&
-      electronMainSource.includes("stickyNavigatorAfterDeepScroll") &&
-      electronMainSource.includes('navigatorPosition !== "sticky"') &&
-      electronMainSource.includes("!sticky.tabListFullyVisible") &&
-      electronMainSource.includes("!sticky.activeTabFullyVisible"),
-    "the 901-1220 desktop layout should keep a compact sticky functional tablist visible after deep Arrange, Mix, and Deliver scrolling"
+    styles.includes(".app-shell > .workflow-navigator {\n    position: relative;\n    top: auto;") &&
+      styles.includes(".workspace-tabpanels {\n    grid-row: 4;") &&
+      styles.includes(".workspace-zone-panel:not([hidden]) > .workspace-page-panel:not([hidden]),") &&
+      styles.includes(".workspace-deliver-panel > .handoff-pack {") &&
+      styles.includes("overscroll-behavior: contain;"),
+    "fixed desktop should keep compact main tabs in flow while the selected page owns deep scrolling"
   );
   const loopScopeSegments = [
     "playback-mode-arrangement",
@@ -3139,7 +3443,7 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       styles.includes(".tempo-nudge-pads button strong,") &&
       styles.includes(".tempo-nudge-pads button small {") &&
       styles.includes("min-height: 25px;") &&
-      styles.includes("grid-template-columns: minmax(100px, 127px) minmax(56px, 68px) 96px minmax(84px, 100px) 72px minmax(125px, 1fr);") &&
+      styles.includes("grid-template-columns: minmax(150px, 1.3fr) minmax(56px, 64px) 96px minmax(84px, 100px) 72px minmax(125px, 1fr);") &&
       styles.includes("grid-template-columns: minmax(110px, 140px) minmax(56px, 64px) 96px minmax(84px, 100px) 72px minmax(125px, 1fr);"),
     "Tempo Nudge pads should retain a contained readable two-by-two setup-row treatment at wide and minimum desktop widths"
   );
@@ -3175,27 +3479,28 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
   const transportStatusControlsIndex = html.indexOf('data-testid="transport-status-controls"');
   const transportEssentialsIndex = html.indexOf('data-testid="transport-essential-controls"');
   const transportPlayIndex = html.indexOf('data-testid="transport-play"');
-  const projectEssentialsIndex = html.indexOf('data-testid="project-essential-controls"');
-  const projectSaveIndex = html.indexOf('data-testid="project-save"');
   const transportSessionIndex = html.indexOf('data-testid="transport-session-tools"');
-  const transportExportsIndex = html.indexOf('data-testid="transport-export-tools"');
-  const exportWavIndex = html.indexOf('data-testid="export-wav"');
+  const headerActionDockIndex = html.indexOf('data-testid="header-action-dock"');
+  const headerUndoIndex = html.indexOf('data-testid="undo-button"');
+  const headerUtilityIndex = html.indexOf('data-testid="header-utility-trigger"');
+  const headerExportIndex = html.indexOf('data-testid="header-export-trigger"');
   check(
     transportBandIndex >= 0 &&
       transportStatusControlsIndex > transportBandIndex &&
       transportEssentialsIndex > transportStatusControlsIndex &&
       transportPlayIndex > transportEssentialsIndex &&
-      projectEssentialsIndex > transportPlayIndex &&
-      projectSaveIndex > projectEssentialsIndex &&
-      transportSessionIndex > projectSaveIndex &&
-      transportExportsIndex > transportSessionIndex &&
-      exportWavIndex > transportExportsIndex,
-    "Transport hierarchy should keep status, direct transport, direct project safety, Session Context, and Exports in order"
+      transportSessionIndex > transportPlayIndex &&
+      headerActionDockIndex > transportSessionIndex &&
+      headerUndoIndex > headerActionDockIndex &&
+      headerUtilityIndex > headerUndoIndex &&
+      headerExportIndex > headerUtilityIndex,
+    "Transport hierarchy should keep status, playback, Session Context, and the fixed Utility/Export action dock in order"
   );
   check(
     !html.includes('<details class="transport-session-tools" data-testid="transport-session-tools" open="">') &&
-      !html.includes('<details class="transport-export-tools" data-testid="transport-export-tools" open="">'),
-    "Guided first render should keep Session Context and Exports collapsed"
+      !html.includes('data-testid="transport-export-tools"') &&
+      html.includes('data-testid="header-export-trigger"'),
+    "Guided first render should keep Session Context collapsed and expose exports through the fixed menu trigger"
   );
   check(
     [
@@ -3204,14 +3509,12 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       'data-testid="project-key-select"',
       'data-testid="project-time-signature"',
       'aria-keyshortcuts="Control+K Meta+K"',
-      'aria-keyshortcuts="? Control+/ Meta+/"',
       'aria-keyshortcuts="Space"',
       'aria-keyshortcuts="Control+Z Meta+Z"',
       'aria-keyshortcuts="Control+Y Meta+Y Control+Shift+Z Meta+Shift+Z"',
-      'aria-keyshortcuts="Control+O Meta+O"',
       'aria-keyshortcuts="Control+S Meta+S"'
     ].every((shortcut) => html.includes(shortcut)),
-    "essential transport and project controls should expose a stable editable field hook and their existing desktop shortcuts"
+    "visible transport, header edit, and bottom-player controls should expose stable field hooks and desktop shortcuts"
   );
   check(
     appSource.includes("sanitizeProjectTitleInput(event.target.value)") &&
@@ -3222,13 +3525,11 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
   );
   check(
     html.includes('title="Open Quick Actions (Ctrl/Cmd+K)"') &&
-      html.includes('title="Open Command Reference (? or Ctrl/Cmd+/)"') &&
       html.includes('title="Play Song loop · 8 bars timeline · 82 BPM · Space"') &&
       html.includes('title="Undo last edit (Ctrl/Cmd+Z)"') &&
       html.includes('title="Redo last undone edit (Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y)"') &&
-      html.includes('title="Open project (Ctrl/Cmd+O)"') &&
       html.includes('title="Save project (Ctrl/Cmd+S)"'),
-    "essential transport and project controls should name shortcuts in native tooltips"
+    "visible playback and edit controls should name their shortcuts in native tooltips"
   );
   check(
     html.includes('data-testid="transport-play"') && html.includes('aria-pressed="false"'),
@@ -3249,8 +3550,10 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
   check(
     styles.includes(".icon-button.transport-play-toggle {") &&
       styles.includes("min-width: 112px;") &&
-      styles.includes("width: 340px;") &&
-      styles.includes("grid-template-columns: repeat(3, 68px) 112px;") &&
+      styles.includes(".command-strip .transport-essential-controls {") &&
+      styles.includes("grid-column: 2 / 4;") &&
+      styles.includes("grid-template-columns: repeat(4, minmax(0, 1fr));") &&
+      styles.includes(".command-strip .icon-button {\n    width: 100%;\n    min-width: 0;") &&
       styles.includes(
         ".command-strip .transport-essential-controls > .icon-button:not(.metronome-toggle):not(.transport-play-toggle) {"
       ) &&
@@ -3662,16 +3965,14 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       'data-testid="transport-status-controls"',
       'data-testid="transport-essential-controls"',
       'data-testid="transport-play"',
-      'data-testid="project-essential-controls"',
-      'data-testid="project-open"',
-      'data-testid="project-save"',
       'data-testid="transport-session-tools"',
       'data-testid="transport-session-toggle"',
       'data-testid="transport-session-content"',
-      'data-testid="transport-export-tools"',
-      'data-testid="transport-export-toggle"',
-      'data-testid="transport-export-content"',
-      'data-testid="export-wav"',
+      'data-testid="header-action-dock"',
+      'data-testid="header-utility-trigger"',
+      'data-testid="header-export-trigger"',
+      'data-testid="workspace-command-dock"',
+      'data-testid="workspace-command-dock-play"',
       "Session Context",
       "Tap Tempo · Undo/Keys",
       "Exports",
@@ -3714,7 +4015,11 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       "Balance diagnosis and local corrective moves"
     ],
     "delivery actions first": [
+      'data-testid="deliver-page-tabs"',
+      'data-testid="deliver-page-tab-exports"',
+      'data-testid="deliver-page-tab-checks"',
       'data-testid="handoff-pack-direct"',
+      'data-testid="handoff-pack-checks"',
       'data-testid="handoff-pack-preview-wav"',
       'data-testid="handoff-pack-grid"',
       'data-testid="handoff-pack-action-wav"',
@@ -3731,6 +4036,23 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       "Preview WAV",
       "Delivery Status &amp; Receipt",
       "Format &amp; Package Proof"
+    ],
+    "overview project scan": [
+      'data-testid="workflow-target-overview"',
+      'data-testid="overview-page-tabs"',
+      'data-testid="overview-page-tab-snapshot"',
+      'data-testid="overview-page-tab-song-map"',
+      'data-testid="overview-page-tab-readiness"',
+      'data-testid="overview-page-snapshot"',
+      'data-testid="overview-page-song-map"',
+      'data-testid="overview-page-readiness"',
+      'data-testid="overview-player"',
+      'data-testid="overview-full-song-play"',
+      'data-testid="overview-song-progress"',
+      'data-testid="overview-metrics"',
+      'data-testid="overview-mini-timeline"',
+      'data-testid="overview-arrangement-list"',
+      'data-testid="overview-readiness-grid"'
     ],
     "producer workflow": [
       "Professional producer",
@@ -3750,10 +4072,7 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       "Sound Snapshot",
       "Mix Snapshot",
       "producer-level",
-      'data-testid="quick-actions-open"',
-      'data-testid="command-reference-open"',
-      "Quick Actions",
-      "Command Reference"
+      "Quick Actions"
     ],
     "direct composition surfaces": [
       'data-testid="workflow-target-compose"',
@@ -3775,14 +4094,10 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       "Export meter",
       "Export Preflight",
       "Handoff Pack",
-      "Export WAV",
       "Mix WAV",
       "Stem WAV",
-      "Export MIDI",
       "Handoff Sheet",
-      'data-testid="export-delivery-bundle"',
-      "Delivery Bundle",
-      "Export delivery bundle"
+      "Delivery Bundle"
     ]
   };
 
@@ -5311,7 +5626,7 @@ function validateLocalization(localization, SettingsDialog, App) {
       React.createElement(App)
     )
   );
-  const koreanSettingsEntryIndex = koreanApp.indexOf('data-testid="settings-open"');
+  const koreanUtilityEntryIndex = koreanApp.indexOf('data-testid="header-utility-trigger"');
   const koreanWorkspaceTabpanelsIndex = koreanApp.indexOf('class="workspace-tabpanels"');
   const koreanGuideQuickStartIndex = koreanApp.indexOf('data-testid="guide-quick-start"');
   const koreanGuideQuickStartDetailsContentIndex = koreanApp.indexOf(
@@ -5366,9 +5681,10 @@ function validateLocalization(localization, SettingsDialog, App) {
       koreanApp.includes('data-locale="ko"') &&
       koreanApp.includes(">메인 탭<") &&
       koreanApp.includes(">서브 탭<") &&
-      koreanSettingsEntryIndex >= 0 &&
-      koreanWorkspaceTabpanelsIndex > koreanSettingsEntryIndex,
-    "Korean App render should localize the main/sub tab hierarchy and keep its stable Settings entry point outside the production tabpanels"
+      koreanApp.includes(">기능</span>") &&
+      koreanUtilityEntryIndex >= 0 &&
+      koreanWorkspaceTabpanelsIndex > koreanUtilityEntryIndex,
+    "Korean App render should localize main/sub tabs and keep the Utility menu trigger outside production tabpanels"
   );
   check(
     koreanTransportPositionMarkup.includes('title="곡 반복 대기 · 1마디 1박, 스텝 1, 전체 8마디."') &&
@@ -5514,6 +5830,8 @@ try {
   );
   validateWorkspaceCommandDockSource(html);
   validateCompactStudioTransportSource();
+  validateHeaderActionDockSource(html);
+  validateDesktopFixedFrameSource();
   validateDrumGridKeyboardNavigation(
     html,
     await server.ssrLoadModule("/src/ui/drumGridKeyboardNavigation.ts")
@@ -5609,9 +5927,9 @@ try {
       `- Starter: Untitled Beat, Guided 82 BPM A minor Lo-fi, 8 bars, Starter Sketch, ${workstation.styleProfiles.length} editable styles visible`
     );
     console.log("- Project ownership: Editable 8-bar foundation, editable now, local only, explicit Save-to-keep guidance");
-    console.log("- Starter landing: beginner opens the focused drum grid; producer opens the focused Review Queue; sticky navigation stays clear");
-    console.log("- Deep editor commands: conditional fixed dock reuses Play, Actions, Undo, Redo, and Save after the full transport leaves view");
-    console.log("- Minimum Studio transport: secondary Session Context and Exports stay compact through 1180px entry and resize while retaining manual reopen");
+    console.log("- Fixed desktop frame: 901px+ keeps the document still, compact main tabs in flow, and only the active page internally scrollable");
+    console.log("- Global player: the bottom dock is visible from first render and reuses Play, Actions, Undo, Redo, and Save");
+    console.log("- Header actions: fixed Utility and Export menus share exclusive hover/click state with complete keyboard and ARIA behavior");
     console.log("- Drum grid keyboard: one roving Tab stop, bounded arrows/Home/End, explicit pressed state, Enter/Space toggle, and visible guidance");
     console.log("- Note-grid keyboard: one Tab stop per Bass/Synth grid, exhaustive spatial arrows/Home/End, pressed state, guarded Enter/Space, and guidance");
     console.log("- Live Overdub: Keyboard Capture exposes a direct Pattern-playhead recording mode alongside Next and Replace");
@@ -5636,7 +5954,7 @@ try {
     console.log("- Quick Actions lifecycle: graph module loads on demand with explicit wait/retry UI; one open session reuses its complete graph; reopen builds a fresh graph");
     console.log("- Local draft recovery: Not now is session-only; Project Safety keeps recovery discoverable; successful replacement drops stale restore state");
     console.log("- Unsaved close guard: clean exit is silent; dirty/recovery work blocks unload; Electron defaults to Save and Escape keeps editing");
-    console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack, Delivery Bundle ZIP");
+    console.log("- Workstation path: compose, sound, arrange, mix, master, Export delivery bundle, Delivery Bundle ZIP, and Handoff Pack");
   }
 } finally {
   await server.close();

@@ -41,6 +41,7 @@ import {
 import type { ChangeEvent, CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactElement, ReactNode, Ref } from "react";
 import { Activity, startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { HeaderActionDock } from "./HeaderActionDock";
 import {
   drumGridEntryStep,
   drumGridNavigationTarget,
@@ -619,6 +620,7 @@ import type {
   ExportPreflightFocusSummary,
   ExportPreflightFocusResult,
   WorkflowZoneId,
+  WorkspaceMainTabId,
   WorkflowNavigatorItem,
   WorkflowNavigatorJumpResult,
   FirstBeatPathTarget,
@@ -809,6 +811,7 @@ import {
   createCommandReferenceRouteReadoutSummary
 } from "./workstationShellPanels";
 import { WorkspacePageTabs } from "./WorkspacePageTabs";
+import { WorkspaceOverview, type OverviewWorkspacePageId } from "./WorkspaceOverview";
 import { SettingsDialog } from "./SettingsDialog";
 import { useLocalization } from "./localization";
 import {
@@ -1146,16 +1149,6 @@ type QuickActionGraphFactory = typeof import("./workstationAppQuickActionGraph")
 
 const nativeRecoveryDebounceMs = 750;
 
-function isCompactTransportViewport(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  if (typeof window.matchMedia === "function") {
-    return window.matchMedia("(max-width: 1220px)").matches;
-  }
-  return typeof window.innerWidth === "number" && window.innerWidth <= 1220;
-}
-
 function workspaceActivityMode(visible: boolean): "visible" | "hidden" {
   return typeof document === "undefined" || visible ? "visible" : "hidden";
 }
@@ -1163,6 +1156,7 @@ function workspaceActivityMode(visible: boolean): "visible" | "hidden" {
 type ComposeWorkspacePageId = "drums" | "notes" | "instruments";
 type ArrangeWorkspacePageId = "timeline" | "structure";
 type MixWorkspacePageId = "mixer" | "master";
+type DeliverWorkspacePageId = "exports" | "checks";
 
 type MetadataDraftSnapshot =
   | { kind: "title"; value: string }
@@ -1267,7 +1261,6 @@ export function App(): ReactElement {
   const [masterReviewQueueOpen, setMasterReviewQueueOpen] = useState(false);
   const [masterMixCoachOpen, setMasterMixCoachOpen] = useState(false);
   const [transportSessionOpen, setTransportSessionOpen] = useState(false);
-  const [transportExportsOpen, setTransportExportsOpen] = useState(false);
   const [deliveryStatusOpen, setDeliveryStatusOpen] = useState(false);
   const [deliveryAuditOpen, setDeliveryAuditOpen] = useState(false);
   const [masterCeilingDraft, setMasterCeilingDraft] = useState(() => starterProject.masterCeilingDb.toFixed(1));
@@ -1285,13 +1278,15 @@ export function App(): ReactElement {
   const modalReturnFocusRef = useRef<HTMLElement | null>(null);
   const [guidanceCenterOpen, setGuidanceCenterOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [activeWorkspaceZone, setActiveWorkspaceZone] = useState<WorkflowZoneId>("compose");
+  const [activeWorkspaceZone, setActiveWorkspaceZone] = useState<WorkspaceMainTabId>("compose");
+  const [activeOverviewWorkspacePage, setActiveOverviewWorkspacePage] = useState<OverviewWorkspacePageId>("snapshot");
   const [activeComposeWorkspacePage, setActiveComposeWorkspacePage] = useState<ComposeWorkspacePageId>("drums");
   const [activeArrangeWorkspacePage, setActiveArrangeWorkspacePage] = useState<ArrangeWorkspacePageId>("timeline");
   const [activeMixWorkspacePage, setActiveMixWorkspacePage] = useState<MixWorkspacePageId>("mixer");
+  const [activeDeliverWorkspacePage, setActiveDeliverWorkspacePage] = useState<DeliverWorkspacePageId>("exports");
   const [launchpadOpen, setLaunchpadOpen] = useState(true);
   const [styleChangePreview, setStyleChangePreview] = useState<StyleChangePreview | null>(null);
-  const [workspaceCommandDockVisible, setWorkspaceCommandDockVisible] = useState(false);
+  const [workspaceCommandDockVisible, setWorkspaceCommandDockVisible] = useState(true);
   const [quickActionQuery, setQuickActionQuery] = useState("");
   const [quickActionSearchHintResult, setQuickActionSearchHintResult] = useState<QuickActionSearchHintResult | null>(null);
   const [quickActionSearchResult, setQuickActionSearchResult] = useState<QuickActionSearchResult | null>(null);
@@ -1445,10 +1440,11 @@ export function App(): ReactElement {
   const localDraftReadyRef = useRef(false);
   const localDraftSkipNextWriteRef = useRef(false);
   const selectedEventDeleteSelectionGuardRef = useRef(false);
-  const activeWorkspaceZoneRef = useRef<WorkflowZoneId>(activeWorkspaceZone);
+  const activeWorkspaceZoneRef = useRef<WorkspaceMainTabId>(activeWorkspaceZone);
   const activeComposeWorkspacePageRef = useRef<ComposeWorkspacePageId>(activeComposeWorkspacePage);
   const activeArrangeWorkspacePageRef = useRef<ArrangeWorkspacePageId>(activeArrangeWorkspacePage);
   const activeMixWorkspacePageRef = useRef<MixWorkspacePageId>(activeMixWorkspacePage);
+  const activeDeliverWorkspacePageRef = useRef<DeliverWorkspacePageId>(activeDeliverWorkspacePage);
   const modeAwareToolPanelsModeRef = useRef<ProjectState["mode"] | null>(null);
   const studioExpandedWorkspaceZonesRef = useRef<Set<WorkflowZoneId>>(new Set());
   const controllerRef = useRef<PlaybackController | null>(null);
@@ -1501,12 +1497,13 @@ export function App(): ReactElement {
   activeComposeWorkspacePageRef.current = activeComposeWorkspacePage;
   activeArrangeWorkspacePageRef.current = activeArrangeWorkspacePage;
   activeMixWorkspacePageRef.current = activeMixWorkspacePage;
+  activeDeliverWorkspacePageRef.current = activeDeliverWorkspacePage;
   const style = getStyle(project);
   const deliveryTarget = activeDeliveryTarget(project);
   const currentPattern = activePattern(project);
   const projectAudioAnalysis = useProjectAudioAnalysis(
     project,
-    projectAudioAnalysisCommitEnabledForZone(activeWorkspaceZone)
+    projectAudioAnalysisCommitEnabledForZone(activeWorkspaceZone === "overview" ? "mix" : activeWorkspaceZone)
   );
   const exactProjectAudioAnalysisReady = projectAudioAnalysis.status === "ready";
   const exportAnalysis = projectAudioAnalysis.mix;
@@ -1804,6 +1801,8 @@ export function App(): ReactElement {
     isPlaying && playbackPosition?.mode === "arrangement" && typeof playbackPosition.arrangementIndex === "number"
       ? playbackPosition.arrangementIndex
       : null;
+  const isFullSongPlaying =
+    isPlaying && transportLoopScope === "arrangement" && (playbackPosition?.mode ?? playbackMode) === "arrangement";
   const selectedArrangementBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
   const patternCompareDecisionSummary = useMemo(
     () =>
@@ -2491,20 +2490,6 @@ export function App(): ReactElement {
   }, [project.sound.preset]);
 
   useEffect(() => {
-    const transport = transportPanelRef.current;
-    if (!transport || typeof IntersectionObserver === "undefined") {
-      return;
-    }
-
-    const observer = new IntersectionObserver(([entry]) => {
-      setWorkspaceCommandDockVisible(!entry.isIntersecting);
-    });
-    observer.observe(transport);
-
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
     setEditorAuditionResult(null);
   }, [
     project.selectedPattern,
@@ -2697,7 +2682,6 @@ export function App(): ReactElement {
     const compactTransport = window.matchMedia("(max-width: 1220px)");
     const collapseTransportTools = (): void => {
       setTransportSessionOpen(false);
-      setTransportExportsOpen(false);
     };
     const handleTransportViewportChange = (event: MediaQueryListEvent): void => {
       if (event.matches) {
@@ -4071,14 +4055,15 @@ export function App(): ReactElement {
   function updateModeAwareToolPanels(mode: ProjectState["mode"]): void {
     modeAwareToolPanelsModeRef.current = mode;
     const advancedOpen = mode === "studio";
-    const transportAdvancedOpen = advancedOpen && !isCompactTransportViewport();
     setMasterReviewQueueOpen(false);
     setMasterMixCoachOpen(false);
-    setTransportSessionOpen(transportAdvancedOpen);
-    setTransportExportsOpen(transportAdvancedOpen);
+    setTransportSessionOpen(false);
     if (advancedOpen) {
       studioExpandedWorkspaceZonesRef.current = new Set();
-      expandStudioWorkspaceZone(activeWorkspaceZoneRef.current);
+      const activeZone = activeWorkspaceZoneRef.current;
+      if (activeZone !== "overview") {
+        expandStudioWorkspaceZone(activeZone);
+      }
       return;
     }
     studioExpandedWorkspaceZonesRef.current = new Set();
@@ -7902,32 +7887,36 @@ export function App(): ReactElement {
     );
   }
 
-  function togglePlayback(): void {
-    if (isPlaying) {
-      playbackSessionRef.current += 1;
-      activePlaybackModeRef.current = null;
-      controllerRef.current?.stop();
-      controllerRef.current = null;
-      updatePlaybackPosition(null);
-      setIsPlaying(false);
-      return;
-    }
+  function stopPlayback(): void {
+    playbackSessionRef.current += 1;
+    activePlaybackModeRef.current = null;
+    controllerRef.current?.stop();
+    controllerRef.current = null;
+    updatePlaybackPosition(null);
+    setIsPlaying(false);
+  }
 
-    if (transportLoopScope === "transition" && !arrangementTransitionLoopTarget) {
-      setProjectStatus("Transition loop unavailable");
-      return;
-    }
-
+  function startPlaybackTarget({
+    bars,
+    mode,
+    startBar
+  }: {
+    bars?: number;
+    mode: PlaybackMode;
+    startBar?: number;
+  }): boolean {
     const playbackSession = playbackSessionRef.current + 1;
     playbackSessionRef.current = playbackSession;
-    activePlaybackModeRef.current = transportLoopMode;
+    activePlaybackModeRef.current = mode;
     try {
       stopMixPreview();
+      auditionControllerRef.current?.stop();
+      auditionControllerRef.current = null;
       setIsPlaying(true);
       controllerRef.current = startRealtimePlayback(projectRef.current, {
-        mode: transportLoopMode,
-        bars: transportLoopBars,
-        startBar: transportLoopStartBar,
+        mode,
+        bars,
+        startBar,
         getProject: () => projectRef.current,
         onStep: (position) => {
           if (playbackSessionRef.current === playbackSession) {
@@ -7944,6 +7933,7 @@ export function App(): ReactElement {
           setIsPlaying(false);
         }
       });
+      return true;
     } catch (error) {
       console.error(error);
       if (playbackSessionRef.current === playbackSession) {
@@ -7953,6 +7943,43 @@ export function App(): ReactElement {
         setIsPlaying(false);
         updatePlaybackPosition(null);
       }
+      return false;
+    }
+  }
+
+  function togglePlayback(): void {
+    if (isPlaying) {
+      stopPlayback();
+      return;
+    }
+
+    if (transportLoopScope === "transition" && !arrangementTransitionLoopTarget) {
+      setProjectStatus("Transition loop unavailable");
+      return;
+    }
+
+    startPlaybackTarget({
+      mode: transportLoopMode,
+      bars: transportLoopBars,
+      startBar: transportLoopStartBar
+    });
+  }
+
+  function toggleOverviewSongPlayback(): void {
+    if (isPlaying) {
+      const stoppedScope = transportLoopScope;
+      stopPlayback();
+      setProjectStatus(
+        stoppedScope === "arrangement"
+          ? "Stopped full-song playback"
+          : `Stopped ${transportLoopLabel(stoppedScope)} loop; press Play full song to start from bar 1`
+      );
+      return;
+    }
+
+    selectTransportLoopScope("arrangement", false);
+    if (startPlaybackTarget({ mode: "arrangement", startBar: 0 })) {
+      setProjectStatus("Playing full song from bar 1");
     }
   }
 
@@ -8889,9 +8916,11 @@ export function App(): ReactElement {
     focusBeatBlueprintsPanel();
   }
 
-  function workspaceZoneForTarget(target: HTMLElement | null): WorkflowZoneId | null {
+  function workspaceZoneForTarget(target: HTMLElement | null): WorkspaceMainTabId | null {
     const zone = target?.closest<HTMLElement>("[data-workspace-zone]")?.dataset.workspaceZone;
-    return zone === "compose" || zone === "arrange" || zone === "mix" || zone === "deliver" ? zone : null;
+    return zone === "overview" || zone === "compose" || zone === "arrange" || zone === "mix" || zone === "deliver"
+      ? zone
+      : null;
   }
 
   function workspacePageIdentityForTarget(target: HTMLElement | null): string | null {
@@ -8935,6 +8964,17 @@ export function App(): ReactElement {
     }
   }
 
+  function activateDeliverWorkspacePage(page: DeliverWorkspacePageId, announce = false): void {
+    if (activeDeliverWorkspacePageRef.current === page) {
+      return;
+    }
+    activeDeliverWorkspacePageRef.current = page;
+    setActiveDeliverWorkspacePage(page);
+    if (announce) {
+      setProjectStatus(`Opened Deliver / ${page === "exports" ? "Exports" : "Checks & Package"} page`);
+    }
+  }
+
   function activateWorkspacePageForTarget(target: HTMLElement | null): void {
     const pageRoot = target?.closest<HTMLElement>("[data-workspace-page]");
     const page = pageRoot?.dataset.workspacePage;
@@ -8954,10 +8994,16 @@ export function App(): ReactElement {
     }
     if (zone === "mix" && (page === "mixer" || page === "master") && activeMixWorkspacePageRef.current !== page) {
       flushSync(() => activateMixWorkspacePage(page));
+      return;
+    }
+    if (zone === "deliver" && (page === "exports" || page === "checks")) {
+      if (activeDeliverWorkspacePageRef.current !== page) {
+        flushSync(() => activateDeliverWorkspacePage(page));
+      }
     }
   }
 
-  function activateWorkspaceZone(zone: WorkflowZoneId): void {
+  function activateWorkspaceZone(zone: WorkspaceMainTabId): void {
     if (activeWorkspaceZoneRef.current === zone) {
       return;
     }
@@ -8966,7 +9012,7 @@ export function App(): ReactElement {
     flushSync(() => {
       activeWorkspaceZoneRef.current = zone;
       setActiveWorkspaceZone(zone);
-      if (projectRef.current.mode === "studio") {
+      if (projectRef.current.mode === "studio" && zone !== "overview") {
         expandStudioWorkspaceZone(zone);
       }
     });
@@ -8974,6 +9020,11 @@ export function App(): ReactElement {
 
   function retryCurrentProjectAudioAnalysis(): void {
     const sourceZone = activeWorkspaceZoneRef.current;
+    if (sourceZone === "overview") {
+      projectAudioAnalysis.retry();
+      setProjectStatus("Retrying exact audio meters in Overview");
+      return;
+    }
     const retryZone = projectAudioAnalysisRetryZone(sourceZone);
     if (retryZone !== sourceZone) {
       activateWorkspaceZone(retryZone);
@@ -9121,7 +9172,7 @@ export function App(): ReactElement {
   function scrollWorkspaceTargetIntoView(
     targetResolver: ScrollTargetResolver,
     block: ScrollLogicalPosition = "start",
-    zoneHint: WorkflowZoneId | null = null
+    zoneHint: WorkspaceMainTabId | null = null
   ): void {
     const initialTarget = resolveScrollTarget(targetResolver);
     const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -9838,6 +9889,19 @@ export function App(): ReactElement {
     routeWorkspaceTargetIntoView(zone);
   }
 
+  function selectOverviewNavigatorTab(): void {
+    if (guidanceCenterRef.current?.open) {
+      flushSync(() => setGuidanceCenterOpen(false));
+    }
+    scrollWorkspaceTargetIntoView(
+      () => document.getElementById("workspace-panel-overview"),
+      "start",
+      "overview"
+    );
+    setWorkflowNavigatorResult(null);
+    setProjectStatus("Opened project Overview");
+  }
+
   function jumpToWorkflowNavigatorItem(item: WorkflowNavigatorItem): void {
     jumpToWorkflowZone(item.id);
     setWorkflowNavigatorResult(createWorkflowNavigatorJumpResult(item, workflowNavigatorItems));
@@ -10089,9 +10153,18 @@ export function App(): ReactElement {
 
   function focusArrangementMuteMapLane(lane: ArrangementMuteMapLane): void {
     setArrangementToolsOpen(true);
-    setArrangementMuteMapFocusId(lane.id);
+    flushSync(() => {
+      setArrangementMuteMapFocusId(lane.id);
+      setArrangementMuteMapResult(createArrangementMuteMapFocusResult(lane, arrangementMuteMapSummary));
+    });
     routeWorkspaceTargetIntoView("arrange-mute-map", "start");
-    setArrangementMuteMapResult(createArrangementMuteMapFocusResult(lane, arrangementMuteMapSummary));
+    requestAnimationFrame(() => {
+      scrollWorkspaceTargetIntoView(
+        () => document.querySelector<HTMLElement>('[data-testid="arrangement-mute-map-result"]'),
+        "nearest",
+        "arrange"
+      );
+    });
     setProjectStatus(`Mute Map ${lane.label}: ${lane.value}`);
   }
 
@@ -10367,6 +10440,9 @@ export function App(): ReactElement {
       return;
     }
     setExportPreflightFocusId(card.focusId);
+    if (card.focusTarget === "deliver") {
+      activateDeliverWorkspacePage("checks");
+    }
     routeWorkspaceTargetIntoView(card.focusTarget);
     setExportPreflightResult(createExportPreflightFocusResult(card, exportPreflightSummary));
     setProjectStatus(`Preflight ${card.label}: ${card.value}`);
@@ -10377,6 +10453,7 @@ export function App(): ReactElement {
       return;
     }
     const card = activeExportPreflightQuickActionCard(exportPreflightSummary);
+    activateDeliverWorkspacePage("checks");
     routeWorkspaceTargetIntoView("deliver", "start");
     setProjectStatus(
       card
@@ -10413,6 +10490,7 @@ export function App(): ReactElement {
       currentSendOrder
     );
 
+    activateDeliverWorkspacePage("exports");
     routeWorkspaceTargetIntoView("deliver", "start");
     setProjectStatus(
       `Handoff Pack ${currentRoute.statusLabel}: ${currentRoute.detailLabel} / ${currentAudit.statusLabel} / ${currentSendOrder.nextLabel}`
@@ -10436,6 +10514,7 @@ export function App(): ReactElement {
     const currentSendOrder = createHandoffPackSendOrderSummary(project, currentItems);
     const readyCount = currentItems.filter((item) => item.tone === "good").length;
 
+    activateDeliverWorkspacePage("exports");
     routeWorkspaceTargetIntoView("deliver", "start");
     setProjectStatus(
       `Direct Exports Readout: ${readyCount}/${currentItems.length} ready / ${currentSendOrder.nextLabel} / ${currentReceipt.statusLabel}`
@@ -10447,6 +10526,7 @@ export function App(): ReactElement {
       return;
     }
     setDeliveryStatusOpen(true);
+    activateDeliverWorkspacePage("checks");
     const currentItems = createHandoffPackItems({
       analysis: exportAnalysis,
       project,
@@ -10474,6 +10554,7 @@ export function App(): ReactElement {
       return;
     }
     setDeliveryAuditOpen(true);
+    activateDeliverWorkspacePage("checks");
     setHandoffPackageCheckFocusId(card.focusId);
     routeWorkspaceTargetIntoView("deliver", "start");
     setHandoffPackageCheckResult(createHandoffPackageCheckFocusResult(card, handoffPackageCheckSummary));
@@ -10485,6 +10566,7 @@ export function App(): ReactElement {
       return;
     }
     setDeliveryAuditOpen(true);
+    activateDeliverWorkspacePage("checks");
     const currentItems = createHandoffPackItems({
       analysis: exportAnalysis,
       project,
@@ -10508,6 +10590,7 @@ export function App(): ReactElement {
       return;
     }
     setDeliveryAuditOpen(true);
+    activateDeliverWorkspacePage("checks");
     const currentItems = createHandoffPackItems({
       analysis: exportAnalysis,
       project,
@@ -13051,7 +13134,8 @@ export function App(): ReactElement {
         reviewQueueInternalOverflow:
           starterId === "producer" && reviewQueue ? Math.max(0, reviewQueue.scrollWidth - reviewQueue.clientWidth) : 0,
         reviewQueueReadableFieldCount: starterId === "producer" ? reviewQueueReadableFields.length : 0,
-        reviewQueueStackedRowCount: starterId === "producer" ? reviewQueueStackedRows.length : 0
+        reviewQueueStackedRowCount: starterId === "producer" ? reviewQueueStackedRows.length : 0,
+        viewportWidth: window.innerWidth
       };
     };
 
@@ -13151,7 +13235,7 @@ export function App(): ReactElement {
           window.confirm = originalConfirm;
         }
         await settleTask();
-        flushSync(() => setWorkspaceCommandDockVisible(false));
+        flushSync(() => setWorkspaceCommandDockVisible(true));
         return {
           applyChangedStyle,
           applyDialogClosed,
@@ -13294,7 +13378,8 @@ export function App(): ReactElement {
         const guidedDeliveryStatusOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-status-tools"]')?.open ?? true;
         const guidedDeliveryAuditOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-audit-tools"]')?.open ?? true;
         const guidedTransportSessionOpen = document.querySelector<HTMLDetailsElement>('[data-testid="transport-session-tools"]')?.open ?? true;
-        const guidedTransportExportsOpen = document.querySelector<HTMLDetailsElement>('[data-testid="transport-export-tools"]')?.open ?? true;
+        const guidedTransportExportsOpen =
+          document.querySelector('[data-testid="header-export-trigger"]')?.getAttribute("aria-expanded") === "true";
         flushSync(() => updateModeAwareToolPanels("studio"));
         const studioSoundOpen = document.querySelector<HTMLDetailsElement>('[data-testid="sound-design-tools"]')?.open ?? false;
         const studioHarmonyOpen = document.querySelector<HTMLDetailsElement>('[data-testid="harmony-moves"]')?.open ?? false;
@@ -13313,7 +13398,8 @@ export function App(): ReactElement {
         const studioDeliveryStatusOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-status-tools"]')?.open ?? false;
         const studioDeliveryAuditOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-audit-tools"]')?.open ?? false;
         const studioTransportSessionOpen = document.querySelector<HTMLDetailsElement>('[data-testid="transport-session-tools"]')?.open ?? false;
-        const studioTransportExportsOpen = document.querySelector<HTMLDetailsElement>('[data-testid="transport-export-tools"]')?.open ?? false;
+        const studioTransportExportsOpen =
+          document.querySelector('[data-testid="header-export-trigger"]')?.getAttribute("aria-expanded") === "true";
         const studioBlockMovesElement = document.querySelector<HTMLDetailsElement>('[data-testid="block-moves"]');
         const studioBlockMovesStyle = studioBlockMovesElement ? getComputedStyle(studioBlockMovesElement) : null;
         const studioBlockMovesFullWidth =
@@ -13333,7 +13419,8 @@ export function App(): ReactElement {
         const resetDeliveryStatusOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-status-tools"]')?.open ?? true;
         const resetDeliveryAuditOpen = document.querySelector<HTMLDetailsElement>('[data-testid="handoff-audit-tools"]')?.open ?? true;
         const resetTransportSessionOpen = document.querySelector<HTMLDetailsElement>('[data-testid="transport-session-tools"]')?.open ?? true;
-        const resetTransportExportsOpen = document.querySelector<HTMLDetailsElement>('[data-testid="transport-export-tools"]')?.open ?? true;
+        const resetTransportExportsOpen =
+          document.querySelector('[data-testid="header-export-trigger"]')?.getAttribute("aria-expanded") === "true";
         const arrangementTools = {
           guidedArrangementOpen,
           guidedBlockMovesOpen,
@@ -13661,19 +13748,6 @@ export function App(): ReactElement {
               <h1>GrooveForge</h1>
               <span>{t("app.workstation", { kind: window.grooveforge?.appKind ?? "desktop" })}</span>
             </div>
-            <button
-              aria-expanded={settingsOpen}
-              aria-haspopup="dialog"
-              aria-label={t("action.settingsTitle")}
-              className="brand-settings-button"
-              data-testid="settings-open"
-              onClick={() => setSettingsOpen(true)}
-              title={t("action.settingsTitle")}
-              type="button"
-            >
-              <Settings size={17} aria-hidden="true" />
-              <span>{t("action.settings")}</span>
-            </button>
           </div>
           <details className="first-run-launchpad" data-testid="first-run-launchpad" open={launchpadOpen}>
             <summary
@@ -13948,28 +14022,6 @@ export function App(): ReactElement {
             <small>{metronomeDetailLabel}</small>
           </button>
           <button
-            aria-keyshortcuts="Control+K Meta+K"
-            className="icon-button"
-            data-testid="quick-actions-open"
-            type="button"
-            title={t("action.openActionsTitle")}
-            onClick={openQuickActions}
-          >
-            <KeyboardMusic size={18} aria-hidden="true" />
-            <span>{t("action.actions")}</span>
-          </button>
-          <button
-            aria-keyshortcuts="? Control+/ Meta+/"
-            className="icon-button"
-            data-testid="command-reference-open"
-            type="button"
-            title={t("action.openHelpTitle")}
-            onClick={openCommandReference}
-          >
-            <CircleHelp size={18} aria-hidden="true" />
-            <span>{t("action.help")}</span>
-          </button>
-          <button
             aria-label={transportPlaybackAccessibleLabel}
             aria-keyshortcuts="Space"
             aria-pressed={isPlaying}
@@ -13984,54 +14036,6 @@ export function App(): ReactElement {
               <strong>{transportPlaybackAction}</strong>
               <small>{transportPlaybackTarget.detailLabel}</small>
             </span>
-          </button>
-          </div>
-          <div className="project-essential-controls" data-testid="project-essential-controls">
-          <button
-            aria-keyshortcuts="Control+Z Meta+Z"
-            className="icon-button"
-            data-testid="undo-button"
-            type="button"
-            title={t("action.undoTitle")}
-            disabled={!canUndo}
-            onClick={undoProject}
-          >
-            <Undo2 size={18} aria-hidden="true" />
-            <span>{t("action.undo")}</span>
-          </button>
-          <button
-            aria-keyshortcuts="Control+Y Meta+Y Control+Shift+Z Meta+Shift+Z"
-            className="icon-button"
-            data-testid="redo-button"
-            type="button"
-            title={t("action.redoTitle")}
-            disabled={!canRedo}
-            onClick={redoProject}
-          >
-            <Redo2 size={18} aria-hidden="true" />
-            <span>{t("action.redo")}</span>
-          </button>
-          <button
-            aria-keyshortcuts="Control+O Meta+O"
-            className="icon-button"
-            data-testid="project-open"
-            type="button"
-            title={t("action.openTitle")}
-            onClick={() => void handleOpenProject()}
-          >
-            <FolderOpen size={18} aria-hidden="true" />
-            <span>{t("action.open")}</span>
-          </button>
-          <button
-            aria-keyshortcuts="Control+S Meta+S"
-            className="icon-button"
-            data-testid="project-save"
-            type="button"
-            title={t("action.saveTitle")}
-            onClick={() => void handleSaveProject()}
-          >
-            <Save size={18} aria-hidden="true" />
-            <span>{t("action.save")}</span>
           </button>
           </div>
           <details className="transport-session-tools" data-testid="transport-session-tools" open={transportSessionOpen}>
@@ -14095,45 +14099,132 @@ export function App(): ReactElement {
               </div>
             </div>
           </details>
-          <details className="transport-export-tools" data-testid="transport-export-tools" open={transportExportsOpen}>
-            <summary
-              data-testid="transport-export-toggle"
-              onClick={(event) => {
-                event.preventDefault();
-                setTransportExportsOpen((open) => !open);
-              }}
-            >
-              <Download size={16} aria-hidden="true" />
-              <span>
-                <strong>{t("action.exports")}</strong>
-                <small>{t("action.exportsDetail")}</small>
-              </span>
-              <ArrowDown size={14} aria-hidden="true" />
-            </summary>
-            <div className="transport-tools-content" data-testid="transport-export-content">
-          <button className="icon-button" data-testid="export-wav" type="button" title={t("core.exportWavTitle")} onClick={handleExportWav}>
-            <Download size={18} aria-hidden="true" />
-            <span>WAV</span>
-          </button>
-          <button className="icon-button" data-testid="export-stems" type="button" title={t("core.exportStemsTitle")} onClick={handleExportStems}>
-            <Download size={18} aria-hidden="true" />
-            <span>{t("core.stems")}</span>
-          </button>
-          <button className="icon-button" data-testid="export-midi" type="button" title={t("core.exportMidiTitle")} onClick={handleExportMidi}>
-            <Download size={18} aria-hidden="true" />
-            <span>MIDI</span>
-          </button>
-          <button className="icon-button" data-testid="export-handoff-sheet" type="button" title={t("core.exportSheetTitle")} onClick={handleExportHandoffSheet}>
-            <Download size={18} aria-hidden="true" />
-            <span>{t("core.sheet")}</span>
-          </button>
-          <button className="icon-button" data-testid="export-delivery-bundle" type="button" title={t("core.exportBundleTitle")} onClick={handleExportDeliveryBundle}>
-            <Download size={18} aria-hidden="true" />
-            <span>{t("core.bundle")}</span>
-          </button>
-            </div>
-          </details>
         </div>
+        <HeaderActionDock
+          canRedo={canRedo}
+          canUndo={canUndo}
+          exportDetail={t("action.exportsDetail")}
+          exportIcon={<Download size={17} aria-hidden="true" />}
+          exportItems={[
+            {
+              id: "wav",
+              label: "WAV",
+              detail: t("core.exportWavTitle"),
+              icon: <FileAudio size={17} />,
+              testId: "export-wav",
+              title: t("core.exportWavTitle"),
+              onSelect: handleExportWav
+            },
+            {
+              id: "stems",
+              label: t("core.stems"),
+              detail: t("core.exportStemsTitle"),
+              icon: <Waves size={17} />,
+              testId: "export-stems",
+              title: t("core.exportStemsTitle"),
+              onSelect: handleExportStems
+            },
+            {
+              id: "midi",
+              label: "MIDI",
+              detail: t("core.exportMidiTitle"),
+              icon: <KeyboardMusic size={17} />,
+              testId: "export-midi",
+              title: t("core.exportMidiTitle"),
+              onSelect: handleExportMidi
+            },
+            {
+              id: "sheet",
+              label: t("core.sheet"),
+              detail: t("core.exportSheetTitle"),
+              icon: <ListChecks size={17} />,
+              testId: "export-handoff-sheet",
+              title: t("core.exportSheetTitle"),
+              onSelect: handleExportHandoffSheet
+            },
+            {
+              id: "bundle",
+              label: t("core.bundle"),
+              detail: t("core.exportBundleTitle"),
+              icon: <PackageCheck size={17} />,
+              testId: "export-delivery-bundle",
+              title: t("core.exportBundleTitle"),
+              onSelect: handleExportDeliveryBundle
+            }
+          ]}
+          exportLabel={t("action.exports")}
+          onRedo={redoProject}
+          onUndo={undoProject}
+          redoIcon={<Redo2 size={16} aria-hidden="true" />}
+          redoLabel={t("action.redo")}
+          redoTitle={t("action.redoTitle")}
+          undoIcon={<Undo2 size={16} aria-hidden="true" />}
+          undoLabel={t("action.undo")}
+          undoTitle={t("action.undoTitle")}
+          utilityDetail={t("action.utilityDetail")}
+          utilityIcon={<SlidersHorizontal size={17} aria-hidden="true" />}
+          utilityItems={[
+            {
+              id: "open",
+              label: t("action.open"),
+              detail: t("action.openTitle"),
+              icon: <FolderOpen size={17} />,
+              keyShortcuts: "Control+O Meta+O",
+              testId: "project-open",
+              title: t("action.openTitle"),
+              onSelect: () => void handleOpenProject()
+            },
+            {
+              id: "save",
+              label: t("action.save"),
+              detail: t("action.saveTitle"),
+              icon: <Save size={17} />,
+              keyShortcuts: "Control+S Meta+S",
+              testId: "project-save",
+              title: t("action.saveTitle"),
+              onSelect: () => void handleSaveProject()
+            },
+            {
+              id: "actions",
+              label: t("action.actions"),
+              detail: t("action.openActionsTitle"),
+              icon: <KeyboardMusic size={17} />,
+              keyShortcuts: "Control+K Meta+K",
+              testId: "quick-actions-open",
+              title: t("action.openActionsTitle"),
+              onSelect: openQuickActions
+            },
+            {
+              id: "help",
+              label: t("action.help"),
+              detail: t("action.openHelpTitle"),
+              icon: <CircleHelp size={17} />,
+              keyShortcuts: "? Control+/ Meta+/",
+              testId: "command-reference-open",
+              title: t("action.openHelpTitle"),
+              onSelect: openCommandReference
+            },
+            {
+              id: "guide",
+              label: t("guide.title"),
+              detail: project.mode === "guided" ? t("guide.guidedDetail") : t("guide.studioDetail"),
+              icon: <Target size={17} />,
+              testId: "guidance-center-open",
+              title: t("guide.title"),
+              onSelect: () => setGuidanceCenterOpen(true)
+            },
+            {
+              id: "settings",
+              label: t("action.settings"),
+              detail: t("action.settingsTitle"),
+              icon: <Settings size={17} />,
+              testId: "settings-open",
+              title: t("action.settingsTitle"),
+              onSelect: () => setSettingsOpen(true)
+            }
+          ]}
+          utilityLabel={t("action.utility")}
+        />
       </header>
 
       {workspaceCommandDockVisible && (
@@ -14343,28 +14434,11 @@ export function App(): ReactElement {
       <WorkflowNavigator
         activeZone={activeWorkspaceZone}
         items={workflowNavigatorItems}
+        onOpenOverview={selectOverviewNavigatorTab}
         result={workflowNavigatorResult}
         sectionRef={workflowNavigatorPanelRef}
         onJump={selectWorkflowNavigatorTab}
       />
-
-      {exactProjectAudioAnalysisReady ? (
-        <GuideQuickStart
-          firstBeatPathSummary={firstBeatPathSummary}
-          sessionPassSummary={sessionPassSummary}
-          workflowNavigatorItems={workflowNavigatorItems}
-          onJumpFirstBeatPath={jumpToFirstBeatPathStep}
-          onFocusSessionPass={focusSessionPassCard}
-          onJumpWorkflowSpotlight={jumpToWorkflowNavigatorItem}
-          onOpenGuideCenter={() => setGuidanceCenterOpen(true)}
-        />
-      ) : (
-        <ProjectAudioAnalysisGate
-          onRetry={retryCurrentProjectAudioAnalysis}
-          status={projectAudioAnalysis.status}
-          surface="Guide"
-        />
-      )}
 
       <details
         className="guidance-center"
@@ -14393,6 +14467,23 @@ export function App(): ReactElement {
         </summary>
         <Activity mode={workspaceActivityMode(guidanceCenterOpen)} name="guide-review-center">
         <div className="guidance-center-content" data-testid="guidance-center-content">
+      {exactProjectAudioAnalysisReady ? (
+        <GuideQuickStart
+          firstBeatPathSummary={firstBeatPathSummary}
+          sessionPassSummary={sessionPassSummary}
+          workflowNavigatorItems={workflowNavigatorItems}
+          onJumpFirstBeatPath={jumpToFirstBeatPathStep}
+          onFocusSessionPass={focusSessionPassCard}
+          onJumpWorkflowSpotlight={jumpToWorkflowNavigatorItem}
+          onOpenGuideCenter={() => setGuidanceCenterOpen(true)}
+        />
+      ) : (
+        <ProjectAudioAnalysisGate
+          onRetry={retryCurrentProjectAudioAnalysis}
+          status={projectAudioAnalysis.status}
+          surface="Guide"
+        />
+      )}
       {exactProjectAudioAnalysisReady && (
       <AudienceSessionReadout
         result={audienceSessionActionResult}
@@ -14722,6 +14813,34 @@ export function App(): ReactElement {
         id="workspace-main"
         tabIndex={-1}
       >
+      <section
+        aria-labelledby="workspace-tab-overview"
+        className="workspace-grid workspace-zone-panel workspace-overview-panel"
+        data-testid="workflow-target-overview"
+        data-workspace-zone="overview"
+        hidden={activeWorkspaceZone !== "overview"}
+        id="workspace-panel-overview"
+        role="tabpanel"
+        tabIndex={activeWorkspaceZone === "overview" ? 0 : -1}
+      >
+        <Activity mode={workspaceActivityMode(activeWorkspaceZone === "overview")} name="workspace-overview">
+          <WorkspaceOverview
+            activePage={activeOverviewWorkspacePage}
+            analysis={exactProjectAudioAnalysisReady ? exportAnalysis : null}
+            analysisState={projectAudioAnalysis.status}
+            isFullSongPlaying={isFullSongPlaying}
+            isPlaying={isPlaying}
+            onSelectPage={(page) => {
+              setActiveOverviewWorkspacePage(page);
+              setProjectStatus(`Opened Overview / ${page === "snapshot" ? "At a glance" : page === "song-map" ? "Song map" : "Readiness"} page`);
+            }}
+            onToggleFullSongPlayback={toggleOverviewSongPlayback}
+            playbackPosition={playbackPosition}
+            project={project}
+            workflowItems={workflowNavigatorItems}
+          />
+        </Activity>
+      </section>
       <section
         aria-labelledby="workspace-tab-compose"
         className="workspace-grid workspace-zone-panel workspace-compose-panel"
@@ -16832,8 +16951,32 @@ export function App(): ReactElement {
         tabIndex={activeWorkspaceZone === "deliver" ? 0 : -1}
       >
       <Activity mode={workspaceActivityMode(activeWorkspaceZone === "deliver")} name="workspace-deliver">
+      <WorkspacePageTabs
+        activePage={activeDeliverWorkspacePage}
+        ariaLabel={t("nav.subTabsAria", { title: t("nav.deliver") })}
+        idPrefix="deliver"
+        items={[
+          {
+            id: "exports",
+            label: t("nav.deliverExports"),
+            detail: t("nav.deliverExportsDetail"),
+            meta: t("nav.deliverExportsMeta"),
+            icon: <Download size={18} />
+          },
+          {
+            id: "checks",
+            label: t("nav.deliverChecks"),
+            detail: t("nav.deliverChecksDetail"),
+            meta: t("nav.deliverChecksMeta"),
+            icon: <PackageCheck size={18} />
+          }
+        ]}
+        onSelect={(page) => activateDeliverWorkspacePage(page, true)}
+        title={t("nav.deliverEditor")}
+      />
       {exactProjectAudioAnalysisReady ? (
         <HandoffPack
+          activePage={activeDeliverWorkspacePage}
           analysis={exportAnalysis}
           auditOpen={deliveryAuditOpen}
           exportReceipt={currentHandoffExportReceipt}
@@ -16859,18 +17002,33 @@ export function App(): ReactElement {
           onToggleStatus={() => setDeliveryStatusOpen((open) => !open)}
         />
       ) : (
-        <section className="panel handoff-pack" data-testid="workflow-target-deliver" ref={deliverPanelRef}>
-          <PanelTitle
-            icon={<Download size={18} />}
-            title={t("panel.handoff")}
-            meta={t("panel.exactMetersRequired")}
-          />
-          <ProjectAudioAnalysisGate
-            onRetry={retryCurrentProjectAudioAnalysis}
-            status={projectAudioAnalysis.status}
-            surface="Deliver"
-          />
-        </section>
+        <>
+          {(["exports", "checks"] as const).map((page) => (
+            <section
+              aria-labelledby={`deliver-page-tab-${page}`}
+              className="panel handoff-pack workspace-page-panel"
+              data-testid={page === "exports" ? "workflow-target-deliver" : "handoff-pack-checks"}
+              data-workspace-page={page}
+              hidden={activeDeliverWorkspacePage !== page}
+              id={`deliver-page-panel-${page}`}
+              key={page}
+              ref={activeDeliverWorkspacePage === page ? deliverPanelRef : undefined}
+              role="tabpanel"
+              tabIndex={activeDeliverWorkspacePage === page ? 0 : -1}
+            >
+              <PanelTitle
+                icon={page === "exports" ? <Download size={18} /> : <PackageCheck size={18} />}
+                title={page === "exports" ? t("nav.deliverExports") : t("nav.deliverChecks")}
+                meta={t("panel.exactMetersRequired")}
+              />
+              <ProjectAudioAnalysisGate
+                onRetry={retryCurrentProjectAudioAnalysis}
+                status={projectAudioAnalysis.status}
+                surface="Deliver"
+              />
+            </section>
+          ))}
+        </>
       )}
       </Activity>
       </section>
