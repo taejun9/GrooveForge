@@ -142,7 +142,7 @@ function validateProjectFileLoadErrorStatus(uiModel) {
     "project loading should route parser failures through the actionable status helper"
   );
   check(
-    /async function handleSaveProject\(\): Promise<ProjectSaveAttempt> \{\s*let requestId = 0;\s*try \{\s*commitMasterCeilingDraft\(\);\s*flushActiveMetadataDraft\("commit"\);\s*requestId = \+\+projectSaveRequestIdRef\.current;\s*const projectToSave = projectRef\.current;\s*const contents = serializeProjectFile\(projectToSave\);/u.test(appSource),
+    /async function handleSaveProject\(intentEpoch = claimFixedFeedbackIntent\(\)\): Promise<ProjectSaveAttempt> \{\s*let requestId = 0;\s*try \{\s*commitMasterCeilingDraft\(\);\s*flushActiveMetadataDraft\("commit"\);\s*requestId = \+\+projectSaveRequestIdRef\.current;\s*const projectToSave = projectRef\.current;\s*const contents = serializeProjectFile\(projectToSave\);/u.test(appSource),
     "project serialization should stay inside the Save failure boundary and use the current project reference"
   );
   check(
@@ -1418,6 +1418,15 @@ function validateDesktopFixedFrameSource() {
     fixedMediaStart >= 0 && fixedMediaEnd > fixedMediaStart
       ? styles.slice(fixedMediaStart, fixedMediaEnd)
       : "";
+  const readabilityMediaStart = styles.indexOf("실제 설치 앱 가독성 보정");
+  const readabilityMediaEnd =
+    readabilityMediaStart >= 0
+      ? styles.indexOf("\n@media (min-width: 901px) and (max-width: 1040px)", readabilityMediaStart)
+      : -1;
+  const readabilityFrameStyles =
+    readabilityMediaStart >= 0 && readabilityMediaEnd > readabilityMediaStart
+      ? styles.slice(readabilityMediaStart, readabilityMediaEnd)
+      : "";
   check(
     fixedFrameStyles.includes("html,\n  body,\n  #root {") &&
       fixedFrameStyles.includes("height: 100%;") &&
@@ -1456,6 +1465,40 @@ function validateDesktopFixedFrameSource() {
       fixedFrameStyles.includes("max-height: calc(100dvh - 198px);") &&
       fixedFrameStyles.includes("overscroll-behavior: contain;"),
     "Guide content should open as a viewport-bounded overlay with its own internal scroller"
+  );
+  check(
+    readabilityFrameStyles.includes("--workspace-player-clearance: 80px;") &&
+      readabilityFrameStyles.includes("grid-template-rows: 114px 40px 56px minmax(0, 1fr);") &&
+      readabilityFrameStyles.includes("padding: 10px 10px var(--workspace-player-clearance);") &&
+      readabilityFrameStyles.includes("grid-template-rows: 50px 44px;") &&
+      readabilityFrameStyles.includes("align-self: start;\n    min-height: 50px;") &&
+      readabilityFrameStyles.includes("min-height: 24px;") &&
+      readabilityFrameStyles.includes(".workspace-tabpanels,\n  .workspace-zone-panel:not([hidden]) {\n    overflow: clip;") &&
+      readabilityFrameStyles.includes("scrollbar-gutter: stable;") &&
+      readabilityFrameStyles.includes("padding: 12px 14px 30px;") &&
+      readabilityFrameStyles.includes("backdrop-filter: none;") &&
+      readabilityFrameStyles.includes(".workspace-feedback-anchor > .quick-action-result,\n  .mode-row > .quick-action-result {") &&
+      readabilityFrameStyles.includes("box-sizing: border-box;\n    max-height: 82px;\n    overflow: clip;") &&
+      readabilityFrameStyles.includes("grid-template-columns: minmax(0, 1fr);\n    align-content: center;") &&
+      readabilityFrameStyles.includes("white-space: normal;\n    line-height: 1.2;") &&
+      readabilityFrameStyles.includes("-webkit-line-clamp: 2;") &&
+      readabilityFrameStyles.includes("pointer-events: auto;") &&
+      readabilityFrameStyles.includes(".app-shell:has(.workflow-navigator-result) {\n    --workspace-player-clearance: 170px;") &&
+      readabilityFrameStyles.includes('.app-shell[data-fixed-feedback-active="true"] .guidance-center[open] {') &&
+      readabilityFrameStyles.includes("max-height: calc(100dvh - 238px);") &&
+      readabilityFrameStyles.includes(
+        '.app-shell[data-fixed-feedback-active="true"] .guidance-center[open] .guidance-center-content {'
+      ) &&
+      readabilityFrameStyles.includes("max-height: calc(100dvh - 288px);") &&
+      readabilityFrameStyles.includes("@media (min-width: 1180px) and (min-height: 640px)") &&
+      readabilityFrameStyles.includes("92px 78px minmax(104px, 1fr)") &&
+      readabilityFrameStyles.includes("text-overflow: ellipsis;"),
+    "the final installed-app frame should reserve player clearance, keep one visible scroll owner, prevent toast overlap, keep fixed-result follow-ups readable, and protect the English meter label"
+  );
+  check(
+    shellSource.includes('data-testid="quick-action-result-audition" title={result.auditionCue}') &&
+      shellSource.includes('data-testid="quick-action-result-next-check" title={result.nextCheck}'),
+    "fixed Quick Action follow-ups should expose their complete text on hover when the two-line visual clamp is still shorter than the message"
   );
 }
 
@@ -1857,6 +1900,111 @@ function validateWorkspaceFunctionTabs(html) {
       appSource.includes('className="workspace-tabpanels"') &&
       appSource.includes("data-active-workspace-zone={activeWorkspaceZone}"),
     "App should share one active workspace zone between Workflow Navigator and the tabpanel container"
+  );
+  const overviewTabSelectionSource = printNamedFunction(appSource, "App.tsx", "selectOverviewNavigatorTab");
+  const workflowTabSelectionSource = printNamedFunction(appSource, "App.tsx", "selectWorkflowNavigatorTab");
+  const quickActionRunSource = printNamedFunction(appSource, "App.tsx", "runQuickAction");
+  const clearFixedFeedbackLaneSource = printNamedFunction(appSource, "App.tsx", "clearFixedFeedbackLane");
+  const beginFixedFeedbackIntentSource = printNamedFunction(appSource, "App.tsx", "beginFixedFeedbackIntent");
+  const claimFixedFeedbackIntentSource = printNamedFunction(appSource, "App.tsx", "claimFixedFeedbackIntent");
+  const fixedFeedbackIntentIsCurrentSource = printNamedFunction(
+    appSource,
+    "App.tsx",
+    "fixedFeedbackIntentIsCurrent"
+  );
+  const saveProjectSource = printNamedFunction(appSource, "App.tsx", "handleSaveProject");
+  const openProjectSource = printNamedFunction(appSource, "App.tsx", "handleOpenProject");
+  const importProjectSource = printNamedFunction(appSource, "App.tsx", "handleImportFile");
+  const loadProjectSource = printNamedFunction(appSource, "App.tsx", "loadProjectText");
+  const clearLocalDraftSource = printNamedFunction(appSource, "App.tsx", "clearLocalDraftRecovery");
+  const undoProjectSource = printNamedFunction(appSource, "App.tsx", "undoProject");
+  const redoProjectSource = printNamedFunction(appSource, "App.tsx", "redoProject");
+  const restoreLocalDraftSource = printNamedFunction(appSource, "App.tsx", "restoreLocalDraft");
+  const fixedFeedbackShowSources = [
+    ["showModeSwitchResult", "setModeSwitchResult(result)"],
+    ["showProjectFileResult", "setProjectFileResult(result)"],
+    ["showLocalDraftRecoveryResult", "setLocalDraftRecoveryResult(result)"],
+    ["showWorkflowNavigatorResult", "setWorkflowNavigatorResult(result)"],
+    ["showUndoRedoResult", "setUndoRedoResult(result)"],
+    ["showQuickActionResult", "setQuickActionResult(result)"]
+  ].map(([functionName, setter]) => ({
+    setter,
+    source: printNamedFunction(appSource, "App.tsx", functionName)
+  }));
+  check(
+    [
+      "setModeSwitchResult(null)",
+      "setProjectFileResult(null)",
+      "setLocalDraftRecoveryResult(null)",
+      "setWorkflowNavigatorResult(null)",
+      "setUndoRedoResult(null)",
+      "setQuickActionResult(null)"
+    ].every((setter) => clearFixedFeedbackLaneSource.includes(setter)) &&
+      fixedFeedbackShowSources.every(
+        ({ setter, source }) =>
+          source.includes("intentEpoch = claimFixedFeedbackIntent()") &&
+          source.includes("fixedFeedbackIntentIsCurrent(intentEpoch)") &&
+          source.includes("clearFixedFeedbackLane()") &&
+          source.includes(setter)
+      ) &&
+      overviewTabSelectionSource.includes("beginFixedFeedbackIntent()") &&
+      overviewTabSelectionSource.includes("clearFixedFeedbackLane()") &&
+      workflowTabSelectionSource.includes("showWorkflowNavigatorResult(") &&
+      quickActionRunSource.includes("showQuickActionResult(result, feedbackIntentEpoch)") &&
+      appSource.includes('data-fixed-feedback-active={fixedFeedbackOwner !== "none"}') &&
+      appSource.includes('data-fixed-feedback-owner={fixedFeedbackOwner}') &&
+      appSource.includes('fixedFeedbackOwner === "mode-switch"') &&
+      appSource.includes('fixedFeedbackOwner === "project-file"') &&
+      appSource.includes('fixedFeedbackOwner === "local-draft"') &&
+      appSource.includes('result={fixedFeedbackOwner === "workflow" ? workflowNavigatorResult : null}') &&
+      appSource.includes('fixedFeedbackOwner === "undo-redo"') &&
+      appSource.includes('fixedFeedbackOwner === "quick-action"'),
+    "mode, project-file, draft, workflow, undo/redo, and Quick Action results should share one structurally exclusive fixed feedback lane"
+  );
+  check(
+    appSource.includes("const fixedFeedbackIntentEpochRef = useRef(0)") &&
+      appSource.includes("const activeQuickActionFeedbackIntentEpochRef = useRef<number | null>(null)") &&
+      beginFixedFeedbackIntentSource.includes("fixedFeedbackIntentEpochRef.current += 1") &&
+      claimFixedFeedbackIntentSource.includes(
+        "activeQuickActionFeedbackIntentEpochRef.current ?? beginFixedFeedbackIntent()"
+      ) &&
+      fixedFeedbackIntentIsCurrentSource.includes("intentEpoch === fixedFeedbackIntentEpochRef.current") &&
+      quickActionRunSource.includes("const feedbackIntentEpoch = beginFixedFeedbackIntent()") &&
+      quickActionRunSource.includes("activeQuickActionFeedbackIntentEpochRef.current = feedbackIntentEpoch") &&
+      quickActionRunSource.includes(
+        "activeQuickActionFeedbackIntentEpochRef.current = previousQuickActionFeedbackIntentEpoch"
+      ) &&
+      quickActionRunSource.split("fixedFeedbackIntentIsCurrent(feedbackIntentEpoch)").length - 1 >= 3 &&
+      saveProjectSource.includes("intentEpoch = claimFixedFeedbackIntent()") &&
+      saveProjectSource.includes("showProjectFileResult(") &&
+      saveProjectSource.split("fixedFeedbackIntentIsCurrent(intentEpoch)").length - 1 >= 2 &&
+      openProjectSource.includes("intentEpoch = claimFixedFeedbackIntent()") &&
+      openProjectSource.includes('loadProjectText(result.contents, fileDisplayName(result.filePath), "open", intentEpoch)') &&
+      openProjectSource.split("fixedFeedbackIntentIsCurrent(intentEpoch)").length - 1 >= 3 &&
+      importProjectSource.includes("const intentEpoch = claimFixedFeedbackIntent()") &&
+      importProjectSource.includes('loadProjectText(contents, file.name, "import", intentEpoch)') &&
+      importProjectSource.includes("fixedFeedbackIntentIsCurrent(intentEpoch)") &&
+      loadProjectSource.includes("intentEpoch = claimFixedFeedbackIntent()") &&
+      loadProjectSource.includes("showProjectFileResult(createProjectFileResult(action, sourceName, nextProject), intentEpoch)") &&
+      loadProjectSource.split("fixedFeedbackIntentIsCurrent(intentEpoch)").length - 1 >= 2 &&
+      clearLocalDraftSource.includes("intentEpoch = claimFixedFeedbackIntent()") &&
+      clearLocalDraftSource.split("fixedFeedbackIntentIsCurrent(intentEpoch)").length - 1 >= 4 &&
+      clearLocalDraftSource.includes(
+        'showLocalDraftRecoveryResult(createLocalDraftRecoveryResult("clear", recovery, projectRef.current), intentEpoch)'
+      ) &&
+      appSource.includes('onClear={() => void clearLocalDraftRecovery(beginFixedFeedbackIntent())}') &&
+      electronMainSource.includes('onStep("closing the first-run launchpad before direct fixed-feedback controls")') &&
+      electronMainSource.includes(
+        'document.querySelector(\'[data-testid="first-run-launchpad"]\')?.hasAttribute(\'open\') === false'
+      ) &&
+      undoProjectSource.includes("claimFixedFeedbackIntent()") &&
+      undoProjectSource.indexOf("claimFixedFeedbackIntent()") < undoProjectSource.indexOf("setUndoRedoResult(null)") &&
+      redoProjectSource.includes("claimFixedFeedbackIntent()") &&
+      redoProjectSource.indexOf("claimFixedFeedbackIntent()") < redoProjectSource.indexOf("setUndoRedoResult(null)") &&
+      restoreLocalDraftSource.includes("claimFixedFeedbackIntent()") &&
+      restoreLocalDraftSource.indexOf("claimFixedFeedbackIntent()") <
+        restoreLocalDraftSource.indexOf("setLocalDraftRecoveryResult(null)"),
+    "async Quick Actions should keep one feedback intent through their own project/draft result, direct draft UI should mint a numeric intent, launch-smoke should uncover direct controls after reload, and stale completions should be rejected after a newer intent"
   );
 
   const firstMainTabsLabelIndex = html.indexOf('aria-label="Main production tabs"');
@@ -2921,15 +3069,26 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
   const reviewQueueOuterRevealIndex = reviewQueueRouteSource.indexOf("setMasterReviewOpen(true)");
   const reviewQueueInnerRevealIndex = reviewQueueRouteSource.indexOf("setMasterReviewQueueOpen(true)");
   const reviewQueueScrollIndex = reviewQueueRouteSource.indexOf(
-    'scrollWorkspaceTargetIntoView(() => reviewQueuePanelRef.current, "start", "mix")'
+    'revealWorkspaceTargetAfterLayout(() => reviewQueuePanelRef.current, "start", "mix", true)'
+  );
+  const deferredWorkspaceRevealSource = printNamedFunction(
+    appSource,
+    "App.tsx",
+    "revealWorkspaceTargetAfterLayout"
   );
   check(
     reviewQueueRouteSource.includes("flushSync(() => {") &&
+      reviewQueueRouteSource.includes("setGuidanceCenterOpen(false)") &&
       reviewQueueOuterRevealIndex >= 0 &&
       reviewQueueInnerRevealIndex > reviewQueueOuterRevealIndex &&
       reviewQueueScrollIndex > reviewQueueInnerRevealIndex &&
+      deferredWorkspaceRevealSource.includes("let remainingLayoutFrames = 2") &&
+      deferredWorkspaceRevealSource.includes("window.requestAnimationFrame(reveal)") &&
+      deferredWorkspaceRevealSource.includes("scrollWorkspaceTargetIntoView(targetResolver, block, zoneHint)") &&
+      deferredWorkspaceRevealSource.includes("focus({ preventScroll: true })") &&
+      workspaceScrollSource.includes('target.scrollIntoView({ block, behavior: "auto" })') &&
       !appSource.includes("flushSync(() => focusReviewQueueRouteReadout())"),
-    "Review Queue route readout should synchronously reveal both disclosures inside the production handler before central same-Mix scrolling, without an audit-only outer flush"
+    "Review Queue route readout should dismiss the Guide overlay, reveal both disclosures, then use a bounded post-layout auto scroll and accessible focus"
   );
   check(
     electronMainSource.includes(
@@ -2959,18 +3118,22 @@ function validateFirstRunRenderer(html, supportedStyleCount) {
       ) &&
       desktopLaunchSmokeSource.includes("finishChecklistQuickActionReveal?.visibleHeight > 0") &&
       electronMainSource.includes("reviewQueueClearOfNavigator") &&
+      electronMainSource.includes("reviewQueueUnobscured") &&
+      electronMainSource.includes("queue.contains(queueProbe)") &&
       electronMainSource.includes("disclosurePostureRestored") &&
       desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.sourceZone === \"mix\"") &&
       desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.destinationZone === \"mix\"") &&
       desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.activeElementTestId === \"review-queue\"") &&
       desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.activeElementVisible === true") &&
       desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.activeElementWithinActivePanel === true") &&
+      desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.guidanceCenterOpen === false") &&
       desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.reviewQueueWidth > 0") &&
       desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.reviewQueueHeight > 0") &&
       desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.reviewQueueInViewport === true") &&
+      desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.reviewQueueUnobscured === true") &&
       desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.reviewQueueClearOfNavigator === true") &&
       desktopLaunchSmokeSource.includes("reviewQueueQuickActionReveal?.disclosurePostureRestored === true"),
-    "Electron and its external runner should contract native Finish and same-Mix Review Queue viewport clearance, preservation, and restoration evidence"
+    "Electron and its external runner should contract native Finish plus unobscured same-Mix Review Queue viewport clearance, preservation, and restoration evidence"
   );
   check(
     electronMainSource.includes(

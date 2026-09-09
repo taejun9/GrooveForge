@@ -1431,6 +1431,8 @@ export function App(): ReactElement {
   const localDraftRecoveryRef = useRef(localDraftRecovery);
   const projectSaveRequestIdRef = useRef(0);
   const projectExportRequestIdRef = useRef(0);
+  const fixedFeedbackIntentEpochRef = useRef(0);
+  const activeQuickActionFeedbackIntentEpochRef = useRef<number | null>(null);
   const handoffExportReceiptRef = useRef<HandoffExportReceipt | null>(null);
   const handoffExportReceiptProjectRef = useRef<ProjectState | null>(null);
   const tapTempoTimesRef = useRef<number[]>([]);
@@ -1477,6 +1479,7 @@ export function App(): ReactElement {
   const toplineSpacePanelRef = useRef<HTMLElement | null>(null);
   const listeningPassPanelRef = useRef<HTMLElement | null>(null);
   const workflowNavigatorPanelRef = useRef<HTMLElement | null>(null);
+  const workspaceTargetRevealFrameRef = useRef<number | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
   const composePanelRef = useRef<HTMLElement | null>(null);
   const notePanelRef = useRef<HTMLElement | null>(null);
@@ -1493,6 +1496,14 @@ export function App(): ReactElement {
   const sessionBriefVibeRef = useRef<HTMLInputElement | null>(null);
   const sessionBriefReferenceRef = useRef<HTMLInputElement | null>(null);
   const sessionBriefNotesRef = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(
+    () => () => {
+      if (workspaceTargetRevealFrameRef.current !== null) {
+        window.cancelAnimationFrame(workspaceTargetRevealFrameRef.current);
+      }
+    },
+    []
+  );
   activeWorkspaceZoneRef.current = activeWorkspaceZone;
   activeComposeWorkspacePageRef.current = activeComposeWorkspacePage;
   activeArrangeWorkspacePageRef.current = activeArrangeWorkspacePage;
@@ -3038,6 +3049,82 @@ export function App(): ReactElement {
     }
   }
 
+  function clearFixedFeedbackLane(): void {
+    setModeSwitchResult(null);
+    setProjectFileResult(null);
+    setLocalDraftRecoveryResult(null);
+    setWorkflowNavigatorResult(null);
+    setUndoRedoResult(null);
+    setQuickActionResult(null);
+  }
+
+  function beginFixedFeedbackIntent(): number {
+    fixedFeedbackIntentEpochRef.current += 1;
+    return fixedFeedbackIntentEpochRef.current;
+  }
+
+  function claimFixedFeedbackIntent(): number {
+    return activeQuickActionFeedbackIntentEpochRef.current ?? beginFixedFeedbackIntent();
+  }
+
+  function fixedFeedbackIntentIsCurrent(intentEpoch: number): boolean {
+    return intentEpoch === fixedFeedbackIntentEpochRef.current;
+  }
+
+  function showModeSwitchResult(result: ModeSwitchResult, intentEpoch = claimFixedFeedbackIntent()): void {
+    if (!fixedFeedbackIntentIsCurrent(intentEpoch)) {
+      return;
+    }
+    clearFixedFeedbackLane();
+    setModeSwitchResult(result);
+  }
+
+  function showProjectFileResult(result: ProjectFileResult, intentEpoch = claimFixedFeedbackIntent()): void {
+    if (!fixedFeedbackIntentIsCurrent(intentEpoch)) {
+      return;
+    }
+    clearFixedFeedbackLane();
+    setProjectFileResult(result);
+  }
+
+  function showLocalDraftRecoveryResult(
+    result: LocalDraftRecoveryResult,
+    intentEpoch = claimFixedFeedbackIntent()
+  ): void {
+    if (!fixedFeedbackIntentIsCurrent(intentEpoch)) {
+      return;
+    }
+    clearFixedFeedbackLane();
+    setLocalDraftRecoveryResult(result);
+  }
+
+  function showWorkflowNavigatorResult(
+    result: WorkflowNavigatorJumpResult,
+    intentEpoch = claimFixedFeedbackIntent()
+  ): void {
+    if (!fixedFeedbackIntentIsCurrent(intentEpoch)) {
+      return;
+    }
+    clearFixedFeedbackLane();
+    setWorkflowNavigatorResult(result);
+  }
+
+  function showUndoRedoResult(result: UndoRedoResult, intentEpoch = claimFixedFeedbackIntent()): void {
+    if (!fixedFeedbackIntentIsCurrent(intentEpoch)) {
+      return;
+    }
+    clearFixedFeedbackLane();
+    setUndoRedoResult(result);
+  }
+
+  function showQuickActionResult(result: QuickActionResult, intentEpoch = claimFixedFeedbackIntent()): void {
+    if (!fixedFeedbackIntentIsCurrent(intentEpoch)) {
+      return;
+    }
+    clearFixedFeedbackLane();
+    setQuickActionResult(result);
+  }
+
   function resetProjectDependentUiState(nextProject: ProjectState, invalidatePendingSave = true): void {
     if (invalidatePendingSave) {
       projectSaveRequestIdRef.current += 1;
@@ -3712,6 +3799,7 @@ export function App(): ReactElement {
     const currentRedoStack = redoStackRef.current;
     const previousEntry = currentUndoStack[currentUndoStack.length - 1];
     if (!previousEntry) {
+      claimFixedFeedbackIntent();
       setUndoRedoResult(null);
       setProjectStatus("Nothing to undo");
       return;
@@ -3723,7 +3811,7 @@ export function App(): ReactElement {
     replaceUndoHistory(currentUndoStack.slice(0, -1));
     replaceRedoHistory(prependFuture(currentRedoStack, createEditHistoryEntry(current, previousEntry.label)));
     restoreProjectFromHistory(previousEntry.project, `Undo: ${previousEntry.label}`);
-    setUndoRedoResult(createUndoRedoResult("undo", previousEntry.label, previousEntry.project, remainingUndoDepth, remainingRedoDepth));
+    showUndoRedoResult(createUndoRedoResult("undo", previousEntry.label, previousEntry.project, remainingUndoDepth, remainingRedoDepth));
   }
 
   function redoProject(): void {
@@ -3732,6 +3820,7 @@ export function App(): ReactElement {
     const currentRedoStack = redoStackRef.current;
     const nextEntry = currentRedoStack[0];
     if (!nextEntry) {
+      claimFixedFeedbackIntent();
       setUndoRedoResult(null);
       setProjectStatus("Nothing to redo");
       return;
@@ -3743,7 +3832,7 @@ export function App(): ReactElement {
     replaceRedoHistory(currentRedoStack.slice(1));
     replaceUndoHistory(appendHistory(currentUndoStack, createEditHistoryEntry(current, nextEntry.label)));
     restoreProjectFromHistory(nextEntry.project, `Redo: ${nextEntry.label}`);
-    setUndoRedoResult(createUndoRedoResult("redo", nextEntry.label, nextEntry.project, remainingUndoDepth, remainingRedoDepth));
+    showUndoRedoResult(createUndoRedoResult("redo", nextEntry.label, nextEntry.project, remainingUndoDepth, remainingRedoDepth));
   }
 
   function cancelScheduledNativeProjectRecovery(): void {
@@ -3810,6 +3899,7 @@ export function App(): ReactElement {
 
   function restoreLocalDraft(): void {
     if (!localDraftRecovery) {
+      claimFixedFeedbackIntent();
       setLocalDraftRecoveryResult(null);
       setProjectStatus("No local draft to restore");
       return;
@@ -3841,13 +3931,15 @@ export function App(): ReactElement {
       setSelectedNote(null);
       setSelectedDrumStep(null);
       setSelectedChordIndex(null);
-      setLocalDraftRecoveryResult(createLocalDraftRecoveryResult("restore", recovery, draftProject));
+      showLocalDraftRecoveryResult(createLocalDraftRecoveryResult("restore", recovery, draftProject));
     }
   }
 
-  async function clearLocalDraftRecovery(): Promise<void> {
+  async function clearLocalDraftRecovery(intentEpoch = claimFixedFeedbackIntent()): Promise<void> {
     if (!localDraftRecovery) {
-      setLocalDraftRecoveryResult(null);
+      if (fixedFeedbackIntentIsCurrent(intentEpoch)) {
+        setLocalDraftRecoveryResult(null);
+      }
       return;
     }
 
@@ -3860,13 +3952,17 @@ export function App(): ReactElement {
       try {
         const result = await clearProjectRecovery();
         if (!result.cleared) {
-          setLocalDraftRecoveryResult(null);
+          if (fixedFeedbackIntentIsCurrent(intentEpoch)) {
+            setLocalDraftRecoveryResult(null);
+          }
           setProjectStatus("Could not clear SQLite recovery; retry");
           return;
         }
       } catch {
         console.warn("Unable to clear SQLite project recovery.");
-        setLocalDraftRecoveryResult(null);
+        if (fixedFeedbackIntentIsCurrent(intentEpoch)) {
+          setLocalDraftRecoveryResult(null);
+        }
         setProjectStatus("Could not clear SQLite recovery; retry");
         return;
       }
@@ -3882,13 +3978,15 @@ export function App(): ReactElement {
         projectRef.current
       )
     ) {
-      setLocalDraftRecoveryResult(null);
+      if (fixedFeedbackIntentIsCurrent(intentEpoch)) {
+        setLocalDraftRecoveryResult(null);
+      }
       setProjectStatus("Recovery changed while clearing; current work kept");
       return;
     }
 
     clearLocalDraftState(false);
-    setLocalDraftRecoveryResult(createLocalDraftRecoveryResult("clear", recovery, projectRef.current));
+    showLocalDraftRecoveryResult(createLocalDraftRecoveryResult("clear", recovery, projectRef.current), intentEpoch);
     setProjectStatus("Cleared local draft recovery");
   }
 
@@ -8057,7 +8155,7 @@ export function App(): ReactElement {
     }
   }
 
-  async function handleSaveProject(): Promise<ProjectSaveAttempt> {
+  async function handleSaveProject(intentEpoch = claimFixedFeedbackIntent()): Promise<ProjectSaveAttempt> {
     let requestId = 0;
     try {
       commitMasterCeilingDraft();
@@ -8073,8 +8171,10 @@ export function App(): ReactElement {
           if (requestId !== projectSaveRequestIdRef.current) {
             return "stale";
           }
-          setProjectFileResult(null);
-          setLocalDraftRecoveryResult(null);
+          if (fixedFeedbackIntentIsCurrent(intentEpoch)) {
+            setProjectFileResult(null);
+            setLocalDraftRecoveryResult(null);
+          }
           setProjectStatus("Save canceled");
           return "canceled";
         }
@@ -8096,15 +8196,15 @@ export function App(): ReactElement {
         } else {
           setProjectHasUnsavedChanges(true);
         }
-        setLocalDraftRecoveryResult(null);
-        setProjectFileResult(
+        showProjectFileResult(
           createProjectFileResult(
             "save",
             fileLabel,
             projectToSave,
             completion === "saved-snapshot",
             result.databaseStored !== false
-          )
+          ),
+          intentEpoch
         );
         const statusParts = [
           completion === "saved-current" ? `Saved ${fileLabel}` : `Saved ${fileLabel}; newer changes remain unsaved`,
@@ -8130,9 +8230,9 @@ export function App(): ReactElement {
       } else {
         setProjectHasUnsavedChanges(true);
       }
-      setLocalDraftRecoveryResult(null);
-      setProjectFileResult(
-        createProjectFileResult("download", defaultName, projectToSave, completion === "saved-snapshot")
+      showProjectFileResult(
+        createProjectFileResult("download", defaultName, projectToSave, completion === "saved-snapshot"),
+        intentEpoch
       );
       setProjectStatus(
         completion === "saved-current"
@@ -8145,42 +8245,51 @@ export function App(): ReactElement {
       if (requestId !== 0 && requestId !== projectSaveRequestIdRef.current) {
         return "stale";
       }
-      setProjectFileResult(null);
-      setLocalDraftRecoveryResult(null);
+      if (fixedFeedbackIntentIsCurrent(intentEpoch)) {
+        setProjectFileResult(null);
+        setLocalDraftRecoveryResult(null);
+      }
       setProjectStatus("Save failed");
       return "failed";
     }
   }
 
-  async function handleOpenProject(): Promise<void> {
+  async function handleOpenProject(intentEpoch = claimFixedFeedbackIntent()): Promise<void> {
     flushActiveMetadataDraft("prepare-replacement");
     try {
       const result = await window.grooveforge?.openProject?.();
       if (result) {
         if (result.canceled || !result.contents) {
           flushActiveMetadataDraft("commit");
-          setProjectFileResult(null);
-          setLocalDraftRecoveryResult(null);
+          if (fixedFeedbackIntentIsCurrent(intentEpoch)) {
+            setProjectFileResult(null);
+            setLocalDraftRecoveryResult(null);
+          }
           setProjectStatus("Open canceled");
           return;
         }
-        loadProjectText(result.contents, fileDisplayName(result.filePath), "open");
+        loadProjectText(result.contents, fileDisplayName(result.filePath), "open", intentEpoch);
         return;
       }
 
-      setProjectFileResult(null);
-      setLocalDraftRecoveryResult(null);
+      if (fixedFeedbackIntentIsCurrent(intentEpoch)) {
+        setProjectFileResult(null);
+        setLocalDraftRecoveryResult(null);
+      }
       importInputRef.current?.click();
     } catch (error) {
       console.error(error);
       flushActiveMetadataDraft("commit");
-      setProjectFileResult(null);
-      setLocalDraftRecoveryResult(null);
+      if (fixedFeedbackIntentIsCurrent(intentEpoch)) {
+        setProjectFileResult(null);
+        setLocalDraftRecoveryResult(null);
+      }
       setProjectStatus(projectFileLoadErrorStatus(error, "Open failed"));
     }
   }
 
   function handleImportFile(event: ChangeEvent<HTMLInputElement>): void {
+    const intentEpoch = claimFixedFeedbackIntent();
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
     if (!file) {
@@ -8199,12 +8308,14 @@ export function App(): ReactElement {
 
     void file
       .text()
-      .then((contents) => loadProjectText(contents, file.name, "import"))
+      .then((contents) => loadProjectText(contents, file.name, "import", intentEpoch))
       .catch((error: unknown) => {
         console.error(error);
         flushActiveMetadataDraft("commit");
-        setProjectFileResult(null);
-        setLocalDraftRecoveryResult(null);
+        if (fixedFeedbackIntentIsCurrent(intentEpoch)) {
+          setProjectFileResult(null);
+          setLocalDraftRecoveryResult(null);
+        }
         setProjectStatus(projectFileLoadErrorStatus(error, "Open failed"));
       });
   }
@@ -8293,7 +8404,12 @@ export function App(): ReactElement {
     };
   }
 
-  function loadProjectText(contents: string, sourceName: string, action: "open" | "import"): void {
+  function loadProjectText(
+    contents: string,
+    sourceName: string,
+    action: "open" | "import",
+    intentEpoch = claimFixedFeedbackIntent()
+  ): void {
     try {
       const nextProject = parseProjectFile(contents);
       commitMasterCeilingDraft();
@@ -8304,8 +8420,10 @@ export function App(): ReactElement {
       );
       if (replacementGuard.requiresConfirmation && replacementGuard.warning && !window.confirm(replacementGuard.warning)) {
         flushActiveMetadataDraft("commit");
-        setProjectFileResult(null);
-        setLocalDraftRecoveryResult(null);
+        if (fixedFeedbackIntentIsCurrent(intentEpoch)) {
+          setProjectFileResult(null);
+          setLocalDraftRecoveryResult(null);
+        }
         setProjectStatus("Open canceled; current project kept");
         return;
       }
@@ -8317,13 +8435,14 @@ export function App(): ReactElement {
       setLaunchpadOpen(false);
       updatePlaybackPosition(null);
       setIsPlaying(false);
-      setLocalDraftRecoveryResult(null);
-      setProjectFileResult(createProjectFileResult(action, sourceName, nextProject));
+      showProjectFileResult(createProjectFileResult(action, sourceName, nextProject), intentEpoch);
     } catch (error) {
       console.error(error);
       flushActiveMetadataDraft("commit");
-      setProjectFileResult(null);
-      setLocalDraftRecoveryResult(null);
+      if (fixedFeedbackIntentIsCurrent(intentEpoch)) {
+        setProjectFileResult(null);
+        setLocalDraftRecoveryResult(null);
+      }
       setProjectStatus(projectFileLoadErrorStatus(error));
     }
   }
@@ -8656,7 +8775,7 @@ export function App(): ReactElement {
         )
       : modeFocusSummary;
 
-    setModeSwitchResult(
+    showModeSwitchResult(
       createModeSwitchResult(
         mode,
         beforeProject,
@@ -9057,6 +9176,38 @@ export function App(): ReactElement {
     return typeof target === "function" ? target() : target;
   }
 
+  function cancelScheduledWorkspaceTargetReveal(): void {
+    if (workspaceTargetRevealFrameRef.current === null) {
+      return;
+    }
+    window.cancelAnimationFrame(workspaceTargetRevealFrameRef.current);
+    workspaceTargetRevealFrameRef.current = null;
+  }
+
+  function revealWorkspaceTargetAfterLayout(
+    targetResolver: ScrollTargetResolver,
+    block: ScrollLogicalPosition = "start",
+    zoneHint: WorkspaceMainTabId | null = null,
+    focusTarget = false
+  ): void {
+    cancelScheduledWorkspaceTargetReveal();
+    let remainingLayoutFrames = 2;
+    const reveal = (): void => {
+      remainingLayoutFrames -= 1;
+      if (remainingLayoutFrames > 0) {
+        workspaceTargetRevealFrameRef.current = window.requestAnimationFrame(reveal);
+        return;
+      }
+
+      workspaceTargetRevealFrameRef.current = null;
+      scrollWorkspaceTargetIntoView(targetResolver, block, zoneHint);
+      if (focusTarget) {
+        resolveScrollTarget(targetResolver)?.focus({ preventScroll: true });
+      }
+    };
+    workspaceTargetRevealFrameRef.current = window.requestAnimationFrame(reveal);
+  }
+
   function workspaceRouteZone(target: WorkspaceRouteTargetId): WorkflowZoneId | null {
     switch (target) {
       case "compose":
@@ -9149,6 +9300,7 @@ export function App(): ReactElement {
     target: WorkspaceRouteTargetId,
     block: ScrollLogicalPosition = "start"
   ): void {
+    cancelScheduledWorkspaceTargetReveal();
     const zone = workspaceRouteZone(target);
     // 상위 탭과 목적 하위 탭을 순서대로 실제 DOM에 드러낸 다음 요소를 조회해야 숨은 Activity의 0px 위치를 읽지 않는다.
     if (zone !== null) {
@@ -9174,6 +9326,7 @@ export function App(): ReactElement {
     block: ScrollLogicalPosition = "start",
     zoneHint: WorkspaceMainTabId | null = null
   ): void {
+    cancelScheduledWorkspaceTargetReveal();
     const initialTarget = resolveScrollTarget(targetResolver);
     const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const activeElementZone = workspaceZoneForTarget(activeElement);
@@ -9345,7 +9498,7 @@ export function App(): ReactElement {
           currentHandoffExportReceiptForProject(),
           null
         );
-        setQuickActionResult(result);
+        showQuickActionResult(result);
         flushSync(() => setAudienceStarterResult(result));
         setQuickActionRecents((recents) => prependQuickActionRecent(recents, resultAction, result));
         setProjectStatus(`Built ${label} starter project`);
@@ -9893,18 +10046,20 @@ export function App(): ReactElement {
     if (guidanceCenterRef.current?.open) {
       flushSync(() => setGuidanceCenterOpen(false));
     }
+    // 기능 탭 이동 결과와 이전 Quick Action 결과를 같은 fixed 상태 영역에 겹쳐 두지 않는다.
+    beginFixedFeedbackIntent();
+    clearFixedFeedbackLane();
     scrollWorkspaceTargetIntoView(
       () => document.getElementById("workspace-panel-overview"),
       "start",
       "overview"
     );
-    setWorkflowNavigatorResult(null);
     setProjectStatus("Opened project Overview");
   }
 
   function jumpToWorkflowNavigatorItem(item: WorkflowNavigatorItem): void {
     jumpToWorkflowZone(item.id);
-    setWorkflowNavigatorResult(createWorkflowNavigatorJumpResult(item, workflowNavigatorItems));
+    showWorkflowNavigatorResult(createWorkflowNavigatorJumpResult(item, workflowNavigatorItems));
     setProjectStatus(`Workflow ${item.label}: ${item.value}`);
   }
 
@@ -9921,7 +10076,7 @@ export function App(): ReactElement {
       "start",
       item.id
     );
-    setWorkflowNavigatorResult(createWorkflowNavigatorJumpResult(item, workflowNavigatorItems));
+    showWorkflowNavigatorResult(createWorkflowNavigatorJumpResult(item, workflowNavigatorItems));
     setProjectStatus(`Workflow ${item.label}: ${item.value}`);
   }
 
@@ -10630,13 +10785,15 @@ export function App(): ReactElement {
       return;
     }
     flushSync(() => {
+      setGuidanceCenterOpen(false);
       setMasterReviewOpen(true);
       setMasterReviewQueueOpen(true);
     });
     const item = reviewQueueSummary.items[0] ?? null;
     routeWorkspaceTargetIntoView("master", "start");
-    scrollWorkspaceTargetIntoView(() => reviewQueuePanelRef.current, "start", "mix");
-    reviewQueuePanelRef.current?.focus({ preventScroll: true });
+    // 모달 제거와 두 disclosure의 레이아웃이 확정된 뒤 내부 workspace scroller를 맞춘다.
+    // 두 프레임으로 제한해 stale route가 오래 남지 않게 하고, auto scroll로 reduced-motion을 보존한다.
+    revealWorkspaceTargetAfterLayout(() => reviewQueuePanelRef.current, "start", "mix", true);
     setProjectStatus(
       item
         ? `Review Queue Route Readout Pattern ${project.selectedPattern}: ${reviewQueueRouteLabel(item)} / ${item.status} / direct review-queue-item-${item.id} unchanged / review-fix unchanged / ${item.focusLabel} panel`
@@ -10872,6 +11029,7 @@ export function App(): ReactElement {
     if (action.disabled) {
       return;
     }
+    const feedbackIntentEpoch = beginFixedFeedbackIntent();
     if (action.group === "Project" || action.group === "Export") {
       flushSync(() => setGuidanceCenterOpen(true));
     }
@@ -10896,7 +11054,14 @@ export function App(): ReactElement {
     });
     closeQuickActions(false);
     try {
-      const runResult = action.run();
+      const previousQuickActionFeedbackIntentEpoch = activeQuickActionFeedbackIntentEpochRef.current;
+      let runResult: ReturnType<QuickAction["run"]>;
+      try {
+        activeQuickActionFeedbackIntentEpochRef.current = feedbackIntentEpoch;
+        runResult = action.run();
+      } finally {
+        activeQuickActionFeedbackIntentEpochRef.current = previousQuickActionFeedbackIntentEpoch;
+      }
       const exportRequestId = action.group === "Export" ? projectExportRequestIdRef.current : null;
       void Promise.resolve(runResult)
         .then((runOutcome) => {
@@ -10911,6 +11076,9 @@ export function App(): ReactElement {
           ) {
             return;
           }
+          if (!fixedFeedbackIntentIsCurrent(feedbackIntentEpoch)) {
+            return;
+          }
           const result = createQuickActionResult(
             action,
             beforeProject,
@@ -10920,7 +11088,8 @@ export function App(): ReactElement {
             currentHandoffExportReceiptForProject(),
             inputSetupResult
           );
-          setQuickActionResult(result);
+          // 구체적인 Quick Action 결과가 최신 상태이므로 이전 기능 탭 이동 결과를 함께 남기지 않는다.
+          showQuickActionResult(result, feedbackIntentEpoch);
           setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
         })
         .catch((error: unknown) => {
@@ -10936,6 +11105,9 @@ export function App(): ReactElement {
             return;
           }
           console.error(error);
+          if (!fixedFeedbackIntentIsCurrent(feedbackIntentEpoch)) {
+            return;
+          }
           setProjectStatus("Quick action failed");
           const result = createQuickActionResult(
             action,
@@ -10946,11 +11118,14 @@ export function App(): ReactElement {
             currentHandoffExportReceiptForProject(),
             inputSetupResult
           );
-          setQuickActionResult(result);
+          showQuickActionResult(result, feedbackIntentEpoch);
           setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
         });
     } catch (error) {
       console.error(error);
+      if (!fixedFeedbackIntentIsCurrent(feedbackIntentEpoch)) {
+        return;
+      }
       setProjectStatus("Quick action failed");
       const result = createQuickActionResult(
         action,
@@ -10961,7 +11136,7 @@ export function App(): ReactElement {
         currentHandoffExportReceiptForProject(),
         inputSetupResult
       );
-      setQuickActionResult(result);
+      showQuickActionResult(result, feedbackIntentEpoch);
       setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
     }
   }
@@ -12366,7 +12541,7 @@ export function App(): ReactElement {
         const buttonRect = button.getBoundingClientRect();
         return Boolean(
           loopScopeGroupRect &&
-            buttonRect.height >= 48 &&
+            buttonRect.height >= 44 &&
             buttonRect.left >= loopScopeGroupRect.left - 1 &&
             buttonRect.right <= loopScopeGroupRect.right + 1
         );
@@ -13719,10 +13894,25 @@ export function App(): ReactElement {
           sessionPassSummary
         })
       : t(project.mode === "studio" ? "mode.activeTitle" : "mode.switchTitle", { mode: t("mode.studio") });
+  const fixedFeedbackOwner = quickActionResult
+    ? "quick-action"
+    : undoRedoResult
+      ? "undo-redo"
+      : workflowNavigatorResult
+        ? "workflow"
+        : localDraftRecoveryResult
+          ? "local-draft"
+          : projectFileResult
+            ? "project-file"
+            : modeSwitchResult
+              ? "mode-switch"
+              : "none";
 
   return (
     <main
       className="app-shell"
+      data-fixed-feedback-active={fixedFeedbackOwner !== "none"}
+      data-fixed-feedback-owner={fixedFeedbackOwner}
       data-locale={locale}
       data-workspace-command-dock-visible={workspaceCommandDockVisible}
       data-quick-actions-graph-state={
@@ -14352,7 +14542,7 @@ export function App(): ReactElement {
       {localDraftRecovery && !localDraftRecoveryDeferred && (
         <LocalDraftRecoveryBanner
           draft={localDraftRecovery}
-          onClear={clearLocalDraftRecovery}
+          onClear={() => void clearLocalDraftRecovery(beginFixedFeedbackIntent())}
           onDefer={deferLocalDraftRecovery}
           onRestore={restoreLocalDraft}
         />
@@ -14426,16 +14616,18 @@ export function App(): ReactElement {
           </div>
           <span data-testid="project-status">{projectStatus}</span>
         </div>
-        {modeSwitchResult && <ModeSwitchResultStrip result={modeSwitchResult} />}
-        {projectFileResult && <ProjectFileResultStrip result={projectFileResult} />}
-        {localDraftRecoveryResult && <LocalDraftRecoveryResultStrip result={localDraftRecoveryResult} />}
+        {fixedFeedbackOwner === "mode-switch" && modeSwitchResult && <ModeSwitchResultStrip result={modeSwitchResult} />}
+        {fixedFeedbackOwner === "project-file" && projectFileResult && <ProjectFileResultStrip result={projectFileResult} />}
+        {fixedFeedbackOwner === "local-draft" && localDraftRecoveryResult && (
+          <LocalDraftRecoveryResultStrip result={localDraftRecoveryResult} />
+        )}
       </section>
 
       <WorkflowNavigator
         activeZone={activeWorkspaceZone}
         items={workflowNavigatorItems}
         onOpenOverview={selectOverviewNavigatorTab}
-        result={workflowNavigatorResult}
+        result={fixedFeedbackOwner === "workflow" ? workflowNavigatorResult : null}
         sectionRef={workflowNavigatorPanelRef}
         onJump={selectWorkflowNavigatorTab}
       />
@@ -14802,8 +14994,8 @@ export function App(): ReactElement {
       </details>
 
       <div className="workspace-feedback-anchor" data-testid="workspace-feedback-anchor">
-        {undoRedoResult && <UndoRedoResultStrip result={undoRedoResult} />}
-        {quickActionResult && <QuickActionResultStrip result={quickActionResult} />}
+        {fixedFeedbackOwner === "undo-redo" && undoRedoResult && <UndoRedoResultStrip result={undoRedoResult} />}
+        {fixedFeedbackOwner === "quick-action" && quickActionResult && <QuickActionResultStrip result={quickActionResult} />}
       </div>
 
       <div

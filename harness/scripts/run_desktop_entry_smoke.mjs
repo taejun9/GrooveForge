@@ -756,8 +756,8 @@ function checkElectronMainContract() {
   );
   checkIncludes(
     launchSmokeLazyPreparation,
-    'clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle")',
-    `${label} lazy launch-smoke native Guide preparation`
+    "toggleLaunchSmokeGuidanceCenterNative(win)",
+    `${label} lazy launch-smoke state-aware native Guide preparation`
   );
   checkIncludes(
     launchSmokeLazyPreparation,
@@ -847,6 +847,11 @@ function checkElectronMainContract() {
   );
   checkIncludes(
     launchSmokeMinimumWindowCollector,
+    "const settleDesktopResize = async (expectedWidth: number)",
+    `${label} reusable Studio resize settle`
+  );
+  checkIncludes(
+    launchSmokeMinimumWindowCollector,
     'const compactMedia = window.matchMedia("(max-width: 1220px)")',
     `${label} Studio resize media-query settle`
   );
@@ -857,9 +862,16 @@ function checkElectronMainContract() {
   );
   checkIncludes(
     launchSmokeMinimumWindowCollector,
-    "compactMedia.matches &&",
+    "compactMedia.matches === expectedCompactMedia",
     `${label} Studio resize media-query match prerequisite`
   );
+  for (const width of [901, 1024, 1180, 1440]) {
+    checkIncludes(
+      launchSmokeMinimumWindowCollector,
+      `await settleDesktopResize(${width})`,
+      `${label} ${width}px bounded desktop resize settle`
+    );
+  }
   checkIncludes(source, "ipcMain.on(closeWindowChannel", label);
   checkIncludes(source, "BrowserWindow.fromWebContents(event.sender)?.close();", label);
   checkIncludes(source, 'const isCloseFlowSmoke = process.env.GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE === "1"', label);
@@ -947,8 +959,8 @@ function checkElectronMainContract() {
   checkIncludes(functionalTabsCollector, "guidanceBeatPassportQuickActionEvidence", `${label} functional-tab Guide route evidence`);
   checkIncludes(
     launchSmokeBridgeDirectCollector,
-    'clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle")',
-    `${label} Audience Route Bridge visible Guide preparation`
+    "toggleLaunchSmokeGuidanceCenterNative(win)",
+    `${label} Audience Route Bridge state-aware visible Guide preparation`
   );
   checkIncludes(launchSmokeBridgeDirectCollector, "state.actionTargetsVisible", `${label} Audience Route Bridge visible actions`);
   checkIncludes(launchSmokeBridgeDirectCollector, "state.hookReady", `${label} Audience Route Bridge React hook readiness`);
@@ -973,8 +985,8 @@ function checkElectronMainContract() {
   );
   checkIncludes(
     launchSmokePaletteCollector,
-    'clickLaunchSmokeFunctionalTabNativeTarget(win, "guidance-center-toggle")',
-    `${label} Quick Actions palette visible Guide preparation`
+    "toggleLaunchSmokeGuidanceCenterNative(win)",
+    `${label} Quick Actions palette state-aware visible Guide preparation`
   );
   checkIncludes(launchSmokePaletteCollector, "state.captureIdeasVisible", `${label} Quick Actions palette Capture visibility`);
   checkIncludes(
@@ -1015,13 +1027,19 @@ function checkElectronMainContract() {
   );
   checkIncludes(
     launchSmokePaletteCollector,
-    'throw new Error("First-run launchpad should be open before native Audience Starter lifecycle evidence.")',
-    `${label} Quick Actions observed initial launchpad-open contract`
+    "const initialLaunchpadOpen = await readLaunchSmokeLaunchpadOpen(win);",
+    `${label} Quick Actions explicitly established launchpad-open baseline evidence`
   );
-  checkIncludes(
-    launchSmokePaletteCollector,
-    'waitForLaunchSmokeLaunchpadOpen(win, true, "open before changed beginner starter selection")',
-    `${label} Quick Actions changed starter open launchpad precondition`
+  const changedStarterCollapseIndex = launchSmokePaletteCollector.indexOf(
+    "const collapsedAfterStarter = nativeStarterBeginner.launchpadCollapsedAfterSelection;"
+  );
+  const changedStarterReopenIndex = launchSmokePaletteCollector.indexOf(
+    "await setLaunchSmokeLaunchpadOpen(win, true);",
+    changedStarterCollapseIndex
+  );
+  check(
+    changedStarterCollapseIndex >= 0 && changedStarterReopenIndex > changedStarterCollapseIndex,
+    `${label} Quick Actions changed starter should explicitly reopen the launchpad after observing its collapse`
   );
   checkIncludes(
     launchSmokePaletteCollector,
@@ -1141,8 +1159,8 @@ function checkElectronMainContract() {
   );
   checkIncludes(
     launchSmokeBaseDomPreparation,
-    ".then(() => collectLaunchSmokeEvidence(win))",
-    `${label} base DOM collection after ready-posture preparation`
+    ".then(() => collectLaunchSmokeBaseDomEvidence(win))",
+    `${label} base DOM visible-Guide collection after ready-posture preparation`
   );
   checkIncludes(
     launchSmokeModeToolCollector,

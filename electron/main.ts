@@ -1409,6 +1409,7 @@ type LaunchSmokeFunctionalTabsEvidence = {
     actionVisible: boolean;
     destinationZone: string;
     disclosurePostureRestored: boolean;
+    guidanceCenterOpen: boolean;
     masterReviewInitiallyClosed: boolean;
     masterReviewOpen: boolean;
     masterReviewQueueInitiallyClosed: boolean;
@@ -1419,6 +1420,7 @@ type LaunchSmokeFunctionalTabsEvidence = {
     reviewQueueClearOfNavigator: boolean;
     reviewQueueHeight: number;
     reviewQueueInViewport: boolean;
+    reviewQueueUnobscured: boolean;
     reviewQueueVisible: boolean;
     reviewQueueWidth: number;
     selectedActionId: string;
@@ -1891,6 +1893,24 @@ type LaunchSmokeLocalizedLayoutSnapshot = {
   viewportWidth: number;
 };
 
+type LaunchSmokeFixedFeedbackLaneSnapshot = {
+  active: string;
+  activePageClearOfResult: boolean;
+  activeResultCount: number;
+  activeResultTestIds: string[];
+  guideClearOfResult: boolean;
+  guideOpen: boolean;
+  owner: string;
+  playerClearOfResult: boolean;
+  resultCenterHitReady: boolean;
+  resultClientHeight: number;
+  resultHeight: number;
+  resultHeightWithinLane: boolean;
+  resultScrollFree: boolean;
+  resultScrollHeight: number;
+  resultViewportContained: boolean;
+};
+
 type LaunchSmokeModalFocusEvidence = {
   closedDetails: LaunchSmokeClosedDetailsEvidence;
   commandShortcutFromEditable: boolean;
@@ -1924,6 +1944,15 @@ type LaunchSmokeModalFocusEvidence = {
   editableFocusRestored: boolean;
   editableQuestionTyped: boolean;
   editableValuePreserved: boolean;
+  fixedFeedbackLane: {
+    afterLocalDraft: LaunchSmokeFixedFeedbackLaneSnapshot;
+    afterModeSwitch: LaunchSmokeFixedFeedbackLaneSnapshot;
+    afterProjectFile: LaunchSmokeFixedFeedbackLaneSnapshot;
+    afterQuickAction: LaunchSmokeFixedFeedbackLaneSnapshot;
+    afterUndoRedo: LaunchSmokeFixedFeedbackLaneSnapshot;
+    afterWorkflow: LaunchSmokeFixedFeedbackLaneSnapshot;
+    staleQuickActionCompletionSuppressed: boolean;
+  };
   headerActionMenus: {
     actionDockFixed: boolean;
     actionDockViewportReady: boolean;
@@ -2742,7 +2771,13 @@ function registerProjectFileHandlers(): void {
       workspace.projects,
       payload.defaultName
     );
-    const smokeFilePath = projectIoSmokePath() ?? closeFlowSmokePath() ?? manualQaSavePath();
+    // Launch smoke는 실제 Save 버튼과 결과 strip을 검증하므로 사용자 대화상자 대신
+    // 프로세스별 임시 workspace 안의 소유된 파일을 사용한다.
+    const smokeFilePath =
+      projectIoSmokePath() ??
+      closeFlowSmokePath() ??
+      manualQaSavePath() ??
+      (isLaunchSmoke ? path.join(workspace.projects, "fixed-feedback-lane.grooveforge.json") : null);
     if (isManualQa && smokeFilePath) {
       await assertManualQaPathSafety(smokeFilePath, false);
     }
@@ -2764,6 +2799,11 @@ function registerProjectFileHandlers(): void {
       closeFlowSmokeState.nativeSaveDefaultName = payload.defaultName;
       closeFlowSmokeState.nativeSavePath = result.filePath;
       closeFlowSmokeState.events.push("native-save-started");
+    }
+    // Fixed-feedback 회귀에서는 Save Quick Action의 완료를 의도적으로 늦춰, 그 사이 발생한
+    // 새 모드 결과가 오래된 비동기 완료에 다시 덮이지 않는지 실제 renderer에서 확인한다.
+    if (isLaunchSmoke) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
     }
     // 선택된 경로에도 직접 덮어쓰지 않고 임시 파일+fsync+rename으로 완결된 JSON만 교체한다.
     await atomicWriteUtf8File(result.filePath, payload.contents, maxNativeProjectFileCharacters);
@@ -2956,7 +2996,7 @@ function launchSmokeFailures(evidence: LaunchSmokeEvidence): string[] {
       frame.subTabListHeight <= 0 ||
       frame.subTabListHeight > 54 ||
       frame.mainTabMaximumHeight <= 0 ||
-      frame.mainTabMaximumHeight > 44 ||
+      frame.mainTabMaximumHeight > 48 ||
       frame.subTabMaximumHeight <= 0 ||
       frame.subTabMaximumHeight > 44 ||
       !frame.mainTabListViewportContained ||
@@ -3374,6 +3414,38 @@ function launchSmokeModalFocusFailures(evidence: LaunchSmokeModalFocusEvidence):
   }
   if (!evidence.quickKeyboardEnterRanSelected || evidence.quickKeyboardSelectedTitle !== evidence.quickKeyboardResultTitle) {
     failures.push("Quick Actions native Enter should run the explicitly selected result instead of the first result");
+  }
+  const fixedFeedbackSnapshots = [
+    ["local-draft", "local-draft-recovery-result", evidence.fixedFeedbackLane.afterLocalDraft],
+    ["mode-switch", "mode-switch-result", evidence.fixedFeedbackLane.afterModeSwitch],
+    ["project-file", "project-file-result", evidence.fixedFeedbackLane.afterProjectFile],
+    ["workflow", "workflow-navigator-result", evidence.fixedFeedbackLane.afterWorkflow],
+    ["quick-action", "quick-action-result", evidence.fixedFeedbackLane.afterQuickAction],
+    ["undo-redo", "undo-redo-result", evidence.fixedFeedbackLane.afterUndoRedo]
+  ] as const;
+  if (
+    !evidence.fixedFeedbackLane.staleQuickActionCompletionSuppressed ||
+    fixedFeedbackSnapshots.some(
+      ([owner, testId, snapshot]) =>
+        snapshot.active !== "true" ||
+        snapshot.owner !== owner ||
+        snapshot.activeResultCount !== 1 ||
+        snapshot.activeResultTestIds.join("|") !== testId ||
+        !snapshot.guideOpen ||
+        !snapshot.guideClearOfResult ||
+        !snapshot.playerClearOfResult ||
+        !snapshot.activePageClearOfResult ||
+        !snapshot.resultHeightWithinLane ||
+        !snapshot.resultScrollFree ||
+        !snapshot.resultViewportContained ||
+        !snapshot.resultCenterHitReady
+    )
+  ) {
+    failures.push(
+      `All six feedback result owners should replace one another in one 82px fixed lane without internal scrolling while staying visible, unobscured, and clear of the active page, open Guide, and player, got ${JSON.stringify(
+        evidence.fixedFeedbackLane
+      )}`
+    );
   }
   if (evidence.commandInitialFocus !== "command-reference-search-input") {
     failures.push("Command Reference should place initial focus in reference search");
@@ -3884,12 +3956,14 @@ function launchSmokeFunctionalTabsFailures(evidence: LaunchSmokeFunctionalTabsEv
     !evidence.reviewQueueQuickActionReveal.actionVisible ||
     evidence.reviewQueueQuickActionReveal.selectedActionId !== "review-queue-route-readout-action" ||
     !evidence.reviewQueueQuickActionReveal.modalClosed ||
+    evidence.reviewQueueQuickActionReveal.guidanceCenterOpen ||
     !evidence.reviewQueueQuickActionReveal.masterReviewOpen ||
     !evidence.reviewQueueQuickActionReveal.masterReviewQueueOpen ||
     !evidence.reviewQueueQuickActionReveal.reviewQueueVisible ||
     evidence.reviewQueueQuickActionReveal.reviewQueueWidth <= 0 ||
     evidence.reviewQueueQuickActionReveal.reviewQueueHeight <= 0 ||
     !evidence.reviewQueueQuickActionReveal.reviewQueueInViewport ||
+    !evidence.reviewQueueQuickActionReveal.reviewQueueUnobscured ||
     !evidence.reviewQueueQuickActionReveal.reviewQueueClearOfNavigator ||
     evidence.reviewQueueQuickActionReveal.visibleHeight <= 0 ||
     evidence.reviewQueueQuickActionReveal.viewportHeight < 760 ||
@@ -5839,6 +5913,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
           const rect = queue?.getBoundingClientRect();
           return (
             document.querySelector('[data-testid="quick-actions"]') === null &&
+            document.querySelector('[data-testid="guidance-center"]')?.open !== true &&
             document.querySelector('[data-testid="workflow-navigator"] [role="tab"][aria-selected="true"]')?.id === 'workspace-tab-mix' &&
             document.querySelector('[data-testid="master-review-tools"]')?.open === true &&
             document.querySelector('[data-testid="master-review-queue-tools"]')?.open === true &&
@@ -5870,6 +5945,15 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
         const visibleHeight = rect
           ? Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0))
           : 0;
+        const visibleTop = rect ? Math.max(rect.top, navigatorRect?.bottom ?? 0, 0) : 0;
+        const visibleBottom = rect ? Math.min(rect.bottom, window.innerHeight) : 0;
+        const queueProbe =
+          rect && visibleBottom > visibleTop
+            ? document.elementFromPoint(
+                Math.min(window.innerWidth - 1, Math.max(0, rect.left + rect.width / 2)),
+                visibleTop + Math.min(12, (visibleBottom - visibleTop) / 2)
+              )
+            : null;
         return {
           activeElementTestId: activeElement?.getAttribute('data-testid') ?? activeElement?.id ?? '',
           activeElementVisible: Boolean(
@@ -5882,6 +5966,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
           activeElementWithinActivePanel: Boolean(activeElement && activePanel?.contains(activeElement)),
           actionVisible: ${JSON.stringify(true)},
           destinationZone: activeTab?.id?.replace('workspace-tab-', '') ?? '',
+          guidanceCenterOpen: document.querySelector('[data-testid="guidance-center"]')?.open === true,
           masterReviewInitiallyClosed: ${JSON.stringify(reviewQueueClosedPosture.masterReviewClosed)},
           masterReviewOpen: document.querySelector('[data-testid="master-review-tools"]')?.open === true,
           masterReviewQueueInitiallyClosed: ${JSON.stringify(reviewQueueClosedPosture.masterReviewQueueClosed)},
@@ -5891,6 +5976,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
           reviewQueueClearOfNavigator: Boolean(rect && navigatorRect && rect.top >= navigatorRect.bottom - 1),
           reviewQueueHeight: rect?.height ?? 0,
           reviewQueueInViewport: Boolean(rect && rect.top >= 0 && rect.top < window.innerHeight && rect.bottom > 0),
+          reviewQueueUnobscured: Boolean(queue && queueProbe && queue.contains(queueProbe)),
           reviewQueueVisible: Boolean(
             queue &&
               activePanel?.contains(queue) &&
@@ -6493,9 +6579,38 @@ async function collectLaunchSmokeMinimumWindowEvidence(
 ): Promise<LaunchSmokeMinimumWindowEvidence> {
   const originalSize = win.getSize();
   const originalMinimumSize = win.getMinimumSize();
+  const settleDesktopResize = async (expectedWidth: number): Promise<void> => {
+    const expectedCompactMedia = expectedWidth <= 1220;
+    const resizeState = (await win.webContents.executeJavaScript(`
+      (async () => {
+        const compactMedia = window.matchMedia("(max-width: 1220px)");
+        const expectedCompactMedia = ${JSON.stringify(expectedCompactMedia)};
+        const expectedWidth = ${JSON.stringify(expectedWidth)};
+        const resizeDeadline = performance.now() + 30000;
+        const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        let ready = false;
+        while (performance.now() < resizeDeadline) {
+          await settle();
+          ready = window.innerWidth === expectedWidth && compactMedia.matches === expectedCompactMedia;
+          if (ready) break;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        return {
+          compactMediaMatches: compactMedia.matches,
+          ready,
+          viewportWidth: window.innerWidth
+        };
+      })();
+    `)) as { compactMediaMatches: boolean; ready: boolean; viewportWidth: number };
+    if (!resizeState.ready) {
+      throw new Error(
+        `Desktop resize did not settle at ${expectedWidth}px: ${JSON.stringify(resizeState)}`
+      );
+    }
+  };
   await win.webContents.executeJavaScript(`window.__grooveforgeLaunchSmoke?.setModeAwareToolPanels?.('guided');`);
   win.setSize(1180, 800);
-  await new Promise((resolve) => setTimeout(resolve, 180));
+  await settleDesktopResize(1180);
   try {
     const minimum = (await win.webContents.executeJavaScript(`
       (() => {
@@ -6598,15 +6713,15 @@ async function collectLaunchSmokeMinimumWindowEvidence(
 
     win.setMinimumSize(901, 760);
     win.setSize(901, 800);
-    await new Promise((resolve) => setTimeout(resolve, 180));
+    await settleDesktopResize(901);
     const edge901Frame = await readLaunchSmokeDesktopFrameEvidence(win);
 
     win.setSize(1024, 800);
-    await new Promise((resolve) => setTimeout(resolve, 180));
+    await settleDesktopResize(1024);
     const compactFrame = await readLaunchSmokeDesktopFrameEvidence(win);
 
     win.setSize(1440, 960);
-    await new Promise((resolve) => setTimeout(resolve, 180));
+    await settleDesktopResize(1440);
     const wideFrame = await readLaunchSmokeDesktopFrameEvidence(win);
     return {
       ...minimum,
@@ -6621,7 +6736,7 @@ async function collectLaunchSmokeMinimumWindowEvidence(
     await win.webContents.executeJavaScript(`window.__grooveforgeLaunchSmoke?.setModeAwareToolPanels?.('guided');`);
     win.setMinimumSize(originalMinimumSize[0], originalMinimumSize[1]);
     win.setSize(originalSize[0], originalSize[1]);
-    await new Promise((resolve) => setTimeout(resolve, 120));
+    await settleDesktopResize(originalSize[0]);
   }
 }
 
@@ -8685,6 +8800,13 @@ async function clickLaunchSmokeAudienceStarterFollowup(
   starterId: "beginner" | "producer",
   route: "completion" | "primary" | "readiness"
 ): Promise<string> {
+  // Producer의 첫 follow-up은 Review Queue를 가리지 않도록 Guide를 닫는다. 같은 결과의
+  // 다음 follow-up을 native click하기 전에는 Guide와 결과 행을 다시 실제 화면에 드러낸다.
+  const paletteState = await readLaunchSmokePaletteSurfaceState(win);
+  if (!paletteState.guideOpen) {
+    await toggleLaunchSmokeGuidanceCenterNative(win);
+  }
+  await waitForLaunchSmokeAudienceStarterVisibleResult(win, starterId);
   const target =
     starterId === "beginner"
       ? route === "primary"
@@ -8867,6 +8989,30 @@ async function collectLaunchSmokePaletteEvidence(
     if (!result || result.ready !== true || !result.evidence) {
       throw new Error("Launch smoke Quick Actions hook was not ready.");
     }
+    // Quick Actions hook가 프로젝트를 바꾸면 exact audio analysis가 잠시 pending이 되어
+    // Guide의 Audience Starter 행이 조건부 렌더에서 빠질 수 있다. 실제 Mix 분석을 끝낸 뒤
+    // Compose/Guide를 다시 드러내고 native target 가시성을 확인해야 race 없이 클릭할 수 있다.
+    const postHookState = await readLaunchSmokePaletteSurfaceState(win);
+    if (postHookState.activeZone !== "compose") {
+      await clickLaunchSmokeFunctionalTabNativeTarget(win, "workflow-jump-compose");
+      await waitForLaunchSmokeAudioAnalysisTabPosture(win, "compose");
+    }
+    await prewarmLaunchSmokeExactAudioAnalysis(win);
+    await activateLaunchSmokeWorkspacePage(win, "compose", "notes");
+    const postAnalysisState = await readLaunchSmokePaletteSurfaceState(win);
+    if (!postAnalysisState.guideOpen) {
+      await toggleLaunchSmokeGuidanceCenterNative(win);
+    }
+    await waitForLaunchSmokePaletteSurfaceState(
+      win,
+      (state) =>
+        state.activeZone === "compose" &&
+        state.guideOpen &&
+        state.captureIdeasVisible &&
+        state.audienceStarterActionsVisible &&
+        state.hookReady,
+      "the restored exact-ready Audience Starter surface after Quick Actions hook collection"
+    );
     await setLaunchSmokeLaunchpadOpen(win, true);
     const nativeStarterBeginner = await runLaunchSmokePaletteStage(
       win,
@@ -10602,6 +10748,79 @@ async function collectLaunchSmokeModalFocusEvidence(
         };
       })();
     `);
+  const fixedFeedbackLaneSnapshot = (): Promise<LaunchSmokeFixedFeedbackLaneSnapshot> =>
+    runStep<LaunchSmokeFixedFeedbackLaneSnapshot>(`
+      (() => {
+        const shell = document.querySelector('main.app-shell');
+        const guide = document.querySelector('[data-testid="guidance-center"]');
+        const player = document.querySelector('[data-testid="workspace-command-dock"]');
+        const activePage = document.querySelector(
+          '.workspace-zone-panel:not([hidden]) > .workspace-page-panel:not([hidden])'
+        );
+        const resultSelectors = [
+          '[data-testid="mode-switch-result"]',
+          '[data-testid="project-file-result"]',
+          '[data-testid="local-draft-recovery-result"]',
+          '[data-testid="workflow-navigator-result"]',
+          '[data-testid="undo-redo-result"]',
+          '[data-testid="quick-action-result"]'
+        ];
+        const visible = (element) => {
+          if (!(element instanceof HTMLElement)) return false;
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+        };
+        const activeResults = Array.from(document.querySelectorAll(resultSelectors.join(','))).filter((element) =>
+          visible(element)
+        );
+        const result = activeResults[0] ?? null;
+        const resultRect = result?.getBoundingClientRect() ?? null;
+        const guideRect = guide?.getBoundingClientRect() ?? null;
+        const playerRect = player?.getBoundingClientRect() ?? null;
+        const activePageRect = activePage?.getBoundingClientRect() ?? null;
+        const overlaps = (first, second) =>
+          Boolean(
+            first &&
+            second &&
+            first.left < second.right &&
+            first.right > second.left &&
+            first.top < second.bottom &&
+            first.bottom > second.top
+          );
+        return {
+          active: shell?.getAttribute('data-fixed-feedback-active') ?? '',
+          activePageClearOfResult: !overlaps(activePageRect, resultRect),
+          activeResultCount: activeResults.length,
+          activeResultTestIds: activeResults.map((element) => element.getAttribute('data-testid') ?? ''),
+          guideClearOfResult: !(guide instanceof HTMLDetailsElement && guide.open) || !overlaps(guideRect, resultRect),
+          guideOpen: guide instanceof HTMLDetailsElement && guide.open,
+          owner: shell?.getAttribute('data-fixed-feedback-owner') ?? '',
+          playerClearOfResult: !overlaps(playerRect, resultRect),
+          resultCenterHitReady: Boolean(
+            result &&
+            resultRect &&
+            result.contains(document.elementFromPoint(resultRect.left + resultRect.width / 2, resultRect.top + resultRect.height / 2))
+          ),
+          resultClientHeight: result instanceof HTMLElement ? result.clientHeight : 0,
+          resultHeight: resultRect?.height ?? 0,
+          resultHeightWithinLane: Boolean(resultRect && resultRect.height > 0 && resultRect.height <= 82.5),
+          resultScrollFree: Boolean(
+            result instanceof HTMLElement &&
+            result.scrollHeight <= result.clientHeight &&
+            result.scrollWidth <= result.clientWidth
+          ),
+          resultScrollHeight: result instanceof HTMLElement ? result.scrollHeight : 0,
+          resultViewportContained: Boolean(
+            resultRect &&
+            resultRect.left >= 0 &&
+            resultRect.right <= innerWidth &&
+            resultRect.top >= 0 &&
+            resultRect.bottom <= innerHeight
+          )
+        };
+      })();
+    `);
   const settingsIsolationSnapshot = (): Promise<{
     historyDepthPosture: string;
     historyDepthReady: boolean;
@@ -10739,6 +10958,18 @@ async function collectLaunchSmokeModalFocusEvidence(
     win.webContents.sendInputEvent({ type: "mouseDown", x: point.x, y: point.y, button: "left", clickCount: 1 });
     win.webContents.sendInputEvent({ type: "mouseUp", x: point.x, y: point.y, button: "left", clickCount: 1 });
     await new Promise((resolve) => setTimeout(resolve, 80));
+  };
+  const ensureGuideOpen = async (): Promise<void> => {
+    const guideOpen = await runStep<boolean>(
+      `document.querySelector('[data-testid="guidance-center"]')?.hasAttribute('open') === true`
+    );
+    if (guideOpen) {
+      return;
+    }
+    await sendClick("header-utility-trigger");
+    await waitFor(`document.querySelector('[data-testid="guidance-center-open"]') !== null`);
+    await sendClick("guidance-center-open");
+    await waitFor(`document.querySelector('[data-testid="guidance-center"]')?.hasAttribute('open') === true`);
   };
   const moveMouseTo = async (testId: string): Promise<void> => {
     const point = await runStep<{ x: number; y: number }>(`
@@ -11221,12 +11452,12 @@ async function collectLaunchSmokeModalFocusEvidence(
   onStep("running selected Enter Studio action");
   await sendKey("Enter");
   await waitFor(
-    `document.querySelector('[data-testid="quick-actions"]') === null && document.querySelector('[data-testid="quick-action-result-title"]')?.textContent?.trim() === ${JSON.stringify(keyboardBeforeEnter.title)} && document.querySelector('[data-testid="mode-studio"]')?.classList.contains('selected') === true`
+    `document.querySelector('[data-testid="quick-actions"]') === null && document.querySelector('[data-testid="quick-action-result-title"]')?.textContent?.trim() === ${JSON.stringify(keyboardBeforeEnter.title)} && document.querySelector('[data-testid="mode-studio"]')?.classList.contains('selected') === true && document.querySelector('main.app-shell')?.getAttribute('data-fixed-feedback-owner') === 'quick-action'`
   );
   const keyboardAfterEnter = await keyboardSelectionSnapshot();
   onStep("restoring Guided mode after keyboard execution");
   await runStep(`document.querySelector('[data-testid="mode-guided"]')?.click();`);
-  await waitFor(`document.querySelector('[data-testid="mode-guided"]')?.classList.contains('selected') === true`);
+  await waitFor(`document.querySelector('[data-testid="mode-guided"]')?.classList.contains('selected') === true && document.querySelector('main.app-shell')?.getAttribute('data-fixed-feedback-owner') === 'mode-switch'`);
   await runStep(`document.querySelector('[data-testid="project-title-input"]')?.focus();`);
   await sendKey("K", commandModifier);
   await waitFor(`document.activeElement?.dataset?.testid === 'quick-actions-search'`);
@@ -11861,6 +12092,94 @@ async function collectLaunchSmokeModalFocusEvidence(
       document.querySelector('[data-testid="workflow-navigator"]')?.textContent?.includes('MAIN TABS') === true
   `);
   const englishMenuRestored = await waitForNativeMenuLocale("en");
+
+  onStep("checking all six fixed feedback owners with native controls");
+  await waitFor(`document.querySelector('[data-testid="local-draft-recovery"]') !== null`, 60000);
+  await sendClick("clear-local-draft");
+  await waitFor(`document.querySelector('main.app-shell')?.getAttribute('data-fixed-feedback-owner') === 'local-draft'`);
+  const launchpadReopenedAfterLocaleReload = await runStep<boolean>(
+    `document.querySelector('[data-testid="first-run-launchpad"]')?.hasAttribute('open') === true`
+  );
+  if (launchpadReopenedAfterLocaleReload) {
+    onStep("closing the first-run launchpad before direct fixed-feedback controls");
+    await sendClick("first-run-launchpad-toggle");
+    await waitFor(`document.querySelector('[data-testid="first-run-launchpad"]')?.hasAttribute('open') === false`);
+  }
+  await ensureGuideOpen();
+  const feedbackAfterLocalDraft = await fixedFeedbackLaneSnapshot();
+
+  onStep("switching directly to Studio for mode feedback");
+  await sendClick("mode-studio");
+  await waitFor(`
+    document.querySelector('[data-testid="mode-studio"]')?.classList.contains('selected') === true &&
+      document.querySelector('main.app-shell')?.getAttribute('data-fixed-feedback-owner') === 'mode-switch' &&
+      document.querySelector('[data-testid="mode-switch-result"]')?.getAttribute('data-mode-switch-result') === 'studio'
+  `);
+  await ensureGuideOpen();
+
+  await sendClick("header-utility-trigger");
+  await waitFor(`document.querySelector('[data-testid="project-save"]') !== null`);
+  await sendClick("project-save");
+  await waitFor(`document.querySelector('main.app-shell')?.getAttribute('data-fixed-feedback-owner') === 'project-file'`, 60000);
+  await ensureGuideOpen();
+  const feedbackAfterProjectFile = await fixedFeedbackLaneSnapshot();
+
+  await sendClick("workspace-command-dock-actions");
+  await waitFor(`document.activeElement?.dataset?.testid === 'quick-actions-search'`);
+  await runStep(`
+    (() => {
+      const input = document.querySelector('[data-testid="quick-actions-search"]');
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      valueSetter?.call(input, 'save project');
+      input?.dispatchEvent(new Event('input', { bubbles: true }));
+    })();
+  `);
+  await waitFor(`document.querySelector('[data-testid="quick-action-save-project"]') !== null`);
+  await sendClick("quick-action-save-project");
+  await waitFor(`document.querySelector('[data-testid="quick-actions"]') === null`);
+  onStep("replacing delayed Save feedback with a direct Guided mode intent");
+  await sendClick("mode-guided");
+  await waitFor(`
+    document.querySelector('[data-testid="mode-guided"]')?.classList.contains('selected') === true &&
+      document.querySelector('main.app-shell')?.getAttribute('data-fixed-feedback-owner') === 'mode-switch' &&
+      document.querySelector('[data-testid="mode-switch-result"]')?.getAttribute('data-mode-switch-result') === 'guided'
+  `);
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+  await ensureGuideOpen();
+  const feedbackAfterModeSwitchSequence = await fixedFeedbackLaneSnapshot();
+  const staleQuickActionCompletionSuppressed =
+    feedbackAfterModeSwitchSequence.owner === "mode-switch" &&
+    feedbackAfterModeSwitchSequence.activeResultCount === 1 &&
+    feedbackAfterModeSwitchSequence.activeResultTestIds.join("|") === "mode-switch-result";
+
+  await sendClick("guidance-center-toggle");
+  await waitFor(`document.querySelector('[data-testid="guidance-center"]')?.hasAttribute('open') === false`);
+  await sendClick("workflow-jump-arrange");
+  await waitFor(`document.querySelector('main.app-shell')?.getAttribute('data-fixed-feedback-owner') === 'workflow'`);
+  await ensureGuideOpen();
+  const feedbackAfterWorkflow = await fixedFeedbackLaneSnapshot();
+
+  await sendClick("workspace-command-dock-actions");
+  await waitFor(`document.activeElement?.dataset?.testid === 'quick-actions-search'`);
+  await runStep(`
+    (() => {
+      const input = document.querySelector('[data-testid="quick-actions-search"]');
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      valueSetter?.call(input, 'enter guided first-time composer');
+      input?.dispatchEvent(new Event('input', { bubbles: true }));
+    })();
+  `);
+  await waitFor(`document.querySelector('[data-testid="quick-action-audience-session-enter-beginner"]') !== null`);
+  await sendClick("quick-action-audience-session-enter-beginner");
+  await waitFor(`document.querySelector('main.app-shell')?.getAttribute('data-fixed-feedback-owner') === 'quick-action'`);
+  await ensureGuideOpen();
+  const feedbackAfterQuickActionSequence = await fixedFeedbackLaneSnapshot();
+
+  await sendClick("workspace-command-dock-undo");
+  await waitFor(`document.querySelector('main.app-shell')?.getAttribute('data-fixed-feedback-owner') === 'undo-redo'`);
+  await ensureGuideOpen();
+  const feedbackAfterUndoRedo = await fixedFeedbackLaneSnapshot();
+
   const settingsLocalization: LaunchSmokeModalFocusEvidence["settingsLocalization"] = {
     backdropClosed: settingsBackdropClosed.closed,
     backdropFocusRestored: settingsBackdropClosed.focusRestored,
@@ -11934,6 +12253,15 @@ async function collectLaunchSmokeModalFocusEvidence(
     editableFocusRestored: editableFinal.activeTestId === "project-title-input",
     editableQuestionTyped,
     editableValuePreserved: editableFinal.title === editableTitleBefore,
+    fixedFeedbackLane: {
+      afterLocalDraft: feedbackAfterLocalDraft,
+      afterModeSwitch: feedbackAfterModeSwitchSequence,
+      afterProjectFile: feedbackAfterProjectFile,
+      afterQuickAction: feedbackAfterQuickActionSequence,
+      afterUndoRedo: feedbackAfterUndoRedo,
+      afterWorkflow: feedbackAfterWorkflow,
+      staleQuickActionCompletionSuppressed
+    },
     headerActionMenus,
     modifiedShortcutHandoff: commandToQuickShortcut && quickToCommandShortcut,
     quickBackwardWrap:

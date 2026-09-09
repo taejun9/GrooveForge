@@ -30444,7 +30444,9 @@ input[type="range"] {
   border: 1px solid rgba(244, 239, 231, 0.12);
   border-radius: 8px;
   background: rgba(244, 239, 231, 0.035);
-  overflow: hidden;
+  /* 둥근 경계는 유지하되 scrollIntoView가 보이지 않는 내부 scroll offset을 만들어
+   * summary를 자체 클릭 영역 밖으로 밀어내지 않도록 한다. */
+  overflow: clip;
 }
 
 .master-polish-tools[open],
@@ -30521,7 +30523,8 @@ input[type="range"] {
   border: 1px solid rgba(244, 239, 231, 0.11);
   border-radius: 7px;
   background: rgba(244, 239, 231, 0.028);
-  overflow: hidden;
+  /* 중첩 review 경로는 이 disclosure가 아니라 workspace page를 스크롤해야 한다. */
+  overflow: clip;
 }
 
 .master-diagnostic-tools[open] {
@@ -35690,6 +35693,7 @@ input[type="range"] {
   }
 
   .brand-lockup {
+    align-self: stretch;
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
@@ -36298,5 +36302,402 @@ input[type="range"] {
   .header-action-menu-trigger {
     width: 38px;
     padding: 0;
+  }
+}
+
+/*
+ * 실제 설치 앱 가독성 보정: 고정 player와 일시 결과 strip이 편집기의 마지막 행을 덮지 않게 하고,
+ * 최소 데스크톱 폭에서도 탐색 글자와 핵심 편집 hit target을 읽을 수 있는 크기로 유지한다.
+ */
+@media (min-width: 901px) and (min-height: 640px) {
+  .app-shell,
+  .app-shell[data-workspace-command-dock-visible="true"] {
+    --workspace-player-clearance: 80px;
+    grid-template-rows: 114px 40px 56px minmax(0, 1fr);
+    gap: 7px;
+    padding: 10px 10px var(--workspace-player-clearance);
+  }
+
+  .transport-band {
+    grid-template-rows: 50px 44px;
+    gap: 6px 12px;
+    padding: 6px 8px;
+  }
+
+  .brand-lockup {
+    min-height: 50px;
+  }
+
+  .transport-controls {
+    align-self: start;
+    min-height: 50px;
+  }
+
+  .transport-controls .tempo-nudge-pads {
+    min-height: 50px;
+    height: 50px;
+    gap: 2px 4px;
+  }
+
+  .transport-controls .tempo-nudge-pads button {
+    min-height: 24px;
+  }
+
+  .transport-controls .field {
+    gap: 3px;
+  }
+
+  .transport-controls .field > span,
+  .transport-controls .style-field-label,
+  .transport-controls .time-signature-field > span {
+    font-size: 10px;
+    line-height: 1.15;
+  }
+
+  .transport-controls .field input,
+  .transport-controls .field select,
+  .transport-controls .time-signature-field output {
+    min-height: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+
+  .command-strip .transport-status,
+  .command-strip .transport-position-readout,
+  .command-strip .transport-essential-controls > .icon-button,
+  .command-strip .transport-session-tools > summary,
+  .command-strip .playback-mode-row button {
+    min-height: 44px;
+    height: 44px;
+  }
+
+  .mode-row {
+    height: 40px;
+  }
+
+  .mode-row .segmented button {
+    min-height: 30px;
+    font-size: 11px;
+  }
+
+  .app-shell > .workflow-navigator {
+    height: 56px;
+    /* 이전 반응형 규칙의 blur는 sticky 행에만 필요했다. 고정 앱 프레임에서 이를 남기면
+     * fixed workflow 결과가 viewport 대신 이 행을 기준으로 잡혀 transport를 덮는다. */
+    backdrop-filter: none;
+  }
+
+  .workspace-tabs-surface {
+    grid-template-columns: 126px minmax(0, 1fr);
+  }
+
+  .workspace-tabs-kicker,
+  .workflow-navigator-card .workflow-tab-label {
+    font-size: 10px;
+  }
+
+  .workspace-tabs-heading > strong,
+  .workflow-navigator-card strong {
+    font-size: 12px;
+  }
+
+  .workflow-navigator-card .workflow-tab-status {
+    padding: 2px 5px;
+    font-size: 8px;
+  }
+
+  .workspace-page-tabs {
+    grid-template-columns: 142px minmax(0, 1fr);
+    height: 54px;
+  }
+
+  .workspace-page-tabs-heading > span {
+    font-size: 9px;
+  }
+
+  .workspace-page-tabs-heading > strong,
+  .workspace-page-tab-copy strong {
+    font-size: 12px;
+  }
+
+  .workspace-page-tab {
+    min-height: 44px;
+    padding-inline: 8px;
+  }
+
+  .workspace-page-tab-meta {
+    padding: 2px 5px;
+    font-size: 8px;
+  }
+
+  .workspace-zone-panel:not([hidden]),
+  .workspace-deliver-panel,
+  .workspace-grid.workspace-overview-panel,
+  .workspace-compose-panel,
+  .workspace-arrange-panel,
+  .workspace-mix-panel {
+    grid-template-rows: 54px minmax(0, 1fr);
+  }
+
+  /* 구조용 shell은 scroll owner가 아니다. hidden은 scrollIntoView가 보이지 않는 중간
+   * scrollTop을 만들 수 있으므로 clip으로 고정하고, 선택된 page page panel만 스크롤한다. */
+  .workspace-tabpanels,
+  .workspace-zone-panel:not([hidden]) {
+    overflow: clip;
+  }
+
+  .workspace-zone-panel:not([hidden]) > .workspace-page-panel:not([hidden]),
+  .workspace-deliver-panel > .handoff-pack {
+    scrollbar-gutter: stable;
+    scroll-padding-block: 16px 32px;
+  }
+
+  .workspace-zone-panel:not([hidden]) > .workspace-page-panel:not([hidden]) {
+    padding: 12px 14px 30px;
+  }
+
+  .workspace-zone-panel:not([hidden]) > .workspace-page-panel:not([hidden]) :focus-visible,
+  .workspace-deliver-panel > .handoff-pack :focus-visible {
+    scroll-margin-block: 14px 32px;
+  }
+
+  .workspace-command-dock {
+    min-height: 58px;
+    border-color: rgba(130, 215, 255, 0.46);
+    box-shadow:
+      0 18px 50px rgba(0, 0, 0, 0.58),
+      0 0 0 1px rgba(17, 16, 15, 0.88);
+  }
+
+  .workspace-command-dock-position span,
+  .workspace-command-dock-position small,
+  .workspace-command-dock-button span {
+    font-size: 10px;
+  }
+
+  .workspace-command-dock-position strong {
+    font-size: 12px;
+  }
+
+  /* 결과는 전체 편집 면을 덮지 않는, player와 같은 폭의 상태 toast로 제한한다. */
+  .mode-switch-result,
+  .mode-row .project-file-result,
+  .mode-row .local-draft-recovery-result,
+  .workspace-feedback-anchor:not(:empty),
+  .workflow-navigator-result {
+    inset-inline-start: 50%;
+    inset-inline-end: auto;
+    inset-block-end: 82px;
+    width: min(720px, calc(100vw - 24px));
+    box-sizing: border-box;
+    max-height: 82px;
+    transform: translateX(-50%);
+    overflow: auto;
+    pointer-events: auto;
+  }
+
+  /* 1600px 이하의 본문 카드는 한 열로 접지만, 고정 결과 strip은 82px 전용 행에서
+   * 제목·수치·다음 확인을 한 번에 읽을 수 있도록 원래의 가로 구조를 복원한다. */
+  .workspace-feedback-anchor > .quick-action-result,
+  .mode-row > .quick-action-result {
+    grid-template-columns: minmax(180px, 0.75fr) minmax(180px, 0.75fr) minmax(300px, 1.5fr);
+    box-sizing: border-box;
+    max-height: 82px;
+    overflow: clip;
+  }
+
+  .workspace-feedback-anchor > .quick-action-result .quick-action-result-followup,
+  .mode-row > .quick-action-result .quick-action-result-followup {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* 좁은 고정 결과 행에서도 미리듣기와 다음 확인의 핵심 문장을 두 줄까지 읽게 한다.
+   * 라벨을 위로 올려 본문 폭을 확보하고, 전체 문장은 각 요소의 title로도 제공한다. */
+  .workspace-feedback-anchor > .quick-action-result .quick-action-result-followup span,
+  .mode-row > .quick-action-result .quick-action-result-followup span {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: center;
+    gap: 2px;
+    padding-block: 5px;
+  }
+
+  .workspace-feedback-anchor > .quick-action-result .quick-action-result-followup em,
+  .mode-row > .quick-action-result .quick-action-result-followup em {
+    display: -webkit-box;
+    overflow: hidden;
+    white-space: normal;
+    line-height: 1.2;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  /* 고정 결과 strip은 player 위의 독립 행을 사용한다. 편집 면 높이를 그만큼 줄여
+   * 성공/경고 메시지가 카드나 마지막 control 위에 떠서 가리는 순간도 없앤다. */
+  .app-shell:has(.mode-switch-result),
+  .app-shell:has(.mode-row .project-file-result),
+  .app-shell:has(.mode-row .local-draft-recovery-result),
+  .app-shell:has(.workspace-feedback-anchor:not(:empty)),
+  .app-shell:has(.workflow-navigator-result) {
+    --workspace-player-clearance: 170px;
+  }
+
+  /* Guide를 유지하는 Project/Export Quick Action도 결과 전용 행 위에서 끝나게 한다.
+   * summary 50px를 포함한 전체 높이와 내부 scroll owner를 같은 82px만큼 줄인다. */
+  .app-shell[data-fixed-feedback-active="true"] .guidance-center[open] {
+    max-height: calc(100dvh - 238px);
+  }
+
+  .app-shell[data-fixed-feedback-active="true"] .guidance-center[open] .guidance-center-content {
+    max-height: calc(100dvh - 288px);
+  }
+
+  .workspace-page-panel:not([hidden]) .panel-title h2 {
+    font-size: 17px;
+  }
+
+  .workspace-page-panel:not([hidden]) .panel-title > span,
+  .instrument-tools-copy small,
+  .harmony-moves-copy small,
+  .instrument-tools-context,
+  .harmony-moves-context,
+  .arrangement-tools-copy small,
+  .block-moves-copy small,
+  .arrangement-tools-context,
+  .block-moves-context,
+  .mix-tools-copy small,
+  .mix-tools-context,
+  .master-tools-copy small,
+  .master-tools-context,
+  .master-diagnostic-copy small,
+  .master-diagnostic-context {
+    color: rgba(244, 239, 231, 0.7);
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  /* 두 음정 lane은 충분한 가로 폭을 나눠 써서 세로 스크롤을 절반가량 줄인다. */
+  .note-lanes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 12px;
+  }
+
+  .piano-grid {
+    gap: 5px;
+  }
+
+  .piano-row {
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .piano-row > div,
+  .note {
+    min-height: 28px;
+  }
+
+  .piano-row span,
+  .lane-header strong,
+  .note-grid-keyboard-help,
+  .drum-grid-keyboard-help {
+    color: rgba(244, 239, 231, 0.7);
+    font-size: 11px;
+  }
+
+  .instrument-panel,
+  .arrangement-panel,
+  .mixer-panel,
+  .master-panel {
+    gap: 10px;
+  }
+
+  .instrument-direct-chords,
+  .chord-editor,
+  .arrangement-tools-content,
+  .block-moves-content,
+  .instrument-tools-content,
+  .mix-tools-content,
+  .master-tools-content {
+    gap: 8px;
+  }
+
+  .instrument-tools-summary,
+  .harmony-moves-summary,
+  .arrangement-tools-summary,
+  .block-moves-summary,
+  .mix-tools-summary,
+  .master-tools-summary {
+    min-height: 50px;
+  }
+
+  .arrangement-track {
+    grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  }
+
+  .arrangement-block {
+    min-height: 84px;
+    gap: 5px;
+  }
+
+  .arrangement-block strong {
+    font-size: 19px;
+  }
+
+  .arrangement-editor {
+    grid-template-columns: minmax(150px, 0.8fr) repeat(3, minmax(150px, 1fr));
+    gap: 8px;
+    margin-block-start: 9px;
+    padding-block-start: 9px;
+  }
+
+  .arrangement-shape-controls,
+  .arrangement-block-role-readout,
+  .arrangement-editor > .block-moves {
+    grid-column: 1 / -1;
+  }
+
+  .arrangement-editor select,
+  .arrangement-editor input[type="number"] {
+    min-height: 38px;
+    font-size: 12px;
+  }
+
+  .arrangement-mute-row button,
+  .arrangement-actions button,
+  .block-pattern-row button {
+    min-height: 36px;
+    font-size: 11px;
+  }
+}
+
+@media (min-width: 1180px) and (min-height: 640px) {
+  .transport-controls {
+    grid-template-columns: minmax(138px, 1.2fr) 60px 96px 92px 78px minmax(104px, 1fr);
+  }
+
+  .transport-controls .time-signature-field > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1040px) and (min-height: 640px) {
+  .workspace-tabs-surface {
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+
+  .workspace-page-tabs {
+    grid-template-columns: 126px minmax(0, 1fr);
+  }
+
+  .arrangement-editor {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .arrangement-shape-controls,
+  .arrangement-block-role-readout,
+  .arrangement-editor > .block-moves {
+    grid-column: 1 / -1;
   }
 }

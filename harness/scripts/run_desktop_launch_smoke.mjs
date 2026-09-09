@@ -507,12 +507,14 @@ function checkResult(result) {
       functionalTabs?.reviewQueueQuickActionReveal?.actionVisible === true &&
       functionalTabs?.reviewQueueQuickActionReveal?.selectedActionId === "review-queue-route-readout-action" &&
       functionalTabs?.reviewQueueQuickActionReveal?.modalClosed === true &&
+      functionalTabs?.reviewQueueQuickActionReveal?.guidanceCenterOpen === false &&
       functionalTabs?.reviewQueueQuickActionReveal?.masterReviewOpen === true &&
       functionalTabs?.reviewQueueQuickActionReveal?.masterReviewQueueOpen === true &&
       functionalTabs?.reviewQueueQuickActionReveal?.reviewQueueVisible === true &&
       functionalTabs?.reviewQueueQuickActionReveal?.reviewQueueWidth > 0 &&
       functionalTabs?.reviewQueueQuickActionReveal?.reviewQueueHeight > 0 &&
       functionalTabs?.reviewQueueQuickActionReveal?.reviewQueueInViewport === true &&
+      functionalTabs?.reviewQueueQuickActionReveal?.reviewQueueUnobscured === true &&
       functionalTabs?.reviewQueueQuickActionReveal?.reviewQueueClearOfNavigator === true &&
       functionalTabs?.reviewQueueQuickActionReveal?.visibleHeight > 0 &&
       functionalTabs?.reviewQueueQuickActionReveal?.viewportHeight >= 760 &&
@@ -521,7 +523,7 @@ function checkResult(result) {
       ) &&
       functionalTabs?.reviewQueueQuickActionReveal?.projectFingerprintPreserved === true &&
       functionalTabs?.reviewQueueQuickActionReveal?.disclosurePostureRestored === true,
-    `live desktop native Quick Actions Review Queue route should reveal both closed disclosures in the same Mix viewport, clear the compact navigator, preserve Compose, and restore disclosure posture (${JSON.stringify(functionalTabs?.reviewQueueQuickActionReveal ?? null)})`
+    `live desktop native Quick Actions Review Queue route should dismiss the Guide overlay, reveal both closed disclosures unobscured in the same Mix viewport, clear the compact navigator, preserve Compose, and restore disclosure posture (${JSON.stringify(functionalTabs?.reviewQueueQuickActionReveal ?? null)})`
   );
   check(
     functionalTabs?.minimumWindow?.viewportWidth >= 1000 &&
@@ -873,7 +875,7 @@ function checkResult(result) {
         frame?.subTabListHeight > 0 &&
         frame?.subTabListHeight <= 54 &&
         frame?.mainTabMaximumHeight > 0 &&
-        frame?.mainTabMaximumHeight <= 44 &&
+        frame?.mainTabMaximumHeight <= 48 &&
         frame?.subTabMaximumHeight > 0 &&
         frame?.subTabMaximumHeight <= 44 &&
         frame?.mainTabListViewportContained === true &&
@@ -2046,7 +2048,7 @@ child.on("exit", (code, signal) => {
     `- Quick Actions keyboard selection: arrows/Home/End retained search focus; Enter ran ${result.evidence.modalFocus.quickKeyboardSelectedTitle}`
   );
   console.log(
-    `- Review Queue route: native shortcut/search/Enter revealed both closed disclosures in the same Mix viewport with ${Math.round(result.evidence.functionalTabs.reviewQueueQuickActionReveal.visibleHeight)}px visible below the sticky navigator, then restored disclosure posture`
+    `- Review Queue route: native shortcut/search/Enter dismissed the Guide overlay and revealed both closed disclosures unobscured in the same Mix viewport with ${Math.round(result.evidence.functionalTabs.reviewQueueQuickActionReveal.visibleHeight)}px visible below the sticky navigator, then restored disclosure posture`
   );
   console.log(
     `- Guide route: native shortcut/search/Enter opened the closed Guide and focused Beat Passport in Compose with ${Math.round(result.evidence.functionalTabs.guidanceBeatPassportQuickActionReveal.visibleHeight)}px visible below the sticky navigator, then restored Guide posture`

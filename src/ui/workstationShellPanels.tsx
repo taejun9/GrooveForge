@@ -4107,11 +4107,11 @@ export function QuickActionResultStrip({ result }: { result: QuickActionResult }
       <div className="quick-action-result-followup" data-testid="quick-action-result-followup">
         <span>
           <b>Audition</b>
-          <em data-testid="quick-action-result-audition">{result.auditionCue}</em>
+          <em data-testid="quick-action-result-audition" title={result.auditionCue}>{result.auditionCue}</em>
         </span>
         <span>
           <b>Next check</b>
-          <em data-testid="quick-action-result-next-check">{result.nextCheck}</em>
+          <em data-testid="quick-action-result-next-check" title={result.nextCheck}>{result.nextCheck}</em>
         </span>
       </div>
     </section>
