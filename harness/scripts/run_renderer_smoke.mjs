@@ -1685,6 +1685,7 @@ function validateClosedDetailsContainment(html) {
   const expectedDisclosures = [
     "first-run-launchpad",
     "transport-session-tools",
+    "overview-length-goal",
     "guide-quick-start-details",
     "guidance-center",
     "workflow-review-disclosure",
@@ -1723,6 +1724,13 @@ function validateClosedDetailsContainment(html) {
     detailsTags.length === expectedDisclosures.length &&
       expectedDisclosures.every((testId) => detailsTags.some((tag) => tag.includes(`data-testid=\"${testId}\"`))),
     `renderer should expose the complete ${expectedDisclosures.length}-disclosure inventory under the shared containment contract`
+  );
+  check(
+    electronMainSource.includes(`evidence.closedDetails.totalCount !== ${expectedDisclosures.length}`) &&
+      electronMainSource.includes(`evidence.closedDetails.closedCount !== ${expectedDisclosures.length - 1}`) &&
+      desktopLaunchSmokeSource.includes(`closedDetails?.totalCount === ${expectedDisclosures.length}`) &&
+      desktopLaunchSmokeSource.includes(`closedDetails?.closedCount === ${expectedDisclosures.length - 1}`),
+    "production Electron and its launch wrapper should expect the same native disclosure inventory as renderer smoke"
   );
   check(
     openDetailsTags.length === 1 && openDetailsTags[0]?.includes('data-testid="first-run-launchpad"'),
@@ -2717,9 +2725,149 @@ function validateProjectAudioAnalysisPerformance(html, helpers) {
   );
 }
 
+function validateOverviewLengthGoal(lengthModule, overviewModule, localization, workstation, render) {
+  const starter = workstation.createAudienceStarterProject("beginner");
+  const projectWithBars = (bpm, bars) => {
+    const arrangement = [];
+    let remaining = bars;
+    while (remaining > 0) {
+      const blockBars = Math.min(16, remaining);
+      arrangement.push({ ...starter.arrangement[0], bars: blockBars });
+      remaining -= blockBars;
+    }
+    return { ...starter, bpm, arrangement };
+  };
+  const shortProject = projectWithBars(60, 22);
+  const thresholdProject = projectWithBars(81, 30);
+  const inRangeProject = projectWithBars(60, 44);
+  const longProject = projectWithBars(60, 45);
+  const cappedProject = projectWithBars(200, 64);
+  const nearMinimumProject = projectWithBars(156, 58);
+  const nearMaximumProject = projectWithBars(83, 62);
+  const short = lengthModule.createOverviewLengthGoal(shortProject);
+  const threshold = lengthModule.createOverviewLengthGoal(thresholdProject);
+  const inRange = lengthModule.createOverviewLengthGoal(inRangeProject);
+  const long = lengthModule.createOverviewLengthGoal(longProject);
+  const capped = lengthModule.createOverviewLengthGoal(cappedProject);
+  const nearMinimum = lengthModule.createOverviewLengthGoal(nearMinimumProject);
+  const nearMaximum = lengthModule.createOverviewLengthGoal(nearMaximumProject);
+  check(
+    short.status === "short" && short.minimumBars === 23 && short.maximumBars === 44 && short.neededBarChange === 1 &&
+      threshold.status === "in-range" && threshold.minimumBars === 30 && threshold.estimatedExportSeconds === 90 &&
+      inRange.status === "in-range" && inRange.maximumBars === 44 &&
+      long.status === "long" && long.neededBarChange === 1 &&
+      capped.status === "short" && capped.minimumBars === 75 && capped.maximumBars === 64 && !capped.possibleAtCurrentBpm,
+    "Overview length goal should classify 90/180-second boundaries, BPM-specific bars, and the 64-bar cap"
+  );
+  const sourceBefore = JSON.stringify(cappedProject);
+  const nominalSeconds = capped.currentBars * workstation.stepsPerBar * workstation.projectStepDurationSeconds(cappedProject) +
+    render.exportTailDurationSeconds(cappedProject);
+  check(
+    capped.estimatedExportSeconds === Math.ceil(nominalSeconds * render.wavSampleRate) / render.wavSampleRate &&
+      JSON.stringify(cappedProject) === sourceBefore,
+    "Overview estimate should use the renderer's exact WAV frame ceiling without changing project data"
+  );
+  const nearMinimumDisplay = lengthModule.formatOverviewLengthEstimate(nearMinimum.estimatedExportSeconds, nearMinimum.status);
+  const nearMaximumDisplay = lengthModule.formatOverviewLengthEstimate(nearMaximum.estimatedExportSeconds, nearMaximum.status);
+  const nextFrameDisplay = lengthModule.formatOverviewLengthEstimate(180 + 1 / render.wavSampleRate, "long");
+  check(
+    nearMinimum.status === "short" && nearMinimum.estimatedExportSeconds > 89.98 &&
+      nearMinimumDisplay.clock === "1:29.98" && nearMinimumDisplay.seconds === "89.98" &&
+      nearMaximum.status === "long" && nearMaximum.estimatedExportSeconds > 180 &&
+      nearMaximumDisplay.clock === "3:00.37" && nearMaximumDisplay.seconds === "180.37" &&
+      nextFrameDisplay.clock === "3:00.01" && nextFrameDisplay.seconds === "180.01",
+    "goal estimate display should floor short and ceil long WAV lengths to centiseconds without crossing 90/180-second labels"
+  );
+  const baseProps = {
+    activePage: "snapshot",
+    analysis: null,
+    analysisState: "pending",
+    isFullSongPlaying: false,
+    isPlaying: false,
+    onSelectPage() {},
+    onOpenArrange() {},
+    onToggleFullSongPlayback() {},
+    playbackPosition: null,
+    project: shortProject,
+    workflowItems: []
+  };
+  const englishHtml = renderToStaticMarkup(React.createElement(
+    localization.LocalizationProvider,
+    { initialLocale: "en" },
+    React.createElement(overviewModule.WorkspaceOverview, baseProps)
+  ));
+  const koreanHtml = renderToStaticMarkup(React.createElement(
+    localization.LocalizationProvider,
+    { initialLocale: "ko" },
+    React.createElement(overviewModule.WorkspaceOverview, { ...baseProps, project: cappedProject })
+  ));
+  const bilingualBoundaryHtml = ["en", "ko"].map((locale) => ({
+    locale,
+    short: renderToStaticMarkup(React.createElement(
+      localization.LocalizationProvider,
+      { initialLocale: locale },
+      React.createElement(overviewModule.WorkspaceOverview, { ...baseProps, project: nearMinimumProject })
+    )),
+    long: renderToStaticMarkup(React.createElement(
+      localization.LocalizationProvider,
+      { initialLocale: locale },
+      React.createElement(overviewModule.WorkspaceOverview, { ...baseProps, project: nearMaximumProject })
+    ))
+  }));
+  const englishDisclosureTag = /<details[^>]*data-testid="overview-length-goal"[^>]*>/u.exec(englishHtml)?.[0] ?? "";
+  const englishSummaryStart = englishHtml.indexOf('<summary class="overview-length-goal-summary"');
+  const englishSummaryEnd = englishHtml.indexOf("</summary>", englishSummaryStart);
+  const englishSummary = englishSummaryStart >= 0 && englishSummaryEnd > englishSummaryStart
+    ? englishHtml.slice(englishSummaryStart, englishSummaryEnd)
+    : "";
+  const koreanSummaryStart = koreanHtml.indexOf('<summary class="overview-length-goal-summary"');
+  const koreanSummaryEnd = koreanHtml.indexOf("</summary>", koreanSummaryStart);
+  const koreanSummary = koreanSummaryStart >= 0 && koreanSummaryEnd > koreanSummaryStart
+    ? koreanHtml.slice(koreanSummaryStart, koreanSummaryEnd)
+    : "";
+  check(
+    englishDisclosureTag.startsWith("<details ") &&
+      !englishDisclosureTag.includes(" open") &&
+      englishSummary.includes('data-testid="overview-length-goal-toggle"') &&
+      englishSummary.includes("OPTIONAL LONG-TRACK GOAL") &&
+      englishSummary.includes("an 8-bar first beat can stay short") &&
+      !englishSummary.includes("Short of goal") &&
+      koreanSummary.includes("선택형 긴 곡 목표") &&
+      koreanSummary.includes("8마디 첫 비트는 짧아도 괜찮습니다") &&
+      !koreanSummary.includes("목표보다 짧음") &&
+      styles.includes("details:not([open]) > :not(summary)") &&
+      styles.includes(".overview-length-goal-summary:focus-visible") &&
+      styles.includes(".overview-length-goal[open] .overview-length-goal-chevron") &&
+      englishHtml.includes('data-testid="overview-length-goal-content"') &&
+      englishHtml.includes('data-length-status="short"') &&
+      englishHtml.includes('data-testid="overview-length-open-arrange"') &&
+      englishHtml.includes('aria-label="Open Arrange to review song length"') &&
+      englishHtml.includes("Estimated WAV export") &&
+      koreanHtml.includes("예상 WAV 출력 길이") &&
+      koreanHtml.includes("프로젝트 한도는 64마디") &&
+      koreanHtml.includes('aria-label="곡 길이를 확인할 수 있는 편곡 화면 열기"') &&
+      workspaceOverviewSource.includes("onClick={onOpenArrange}") &&
+      appSource.includes("selectWorkflowNavigatorTab(arrangeItem);") &&
+      styles.includes(".overview-length-goal") &&
+      styles.includes(".overview-length-open-arrange") &&
+      bilingualBoundaryHtml.every(({ locale, short, long }) =>
+        short.includes(locale === "en" ? "Estimated WAV export 1:29.98 (89.98s" : "예상 WAV 출력 길이 1:29.98 (89.98초") &&
+          long.includes(locale === "en" ? "Estimated WAV export 3:00.37 (180.37s" : "예상 WAV 출력 길이 3:00.37 (180.37초")
+      ),
+    "optional Overview long-track goal should stay natively collapsed without a first-beat warning, then expose bilingual status and Arrange CTA on expansion"
+  );
+}
+
 function validateFirstRunRenderer(html, supportedStyleCount) {
   check(html.length > 250000, `first-run renderer output should be substantial, got ${html.length} characters`);
   validateWorkspaceFunctionTabs(html);
+  const firstRunLengthDisclosure = /<details[^>]*data-testid="overview-length-goal"[^>]*>/u.exec(html)?.[0] ?? "";
+  check(
+    firstRunLengthDisclosure.startsWith("<details ") &&
+      !firstRunLengthDisclosure.includes(" open") &&
+      html.includes('data-testid="overview-length-goal-toggle"'),
+    "the default 8-bar first beat should show only a collapsed optional long-track guide, with no visible short-track warning"
+  );
   const workspaceIndex = html.indexOf('class="workspace-grid"');
   check(
     !html.includes('<details class="guidance-center" data-testid="guidance-center" open="">'),
@@ -5953,6 +6101,13 @@ try {
   const localization = await server.ssrLoadModule("/src/ui/localization.tsx");
   const { SettingsDialog } = await server.ssrLoadModule("/src/ui/SettingsDialog.tsx");
   const workstation = await server.ssrLoadModule("/src/domain/workstation.ts");
+  validateOverviewLengthGoal(
+    await server.ssrLoadModule("/src/ui/overviewLengthGoal.ts"),
+    await server.ssrLoadModule("/src/ui/WorkspaceOverview.tsx"),
+    localization,
+    workstation,
+    await server.ssrLoadModule("/src/audio/render.ts")
+  );
   validateProjectFileLoadErrorStatus(await server.ssrLoadModule("/src/ui/workstationUiModel.ts"));
   validateMasterCeilingDraftLifecycle(workstation);
   validateNativeDialogOptions(await server.ssrLoadModule("/electron/nativeDialogOptions.ts"));
@@ -6096,7 +6251,7 @@ try {
     console.log("- Drum grid keyboard: one roving Tab stop, bounded arrows/Home/End, explicit pressed state, Enter/Space toggle, and visible guidance");
     console.log("- Note-grid keyboard: one Tab stop per Bass/Synth grid, exhaustive spatial arrows/Home/End, pressed state, guarded Enter/Space, and guidance");
     console.log("- Live Overdub: Keyboard Capture exposes a direct Pattern-playhead recording mode alongside Next and Replace");
-    console.log("- Closed disclosures: 24-panel inventory shares one non-summary containment rule; only the project launchpad starts open");
+    console.log("- Closed disclosures: 25-panel inventory shares one non-summary containment rule; only the project launchpad starts open");
     console.log(
       "- Beginner path: Guide Quick Start, Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
     );

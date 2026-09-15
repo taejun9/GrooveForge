@@ -15026,6 +15026,12 @@ export function App(): ReactElement {
               setActiveOverviewWorkspacePage(page);
               setProjectStatus(`Opened Overview / ${page === "snapshot" ? "At a glance" : page === "song-map" ? "Song map" : "Readiness"} page`);
             }}
+            onOpenArrange={() => {
+              const arrangeItem = workflowNavigatorItems.find((item) => item.id === "arrange");
+              if (arrangeItem) {
+                selectWorkflowNavigatorTab(arrangeItem);
+              }
+            }}
             onToggleFullSongPlayback={toggleOverviewSongPlayback}
             playbackPosition={playbackPosition}
             project={project}

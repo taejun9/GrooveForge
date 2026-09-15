@@ -3318,13 +3318,13 @@ function launchSmokeCommandReferenceFailures(evidence: LaunchSmokeCommandReferen
 function launchSmokeModalFocusFailures(evidence: LaunchSmokeModalFocusEvidence): string[] {
   const failures: string[] = [];
   if (
-    evidence.closedDetails.totalCount !== 24 ||
+    evidence.closedDetails.totalCount !== 25 ||
     evidence.closedDetails.initiallyOpenCount !== 1 ||
-    evidence.closedDetails.closedCount !== 23 ||
+    evidence.closedDetails.closedCount !== 24 ||
     evidence.closedDetails.leakedContentCount !== 0 ||
     evidence.closedDetails.leakedControlCount !== 0
   ) {
-    failures.push("all 24 native disclosures should honor their initial state with zero visible or reachable content beneath the 23 closed summaries");
+    failures.push("all 25 native disclosures should honor their initial state with zero visible or reachable content beneath the 24 closed summaries");
   }
   if (
     !evidence.closedDetails.guideOpenReady ||
@@ -7141,6 +7141,9 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
         "workflow-target-overview",
         "overview-page-tabs",
         "overview-player",
+        "overview-length-goal",
+        "overview-length-goal-toggle",
+        "overview-length-goal-content",
         "overview-full-song-play",
         "overview-song-progress",
         "deliver-page-tabs",

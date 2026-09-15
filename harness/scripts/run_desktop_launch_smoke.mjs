@@ -100,6 +100,9 @@ const expectedLiveTestIds = [
   "workflow-target-overview",
   "overview-page-tabs",
   "overview-player",
+  "overview-length-goal",
+  "overview-length-goal-toggle",
+  "overview-length-goal-content",
   "overview-full-song-play",
   "overview-song-progress",
   "deliver-page-tabs",
@@ -553,9 +556,9 @@ function checkResult(result) {
   check(functionalTabPixelDigests.size === 5, "live desktop functional tab screenshots should have five distinct pixel digests");
   check(functionalTabs?.restoredCompose === true, "live desktop functional tab evidence should restore Compose posture");
   check(
-    evidence?.modalFocus?.closedDetails?.totalCount === 24 &&
+    evidence?.modalFocus?.closedDetails?.totalCount === 25 &&
       evidence?.modalFocus?.closedDetails?.initiallyOpenCount === 1 &&
-      evidence?.modalFocus?.closedDetails?.closedCount === 23 &&
+      evidence?.modalFocus?.closedDetails?.closedCount === 24 &&
       evidence?.modalFocus?.closedDetails?.leakedContentCount === 0 &&
       evidence?.modalFocus?.closedDetails?.leakedControlCount === 0 &&
       evidence?.modalFocus?.closedDetails?.guideOpenReady === true &&
@@ -2057,7 +2060,7 @@ child.on("exit", (code, signal) => {
     `- Transport route: native shortcut/search/Enter focused First Beat Path Setup on Transport outside the functional tabs while Compose and project data stayed unchanged, then restored Guide posture`
   );
   console.log("- Drum grid keyboard: 64 pressed-state buttons, one roving Tab stop, bounded navigation, Enter/Space toggles, playback guard, and Undo ready");
-  console.log("- Closed disclosures: 24 panels, zero closed content/Tab leaks, native Enter reopen/reclose, and unchanged project posture ready");
+  console.log("- Closed disclosures: 25 panels, zero closed content/Tab leaks, native Enter reopen/reclose, and unchanged project posture ready");
   console.log("- Note-grid keyboard: one 808 and one Synth Tab stop, native spatial navigation, Enter/Space toggles, playback guard, and Undo ready");
   console.log("- Starter landing: beginner Pattern editor focused/visible; producer Review Queue opened/focused/visible");
   console.log("- Arrangement move controls: 2/2 readable directional labels, unique selected-block names, and contained actions");

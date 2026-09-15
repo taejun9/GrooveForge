@@ -3,6 +3,8 @@
  * 전체 곡 듣기는 상위 App이 소유한 단일 transport를 호출하고, 이 컴포넌트는 진행 스냅샷만 표시한다.
  */
 import {
+  ArrowRight,
+  ChevronDown,
   CircleStop,
   Disc3,
   Download,
@@ -19,7 +21,9 @@ import {
   arrangementTotalBars,
   arrangementTotalSteps,
   getStyle,
+  maxProjectArrangementBars,
   patternSlots,
+  projectBpm,
   projectStepDurationSeconds,
   type PatternData,
   type ProjectState
@@ -28,6 +32,7 @@ import type { ExportAnalysis } from "../audio/render";
 import type { PlaybackSnapshot } from "../audio/scheduler";
 import { localizeWorkflowNavigatorItem, useLocalization } from "./localization";
 import type { WorkflowNavigatorItem } from "./workstationUiModel";
+import { createOverviewLengthGoal, formatOverviewLengthEstimate } from "./overviewLengthGoal";
 import { WorkspacePageTabs } from "./WorkspacePageTabs";
 
 export type OverviewWorkspacePageId = "snapshot" | "song-map" | "readiness";
@@ -102,6 +107,7 @@ export function WorkspaceOverview({
   isFullSongPlaying,
   isPlaying,
   onSelectPage,
+  onOpenArrange,
   onToggleFullSongPlayback,
   playbackPosition,
   project,
@@ -113,6 +119,7 @@ export function WorkspaceOverview({
   isFullSongPlaying: boolean;
   isPlaying: boolean;
   onSelectPage: (page: OverviewWorkspacePageId) => void;
+  onOpenArrange: () => void;
   onToggleFullSongPlayback: () => void;
   playbackPosition: PlaybackSnapshot | null;
   project: ProjectState;
@@ -123,6 +130,9 @@ export function WorkspaceOverview({
   const target = activeDeliveryTarget(project);
   const bars = arrangementTotalBars(project);
   const progress = createOverviewPlaybackProgress(project, playbackPosition, isFullSongPlaying);
+  const lengthGoal = createOverviewLengthGoal(project);
+  const lengthDisplay = formatOverviewLengthEstimate(lengthGoal.estimatedExportSeconds, lengthGoal.status);
+  const safeBpm = projectBpm(project);
   const durationLabel = formatClock(progress.totalSeconds);
   const elapsedLabel = formatClock(progress.elapsedSeconds);
   const eventCounts = patternSlots.map((slot) => ({ slot, ...patternEventCounts(project.patterns[slot]) }));
@@ -166,6 +176,25 @@ export function WorkspaceOverview({
     : analysisState === "error"
       ? t("overview.analysisUnavailable")
       : t("overview.analysisUpdating");
+  const lengthBarGuidance = lengthGoal.possibleAtCurrentBpm
+    ? t("overview.lengthBarRange", {
+        bpm: safeBpm,
+        minimum: lengthGoal.minimumBars,
+        maximum: lengthGoal.maximumBars,
+        cap: maxProjectArrangementBars
+      })
+    : t("overview.lengthBpmCap", {
+        bpm: safeBpm,
+        minimum: lengthGoal.minimumBars,
+        cap: maxProjectArrangementBars
+      });
+  const lengthActionGuidance = lengthGoal.status === "short"
+    ? lengthGoal.possibleAtCurrentBpm
+      ? t("overview.lengthAddBars", { count: lengthGoal.neededBarChange })
+      : t("overview.lengthLowerBpm")
+    : lengthGoal.status === "long"
+      ? t("overview.lengthTrimBars", { count: lengthGoal.neededBarChange })
+      : t("overview.lengthInRange", { bars: lengthGoal.currentBars });
 
   return (
     <>
@@ -258,6 +287,55 @@ export function WorkspaceOverview({
             </span>
           </div>
         </div>
+
+        <details
+          className="overview-length-goal"
+          data-testid="overview-length-goal"
+        >
+          <summary className="overview-length-goal-summary" data-testid="overview-length-goal-toggle">
+            <span>{t("overview.lengthGoalEyebrow")}</span>
+            <strong>{t("overview.lengthGoalRange")}</strong>
+            <small>{t("overview.lengthOptionalDetail")}</small>
+            <ChevronDown className="overview-length-goal-chevron" size={17} aria-hidden="true" />
+          </summary>
+          <div
+            className={`overview-length-goal-content ${lengthGoal.status}`}
+            data-length-status={lengthGoal.status}
+            data-testid="overview-length-goal-content"
+          >
+            <div className="overview-length-goal-copy">
+              <span>{t("overview.lengthExpandedEyebrow")}</span>
+              <strong>{t("overview.lengthGoalRange")}</strong>
+              <small data-testid="overview-length-estimate">
+                {t("overview.lengthEstimatedWav", {
+                  duration: lengthDisplay.clock,
+                  seconds: lengthDisplay.seconds
+                })}
+              </small>
+            </div>
+            <div className="overview-length-goal-guidance">
+              <strong data-testid="overview-length-status">
+                {t(lengthGoal.status === "short"
+                  ? "overview.lengthShort"
+                  : lengthGoal.status === "long"
+                    ? "overview.lengthLong"
+                    : "overview.lengthInRangeStatus")}
+              </strong>
+              <small data-testid="overview-length-bars">{lengthBarGuidance}</small>
+              <small>{lengthActionGuidance}</small>
+            </div>
+            <button
+              aria-label={t("overview.lengthOpenArrangeAria")}
+              className="overview-length-open-arrange"
+              data-testid="overview-length-open-arrange"
+              onClick={onOpenArrange}
+              type="button"
+            >
+              <span>{t("overview.lengthOpenArrange")}</span>
+              <ArrowRight size={16} aria-hidden="true" />
+            </button>
+          </div>
+        </details>
 
         <div className="overview-metric-grid" data-testid="overview-metrics">
           <article>
