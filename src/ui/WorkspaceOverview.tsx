@@ -1,6 +1,6 @@
 /**
- * 현재 프로젝트를 편집 상태와 분리된 읽기 전용 Overview로 투영한다.
- * 전체 곡 듣기는 상위 App이 소유한 단일 transport를 호출하고, 이 컴포넌트는 진행 스냅샷만 표시한다.
+ * 현재 프로젝트를 Overview로 투영하고 곡 구간에서 기존 편곡 편집기로 이동하는 경로를 제공한다.
+ * 전체 곡 듣기는 상위 App이 소유한 단일 transport를 호출하고, 이 컴포넌트는 음악 데이터를 변경하지 않는다.
  */
 import {
   ArrowRight,
@@ -22,9 +22,11 @@ import {
   arrangementTotalSteps,
   getStyle,
   maxProjectArrangementBars,
+  normalizeArrangementBars,
   patternSlots,
   projectBpm,
   projectStepDurationSeconds,
+  stepsPerBar,
   type PatternData,
   type ProjectState
 } from "../domain/workstation";
@@ -77,6 +79,16 @@ function formatClock(seconds: number): string {
   return `${minutes}:${remainder.toString().padStart(2, "0")}`;
 }
 
+export function createOverviewSectionTimes(project: ProjectState): Array<{ startSeconds: number; endSeconds: number }> {
+  const secondsPerBar = projectStepDurationSeconds(project) * stepsPerBar;
+  let endBar = 0;
+  return project.arrangement.map((block) => {
+    const startBar = endBar;
+    endBar = Math.min(maxProjectArrangementBars, startBar + normalizeArrangementBars(block.bars));
+    return { startSeconds: startBar * secondsPerBar, endSeconds: endBar * secondsPerBar };
+  });
+}
+
 function patternEventCounts(pattern: PatternData): {
   bass: number;
   chords: number;
@@ -108,6 +120,7 @@ export function WorkspaceOverview({
   isPlaying,
   onSelectPage,
   onOpenArrange,
+  onEditSection,
   onToggleFullSongPlayback,
   playbackPosition,
   project,
@@ -120,6 +133,7 @@ export function WorkspaceOverview({
   isPlaying: boolean;
   onSelectPage: (page: OverviewWorkspacePageId) => void;
   onOpenArrange: () => void;
+  onEditSection: (index: number) => void;
   onToggleFullSongPlayback: () => void;
   playbackPosition: PlaybackSnapshot | null;
   project: ProjectState;
@@ -135,6 +149,7 @@ export function WorkspaceOverview({
   const safeBpm = projectBpm(project);
   const durationLabel = formatClock(progress.totalSeconds);
   const elapsedLabel = formatClock(progress.elapsedSeconds);
+  const sectionTimes = createOverviewSectionTimes(project);
   const eventCounts = patternSlots.map((slot) => ({ slot, ...patternEventCounts(project.patterns[slot]) }));
   const totalEvents = eventCounts.reduce((total, counts) => total + counts.total, 0);
   const usedPatterns = new Set(project.arrangement.map((block) => block.pattern));
@@ -149,7 +164,7 @@ export function WorkspaceOverview({
   const playbackButtonLabel = isFullSongPlaying
     ? t("overview.stopFullSong")
     : isPlaying
-      ? t("overview.stopCurrentPreview")
+      ? t("overview.switchToFullSong")
       : t("overview.playFullSong");
   const playbackStatus = isFullSongPlaying
     ? t("overview.playingStatus", {
@@ -267,7 +282,7 @@ export function WorkspaceOverview({
               title={playbackButtonLabel}
               type="button"
             >
-              {isPlaying ? <CircleStop size={19} aria-hidden="true" /> : <Play size={19} aria-hidden="true" />}
+              {isFullSongPlaying ? <CircleStop size={19} aria-hidden="true" /> : <Play size={19} aria-hidden="true" />}
               <span>{playbackButtonLabel}</span>
             </button>
             <progress
@@ -427,9 +442,22 @@ export function WorkspaceOverview({
             >
               <span>{String(index + 1).padStart(2, "0")}</span>
               <strong>{block.section}</strong>
+              <span className="overview-section-time" data-testid={`overview-section-time-${index}`}>
+                {formatClock(sectionTimes[index].startSeconds)}–{formatClock(sectionTimes[index].endSeconds)}
+              </span>
               <b>{t("overview.pattern")} {block.pattern}</b>
               <small>{block.bars} {t("overview.bars")} · {Math.round(block.energy * 100)}% {t("overview.energy")}</small>
               <em>{block.mutedTracks.length > 0 ? `${block.mutedTracks.length} ${t("overview.muted")}` : t("overview.allLayers")}</em>
+              <button
+                aria-label={t("overview.editSectionAria", { section: block.section, block: index + 1 })}
+                className="overview-edit-section"
+                data-testid={`overview-edit-section-${index}`}
+                onClick={() => onEditSection(index)}
+                type="button"
+              >
+                <span>{t("overview.editSection")}</span>
+                <ArrowRight size={14} aria-hidden="true" />
+              </button>
             </article>
           ))}
         </div>

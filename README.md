@@ -6,7 +6,7 @@ GrooveForge는 여러 장르의 비트를 직접 만들기 위한 데스크톱�
 
 프로젝트 유형: `web-first TypeScript mini DAW / beat workstation`
 
-처음 비트를 만드는 사용자는 `설정 → 작곡 → 편곡 → 믹싱 → 전달` 흐름을 따라갈 수 있고, 숙련된 프로듀서는 안내를 건너뛰고 이벤트, 사운드, 편곡, 믹서, 마스터와 전달 상태를 바로 편집할 수 있습니다. 모든 기본 작업은 내장 악기와 편집 가능한 음악 이벤트에서 시작합니다.
+처음 비트를 만드는 사용자는 `개요 → 작곡 → 편곡 → 믹싱 → 전달` 흐름을 따라갈 수 있고, 숙련된 프로듀서는 안내를 건너뛰고 이벤트, 사운드, 편곡, 믹서, 마스터와 전달 상태를 바로 편집할 수 있습니다. 모든 기본 작업은 내장 악기와 편집 가능한 음악 이벤트에서 시작합니다.
 
 이 저장소는 `Team Forge`가 관리합니다. 에이전트 역할과 작업 규칙은 [AGENTS.md](AGENTS.md)를 참고하세요. 기존의 상세 영문 README와 전체 운영 명령 카탈로그는 [readme-en.md](readme-en.md)에 보존되어 있습니다.
 
@@ -66,6 +66,10 @@ BPM/키/스타일 → 패턴 프로그래밍 → 드럼 → 808/베이스 → �
 - Sound Snapshot과 Mix Snapshot 비교
 
 ### 편곡과 전달
+
+- 개요에서 패턴 미리듣기를 전체 곡 재생으로 한 번에 전환
+- 곡 지도에 구간별 시작·끝 시간을 표시하고 해당 편곡 구간으로 바로 이동
+- 상단 내보내기 메뉴에서 전체 마디 수, WAV 예상 길이와 출력 규격 확인
 
 - Intro, Verse, Hook, Bridge와 Outro 블록
 - 섹션 복사, 분할, 병합, 이동과 길이 조절
@@ -165,6 +169,12 @@ npm run desktop:all-genres-qa
 이 exhaustive 명령은 기존 `desktop:multigenre-qa`의 대표 6장르 회귀를 대체하지 않습니다. 16개 프로젝트를 각각 Open하고 native UI로 메타데이터·편곡·마스터 자동화를 편집한 뒤 Arrange, Mix, Deliver를 거쳐 WAV를 내보내고 Save·reopen합니다. 각 곡은 90~180초의 canonical stereo 44.1kHz signed PCM 24-bit WAV이며, ignored `build/desktop/plan-1531-all-genres-actual-app-qa-*/delivery/`에 장르별 WAV, 다시 열 수 있는 프로젝트, 한글 SoundCloud private-first 업로드 시트, 실제 앱 화면, 기술 QA, 최상위 manifest와 SHA-256 checksums를 모읍니다. 이 명령도 로그인·업로드·공개·수익화·배급을 수행하지 않습니다.
 
 ## 핵심 검증 명령
+
+새로 저작한 합성 리프 록·힙합 5곡을 실제 앱으로 검증하려면 다음 명령을 실행합니다. 각 곡은 90~180초이며, 전체 곡 재생 진행과 실제 오디오 출력, WAV 미리듣기·내보내기·저장·재열기를 확인합니다. 결과는 `build/desktop/plan-1536-rock-hiphop-actual-app-qa-*/delivery/`에 생성됩니다.
+
+```sh
+node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_multigenre_actual_app_qa.mjs --rock-hiphop-pack
+```
 
 | 명령 | 확인 범위 |
 |---|---|

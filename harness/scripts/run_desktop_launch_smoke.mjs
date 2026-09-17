@@ -364,7 +364,7 @@ function checkResult(result) {
       overviewPlayback?.composeFingerprintPreserved === true &&
       overviewPlayback?.dirtyPosturePreserved === true &&
       overviewPlayback?.historyDepthPreserved === true,
-    `live desktop Overview should start the shared full-arrangement transport at bar one, advance and reset progress, then stop without mutating project or edit history (${JSON.stringify(overviewPlayback ?? null)})`
+    `live desktop Overview should switch from an existing preview to the full arrangement in one click at bar one, advance and reset progress, then stop without mutating project or edit history (${JSON.stringify(overviewPlayback ?? null)})`
   );
   check(
     functionalTabs?.arrangeStructureRoute?.activeZone === "arrange" &&

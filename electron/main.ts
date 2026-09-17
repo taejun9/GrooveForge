@@ -376,6 +376,11 @@ type ManualQaMovementReport = {
   mode: "visible-native-auto-movement-qa";
   ok: boolean;
   performance: ManualQaAutoSongReport["performance"];
+  playback: {
+    arrangementAdvanced: boolean;
+    arrangementAudible: boolean;
+    wavPreviewAudible: boolean;
+  };
   project?: ManualQaAutoSongReport["project"] & {
     automation: unknown;
     preservedSourceCore: boolean;
@@ -5517,12 +5522,6 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
     );
     await new Promise((resolve) => setTimeout(resolve, 120));
     await clickLaunchSmokeFunctionalTabNativeTarget(win, "overview-full-song-play");
-    const arbitrationStopped = await waitForLaunchSmokeOverviewPlaybackDomState(
-      win,
-      (state) => !state.transportPlaying && state.overviewState === "idle" && state.progressValue === 0,
-      "a stopped arbitration posture"
-    );
-    await clickLaunchSmokeFunctionalTabNativeTarget(win, "overview-full-song-play");
     const overviewPlaybackStarted = await waitForLaunchSmokeOverviewPlaybackDomState(
       win,
       (state) =>
@@ -5530,7 +5529,7 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
         state.arrangementSelected &&
         state.overviewState === "song" &&
         state.progressValue >= 1,
-      "full-song playback from the arrangement start"
+      "one-click switch from preview to full-song playback from the arrangement start"
     );
     const overviewPlaybackAdvanced = await waitForLaunchSmokeOverviewPlaybackDomState(
       win,
@@ -5564,8 +5563,9 @@ async function collectLaunchSmokeFunctionalTabsEvidence(
       otherPlaybackArbitrated:
         otherPlayback.overviewState === "other" &&
         otherPlayback.transportPlaying &&
-        arbitrationStopped.overviewState === "idle" &&
-        !arbitrationStopped.transportPlaying,
+        overviewPlaybackStarted.overviewState === "song" &&
+        overviewPlaybackStarted.transportPlaying &&
+        overviewPlaybackStarted.arrangementSelected,
       overviewPlaying: overviewPlaybackStarted.overviewState === "song",
       overviewStopped: overviewPlaybackStopped.overviewState === "idle",
       playbackAdvanced: overviewPlaybackAdvanced.progressValue > overviewPlaybackStarted.progressValue,
@@ -15679,6 +15679,7 @@ function installManualQaAutoMovement(win: BrowserWindow): void {
     interactions: manualQaAutoSongInteractions,
     mode: "visible-native-auto-movement-qa",
     ok: false,
+    playback: { arrangementAdvanced: false, arrangementAudible: false, wavPreviewAudible: false },
     performance: {
       generalBudgetMs: 5000,
       generalViolations: [],
@@ -15931,6 +15932,20 @@ function installManualQaAutoMovement(win: BrowserWindow): void {
       await captureZone("arrange");
     });
 
+    await runStep("audition-arrangement", async () => {
+      // 장곡 QA도 실제 오디오 출력과 transport 진행을 확인한다. WAV 수치 검사와 별개인 재생 경로 증거다.
+      await clickAndWait("workflow-jump-overview", "Overview playback workspace", `document.querySelector('[data-testid="workflow-jump-overview"]')?.getAttribute('aria-selected') === 'true'`);
+      await clickAndWait("overview-full-song-play", "Movement playback started", `document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'true'`);
+      await waitForManualQaDelay(3500);
+      report.playback.arrangementAudible = win.webContents.isCurrentlyAudible();
+      const playing = await readLaunchSmokeOverviewPlaybackDomState(win);
+      report.playback.arrangementAdvanced = playing.transportPlaying && playing.progressValue > 1;
+      await clickAndWait("overview-full-song-play", "Movement playback stopped", `document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'false'`);
+      if (!report.playback.arrangementAudible || !report.playback.arrangementAdvanced) {
+        throw new Error(`Movement playback did not advance with audible output: ${JSON.stringify(report.playback)}`);
+      }
+    });
+
     await runStep("apply-length-bound-master-automation", async () => {
       await clickAndWait(
         "workflow-jump-mix",
@@ -15971,6 +15986,11 @@ function installManualQaAutoMovement(win: BrowserWindow): void {
           document.querySelector('[data-testid="audio-analysis-status"]')?.textContent?.trim() === 'Audio meters ready'`,
         180000
       );
+      await clickAndWait("handoff-pack-preview-wav", "Movement rendered WAV preview started", `document.querySelector('[data-testid="handoff-pack-preview-wav"]')?.getAttribute('aria-pressed') === 'true'`, 120000);
+      await waitForManualQaDelay(3000);
+      report.playback.wavPreviewAudible = win.webContents.isCurrentlyAudible();
+      await clickAndWait("handoff-pack-preview-wav", "Movement rendered WAV preview stopped", `document.querySelector('[data-testid="handoff-pack-preview-wav"]')?.getAttribute('aria-pressed') === 'false'`);
+      if (!report.playback.wavPreviewAudible) throw new Error("Movement rendered WAV preview did not produce audible output.");
       const downloadStartIndex = manualQaDownloads.length;
       const exportInteractionStartedAt = Date.now();
       await clickManualQaNativeTarget(win, "handoff-pack-action-wav");

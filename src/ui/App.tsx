@@ -812,6 +812,7 @@ import {
 } from "./workstationShellPanels";
 import { WorkspacePageTabs } from "./WorkspacePageTabs";
 import { WorkspaceOverview, type OverviewWorkspacePageId } from "./WorkspaceOverview";
+import { createOverviewLengthGoal, formatOverviewLengthEstimate } from "./overviewLengthGoal";
 import { SettingsDialog } from "./SettingsDialog";
 import { useLocalization } from "./localization";
 import {
@@ -1814,6 +1815,8 @@ export function App(): ReactElement {
       : null;
   const isFullSongPlaying =
     isPlaying && transportLoopScope === "arrangement" && (playbackPosition?.mode ?? playbackMode) === "arrangement";
+  const songExportLength = createOverviewLengthGoal(project);
+  const songExportDuration = formatOverviewLengthEstimate(songExportLength.estimatedExportSeconds, songExportLength.status).clock;
   const selectedArrangementBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
   const patternCompareDecisionSummary = useMemo(
     () =>
@@ -8064,21 +8067,33 @@ export function App(): ReactElement {
   }
 
   function toggleOverviewSongPlayback(): void {
-    if (isPlaying) {
-      const stoppedScope = transportLoopScope;
+    if (isFullSongPlaying) {
       stopPlayback();
-      setProjectStatus(
-        stoppedScope === "arrangement"
-          ? "Stopped full-song playback"
-          : `Stopped ${transportLoopLabel(stoppedScope)} loop; press Play full song to start from bar 1`
-      );
+      setProjectStatus("Stopped full-song playback");
       return;
     }
 
+    // 패턴·구간 미리듣기를 먼저 해제해 한 번의 명시적 클릭으로 전체 편곡을 처음부터 듣는다.
+    if (isPlaying) {
+      stopPlayback();
+    }
     selectTransportLoopScope("arrangement", false);
     if (startPlaybackTarget({ mode: "arrangement", startBar: 0 })) {
       setProjectStatus("Playing full song from bar 1");
     }
+  }
+
+  function editOverviewSection(index: number): void {
+    if (!project.arrangement[index]) {
+      return;
+    }
+    selectArrangementBlock(index);
+    flushSync(() => activateArrangeWorkspacePage("timeline"));
+    scrollWorkspaceTargetIntoView(
+      () => document.querySelector<HTMLElement>(`[data-testid="arrangement-block-${index}"]`),
+      "center",
+      "arrange"
+    );
   }
 
   function stopMixPreview(status?: string): void {
@@ -14294,6 +14309,10 @@ export function App(): ReactElement {
           canRedo={canRedo}
           canUndo={canUndo}
           exportDetail={t("action.exportsDetail")}
+          exportContext={{
+            summary: t("action.exportSongContext", { bars: songExportLength.currentBars, duration: songExportDuration }),
+            detail: t("action.exportSongFormat")
+          }}
           exportIcon={<Download size={17} aria-hidden="true" />}
           exportItems={[
             {
@@ -15033,6 +15052,7 @@ export function App(): ReactElement {
               }
             }}
             onToggleFullSongPlayback={toggleOverviewSongPlayback}
+            onEditSection={editOverviewSection}
             playbackPosition={playbackPosition}
             project={project}
             workflowItems={workflowNavigatorItems}

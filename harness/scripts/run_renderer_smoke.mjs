@@ -2173,6 +2173,7 @@ function validateWorkspaceFunctionTabs(html) {
       appSource.includes("onToggleFullSongPlayback={toggleOverviewSongPlayback}") &&
       appSource.includes("playbackPosition={playbackPosition}") &&
       overviewPlaybackSource.includes("if (isPlaying)") &&
+      overviewPlaybackSource.includes("if (isFullSongPlaying)") &&
       overviewPlaybackSource.includes("stopPlayback();") &&
       overviewArrangementSelectionIndex >= 0 &&
       overviewArrangementStartIndex > overviewArrangementSelectionIndex &&
@@ -2786,11 +2787,51 @@ function validateOverviewLengthGoal(lengthModule, overviewModule, localization, 
     isPlaying: false,
     onSelectPage() {},
     onOpenArrange() {},
+    onEditSection() {},
     onToggleFullSongPlayback() {},
     playbackPosition: null,
     project: shortProject,
     workflowItems: []
   };
+  const sectionProject = projectWithBars(120, 40);
+  const originalSectionProject = JSON.stringify(sectionProject);
+  const sectionTimes = overviewModule.createOverviewSectionTimes(sectionProject);
+  check(
+    isDeepStrictEqual(sectionTimes, [
+      { startSeconds: 0, endSeconds: 32 },
+      { startSeconds: 32, endSeconds: 64 },
+      { startSeconds: 64, endSeconds: 80 }
+    ]) && JSON.stringify(sectionProject) === originalSectionProject,
+    "Song map time ranges should cover uneven arrangement blocks in order without altering the project"
+  );
+  const songMapHtml = renderToStaticMarkup(React.createElement(
+    localization.LocalizationProvider,
+    { initialLocale: "ko" },
+    React.createElement(overviewModule.WorkspaceOverview, {
+      ...baseProps, activePage: "song-map", project: sectionProject, isPlaying: true
+    })
+  ));
+  const sectionRouteSource = printNamedFunction(appSource, "App.tsx", "editOverviewSection");
+  check(
+    songMapHtml.includes("전체 곡으로 전환") &&
+      songMapHtml.includes('data-testid="overview-edit-section-2"') &&
+      songMapHtml.includes('data-testid="overview-section-time-2">1:04–1:20') &&
+      songMapHtml.includes("구간 편집") &&
+      workspaceOverviewSource.includes("onClick={() => onEditSection(index)}") &&
+      sectionRouteSource.includes("selectArrangementBlock(index)") &&
+      sectionRouteSource.includes('activateArrangeWorkspacePage("timeline")') &&
+      sectionRouteSource.includes('data-testid="arrangement-block-${index}"') &&
+      appSource.includes("onEditSection={editOverviewSection}") &&
+      styles.includes(".overview-edit-section:focus-visible"),
+    "Song map should expose keyboard-accessible direct section editing and one-click full-song switching in Korean"
+  );
+  check(
+    headerActionDockSource.includes('data-testid="header-export-context"') &&
+      appSource.includes('t("action.exportSongContext", { bars: songExportLength.currentBars, duration: songExportDuration })') &&
+      appSource.includes('t("action.exportSongFormat")') &&
+      localization.translate("ko", "action.exportSongFormat").includes("44.1 kHz / 24-bit"),
+    "Export menu should describe the complete arrangement duration with renderer tail and canonical WAV format"
+  );
   const englishHtml = renderToStaticMarkup(React.createElement(
     localization.LocalizationProvider,
     { initialLocale: "en" },

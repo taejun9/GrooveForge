@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * 역할: 실제 Electron 앱 화면에서 대표 6장르, 전체 16장르 또는 요청형 7곡 프로젝트를 순차 검수하고 SoundCloud 전달용 WAV·보고서를 조립한다.
+ * 역할: 실제 Electron 앱 화면에서 대표 6장르, 전체 16장르, 요청형 7곡 또는 록·힙합 5곡 프로젝트를 순차 검수하고 SoundCloud 전달용 WAV·보고서를 조립한다.
  * 흐름: 기본 90~150초 대표 모드와 opt-in 90~180초 전체 장르/요청형 힙합 팩 모드의 fixture를 준비해 visible UI QA와 PCM24·재열기 증거를 검증한다.
  * 안전 경계: 생성 음원은 로컬 원본 합성만 사용하고 외부 업로드는 하지 않으며, 경로·해시·신호 검증 실패 시 패키징을 중단한다.
  */
@@ -19,6 +19,7 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { composeRockHiphopProject, rockHiphopCases, rockHiphopLaneContract } from "./rock_hiphop_track_compositions.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const desktopBuildRoot = path.join(root, "build", "desktop");
@@ -391,7 +392,7 @@ function existingGenreCase(id) {
   return config;
 }
 
-const requestedLaneContract = [
+const requestedHiphopLaneContract = [
   { count: 3, id: "dry-grit-rap-pocket", name: "건조하고 거친 랩 포켓" },
   { count: 2, id: "dark-minimal-split-verse", name: "어둡고 미니멀한 분할 벌스 포켓" },
   { count: 2, id: "synth-drive-punk-rap", name: "신스 드라이브 펑크 랩 포켓" }
@@ -517,13 +518,25 @@ const requestedHiphopCases = [
 let genreCases = representativeGenreCases;
 let allGenresMode = false;
 let requestedHiphopPackMode = false;
+let rockHiphopPackMode = false;
+let requestedPackMode = false;
+let requestedLaneContract = requestedHiphopLaneContract;
 let outputRootPrefix = "plan-1528-";
 
-function configureGenreMode(requestAllGenres, requestRequestedHiphopPack) {
-  check(!(requestAllGenres && requestRequestedHiphopPack), "Choose only one of --all-genres or --requested-hiphop-pack.");
+function configureGenreMode(requestAllGenres, requestRequestedHiphopPack, requestRockHiphopPack) {
+  check([requestAllGenres, requestRequestedHiphopPack, requestRockHiphopPack].filter(Boolean).length <= 1, "Choose only one genre pack mode.");
   allGenresMode = requestAllGenres;
   requestedHiphopPackMode = requestRequestedHiphopPack;
-  if (requestedHiphopPackMode) {
+  rockHiphopPackMode = requestRockHiphopPack;
+  requestedPackMode = requestedHiphopPackMode || rockHiphopPackMode;
+  if (rockHiphopPackMode) {
+    genreCases = rockHiphopCases;
+    requestedLaneContract = rockHiphopLaneContract;
+    planId = "plan-1536-rock-hiphop-usability";
+    ownerMarker = "GrooveForge plan-1536 rock hip-hop actual-app QA";
+    maximumDurationSeconds = 180;
+    outputRootPrefix = "plan-1536-";
+  } else if (requestedHiphopPackMode) {
     genreCases = requestedHiphopCases;
     planId = "plan-1532-requested-hiphop-actual-app-qa";
     ownerMarker = "GrooveForge plan-1532 requested hip-hop actual-app QA";
@@ -543,27 +556,30 @@ function durationRangeLabel() {
 }
 
 function expectedGenreCount() {
-  if (requestedHiphopPackMode) return requestedHiphopCases.length;
+  if (requestedPackMode) return genreCases.length;
   return allGenresMode ? workstation.styleProfiles.length : representativeGenreCases.length;
 }
 
 function runPlanMode() {
+  if (rockHiphopPackMode) return "visible-native-sequential-rock-hiphop-pack";
   if (requestedHiphopPackMode) return "visible-native-sequential-requested-hiphop-pack";
   return allGenresMode ? "visible-native-sequential-all-genres" : "visible-native-sequential-multigenre";
 }
 
 function ownershipSentinelName() {
+  if (rockHiphopPackMode) return ".grooveforge-plan-1536-owned.json";
   if (requestedHiphopPackMode) return ".grooveforge-plan-1532-owned.json";
   return allGenresMode ? ".grooveforge-plan-1531-owned.json" : ".grooveforge-plan-1528-owned.json";
 }
 
 function modeLabel() {
+  if (rockHiphopPackMode) return "synth-driven rock hip-hop pack";
   if (requestedHiphopPackMode) return "requested hip-hop pack";
   return allGenresMode ? "all-genre" : "multi-genre";
 }
 
 function usesExtendedDeliveryContract() {
-  return allGenresMode || requestedHiphopPackMode;
+  return allGenresMode || requestedPackMode;
 }
 
 function fail(message) {
@@ -628,6 +644,7 @@ function parseArguments(argv) {
     outputRoot: null,
     prepareOnly: false,
     requestedHiphopPack: false,
+    rockHiphopPack: false,
     selfTest: false,
     skipBuild: false
   };
@@ -638,6 +655,7 @@ function parseArguments(argv) {
     else if (argument === "--from-existing") parsed.fromExisting = true;
     else if (argument === "--prepare-only") parsed.prepareOnly = true;
     else if (argument === "--requested-hiphop-pack") parsed.requestedHiphopPack = true;
+    else if (argument === "--rock-hiphop-pack") parsed.rockHiphopPack = true;
     else if (argument === "--self-test") parsed.selfTest = true;
     else if (argument === "--skip-build") parsed.skipBuild = true;
     else if (argument === "--output-root") {
@@ -651,7 +669,7 @@ function parseArguments(argv) {
   }
   const exclusiveModes = [parsed.audioSelfTest, parsed.fromExisting, parsed.prepareOnly, parsed.selfTest].filter(Boolean).length;
   check(exclusiveModes <= 1, "Choose at most one of --audio-self-test, --from-existing, --prepare-only, or --self-test.");
-  check(!(parsed.allGenres && parsed.requestedHiphopPack), "Choose only one of --all-genres or --requested-hiphop-pack.");
+  check([parsed.allGenres, parsed.requestedHiphopPack, parsed.rockHiphopPack].filter(Boolean).length <= 1, "Choose only one genre pack mode.");
   if (parsed.fromExisting) check(Boolean(parsed.outputRoot), "--from-existing requires --output-root.");
   if ((parsed.audioSelfTest || parsed.fromExisting || parsed.prepareOnly || parsed.selfTest) && parsed.skipBuild) {
     fail("--skip-build is only meaningful for a normal actual-app run.");
@@ -664,7 +682,9 @@ function timestampId() {
 }
 
 function defaultOutputRoot() {
-  const runName = requestedHiphopPackMode
+  const runName = rockHiphopPackMode
+    ? "plan-1536-rock-hiphop-actual-app-qa"
+    : requestedHiphopPackMode
     ? "plan-1532-requested-hiphop-actual-app-qa"
     : allGenresMode
       ? "plan-1531-all-genres-actual-app-qa"
@@ -745,6 +765,13 @@ function caseDirectoryName(config) {
   return `${String(config.order).padStart(2, "0")}-${config.id}`;
 }
 
+function soundCloudBatchFileName(config) {
+  const stem = rockHiphopPackMode
+    ? `${String(config.order).padStart(2, "0")}-${workstation.projectFileStem({ title: config.title })}`
+    : caseDirectoryName(config);
+  return `${stem}-soundcloud.wav`;
+}
+
 function sourceProjectPath(outputRoot, config) {
   return path.join(outputRoot, "inputs", caseDirectoryName(config), "source.grooveforge.json");
 }
@@ -765,7 +792,8 @@ function createSourceProject(config) {
   const blueprint = workstation.beatBlueprints.find((candidate) => candidate.id === config.blueprintId);
   check(Boolean(blueprint), `${config.id}: Beat Blueprint ${config.blueprintId} is missing.`);
   const styled = workstation.applyBeatBlueprint(workstation.starterProject, config.blueprintId);
-  const delivered = workstation.applyDeliveryTarget(styled, "beat_store");
+  const deliverySeed = workstation.applyDeliveryTarget(styled, "beat_store");
+  const delivered = rockHiphopPackMode ? composeRockHiphopProject(deliverySeed, config, workstation) : deliverySeed;
   const project = {
     ...delivered,
     arrangement: workstation.createPatternChain("eight_bar"),
@@ -778,10 +806,10 @@ function createSourceProject(config) {
     mode: "studio",
     selectedPattern: "A",
     sessionBrief: {
-      artist: requestedHiphopPackMode ? "" : "GrooveForge 오리지널 QA",
+      artist: requestedPackMode ? "" : "GrooveForge 오리지널 QA",
       vibe: `${config.styleName} 실제 앱 장곡 QA 시드`,
       reference: "내장 이벤트와 신시사이저만 사용",
-      notes: requestedHiphopPackMode
+      notes: requestedPackMode
         ? "실제 앱에서 편곡, WAV 내보내기, 저장과 재열기를 검증하기 위한 외부 샘플 없는 로컬 시드 프로젝트."
         : "실제 앱에서 편곡, WAV 내보내기, 저장과 재열기를 검증하기 위한 샘플 없는 오리지널 시드 프로젝트."
     },
@@ -806,12 +834,12 @@ function createMovementSpec(config, absoluteSourcePath) {
     outputProjectFileName: outputProjectFileName(config),
     schemaVersion: 1,
     sessionBrief: {
-      artist: requestedHiphopPackMode ? "" : "GrooveForge 오리지널 QA",
+      artist: requestedPackMode ? "" : "GrooveForge 오리지널 QA",
       vibe: config.vibe,
-      reference: requestedHiphopPackMode
+      reference: requestedPackMode
         ? `${config.styleName} 내장 이벤트 기반 로컬 편곡`
         : `${config.styleName} 내장 이벤트 기반 오리지널 편곡`,
-      notes: requestedHiphopPackMode
+      notes: requestedPackMode
         ? "외부 샘플 없이 GrooveForge의 편집 가능한 음악 이벤트와 내장 신시사이저로 제작한 실제 앱 QA 곡. 공개 전 권리자, 기여자/크레딧과 아트워크를 확인해야 합니다."
         : "외부 샘플 없이 GrooveForge의 편집 가능한 음악 이벤트와 내장 신시사이저로 제작한 실제 앱 QA 곡. 특정 아티스트를 모사하지 않으며 공개 전 권리자, 크레딧과 아트워크를 확인해야 합니다."
     },
@@ -898,12 +926,20 @@ function validateGenreMatrix() {
   );
   check(new Set(genreCases.map((entry) => entry.title)).size === genreCases.length, "Genre titles must be unique.");
   check(new Set(genreCases.map((entry) => entry.blueprintId)).size === genreCases.length, "Genre Beat Blueprint ids must be unique.");
-  if (requestedHiphopPackMode) {
+  if (rockHiphopPackMode) {
+    check(genreCases.length === 5, "Rock hip-hop pack must contain five new compositions.");
+    check(new Set(genreCases.map((entry) => entry.key)).size === 5, "Rock hip-hop compositions must use five different keys.");
+    check(new Set(genreCases.map((entry) => entry.bpm)).size === 5, "Rock hip-hop compositions must use five different tempos.");
+    check(new Set(genreCases.map((entry) => canonicalJson(entry.riff))).size === 5, "Rock hip-hop compositions must use five different riffs.");
+    check(new Set(genreCases.map((entry) => canonicalJson(entry.hook))).size === 5, "Rock hip-hop compositions must use five different hooks.");
+    check(new Set(genreCases.map((entry) => canonicalJson(entry.arrangement))).size === 5, "Rock hip-hop compositions must use five different arrangements.");
+  }
+  if (requestedPackMode) {
     const actualLaneCounts = Object.fromEntries(
       requestedLaneContract.map((lane) => [lane.id, genreCases.filter((config) => config.productionLaneId === lane.id).length])
     );
     const expectedLaneCounts = Object.fromEntries(requestedLaneContract.map((lane) => [lane.id, lane.count]));
-    check(canonicalJson(actualLaneCounts) === canonicalJson(expectedLaneCounts), "Requested hip-hop pack must preserve the exact 3+2+2 production-lane contract.");
+    check(canonicalJson(actualLaneCounts) === canonicalJson(expectedLaneCounts), "Requested pack must preserve its exact production-lane contract.");
     for (const config of genreCases) {
       const lane = requestedLaneContract.find((candidate) => candidate.id === config.productionLaneId);
       check(Boolean(lane) && config.productionLaneName === lane.name, `${config.id}: requested production lane identity is invalid.`);
@@ -930,7 +966,7 @@ function validateGenreMatrix() {
       "The selected cases must cover the complete Bass Voice family set."
     );
   }
-  if (!allGenresMode && !requestedHiphopPackMode) {
+  if (!allGenresMode && !requestedPackMode) {
     check(
       canonicalJson(genreCases.map((entry) => entry.bassStyle).sort()) === canonicalJson(requiredBassStyles),
       "The six representative cases must cover every Bass Voice family exactly once."
@@ -946,12 +982,13 @@ function validateGenreMatrix() {
     check(Boolean(profile), `${config.id}: style profile is missing.`);
     check(Boolean(blueprint), `${config.id}: dedicated Beat Blueprint ${config.blueprintId} is missing.`);
     check(blueprint?.styleId === config.id, `${config.id}: Beat Blueprint style identity does not match.`);
-    check(blueprint?.bpm === config.bpm, `${config.id}: Beat Blueprint BPM does not match the case matrix.`);
+    if (!rockHiphopPackMode) check(blueprint?.bpm === config.bpm, `${config.id}: Beat Blueprint BPM does not match the case matrix.`);
     check(profile.bassStyle === config.bassStyle, `${config.id}: expected ${config.bassStyle} Bass Voice, got ${profile.bassStyle}.`);
-    check(profile.defaultBpm === config.bpm, `${config.id}: case BPM must match the style default.`);
+    if (!rockHiphopPackMode) check(profile.defaultBpm === config.bpm, `${config.id}: case BPM must match the style default.`);
     const bars = arrangementBars(config);
     check(bars <= workstation.maxProjectArrangementBars, `${config.id}: ${bars} bars exceeds the project limit.`);
     check(config.arrangement.every((block) => block.bars >= 1 && block.bars <= 16), `${config.id}: a block exceeds 1-16 bars.`);
+    check(config.arrangement.every((block) => canonicalJson(block.mutedTracks) === canonicalJson(workstation.arrangementMuteTrackIds.filter((track) => block.mutedTracks.includes(track)))), `${config.id}: movement spec muted tracks must already be in canonical order.`);
     const duration = expectedDuration(config);
     check(
       duration >= minimumDurationSeconds && duration <= maximumDurationSeconds,
@@ -959,8 +996,8 @@ function validateGenreMatrix() {
     );
     const source = createSourceProject(config);
     const sourceText = deterministicProjectFile(source);
-    if (requestedHiphopPackMode) assertRequestedPublicMetadata(sourceText, `${config.id}: requested source project`);
-    if (requestedHiphopPackMode && config.productionLaneId === "synth-drive-punk-rap") {
+    if (requestedPackMode) assertRequestedPublicMetadata(sourceText, `${config.id}: requested source project`);
+    if (requestedPackMode && config.productionLaneId === "synth-drive-punk-rap") {
       check(source.sound.bassDrive > 0, `${config.id}: synth-drive lane requires audible built-in drive.`);
       check(
         ["A", "B", "C"].every((slot) => source.patterns[slot].melodyNotes.length > 0 && source.patterns[slot].chordEvents.length > 0),
@@ -970,9 +1007,17 @@ function validateGenreMatrix() {
     }
     const reopened = workstation.parseProjectFile(sourceText);
     check(reopened.styleId === config.id && reopened.bpm === config.bpm, `${config.id}: deterministic source did not reopen exactly.`);
+    if (rockHiphopPackMode) {
+      check(reopened.key === config.key, `${config.id}: authored key was not preserved.`);
+      check(canonicalJson(reopened.patterns) === canonicalJson(source.patterns), `${config.id}: authored events changed during serialization.`);
+      const blueprintSource = workstation.applyBeatBlueprint(workstation.starterProject, config.blueprintId);
+      check(canonicalJson(source.patterns) !== canonicalJson(blueprintSource.patterns), `${config.id}: rock composition must replace the blueprint events.`);
+      check(source.mixer.find((channel) => channel.id === "synth")?.drive >= 0.5, `${config.id}: rock composition is missing its driven synth riff.`);
+      check(["A", "B", "C"].every((slot) => source.patterns[slot].drumPattern.clap[4] && source.patterns[slot].drumPattern.clap[12]), `${config.id}: rock composition is missing its backbeat.`);
+    }
     check(new Set(["A", "B", "C"].map((slot) => sha256(canonicalJson(reopened.patterns[slot])))).size === 3, `${config.id}: Pattern A/B/C must be distinct.`);
     const spec = createMovementSpec(config, path.join(desktopBuildRoot, `${outputRootPrefix}self-test`, `${config.id}.grooveforge.json`));
-    if (requestedHiphopPackMode) assertRequestedPublicMetadata(JSON.stringify(spec), `${config.id}: requested movement spec`);
+    if (requestedPackMode) assertRequestedPublicMetadata(JSON.stringify(spec), `${config.id}: requested movement spec`);
     check(workstation.normalizeProjectTitle(spec.title) === spec.title, `${config.id}: final title is not durable.`);
     check(canonicalJson(workstation.projectSessionBrief({ sessionBrief: spec.sessionBrief })) === canonicalJson(spec.sessionBrief), `${config.id}: Session Brief would normalize during QA.`);
   }
@@ -1010,7 +1055,7 @@ async function prepareOutput(outputRoot) {
       expectedDurationSeconds: round(expectedDuration(config)),
       id: config.id,
       order: config.order,
-      ...(requestedHiphopPackMode
+      ...(requestedPackMode
         ? { productionLaneId: config.productionLaneId, productionLaneName: config.productionLaneName }
         : {}),
       sourceProject: {
@@ -1067,7 +1112,7 @@ async function loadPreparedOutput(outputRoot) {
     check(Boolean(recorded), `${config.id}: run-plan row is missing.`);
     check(recorded.order === config.order, `${config.id}: run-plan order mismatch.`);
     if (usesExtendedDeliveryContract()) check(recorded.blueprintId === config.blueprintId, `${config.id}: run-plan Beat Blueprint mismatch.`);
-    if (requestedHiphopPackMode) {
+    if (requestedPackMode) {
       check(recorded.productionLaneId === config.productionLaneId, `${config.id}: run-plan production lane mismatch.`);
       check(recorded.productionLaneName === config.productionLaneName, `${config.id}: run-plan production lane name mismatch.`);
     }
@@ -1306,7 +1351,7 @@ async function auditGenre(outputRoot, config) {
   const savedProjectPath = path.join(workspaceRoot, "Projects", outputProjectFileName(config));
   const savedProjectBytes = await readRegularFile(savedProjectPath, workstation.maxProjectFileBytes);
   const savedProject = workstation.parseProjectFile(savedProjectBytes.toString("utf8"));
-  if (requestedHiphopPackMode) {
+  if (requestedPackMode) {
     assertRequestedPublicMetadata(savedProjectBytes.toString("utf8"), `${config.id}: saved project metadata`);
     check(
       !/"(?:audioClips?|importedAudio|samplePath|sampleUrl|sampler)"/iu.test(savedProjectBytes.toString("utf8")),
@@ -1321,9 +1366,11 @@ async function auditGenre(outputRoot, config) {
   check(report.performance?.passed === true, `${config.id}: interaction performance budget failed.`);
   check(Array.isArray(report.interactions) && report.interactions.length > 0, `${config.id}: native interaction evidence is missing.`);
   check(report.interactions.every((interaction) => interaction.withinBudget === true), `${config.id}: an interaction exceeded its budget.`);
+  check(report.playback?.arrangementAdvanced === true && report.playback?.arrangementAudible === true && report.playback?.wavPreviewAudible === true, `${config.id}: actual arrangement/WAV playback evidence is missing.`);
   const expectedStepIds = [
     "open-source-and-edit-metadata",
     "apply-arrangement",
+    "audition-arrangement",
     "apply-length-bound-master-automation",
     "deliver-export-save-and-reopen"
   ];
@@ -1571,7 +1618,7 @@ async function assembleDelivery(outputRoot, audits) {
     const wavTarget = path.join(packageRoot, `${caseDirectoryName(config)}-soundcloud.wav`);
     const projectTarget = path.join(packageRoot, `${caseDirectoryName(config)}.grooveforge.json`);
     const sheetTarget = path.join(packageRoot, `${caseDirectoryName(config)}-soundcloud-upload-ko.md`);
-    const briefTarget = requestedHiphopPackMode ? path.join(packageRoot, `${caseDirectoryName(config)}-production-brief-ko.md`) : null;
+    const briefTarget = requestedPackMode ? path.join(packageRoot, `${caseDirectoryName(config)}-production-brief-ko.md`) : null;
     const qaTarget = path.join(packageRoot, `${caseDirectoryName(config)}-qa.json`);
     const reportTarget = path.join(evidenceRoot, "actual-app-report-sanitized.json");
     const wavCopied = await copyEvidenceFile(audit.wav.path, wavTarget);
@@ -1579,7 +1626,7 @@ async function assembleDelivery(outputRoot, audits) {
     check(wavCopied.sha256 === audit.wav.sha256 && projectCopied.sha256 === audit.savedProject.sha256, `${config.id}: copied user artifacts changed.`);
     let soundCloudBatchWav = null;
     if (uploadSelectionRoot) {
-      const batchTarget = path.join(uploadSelectionRoot, `${caseDirectoryName(config)}-soundcloud.wav`);
+      const batchTarget = path.join(uploadSelectionRoot, soundCloudBatchFileName(config));
       const batchCopied = await copyEvidenceFile(wavTarget, batchTarget);
       check(
         batchCopied.bytes === wavCopied.bytes && batchCopied.sha256 === wavCopied.sha256,
@@ -1592,10 +1639,10 @@ async function assembleDelivery(outputRoot, audits) {
       };
     }
     const projectContents = (await readFile(projectTarget)).toString("utf8");
-    if (requestedHiphopPackMode) assertRequestedPublicMetadata(projectContents, `${config.id}: delivered project`);
+    if (requestedPackMode) assertRequestedPublicMetadata(projectContents, `${config.id}: delivered project`);
     const project = workstation.parseProjectFile(projectContents);
     const sheet = buildSoundCloudSheet(audit, project);
-    if (requestedHiphopPackMode) assertRequestedPublicMetadata(sheet, `${config.id}: SoundCloud sheet`);
+    if (requestedPackMode) assertRequestedPublicMetadata(sheet, `${config.id}: SoundCloud sheet`);
     await writeExclusive(sheetTarget, sheet);
     let productionBrief = null;
     if (briefTarget) {
@@ -1611,7 +1658,7 @@ async function assembleDelivery(outputRoot, audits) {
     const sanitizedReport = `${JSON.stringify(sanitizeForDelivery(audit.report, outputRoot), null, 2)}\n`;
     check(!sanitizedReport.includes(outputRoot) && !sanitizedReport.includes(root), `${config.id}: sanitized report retained a known local absolute path.`);
     assertDeliveryTextPrivacy(sanitizedReport, `${config.id}: sanitized actual-app report`);
-    if (requestedHiphopPackMode) assertRequestedPublicMetadata(sanitizedReport, `${config.id}: sanitized actual-app report`);
+    if (requestedPackMode) assertRequestedPublicMetadata(sanitizedReport, `${config.id}: sanitized actual-app report`);
     await writeExclusive(reportTarget, sanitizedReport);
     const screenshots = {};
     for (const zone of ["arrange", "mix", "deliver"]) {
@@ -1630,6 +1677,7 @@ async function assembleDelivery(outputRoot, audits) {
         originalReportBytes: audit.originalReport.bytes,
         originalReportSha256: audit.originalReport.sha256,
         performancePassed: true,
+        playback: { arrangementAdvanced: true, arrangementAudible: true, wavPreviewAudible: true },
         reopenedArrangementMatches: true,
         reopenedAutomationMatches: true,
         sanitizedReport: {
@@ -1670,7 +1718,7 @@ async function assembleDelivery(outputRoot, audits) {
         [usesExtendedDeliveryContract() ? "duration90To180Seconds" : "duration90To150Seconds"]: "passed",
         pcm24Stereo44100: "passed",
         privateFirstPackage: "prepared",
-        ...(requestedHiphopPackMode
+        ...(requestedPackMode
           ? { importedAudioUsed: false, namedReferenceMetadata: "absent", productionLaneContract: "passed" }
           : {}),
         soundCloudUploadPerformed: false
@@ -1682,7 +1730,7 @@ async function assembleDelivery(outputRoot, audits) {
       },
       key: project.key,
       order: config.order,
-      ...(requestedHiphopPackMode
+      ...(requestedPackMode
         ? {
             productionBrief,
             productionLaneId: config.productionLaneId,
@@ -1712,7 +1760,7 @@ async function assembleDelivery(outputRoot, audits) {
     const qaContents = `${JSON.stringify(qaRow, null, 2)}\n`;
     check(!qaContents.includes(outputRoot) && !qaContents.includes(root), `${config.id}: QA row retained a known local absolute path.`);
     assertDeliveryTextPrivacy(qaContents, `${config.id}: QA row`);
-    if (requestedHiphopPackMode) assertRequestedPublicMetadata(qaContents, `${config.id}: QA row`);
+    if (requestedPackMode) assertRequestedPublicMetadata(qaContents, `${config.id}: QA row`);
     await writeExclusive(qaTarget, qaContents);
     manifestRows.push({
       ...qaRow,
@@ -1750,24 +1798,24 @@ async function assembleDelivery(outputRoot, audits) {
     check(batchEntries.every((entry) => entry.isFile() && !entry.isSymbolicLink() && entry.name.endsWith("-soundcloud.wav")), "Top-level SoundCloud WAV folder contains an unexpected entry.");
     check(manifestRows.every((row) => row.soundCloudBatchWav?.sha256 === row.wav.sha256), "A top-level SoundCloud WAV differs from its genre-folder source.");
   }
-  const readmeRows = manifestRows.map((row) => requestedHiphopPackMode
+  const readmeRows = manifestRows.map((row) => requestedPackMode
     ? `| ${String(row.order).padStart(2, "0")} | ${row.productionLaneName} | ${row.styleName} | ${row.title} | ${row.bpm} | ${row.audio.durationSeconds.toFixed(3)}초 | ${row.audio.peakDb.toFixed(2)} dBFS | ${row.audio.rmsDb.toFixed(2)} dBFS | 통과 |`
     : `| ${String(row.order).padStart(2, "0")} | ${row.styleName} | ${row.title} | ${row.bpm} | ${row.bassStyle} | ${row.audio.durationSeconds.toFixed(3)}초 | ${row.audio.peakDb.toFixed(2)} dBFS | ${row.audio.rmsDb.toFixed(2)} dBFS | 통과 |`
   ).join("\n");
-  const readmeTitle = requestedHiphopPackMode
-    ? `# GrooveForge 샘플 없는 힙합 7곡 실제 앱 SoundCloud 준비 패키지\n\n`
+  const readmeTitle = requestedPackMode
+    ? `# GrooveForge ${rockHiphopPackMode ? "합성 리프 록·힙합 5곡" : "샘플 없는 힙합 7곡"} 실제 앱 SoundCloud 준비 패키지\n\n`
     : allGenresMode
       ? `# GrooveForge 전체 ${genreCases.length}장르 실제 앱 SoundCloud 준비 패키지\n\n`
       : `# GrooveForge 6장르 실제 앱 SoundCloud 준비 패키지\n\n`;
-  const resultSummary = requestedHiphopPackMode
-    ? `실제 production Electron 앱 화면에서 서로 다른 StyleProfile/Beat Blueprint 일곱 개를 3+2+2 제작 lane으로 구성하고, 각 곡을 Open → native UI 편곡 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 ${durationRangeLabel()}초, stereo 44.1kHz signed PCM 24-bit이며 편집 가능한 음악 이벤트와 내장 합성만 사용했습니다.\n\n`
+  const resultSummary = requestedPackMode
+    ? `실제 production Electron 앱 화면에서 ${rockHiphopPackMode ? "서로 다른 키·템포·리프·훅으로 새로 저작한 다섯 곡을 불러와" : "서로 다른 StyleProfile/Beat Blueprint 일곱 개를 3+2+2 제작 lane으로 구성하고"}, 각 곡을 Open → native UI 편곡 → 전체곡 모드 재생 확인 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 ${durationRangeLabel()}초, stereo 44.1kHz signed PCM 24-bit이며 편집 가능한 음악 이벤트와 내장 합성만 사용했습니다.\n\n`
     : allGenresMode
-      ? `실제 production Electron 앱 화면에서 현재 지원하는 ${genreCases.length}개 StyleProfile 전체를 각각 Open → native UI 편곡 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 ${durationRangeLabel()}초, stereo 44.1kHz signed PCM 24-bit이며 여섯 Bass Voice family(808, sub, walking, pluck, reese, minimal)를 모두 다룹니다.\n\n`
-      : `실제 production Electron 앱 화면에서 여섯 장르를 각각 Open → native UI 편곡 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 90~150초, stereo 44.1kHz signed PCM 24-bit이며 여섯 Bass Voice(808, sub, walking, pluck, reese, minimal)를 한 번씩 다룹니다.\n\n`;
+      ? `실제 production Electron 앱 화면에서 현재 지원하는 ${genreCases.length}개 StyleProfile 전체를 각각 Open → native UI 편곡 → 전체곡 모드 재생 확인 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 ${durationRangeLabel()}초, stereo 44.1kHz signed PCM 24-bit이며 여섯 Bass Voice family(808, sub, walking, pluck, reese, minimal)를 모두 다룹니다.\n\n`
+      : `실제 production Electron 앱 화면에서 여섯 장르를 각각 Open → native UI 편곡 → 전체곡 모드 재생 확인 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 90~150초, stereo 44.1kHz signed PCM 24-bit이며 여섯 Bass Voice(808, sub, walking, pluck, reese, minimal)를 한 번씩 다룹니다.\n\n`;
   const uploadSelectionGuide = usesExtendedDeliveryContract()
     ? `## SoundCloud WAV 한 번에 선택\n\nSoundCloud 파일 선택기에서 이 패키지의 \`00-SoundCloud-WAV/\` 폴더를 열고 순번과 장르가 표시된 WAV ${genreCases.length}개를 모두 선택하면 됩니다. 이 파일들은 각 장르 폴더의 원본 WAV와 byte-identical하며 두 사본 모두 \`checksums.sha256\` 검증 대상입니다.\n\n`
     : "";
-  const readmeTable = requestedHiphopPackMode
+  const readmeTable = requestedPackMode
     ? `| 순서 | Production lane | 장르 | 제목 | BPM | 길이 | Sample peak | RMS | Actual-app |\n|---:|---|---|---|---:|---:|---:|---:|---|\n${readmeRows}\n\n`
     : `| 순서 | 장르 | 제목 | BPM | Bass Voice | 길이 | Sample peak | RMS | Actual-app |\n|---:|---|---|---:|---|---:|---:|---:|---|\n${readmeRows}\n\n`;
   const readme = readmeTitle +
@@ -1776,7 +1824,7 @@ async function assembleDelivery(outputRoot, audits) {
     readmeTable +
     uploadSelectionGuide +
     `## 폴더 사용법\n\n` +
-    `각 장르 폴더에는 SoundCloud에 올릴 WAV, 다시 편집할 수 있는 GrooveForge 프로젝트, 한글 private-first 업로드 시트, 기술 QA JSON, Arrange/Mix/Deliver 실제 화면 PNG와 경로를 비식별화한 actual-app 보고서${requestedHiphopPackMode ? ", 프로덕션 브리프" : ""}가 있습니다. 전체 파일 무결성은 \`manifest.json\`과 \`checksums.sha256\`으로 확인합니다.\n\n` +
+    `각 장르 폴더에는 SoundCloud에 올릴 WAV, 다시 편집할 수 있는 GrooveForge 프로젝트, 한글 private-first 업로드 시트, 기술 QA JSON, Arrange/Mix/Deliver 실제 화면 PNG와 경로를 비식별화한 actual-app 보고서${requestedPackMode ? ", 프로덕션 브리프" : ""}가 있습니다. 전체 파일 무결성은 \`manifest.json\`과 \`checksums.sha256\`으로 확인합니다.\n\n` +
     `macOS Terminal에서 이 폴더로 이동한 뒤 \`shasum -a 256 -c checksums.sha256\`를 실행하면 모든 전달 파일을 다시 검증할 수 있습니다. 체크섬은 무결성 확인용이며 배포자 서명은 아닙니다.\n\n` +
     `## 아직 사람이 해야 하는 확인\n\n` +
     `- 모든 곡을 헤드폰과 스피커로 처음부터 끝까지 듣고 음악적 완성도, 전환, 저역과 엔딩을 승인합니다.\n` +
@@ -1786,7 +1834,7 @@ async function assembleDelivery(outputRoot, audits) {
     `- 먼저 Private / Downloads Off로 올린 뒤 SoundCloud 변환 스트림을 다시 듣습니다.\n\n` +
     `이 실행에서는 SoundCloud 또는 다른 외부 서비스에 대한 네트워크 작업을 요청하지 않았고, 로그인·업로드·공개, 수익화·배급·Content ID 변경을 수행하지 않았습니다. 런타임 네트워크 트래픽을 계측했다는 의미는 아닙니다.\n`;
   assertDeliveryTextPrivacy(readme, "Delivery README");
-  if (requestedHiphopPackMode) assertRequestedPublicMetadata(readme, "Delivery README");
+  if (requestedPackMode) assertRequestedPublicMetadata(readme, "Delivery README");
   await writeExclusive(path.join(deliveryRoot, "README.md"), readme);
   const manifest = {
     app: "GrooveForge",
@@ -1799,19 +1847,20 @@ async function assembleDelivery(outputRoot, audits) {
     },
     plan: planId,
     rows: manifestRows,
-    schemaVersion: requestedHiphopPackMode ? 3 : allGenresMode ? 2 : 1,
-    scope: requestedHiphopPackMode
-      ? "seven-sample-free-hip-hop-track visible native actual-app QA and SoundCloud private-first preparation"
+    schemaVersion: rockHiphopPackMode ? 4 : requestedPackMode ? 3 : allGenresMode ? 2 : 1,
+    scope: requestedPackMode
+      ? `${rockHiphopPackMode ? "five-sample-free-synth-rock-hip-hop-track" : "seven-sample-free-hip-hop-track"} visible native actual-app QA and SoundCloud private-first preparation`
       : allGenresMode
         ? "all-current-style visible native actual-app QA and SoundCloud private-first preparation"
         : "six-genre visible native actual-app QA and SoundCloud private-first preparation",
     soundCloudUploadPerformed: false,
-    technicalContract: requestedHiphopPackMode
+    technicalContract: requestedPackMode
       ? {
           blueprintCount: new Set(manifestRows.map((row) => row.blueprintId)).size,
           blueprintIdsInDeliveryOrder: manifestRows.map((row) => row.blueprintId),
           durationSeconds: { maximum: maximumDurationSeconds, minimum: minimumDurationSeconds },
           importedAudioUsed: false,
+          ...(rockHiphopPackMode ? { originalEventCompositions: true, realGuitarRecordingUsed: false, distinctKeys: genreCases.map((config) => config.key) } : {}),
           productionLanes: requestedLaneContract.map((lane) => ({
             ...lane,
             styleIdsInDeliveryOrder: manifestRows.filter((row) => row.productionLaneId === lane.id).map((row) => row.id)
@@ -1854,7 +1903,7 @@ async function assembleDelivery(outputRoot, audits) {
   manifest.artifactCount = filesBeforeChecksums.length + 1;
   const manifestContents = `${JSON.stringify(manifest, null, 2)}\n`;
   assertDeliveryTextPrivacy(manifestContents, "Delivery manifest");
-  if (requestedHiphopPackMode) assertRequestedPublicMetadata(manifestContents, "Delivery manifest");
+  if (requestedPackMode) assertRequestedPublicMetadata(manifestContents, "Delivery manifest");
   await writeFile(manifestPath, manifestContents, { encoding: "utf8", mode: 0o600 });
   const checksumRows = [];
   for (const filePath of filesBeforeChecksums) checksumRows.push(`${await sha256File(filePath)}  ${relativeTo(deliveryRoot, filePath)}`);
@@ -1869,7 +1918,7 @@ async function assembleDelivery(outputRoot, audits) {
     check(isInside(deliveryRoot, target), `Checksum path escaped delivery root: ${match[2]}`);
     check(await sha256File(target) === match[1], `Checksum verification failed: ${match[2]}`);
   }
-  if (requestedHiphopPackMode) {
+  if (requestedPackMode) {
     for (const filePath of await collectFiles(deliveryRoot)) {
       if (![".json", ".md", ".sha256"].includes(path.extname(filePath))) continue;
       const contents = (await readRegularFile(filePath, 16 * 1024 * 1024)).toString("utf8");
@@ -1909,6 +1958,12 @@ function createSyntheticWav() {
 
 async function runSelfTest() {
   validateGenreMatrix();
+  check(new Set(genreCases.map(soundCloudBatchFileName)).size === genreCases.length, "SoundCloud batch filenames must be unique.");
+  if (rockHiphopPackMode) {
+    check(soundCloudBatchFileName(genreCases[0]) === "01-비가-끝난-트랙-soundcloud.wav", "Rock hip-hop batch must preserve the readable song title.");
+  } else {
+    check(genreCases.every((config) => soundCloudBatchFileName(config) === `${caseDirectoryName(config)}-soundcloud.wav`), "Existing pack batch filenames must remain unchanged.");
+  }
   const decoded = decodeCanonicalPcm24Wav(createSyntheticWav());
   check(decoded.frames === 4 && decoded.channels === 2 && decoded.bitDepth === 24, "Synthetic PCM24 parser self-test failed.");
   check(decoded.nonZeroSamples === 4 && decoded.terminalZeroFrames === 1, "Synthetic signal metrics self-test failed.");
@@ -1922,7 +1977,7 @@ async function runSelfTest() {
     rejectedUnknownLocalPath = true;
   }
   check(rejectedUnknownLocalPath, "Unknown local absolute-path privacy gate self-test failed.");
-  if (requestedHiphopPackMode) {
+  if (requestedPackMode) {
     const config = genreCases[0];
     const project = createSourceProject(config);
     const safeAudit = {
@@ -1981,7 +2036,7 @@ async function runSelfTest() {
   console.log(`- StyleProfile coverage: ${new Set(genreCases.map((config) => config.id)).size}/${expectedGenreCount()}`);
   console.log(`- Beat Blueprint coverage: ${new Set(genreCases.map((config) => config.blueprintId)).size}/${expectedGenreCount()}`);
   console.log(`- Bass Voice family coverage: ${[...new Set(genreCases.map((config) => config.bassStyle))].sort().join(", ")}`);
-  if (requestedHiphopPackMode) {
+  if (requestedPackMode) {
     console.log(`- Production lanes: ${requestedLaneContract.map((lane) => `${lane.id}=${lane.count}`).join(", ")}`);
   }
   console.log(`- Duration range: ${durationRangeLabel()} seconds`);
@@ -2032,7 +2087,9 @@ function printPreparedCommands(outputRoot) {
       `  GROOVEFORGE_DESKTOP_WORKSPACE_ROOT=${workspacePath(outputRoot, config)} npm run desktop:movement-qa -- --movement-spec ${movementSpecPath(outputRoot, config)}`
     );
   }
-  const resumeCommand = requestedHiphopPackMode
+  const resumeCommand = rockHiphopPackMode
+    ? "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_multigenre_actual_app_qa.mjs --rock-hiphop-pack"
+    : requestedHiphopPackMode
     ? "npm run desktop:requested-hiphop-qa --"
     : allGenresMode
       ? "npm run desktop:all-genres-qa --"
@@ -2042,7 +2099,7 @@ function printPreparedCommands(outputRoot) {
 
 async function main() {
   const args = parseArguments(process.argv.slice(2));
-  configureGenreMode(args.allGenres, args.requestedHiphopPack);
+  configureGenreMode(args.allGenres, args.requestedHiphopPack, args.rockHiphopPack);
   if (args.selfTest) {
     await runSelfTest();
     return;

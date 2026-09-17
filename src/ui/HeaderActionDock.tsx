@@ -30,6 +30,7 @@ export function HeaderActionDock({
   canRedo,
   canUndo,
   exportDetail,
+  exportContext,
   exportItems,
   exportLabel,
   redoLabel,
@@ -49,6 +50,7 @@ export function HeaderActionDock({
   canRedo: boolean;
   canUndo: boolean;
   exportDetail: string;
+  exportContext?: { summary: string; detail: string };
   exportItems: HeaderActionMenuItem[];
   exportLabel: string;
   redoLabel: string;
@@ -291,6 +293,12 @@ export function HeaderActionDock({
             <header>
               <strong>{label}</strong>
               <small>{detail}</small>
+              {id === "export" && exportContext && (
+                <div className="header-export-context" data-testid="header-export-context">
+                  <strong>{exportContext.summary}</strong>
+                  <small>{exportContext.detail}</small>
+                </div>
+              )}
             </header>
             <div className="header-action-menu-items">
               {items.map((item) => (

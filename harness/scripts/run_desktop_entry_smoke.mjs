@@ -878,7 +878,14 @@ function checkElectronMainContract() {
   checkIncludes(source, "installCloseFlowSmoke(win);", label);
   checkIncludes(source, 'closeFlowSmokeState.events.push("first-close-prevented")', label);
   checkIncludes(source, 'closeFlowSmokeState.events.push("renderer-close-request")', label);
-  checkIncludes(source, "const smokeFilePath = projectIoSmokePath() ?? closeFlowSmokePath() ?? manualQaSavePath();", label);
+  // 소스와 빌드의 줄바꿈 차이는 허용하되 네 저장 경로의 우선순위와 launch 전용 임시 파일은 고정한다.
+  const expectedSmokeSavePath = 'const smokeFilePath = projectIoSmokePath() ?? closeFlowSmokePath() ?? manualQaSavePath() ?? (isLaunchSmoke ? path.join(workspace.projects, "fixed-feedback-lane.grooveforge.json") : null);';
+  for (const [saveSource, saveLabel] of [[source, label], [built, "dist-electron/main.js"]]) {
+    check(
+      saveSource.replace(/\s+/g, "").includes(expectedSmokeSavePath.replace(/\s+/g, "")),
+      `${saveLabel} should preserve project IO, close-flow, manual QA, and launch-smoke save-path priority`
+    );
+  }
   checkIncludes(source, "secondGuardedCloseCompleted: true", label);
   checkIncludes(source, '!isCloseFlowSmoke && BrowserWindow.getAllWindows().length === 0', label);
   checkIncludes(source, 'process.platform !== "darwin" || isManualQa', label);

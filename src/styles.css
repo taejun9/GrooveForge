@@ -19075,6 +19075,32 @@ h2 {
   font-weight: 900;
 }
 
+/* 곡 지도에서 들은 시간 위치를 찾고 같은 구간의 편집기로 바로 이동한다. */
+.overview-arrangement-list > article > .overview-section-time {
+  color: rgba(244, 239, 231, 0.82);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.overview-edit-section {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-block-start: 6px;
+  border-color: rgba(130, 215, 255, 0.35);
+  color: #dff5ff;
+  font-size: 12px;
+  padding: 6px 9px;
+}
+
+.overview-edit-section:focus-visible {
+  outline: 2px solid #82d7ff;
+  outline-offset: 2px;
+}
+
 .overview-arrangement-list strong,
 .overview-pattern-grid strong,
 .overview-track-list strong {
@@ -35766,6 +35792,22 @@ input[type="range"] {
 .header-action-menu-items {
   display: grid;
   gap: 5px;
+}
+
+.header-export-context {
+  display: grid;
+  gap: 4px;
+  margin-block-start: 8px;
+  border-radius: 6px;
+  background: rgba(120, 240, 200, 0.08);
+  padding: 9px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.header-action-menu-popover .header-export-context strong {
+  color: #a2f7dc;
+  font-size: 12px;
 }
 
 .header-action-menu-items > button {
