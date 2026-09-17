@@ -820,6 +820,12 @@ npm run desktop:external-remediation-smoke
 npm run desktop:completion-status-smoke
 npm run desktop:external-operator-runbook-smoke
 npm run desktop:external-readiness-ledger-smoke
+npm run desktop:dual-trap-qa
+npm run desktop:security-smoke
+npm run desktop:audibility-observation-smoke
+npm run composer-action:analysis-smoke
+npm run desktop:installed-app-qa-smoke
+npm run delivery:zip-memory-smoke
 npm run qa
 npm run verify
 npm run release:check

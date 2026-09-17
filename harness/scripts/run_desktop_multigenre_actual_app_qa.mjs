@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * 역할: 실제 Electron 앱 화면에서 대표 6장르, 전체 16장르, 요청형 7곡 또는 록·힙합 5곡 프로젝트를 순차 검수하고 SoundCloud 전달용 WAV·보고서를 조립한다.
+ * 역할: 실제 Electron 앱 화면에서 대표 6장르, 전체 16장르, 요청형 7곡, 록·힙합 5곡 또는 듀얼 트랩 3+3곡 프로젝트를 순차 검수하고 SoundCloud 전달용 WAV·보고서를 조립한다.
  * 흐름: 기본 90~150초 대표 모드와 opt-in 90~180초 전체 장르/요청형 힙합 팩 모드의 fixture를 준비해 visible UI QA와 PCM24·재열기 증거를 검증한다.
  * 안전 경계: 생성 음원은 로컬 원본 합성만 사용하고 외부 업로드는 하지 않으며, 경로·해시·신호 검증 실패 시 패키징을 중단한다.
  */
@@ -19,6 +19,7 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { composeDualTrapProject, dualTrapCases, dualTrapLaneContract } from "./dual_trap_track_compositions.mjs";
 import { composeRockHiphopProject, rockHiphopCases, rockHiphopLaneContract } from "./rock_hiphop_track_compositions.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -519,17 +520,26 @@ let genreCases = representativeGenreCases;
 let allGenresMode = false;
 let requestedHiphopPackMode = false;
 let rockHiphopPackMode = false;
+let dualTrapPackMode = false;
 let requestedPackMode = false;
 let requestedLaneContract = requestedHiphopLaneContract;
 let outputRootPrefix = "plan-1528-";
 
-function configureGenreMode(requestAllGenres, requestRequestedHiphopPack, requestRockHiphopPack) {
-  check([requestAllGenres, requestRequestedHiphopPack, requestRockHiphopPack].filter(Boolean).length <= 1, "Choose only one genre pack mode.");
+function configureGenreMode(requestAllGenres, requestRequestedHiphopPack, requestRockHiphopPack, requestDualTrapPack) {
+  check([requestAllGenres, requestRequestedHiphopPack, requestRockHiphopPack, requestDualTrapPack].filter(Boolean).length <= 1, "Choose only one genre pack mode.");
   allGenresMode = requestAllGenres;
   requestedHiphopPackMode = requestRequestedHiphopPack;
   rockHiphopPackMode = requestRockHiphopPack;
-  requestedPackMode = requestedHiphopPackMode || rockHiphopPackMode;
-  if (rockHiphopPackMode) {
+  dualTrapPackMode = requestDualTrapPack;
+  requestedPackMode = requestedHiphopPackMode || rockHiphopPackMode || dualTrapPackMode;
+  if (dualTrapPackMode) {
+    genreCases = dualTrapCases;
+    requestedLaneContract = dualTrapLaneContract;
+    planId = "plan-1537-harness-risk-installed-hiphop";
+    ownerMarker = "GrooveForge plan-1537 dual-trap actual-app QA";
+    maximumDurationSeconds = 180;
+    outputRootPrefix = "plan-1537-";
+  } else if (rockHiphopPackMode) {
     genreCases = rockHiphopCases;
     requestedLaneContract = rockHiphopLaneContract;
     planId = "plan-1536-rock-hiphop-usability";
@@ -561,18 +571,21 @@ function expectedGenreCount() {
 }
 
 function runPlanMode() {
+  if (dualTrapPackMode) return "visible-native-sequential-dual-trap-pack";
   if (rockHiphopPackMode) return "visible-native-sequential-rock-hiphop-pack";
   if (requestedHiphopPackMode) return "visible-native-sequential-requested-hiphop-pack";
   return allGenresMode ? "visible-native-sequential-all-genres" : "visible-native-sequential-multigenre";
 }
 
 function ownershipSentinelName() {
+  if (dualTrapPackMode) return ".grooveforge-plan-1537-owned.json";
   if (rockHiphopPackMode) return ".grooveforge-plan-1536-owned.json";
   if (requestedHiphopPackMode) return ".grooveforge-plan-1532-owned.json";
   return allGenresMode ? ".grooveforge-plan-1531-owned.json" : ".grooveforge-plan-1528-owned.json";
 }
 
 function modeLabel() {
+  if (dualTrapPackMode) return "crew-energy and low-pocket dual-trap pack";
   if (rockHiphopPackMode) return "synth-driven rock hip-hop pack";
   if (requestedHiphopPackMode) return "requested hip-hop pack";
   return allGenresMode ? "all-genre" : "multi-genre";
@@ -645,6 +658,7 @@ function parseArguments(argv) {
     prepareOnly: false,
     requestedHiphopPack: false,
     rockHiphopPack: false,
+    dualTrapPack: false,
     selfTest: false,
     skipBuild: false
   };
@@ -656,6 +670,7 @@ function parseArguments(argv) {
     else if (argument === "--prepare-only") parsed.prepareOnly = true;
     else if (argument === "--requested-hiphop-pack") parsed.requestedHiphopPack = true;
     else if (argument === "--rock-hiphop-pack") parsed.rockHiphopPack = true;
+    else if (argument === "--dual-trap-pack") parsed.dualTrapPack = true;
     else if (argument === "--self-test") parsed.selfTest = true;
     else if (argument === "--skip-build") parsed.skipBuild = true;
     else if (argument === "--output-root") {
@@ -669,7 +684,7 @@ function parseArguments(argv) {
   }
   const exclusiveModes = [parsed.audioSelfTest, parsed.fromExisting, parsed.prepareOnly, parsed.selfTest].filter(Boolean).length;
   check(exclusiveModes <= 1, "Choose at most one of --audio-self-test, --from-existing, --prepare-only, or --self-test.");
-  check([parsed.allGenres, parsed.requestedHiphopPack, parsed.rockHiphopPack].filter(Boolean).length <= 1, "Choose only one genre pack mode.");
+  check([parsed.allGenres, parsed.requestedHiphopPack, parsed.rockHiphopPack, parsed.dualTrapPack].filter(Boolean).length <= 1, "Choose only one genre pack mode.");
   if (parsed.fromExisting) check(Boolean(parsed.outputRoot), "--from-existing requires --output-root.");
   if ((parsed.audioSelfTest || parsed.fromExisting || parsed.prepareOnly || parsed.selfTest) && parsed.skipBuild) {
     fail("--skip-build is only meaningful for a normal actual-app run.");
@@ -682,7 +697,9 @@ function timestampId() {
 }
 
 function defaultOutputRoot() {
-  const runName = rockHiphopPackMode
+  const runName = dualTrapPackMode
+    ? "plan-1537-dual-trap-actual-app-qa"
+    : rockHiphopPackMode
     ? "plan-1536-rock-hiphop-actual-app-qa"
     : requestedHiphopPackMode
     ? "plan-1532-requested-hiphop-actual-app-qa"
@@ -766,7 +783,7 @@ function caseDirectoryName(config) {
 }
 
 function soundCloudBatchFileName(config) {
-  const stem = rockHiphopPackMode
+  const stem = rockHiphopPackMode || dualTrapPackMode
     ? `${String(config.order).padStart(2, "0")}-${workstation.projectFileStem({ title: config.title })}`
     : caseDirectoryName(config);
   return `${stem}-soundcloud.wav`;
@@ -793,7 +810,8 @@ function createSourceProject(config) {
   check(Boolean(blueprint), `${config.id}: Beat Blueprint ${config.blueprintId} is missing.`);
   const styled = workstation.applyBeatBlueprint(workstation.starterProject, config.blueprintId);
   const deliverySeed = workstation.applyDeliveryTarget(styled, "beat_store");
-  const delivered = rockHiphopPackMode ? composeRockHiphopProject(deliverySeed, config, workstation) : deliverySeed;
+  const delivered = dualTrapPackMode ? composeDualTrapProject(deliverySeed, config, workstation)
+    : rockHiphopPackMode ? composeRockHiphopProject(deliverySeed, config, workstation) : deliverySeed;
   const project = {
     ...delivered,
     arrangement: workstation.createPatternChain("eight_bar"),
@@ -926,6 +944,12 @@ function validateGenreMatrix() {
   );
   check(new Set(genreCases.map((entry) => entry.title)).size === genreCases.length, "Genre titles must be unique.");
   check(new Set(genreCases.map((entry) => entry.blueprintId)).size === genreCases.length, "Genre Beat Blueprint ids must be unique.");
+  if (dualTrapPackMode) {
+    check(genreCases.length === 6, "Dual-trap pack must contain six new compositions.");
+    for (const property of ["key", "bpm", "motif", "hook", "bass", "kicks", "tone", "arrangement"]) {
+      check(new Set(genreCases.map((entry) => canonicalJson(entry[property]))).size === 6, `Dual-trap compositions must have six distinct ${property} values.`);
+    }
+  }
   if (rockHiphopPackMode) {
     check(genreCases.length === 5, "Rock hip-hop pack must contain five new compositions.");
     check(new Set(genreCases.map((entry) => entry.key)).size === 5, "Rock hip-hop compositions must use five different keys.");
@@ -982,9 +1006,9 @@ function validateGenreMatrix() {
     check(Boolean(profile), `${config.id}: style profile is missing.`);
     check(Boolean(blueprint), `${config.id}: dedicated Beat Blueprint ${config.blueprintId} is missing.`);
     check(blueprint?.styleId === config.id, `${config.id}: Beat Blueprint style identity does not match.`);
-    if (!rockHiphopPackMode) check(blueprint?.bpm === config.bpm, `${config.id}: Beat Blueprint BPM does not match the case matrix.`);
+    if (!rockHiphopPackMode && !dualTrapPackMode) check(blueprint?.bpm === config.bpm, `${config.id}: Beat Blueprint BPM does not match the case matrix.`);
     check(profile.bassStyle === config.bassStyle, `${config.id}: expected ${config.bassStyle} Bass Voice, got ${profile.bassStyle}.`);
-    if (!rockHiphopPackMode) check(profile.defaultBpm === config.bpm, `${config.id}: case BPM must match the style default.`);
+    if (!rockHiphopPackMode && !dualTrapPackMode) check(profile.defaultBpm === config.bpm, `${config.id}: case BPM must match the style default.`);
     const bars = arrangementBars(config);
     check(bars <= workstation.maxProjectArrangementBars, `${config.id}: ${bars} bars exceeds the project limit.`);
     check(config.arrangement.every((block) => block.bars >= 1 && block.bars <= 16), `${config.id}: a block exceeds 1-16 bars.`);
@@ -1007,6 +1031,13 @@ function validateGenreMatrix() {
     }
     const reopened = workstation.parseProjectFile(sourceText);
     check(reopened.styleId === config.id && reopened.bpm === config.bpm, `${config.id}: deterministic source did not reopen exactly.`);
+    if (dualTrapPackMode) {
+      check(reopened.key === config.key, `${config.id}: authored key was not preserved.`);
+      check(canonicalJson(reopened.patterns) === canonicalJson(source.patterns), `${config.id}: authored events changed during serialization.`);
+      check(canonicalJson(source.patterns) !== canonicalJson(workstation.applyBeatBlueprint(workstation.starterProject, config.blueprintId).patterns), `${config.id}: dual-trap composition must replace the blueprint events.`);
+      check(["A", "B", "C"].every((slot) => source.patterns[slot].drumPattern.clap[8]), `${config.id}: dual-trap composition requires its halftime backbeat.`);
+      check(config.productionLaneId === "crew-energy-trap" ? source.bpm >= 140 && source.sound.bassDrive >= 0.45 : source.bpm <= 116 && source.swing >= 0.12, `${config.id}: dual-trap lane character was lost.`);
+    }
     if (rockHiphopPackMode) {
       check(reopened.key === config.key, `${config.id}: authored key was not preserved.`);
       check(canonicalJson(reopened.patterns) === canonicalJson(source.patterns), `${config.id}: authored events changed during serialization.`);
@@ -1031,6 +1062,9 @@ async function prepareOutput(outputRoot) {
   // 새 디렉터리만 허용하고 ownership sentinel을 먼저 기록한다. --from-existing 경로는 이 sentinel과
   // 결정론적 input 해시가 모두 일치해야만 이후 실제 앱 증거 감사에 들어갈 수 있다.
   const sentinel = {
+    ...(process.env.GROOVEFORGE_DESKTOP_QA_INSTALLED_APP
+      ? { installedApp: process.env.GROOVEFORGE_DESKTOP_QA_INSTALLED_APP }
+      : {}),
     owner: ownerMarker,
     outputRoot,
     plan: planId,
@@ -1091,6 +1125,10 @@ async function loadPreparedOutput(outputRoot) {
   await assertNoSymlinkComponents(desktopBuildRoot, outputRoot);
   const sentinel = await readJson(path.join(outputRoot, ownershipSentinelName()));
   check(sentinel.owner === ownerMarker && sentinel.plan === planId && sentinel.schemaVersion === 1, "Output root ownership sentinel is invalid.");
+  // 재감사에서도 처음 요청한 설치 앱 검증을 조용히 해제하지 못하게 한다.
+  if (sentinel.installedApp) {
+    check(sentinel.installedApp === process.env.GROOVEFORGE_DESKTOP_QA_INSTALLED_APP, "Prepared installed-app run requires the same GROOVEFORGE_DESKTOP_QA_INSTALLED_APP during audit.");
+  }
   check(path.resolve(sentinel.outputRoot) === outputRoot, "Output root ownership sentinel path does not match.");
   const runPlan = await readJson(path.join(outputRoot, "run-plan.json"));
   check(runPlan.plan === planId && runPlan.schemaVersion === 1 && Array.isArray(runPlan.entries), "Prepared run-plan contract is invalid.");
@@ -1148,7 +1186,7 @@ async function runActualAppSequence(outputRoot, skipBuild) {
   for (const config of genreCases) {
     const workspaceRoot = workspacePath(outputRoot, config);
     check(!(await lstatOrNull(workspaceRoot)), `${config.id}: workspace must be fresh and absent before actual-app QA: ${workspaceRoot}`);
-    console.log(`검증: [${config.order}/${genreCases.length}] ${config.styleName} / ${config.title} actual-app QA를 실행합니다.`);
+    console.log(`검증: [실제 앱 시작] [${config.order}/${genreCases.length}] ${config.styleName} / ${config.title}`);
     const result = await runCommand(
       npmCommand(),
       ["run", "desktop:movement-qa", "--", "--movement-spec", movementSpecPath(outputRoot, config)],
@@ -1158,7 +1196,10 @@ async function runActualAppSequence(outputRoot, skipBuild) {
         NO_COLOR: "1"
       }
     );
-    if (result.code !== 0 || result.signal !== null) {
+    const passed = result.code === 0 && result.signal === null;
+    // 시작 로그는 성공 증거가 아니다. 각 자식 실행의 실제 종료 결과를 다음 곡 시작 전에 확정해 알린다.
+    console.log(`검증: [실제 앱 결과: ${passed ? "통과" : "실패"}] [${config.order}/${genreCases.length}] ${config.styleName} / ${config.title} / exitcode=${result.code ?? "없음"} / signal=${result.signal ?? "없음"}`);
+    if (!passed) {
       failures.push(`${config.id}: exit ${result.code ?? "none"}/${result.signal ?? "none"}`);
     }
   }
@@ -1363,6 +1404,13 @@ async function auditGenre(outputRoot, config) {
   check(Array.isArray(report.failures) && report.failures.length === 0, `${config.id}: actual-app report contains failures.`);
   check(report.workspaceRoot === workspaceRoot, `${config.id}: report workspace mismatch.`);
   check(report.provenanceValidatedAtLaunch === true, `${config.id}: source/build provenance was not validated.`);
+  // 설치 앱 검수 요청은 개발 Electron 실행 결과로 대체할 수 없다. 실제 실행 경로까지 확인한다.
+  const installedApp = process.env.GROOVEFORGE_DESKTOP_QA_INSTALLED_APP;
+  if (installedApp) {
+    check(report.runtime?.packaged === true, `${config.id}: installed-app QA ran an unpackaged runtime.`);
+    check(report.runtime?.appPath === path.join(installedApp, "Contents", "Resources", "app"), `${config.id}: installed app resource path mismatch.`);
+    check(report.runtime?.executablePath === path.join(installedApp, "Contents", "MacOS", "GrooveForge"), `${config.id}: installed app executable path mismatch.`);
+  }
   check(report.performance?.passed === true, `${config.id}: interaction performance budget failed.`);
   check(Array.isArray(report.interactions) && report.interactions.length > 0, `${config.id}: native interaction evidence is missing.`);
   check(report.interactions.every((interaction) => interaction.withinBudget === true), `${config.id}: an interaction exceeded its budget.`);
@@ -1485,7 +1533,9 @@ function sanitizeForDelivery(value, outputRoot) {
     return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, sanitizeForDelivery(entry, outputRoot)]));
   }
   if (typeof value !== "string") return value;
-  return value
+  const installedApp = process.env.GROOVEFORGE_DESKTOP_QA_INSTALLED_APP;
+  const portableValue = installedApp ? value.split(installedApp).join("<INSTALLED_APP>") : value;
+  return portableValue
     .split(outputRoot).join("<RUN_ROOT>")
     .split(root).join("<REPOSITORY>");
 }
@@ -1508,6 +1558,23 @@ function assertDeliveryTextPrivacy(contents, label) {
 
 function buildSoundCloudSheet(audit, project) {
   const { config, decoded, tail, wav } = audit;
+  // 새 요청 팩은 복사할 문구와 실제 선택할 파일을 먼저 보여 주고 검수 수치는 아래에 둔다.
+  if (dualTrapPackMode) {
+    return `# ${config.title} — SoundCloud 업로드 텍스트\n\n` +
+      `- 제목: ${config.title}\n` +
+      `- 장르: Hip-Hop & Rap\n` +
+      `- 태그: ${config.tags.join(", ")}\n` +
+      `- 업로드 WAV: 00-SoundCloud-WAV/${soundCloudBatchFileName(config)}\n` +
+      `- BPM / Key: ${config.bpm} BPM / ${project.key}\n\n` +
+      `## 설명 — 아래 문단을 복사\n\n` +
+      `${config.vibe}. ${config.bpm} BPM, ${project.key}. 외부 샘플 없이 드럼·베이스·신스·화음 이벤트와 내장 합성으로 만든 인스트루멘털입니다.\n\n` +
+      `## 파일 검증\n\n` +
+      `Stereo 44.1 kHz signed PCM 24-bit WAV · ${decoded.durationSeconds.toFixed(3)}초 · ${wav.bytes.toLocaleString("en-US")} bytes. ` +
+      `Sample peak ${decoded.peakDb.toFixed(2)} dBFS / RMS ${decoded.rmsDb.toFixed(2)} dBFS. ` +
+      `실제 앱 Open·편곡·재생·WAV 내보내기·Save·reopen과 저장 프로젝트 재렌더 일치를 확인했습니다.\n\n` +
+      `SHA-256: ${wav.sha256}\n\n` +
+      `아티스트 이름은 업로드하는 SoundCloud 프로필을 사용하고, 아트워크와 공개 범위는 계정에서 선택하세요. 실제 업로드는 수행하지 않았습니다.\n`;
+  }
   return `# SoundCloud 업로드 시트 — ${config.title}\n\n` +
     `## 복사할 메타데이터\n\n` +
     `- 제목: ${config.title}\n` +
@@ -1673,6 +1740,9 @@ async function assembleDelivery(outputRoot, audits) {
     }
     const qaRow = {
       actualApp: {
+        ...(process.env.GROOVEFORGE_DESKTOP_QA_INSTALLED_APP
+          ? { installedApplicationVerified: true, packagedRuntime: audit.report.runtime.packaged }
+          : {}),
         nativePointerAndKeyboard: true,
         originalReportBytes: audit.originalReport.bytes,
         originalReportSha256: audit.originalReport.sha256,
@@ -1803,12 +1873,12 @@ async function assembleDelivery(outputRoot, audits) {
     : `| ${String(row.order).padStart(2, "0")} | ${row.styleName} | ${row.title} | ${row.bpm} | ${row.bassStyle} | ${row.audio.durationSeconds.toFixed(3)}초 | ${row.audio.peakDb.toFixed(2)} dBFS | ${row.audio.rmsDb.toFixed(2)} dBFS | 통과 |`
   ).join("\n");
   const readmeTitle = requestedPackMode
-    ? `# GrooveForge ${rockHiphopPackMode ? "합성 리프 록·힙합 5곡" : "샘플 없는 힙합 7곡"} 실제 앱 SoundCloud 준비 패키지\n\n`
+    ? `# GrooveForge ${dualTrapPackMode ? "크루 에너지·저역 포켓 트랩 3+3곡" : rockHiphopPackMode ? "합성 리프 록·힙합 5곡" : "샘플 없는 힙합 7곡"} 실제 앱 SoundCloud 준비 패키지\n\n`
     : allGenresMode
       ? `# GrooveForge 전체 ${genreCases.length}장르 실제 앱 SoundCloud 준비 패키지\n\n`
       : `# GrooveForge 6장르 실제 앱 SoundCloud 준비 패키지\n\n`;
   const resultSummary = requestedPackMode
-    ? `실제 production Electron 앱 화면에서 ${rockHiphopPackMode ? "서로 다른 키·템포·리프·훅으로 새로 저작한 다섯 곡을 불러와" : "서로 다른 StyleProfile/Beat Blueprint 일곱 개를 3+2+2 제작 lane으로 구성하고"}, 각 곡을 Open → native UI 편곡 → 전체곡 모드 재생 확인 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 ${durationRangeLabel()}초, stereo 44.1kHz signed PCM 24-bit이며 편집 가능한 음악 이벤트와 내장 합성만 사용했습니다.\n\n`
+    ? `실제 production Electron 앱 화면에서 ${dualTrapPackMode ? "키·템포·드럼·베이스·훅·톤이 다른 크루 에너지 3곡과 저역 포켓 3곡을 새로 저작하고" : rockHiphopPackMode ? "서로 다른 키·템포·리프·훅으로 새로 저작한 다섯 곡을 불러와" : "서로 다른 StyleProfile/Beat Blueprint 일곱 개를 3+2+2 제작 lane으로 구성하고"}, 각 곡을 Open → native UI 편곡 → 전체곡 모드 재생 확인 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 ${durationRangeLabel()}초, stereo 44.1kHz signed PCM 24-bit이며 편집 가능한 음악 이벤트와 내장 합성만 사용했습니다.\n\n`
     : allGenresMode
       ? `실제 production Electron 앱 화면에서 현재 지원하는 ${genreCases.length}개 StyleProfile 전체를 각각 Open → native UI 편곡 → 전체곡 모드 재생 확인 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 ${durationRangeLabel()}초, stereo 44.1kHz signed PCM 24-bit이며 여섯 Bass Voice family(808, sub, walking, pluck, reese, minimal)를 모두 다룹니다.\n\n`
       : `실제 production Electron 앱 화면에서 여섯 장르를 각각 Open → native UI 편곡 → 전체곡 모드 재생 확인 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 90~150초, stereo 44.1kHz signed PCM 24-bit이며 여섯 Bass Voice(808, sub, walking, pluck, reese, minimal)를 한 번씩 다룹니다.\n\n`;
@@ -1824,18 +1894,30 @@ async function assembleDelivery(outputRoot, audits) {
     readmeTable +
     uploadSelectionGuide +
     `## 폴더 사용법\n\n` +
-    `각 장르 폴더에는 SoundCloud에 올릴 WAV, 다시 편집할 수 있는 GrooveForge 프로젝트, 한글 private-first 업로드 시트, 기술 QA JSON, Arrange/Mix/Deliver 실제 화면 PNG와 경로를 비식별화한 actual-app 보고서${requestedPackMode ? ", 프로덕션 브리프" : ""}가 있습니다. 전체 파일 무결성은 \`manifest.json\`과 \`checksums.sha256\`으로 확인합니다.\n\n` +
+    `각 장르 폴더에는 SoundCloud에 올릴 WAV, 다시 편집할 수 있는 GrooveForge 프로젝트, ${dualTrapPackMode ? "복사 가능한 한글 업로드 텍스트" : "한글 private-first 업로드 시트"}, 기술 QA JSON, Arrange/Mix/Deliver 실제 화면 PNG와 경로를 비식별화한 actual-app 보고서${requestedPackMode ? ", 프로덕션 브리프" : ""}가 있습니다. 전체 파일 무결성은 \`manifest.json\`과 \`checksums.sha256\`으로 확인합니다.\n\n` +
     `macOS Terminal에서 이 폴더로 이동한 뒤 \`shasum -a 256 -c checksums.sha256\`를 실행하면 모든 전달 파일을 다시 검증할 수 있습니다. 체크섬은 무결성 확인용이며 배포자 서명은 아닙니다.\n\n` +
-    `## 아직 사람이 해야 하는 확인\n\n` +
+    (dualTrapPackMode
+      ? `## 업로드 준비\n\n` +
+        `\`SoundCloud-업로드-텍스트.md\`에 여섯 곡의 제목·태그·설명을 모았습니다. 아트워크와 공개 범위는 SoundCloud 계정에서 선택하면 됩니다. 실제 업로드는 수행하지 않았습니다.\n\n` +
+        `표의 수치는 sample peak/RMS이며 LUFS와 true peak를 측정한 값은 아닙니다. 음악을 조정하려면 각 곡의 GrooveForge 프로젝트를 열어 이벤트·사운드·편곡을 편집할 수 있습니다.\n`
+      : `## 아직 사람이 해야 하는 확인\n\n` +
     `- 모든 곡을 헤드폰과 스피커로 처음부터 끝까지 듣고 음악적 완성도, 전환, 저역과 엔딩을 승인합니다.\n` +
     `- LUFS/true-peak와 최종 마스터링은 별도로 판단합니다. 로컬 sample peak/RMS는 이를 대신하지 않습니다.\n` +
     `- 아티스트, 권리자, 기여자/크레딧, 라이선스와 아트워크 placeholder를 실제 정보로 교체합니다.\n` +
     `- 사람이 전곡을 듣고 기존 곡의 인식 가능한 멜로디·리프·편곡·프로듀서 표식과 우연한 겹침이 없는지 확인합니다.\n` +
     `- 먼저 Private / Downloads Off로 올린 뒤 SoundCloud 변환 스트림을 다시 듣습니다.\n\n` +
-    `이 실행에서는 SoundCloud 또는 다른 외부 서비스에 대한 네트워크 작업을 요청하지 않았고, 로그인·업로드·공개, 수익화·배급·Content ID 변경을 수행하지 않았습니다. 런타임 네트워크 트래픽을 계측했다는 의미는 아닙니다.\n`;
+    `이 실행에서는 SoundCloud 또는 다른 외부 서비스에 대한 네트워크 작업을 요청하지 않았고, 로그인·업로드·공개, 수익화·배급·Content ID 변경을 수행하지 않았습니다. 런타임 네트워크 트래픽을 계측했다는 의미는 아닙니다.\n`);
   assertDeliveryTextPrivacy(readme, "Delivery README");
   if (requestedPackMode) assertRequestedPublicMetadata(readme, "Delivery README");
   await writeExclusive(path.join(deliveryRoot, "README.md"), readme);
+  if (dualTrapPackMode) {
+    const uploadText = `# SoundCloud 업로드 텍스트 — 6곡\n\n` +
+      `\`00-SoundCloud-WAV/\`의 순서대로 제목·태그·설명을 복사하세요. 01~03은 크루 에너지 트랩, 04~06은 저역 포켓 트랩입니다.\n\n` +
+      audits.map((audit) => buildSoundCloudSheet(audit, { key: audit.config.key })).join("\n---\n\n");
+    assertDeliveryTextPrivacy(uploadText, "Dual-trap upload text");
+    assertRequestedPublicMetadata(uploadText, "Dual-trap upload text");
+    await writeExclusive(path.join(deliveryRoot, "SoundCloud-업로드-텍스트.md"), uploadText);
+  }
   const manifest = {
     app: "GrooveForge",
     artifactCount: null,
@@ -1847,9 +1929,9 @@ async function assembleDelivery(outputRoot, audits) {
     },
     plan: planId,
     rows: manifestRows,
-    schemaVersion: rockHiphopPackMode ? 4 : requestedPackMode ? 3 : allGenresMode ? 2 : 1,
+    schemaVersion: dualTrapPackMode ? 5 : rockHiphopPackMode ? 4 : requestedPackMode ? 3 : allGenresMode ? 2 : 1,
     scope: requestedPackMode
-      ? `${rockHiphopPackMode ? "five-sample-free-synth-rock-hip-hop-track" : "seven-sample-free-hip-hop-track"} visible native actual-app QA and SoundCloud private-first preparation`
+      ? `${dualTrapPackMode ? "six-original-dual-trap-track" : rockHiphopPackMode ? "five-sample-free-synth-rock-hip-hop-track" : "seven-sample-free-hip-hop-track"} visible native actual-app QA and SoundCloud private-first preparation`
       : allGenresMode
         ? "all-current-style visible native actual-app QA and SoundCloud private-first preparation"
         : "six-genre visible native actual-app QA and SoundCloud private-first preparation",
@@ -1860,7 +1942,7 @@ async function assembleDelivery(outputRoot, audits) {
           blueprintIdsInDeliveryOrder: manifestRows.map((row) => row.blueprintId),
           durationSeconds: { maximum: maximumDurationSeconds, minimum: minimumDurationSeconds },
           importedAudioUsed: false,
-          ...(rockHiphopPackMode ? { originalEventCompositions: true, realGuitarRecordingUsed: false, distinctKeys: genreCases.map((config) => config.key) } : {}),
+          ...(rockHiphopPackMode || dualTrapPackMode ? { originalEventCompositions: true, realGuitarRecordingUsed: false, distinctKeys: genreCases.map((config) => config.key) } : {}),
           productionLanes: requestedLaneContract.map((lane) => ({
             ...lane,
             styleIdsInDeliveryOrder: manifestRows.filter((row) => row.productionLaneId === lane.id).map((row) => row.id)
@@ -1959,7 +2041,9 @@ function createSyntheticWav() {
 async function runSelfTest() {
   validateGenreMatrix();
   check(new Set(genreCases.map(soundCloudBatchFileName)).size === genreCases.length, "SoundCloud batch filenames must be unique.");
-  if (rockHiphopPackMode) {
+  if (dualTrapPackMode) {
+    check(soundCloudBatchFileName(genreCases[0]) === "01-철야-집결-soundcloud.wav", "Dual-trap batch must preserve the readable song title.");
+  } else if (rockHiphopPackMode) {
     check(soundCloudBatchFileName(genreCases[0]) === "01-비가-끝난-트랙-soundcloud.wav", "Rock hip-hop batch must preserve the readable song title.");
   } else {
     check(genreCases.every((config) => soundCloudBatchFileName(config) === `${caseDirectoryName(config)}-soundcloud.wav`), "Existing pack batch filenames must remain unchanged.");
@@ -2087,7 +2171,9 @@ function printPreparedCommands(outputRoot) {
       `  GROOVEFORGE_DESKTOP_WORKSPACE_ROOT=${workspacePath(outputRoot, config)} npm run desktop:movement-qa -- --movement-spec ${movementSpecPath(outputRoot, config)}`
     );
   }
-  const resumeCommand = rockHiphopPackMode
+  const resumeCommand = dualTrapPackMode
+    ? "npm run desktop:dual-trap-qa --"
+    : rockHiphopPackMode
     ? "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_multigenre_actual_app_qa.mjs --rock-hiphop-pack"
     : requestedHiphopPackMode
     ? "npm run desktop:requested-hiphop-qa --"
@@ -2099,7 +2185,7 @@ function printPreparedCommands(outputRoot) {
 
 async function main() {
   const args = parseArguments(process.argv.slice(2));
-  configureGenreMode(args.allGenres, args.requestedHiphopPack, args.rockHiphopPack);
+  configureGenreMode(args.allGenres, args.requestedHiphopPack, args.rockHiphopPack, args.dualTrapPack);
   if (args.selfTest) {
     await runSelfTest();
     return;

@@ -4761,11 +4761,13 @@ export function ComposerGuideFocusResultStrip({ result }: { result: ComposerGuid
 }
 
 export function ComposerActions({
+  analysis,
   project,
   summary,
   result,
   onRun
 }: {
+  analysis: ExportAnalysis;
   project: ProjectState;
   summary: ComposerActionsSummary;
   result: ComposerActionResult | null;
@@ -4784,7 +4786,7 @@ export function ComposerActions({
       {result && <ComposerActionResultStrip result={result} />}
       <div className="composer-actions-grid" data-testid="composer-actions-grid">
         {summary.actions.map((action) => {
-          const actionContext = composerActionButtonContext(action, project);
+          const actionContext = composerActionButtonContext(action, project, analysis);
           return (
             <button
               aria-label={actionContext}
@@ -4812,8 +4814,12 @@ export function ComposerActions({
   );
 }
 
-export function composerActionButtonContext(action: ComposerAction, project: ProjectState): string {
-  return `${action.buttonLabel}: ${composerActionQuickActionDetail(action, project)}`;
+export function composerActionButtonContext(
+  action: ComposerAction,
+  project: ProjectState,
+  analysis?: ExportAnalysis
+): string {
+  return `${action.buttonLabel}: ${composerActionQuickActionDetail(action, project, analysis)}`;
 }
 
 export function ComposerActionResultStrip({ result }: { result: ComposerActionResult }): ReactElement {
@@ -9380,8 +9386,12 @@ export function composerActionQuickActionGroup(action: ComposerAction): string {
   return "Create";
 }
 
-export function composerActionQuickActionDetail(action: ComposerAction, project: ProjectState): string {
-  const followup = composerActionFollowupCues(action, project);
+export function composerActionQuickActionDetail(
+  action: ComposerAction,
+  project: ProjectState,
+  analysis?: ExportAnalysis
+): string {
+  const followup = composerActionFollowupCues(action, project, analysis);
   return [
     action.label,
     action.scope,
@@ -14922,7 +14932,8 @@ export function createComposerActionResult(
 
 export function composerActionFollowupCues(
   action: ComposerAction,
-  project: ProjectState
+  project: ProjectState,
+  analysis?: ExportAnalysis
 ): { auditionCue: string; nextCheck: string } {
   const pattern = activePattern(project);
   const target = activeDeliveryTarget(project);
@@ -14954,9 +14965,11 @@ export function composerActionFollowupCues(
         nextCheck: `${project.arrangement.length} blocks now; compare against ${target.name}.`
       };
     case "finish": {
-      const analysis = analyzeExport(project);
+      // 화면은 이미 준비된 정확 미터를 전달해 재생 위치 갱신마다 전곡 PCM을 다시 렌더하지 않는다.
+      // 명시적 작업 뒤 새 프로젝트를 넘기는 기존 호출자는 생략 시 현재 프로젝트를 그대로 분석한다.
+      const currentAnalysis = analysis ?? analyzeExport(project);
       return {
-        auditionCue: `Play full mix; watch ${formatDb(analysis.headroomDb)} headroom.`,
+        auditionCue: `Play full mix; watch ${formatDb(currentAnalysis.headroomDb)} headroom.`,
         nextCheck: `${project.masterPreset} selected; export only after Mix Coach is clear.`
       };
     }

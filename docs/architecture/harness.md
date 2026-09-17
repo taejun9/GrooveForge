@@ -3,6 +3,14 @@
 
 The harness exists to make the repository readable and enforceable for coding agents.
 
+## Current Entry Points
+
+Start with [agent ownership and QA/review handoffs](../agents/workflow.md) and the [focused QA and evidence map](../quality/navigation.md). `python3 harness/scripts/agent_navigation.py --changed` reads committed branch changes, working changes, and untracked files, then prints the relevant owners, current commands, and documents. It never executes those commands and always retains `npm run release:check` as the required final gate. Both normal and strict QA validate the navigation map against real npm scripts, declared roles, and existing documents.
+
+The detailed contract history and full command catalog below remain reference material. Historical schema/artifact counts describe their regression milestone; use the current runner assertions and fresh evidence for the current total. Actual installed-app claims require the installed executable and bundle provenance; the existing build-directory install smoke alone proves a simulated installation. Keep one writer per shared file and one controller per visible app session.
+
+Normal and strict QA also invoke `node harness/scripts/run_desktop_completion_audit_smoke.mjs --check-docs` before the long release chain. This read-only mode uses the completion audit's own document requirement function and five negative fixtures to catch stale beginner/product/export wording before GUI work. It does not generate release artifacts or claim runtime completion.
+
 ## Principles
 
 - Plans are first-class artifacts.
@@ -31,9 +39,11 @@ main
   -> complete plan and review mirror
   -> merge to main
   -> push main
+  -> remove the clean completed worktree from the main checkout
   -> delete merged branch with git branch -d
-  -> remove worktree
 ```
+
+The worktree must no longer hold the task branch before branch deletion; Git rejects deleting a checked-out branch. Do not force removal when uncommitted work remains, and never clean up unrelated worktrees.
 
 `npm run sample-audio:qa` writes playable full mixes and four stems for the built-in first-time-composer and professional-producer projects, one decoded full-mix WAV for every supported style profile, and two real full mixes whose distinct Korean project titles must retain distinct Unicode-safe filenames. It validates canonical stereo 44.1kHz signed PCM 24-bit, real lower-byte activity rather than 16-bit zero-padding, musical and delivered duration, tempo-aware export-tail preservation, terminal digital zero, audibility, renderer peak/RMS agreement, ceiling safety, full-scale exclusion, distinct audience stems, and byte-identical immediate rerenders. Every full mix must retain post-boundary event or Space-return PCM before its terminal fade. Its render-isolation matrix also proves that non-target mixer volume, pan, mute, solo, EQ, Drive/Glue, and Space-send edits, selected-Pattern UI state, and unrelated Melody note edits do not change the Drums stem, while target Drums mixer and relevant noise-sound edits still do; a Drums-only solo mix must equal the same-state Drums stem. Runtime smoke additionally verifies six style Bass Voices, connected Bass glide, durable `bass_808` compatibility, local SoundCloud Upload Sheet safety defaults, and that project JSON, mix/stem WAV, MIDI, Handoff Sheet, SoundCloud Upload Sheet, and Delivery Bundle ZIP names share one normalized, UTF-8-bounded stem. All WAV, JSON, and Markdown evidence stays ignored under `build/desktop`.
 
@@ -108,6 +118,11 @@ npm run desktop:dmg
 npm run desktop:multigenre-qa
 npm run desktop:all-genres-qa
 npm run desktop:requested-hiphop-qa
+npm run desktop:dual-trap-qa
+npm run desktop:installed-app-qa-smoke
+npm run desktop:security-smoke
+npm run desktop:audibility-observation-smoke
+npm run composer-action:analysis-smoke
 npm run quick-actions:bundle-smoke
 npm run desktop:smoke
 npm run desktop:crash-report-regression-smoke
@@ -193,6 +208,7 @@ npm run desktop:completion-status-smoke
 npm run desktop:external-operator-runbook-smoke
 npm run desktop:external-readiness-ledger-smoke
 npm run desktop:completion-progress-smoke
+npm run delivery:zip-memory-smoke
 npm run qa
 npm run verify
 npm run release:check

@@ -14823,6 +14823,7 @@ export function App(): ReactElement {
       />
 
       <ComposerActions
+        analysis={exportAnalysis}
         project={project}
         summary={composerActionsSummary}
         result={composerActionResult}

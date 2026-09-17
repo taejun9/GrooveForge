@@ -227,7 +227,7 @@ function buildRequirementAudit(input) {
     hasAll(qualityRules, ["Korean concept-brief checks must treat", "샘플링은 부가 기능"]);
   const beginnerReady =
     hasAll(readinessDoc, ["First-time composers get a guided setup -> compose -> arrange -> mix -> deliver path."]) &&
-    hasAll(readme, ["처음 비트를 만드는 사용자", "Guided", "설정 → 작곡 → 편곡 → 믹싱 → 전달"]) &&
+    hasAll(readme, ["처음 비트를 만드는 사용자", "Guided", "개요 → 작곡 → 편곡 → 믹싱 → 전달"]) &&
     hasAll(readmeEn, ["First Beat Path", "Guide Quick Start"]);
   const producerReady =
     hasAll(readinessDoc, ["Working producers can bypass guidance and edit fast."]) &&
@@ -541,6 +541,46 @@ async function createCompletionAuditSummary() {
     localCompletionBlockers,
     externalDistributionBlockers
   };
+}
+
+// 문서만으로 판정하는 계약은 장시간 GUI 실행 전에 동일 함수로 검사한다.
+// 이 모드는 산출물을 쓰거나 앱을 실행하지 않으며 문서 검사를 기능 QA 통과로 승격하지 않는다.
+if (process.argv.includes("--check-docs")) {
+  const input = {
+    readme: await readTextIfExists(readmePath),
+    readmeEn: await readTextIfExists(readmeEnPath),
+    readinessDoc: await readTextIfExists(readinessDocPath),
+    qualityRules: await readTextIfExists(qualityRulesPath)
+  };
+  const documentLabels = [
+    "All-genre direct beat workstation scope",
+    "First-time beat maker path",
+    "Working producer path",
+    "Sample-free all-style export"
+  ];
+  const rows = buildRequirementAudit(input).filter((row) => documentLabels.includes(row.label));
+  check(rows.length === documentLabels.length, "completion document audit should retain every documentation requirement");
+  for (const row of rows) check(row.ready === true, `${row.label}: ${row.blockers.join(" ")}`);
+  check(hasAll(input.readinessDoc, ["Local-first privacy boundary is preserved."]), "completion privacy documentation should be present");
+
+  // 실제 요구 문구를 제거한 입력과 예전 진입 경로를 넣은 입력은 모두 닫힌 상태를 유지해야 한다.
+  const missingMarkerCases = [
+    ["All-genre direct beat workstation scope", "readme", "여러 장르의 비트를 직접 만들기 위한 데스크톱용 이벤트 기반 미니 DAW"],
+    ["First-time beat maker path", "readme", "개요 → 작곡 → 편곡 → 믹싱 → 전달"],
+    ["Working producer path", "readmeEn", "Studio mode"],
+    ["Sample-free all-style export", "readinessDoc", "All supported genres have editable starts."]
+  ];
+  for (const [label, key, marker] of missingMarkerCases) {
+    const modified = { ...input, [key]: input[key].replaceAll(marker, "") };
+    check(buildRequirementAudit(modified).find((row) => row.label === label)?.ready === false,
+      `completion document audit must reject missing ${label}`);
+  }
+  const staleReadme = { ...input, readme: input.readme.replaceAll("개요 → 작곡 → 편곡 → 믹싱 → 전달", "설정 → 작곡 → 편곡 → 믹싱 → 전달") };
+  check(buildRequirementAudit(staleReadme).find((row) => row.label === "First-time beat maker path")?.ready === false,
+    "completion document audit must reject the stale Settings-first workflow");
+  if (failures.length > 0) fail("Completion document requirements are not ready.", failures.join("\n"));
+  console.log("GrooveForge completion document contracts passed: current product paths, export, privacy, and 5 negative fixtures.");
+  process.exit(0);
 }
 
 const summary = await createCompletionAuditSummary();

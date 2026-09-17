@@ -249,10 +249,14 @@ export function createStoredZip(entries: BundleSourceEntry[]): Blob {
   const centralDirectory = concatBytes(centralParts);
   // ZIP 구조는 [각 로컬 헤더+데이터] → [중앙 디렉터리] → [종료 레코드] 순서를 지켜야 한다.
   const end = createEndOfCentralDirectory(entries.length, centralDirectory.byteLength, offset);
-  const zipBytes = concatBytes([...localParts, centralDirectory, end]);
-  const payload = new ArrayBuffer(zipBytes.byteLength);
-  new Uint8Array(payload).set(zipBytes);
-  return new Blob([payload], { type: "application/zip" });
+  // Blob이 각 부분을 한 번 스냅샷하므로 긴 곡의 전체 ZIP을 담는 중간 버퍼 두 개를 만들 필요가 없다.
+  // 부분 배열의 범위를 유지하고 공유 메모리 입력만 복제해 BlobPart의 ArrayBuffer 계약을 지킨다.
+  const parts = [...localParts, centralDirectory, end].map((bytes) =>
+    bytes.buffer instanceof ArrayBuffer
+      ? new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+      : new Uint8Array(bytes)
+  );
+  return new Blob(parts, { type: "application/zip" });
 }
 
 async function createBaseBundleEntries(

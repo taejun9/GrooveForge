@@ -10,8 +10,12 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
+
+sys.dont_write_bytecode = True
+import agent_navigation
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -6844,7 +6848,7 @@ TEXT_EXPECTATIONS = {
         "\"desktop:packaged-project-io-smoke\": \"node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_packaged_project_io_smoke.mjs\"",
         "\"desktop:installed-project-io-smoke\": \"node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_installed_project_io_smoke.mjs\"",
         "\"persona:smoke\": \"node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_persona_readiness_smoke.mjs\"",
-        "\"verify\": \"python3 harness/scripts/run_quality_gate.py && npm run renderer:smoke && npm run workflow:smoke && npm run persona:smoke && npm run harness:smoke && npm run sample-audio:qa && npm run genre-rotation:delivery && npm run desktop:local-delivery-package-smoke && npm run desktop:local-package-reopen-smoke && npm run desktop:local-delivery-zip-smoke && npm run delivery:bundle-zip-smoke && npm run typecheck && npm run project-workspace:smoke && npm run build && npm run quick-actions:bundle-smoke && npm run desktop:smoke && npm run desktop:crash-report-regression-smoke && npm run desktop:launch-smoke && npm run desktop:project-io-smoke && npm run desktop:close-flow-smoke && npm run desktop:package-smoke && npm run desktop:packaged-project-io-smoke && npm run desktop:adhoc-sign-smoke && npm run desktop:hardened-runtime-readiness-smoke && npm run desktop:dmg-smoke && npm run desktop:pkg-smoke && npm run desktop:pkg-payload-smoke && npm run desktop:pkg-payload-project-io-smoke && npm run desktop:install-smoke && npm run desktop:installed-project-io-smoke && npm run desktop:gatekeeper-readiness-smoke && npm run desktop:release-manifest-smoke && npm run desktop:release-notes-smoke && npm run desktop:support-artifact-smoke && npm run desktop:update-feed-config-smoke && npm run desktop:update-metadata-policy-smoke && npm run desktop:update-metadata-artifacts-smoke && npm run desktop:auto-update-readiness-smoke && npm run desktop:developer-id-readiness-smoke && npm run desktop:developer-id-signing-smoke && npm run desktop:notarization-smoke && npm run desktop:notarized-gatekeeper-smoke && npm run desktop:distribution-manual-qa-smoke && npm run desktop:distribution-channel-qa-smoke && npm run desktop:distribution-handoff-smoke && npm run desktop:distribution-bundle-manifest-smoke && npm run desktop:distribution-env-template-smoke && npm run release:prepare-env-smoke && npm run release:prepare-env-write-smoke && npm run release:channel-private-input-template-smoke && npm run release:channel-setup-brief-smoke && npm run release:channel-placeholder-input-receipt-smoke && npm run release:channel-placeholder-input-receipt-ready-smoke && npm run release:channel-private-input-ready-gate-smoke && npm run release:channel-private-input-ready-gate-ready-smoke && npm run release:channel-placeholder-input-receipt && npm run release:channel-private-input-ready-gate && npm run desktop:distribution-private-inputs-smoke && npm run release:channel-unblock-smoke && npm run release:channel-apply-private-env-preflight-smoke && npm run release:channel-apply-private-env-preflight-blocked-smoke && npm run release:channel-apply-private-env-remediation-smoke && npm run release:channel-apply-private-env-targeted-smoke && npm run release:channel-apply-private-env-input-file-smoke && npm run release:channel-apply-private-env-success-smoke && npm run release:channel-apply-private-env-proof-smoke && npm run release:channel-setup-wizard-success-smoke && npm run release:channel-setup-wizard-input-file-success-smoke && npm run release:channel-edit-packet-smoke && npm run desktop:completion-audit-smoke && npm run desktop:external-distribution-gate-smoke && npm run desktop:external-remediation-smoke && npm run desktop:completion-status-smoke && npm run desktop:external-operator-runbook-smoke && npm run desktop:external-readiness-ledger-smoke && npm run desktop:completion-progress-smoke && npm run release:external-preflight && npm run release:next-actions-smoke && npm run desktop:external-operator-runbook-smoke && npm run desktop:external-readiness-ledger-smoke && npm run desktop:completion-progress-smoke && npm run release:proof-bundle-smoke && npm run desktop:external-distribution-gate-smoke && npm run release:progress-smoke && npm run release:current-blocker-smoke && npm run release:private-edit-quick-proof-smoke && npm run release:private-edit-strict-proof-blocked-smoke && npm run release:private-edit-strict-proof-success-smoke && npm run release:private-value-leak-audit-smoke && npm run release:private-value-leak-audit && npm run release:external-completion-resume-packet-smoke\"",
+        "\"verify\": \"python3 harness/scripts/run_quality_gate.py && npm run renderer:smoke && npm run composer-action:analysis-smoke && npm run workflow:smoke && npm run persona:smoke && npm run harness:smoke && npm run sample-audio:qa && npm run genre-rotation:delivery && npm run desktop:local-delivery-package-smoke && npm run desktop:local-package-reopen-smoke && npm run desktop:local-delivery-zip-smoke && npm run delivery:zip-memory-smoke && npm run delivery:bundle-zip-smoke && npm run typecheck && npm run project-workspace:smoke && npm run build && npm run quick-actions:bundle-smoke && npm run desktop:security-smoke && npm run desktop:audibility-observation-smoke && npm run desktop:installed-app-qa-smoke && npm run desktop:smoke && npm run desktop:crash-report-regression-smoke && npm run desktop:launch-smoke && npm run desktop:project-io-smoke && npm run desktop:close-flow-smoke && npm run desktop:package-smoke && npm run desktop:packaged-project-io-smoke && npm run desktop:adhoc-sign-smoke && npm run desktop:hardened-runtime-readiness-smoke && npm run desktop:dmg-smoke && npm run desktop:pkg-smoke && npm run desktop:pkg-payload-smoke && npm run desktop:pkg-payload-project-io-smoke && npm run desktop:install-smoke && npm run desktop:installed-project-io-smoke && npm run desktop:gatekeeper-readiness-smoke && npm run desktop:release-manifest-smoke && npm run desktop:release-notes-smoke && npm run desktop:support-artifact-smoke && npm run desktop:update-feed-config-smoke && npm run desktop:update-metadata-policy-smoke && npm run desktop:update-metadata-artifacts-smoke && npm run desktop:auto-update-readiness-smoke && npm run desktop:developer-id-readiness-smoke && npm run desktop:developer-id-signing-smoke && npm run desktop:notarization-smoke && npm run desktop:notarized-gatekeeper-smoke && npm run desktop:distribution-manual-qa-smoke && npm run desktop:distribution-channel-qa-smoke && npm run desktop:distribution-handoff-smoke && npm run desktop:distribution-bundle-manifest-smoke && npm run desktop:distribution-env-template-smoke && npm run release:prepare-env-smoke && npm run release:prepare-env-write-smoke && npm run release:channel-private-input-template-smoke && npm run release:channel-setup-brief-smoke && npm run release:channel-placeholder-input-receipt-smoke && npm run release:channel-placeholder-input-receipt-ready-smoke && npm run release:channel-private-input-ready-gate-smoke && npm run release:channel-private-input-ready-gate-ready-smoke && npm run release:channel-placeholder-input-receipt && npm run release:channel-private-input-ready-gate && npm run desktop:distribution-private-inputs-smoke && npm run release:channel-unblock-smoke && npm run release:channel-apply-private-env-preflight-smoke && npm run release:channel-apply-private-env-preflight-blocked-smoke && npm run release:channel-apply-private-env-remediation-smoke && npm run release:channel-apply-private-env-targeted-smoke && npm run release:channel-apply-private-env-input-file-smoke && npm run release:channel-apply-private-env-success-smoke && npm run release:channel-apply-private-env-proof-smoke && npm run release:channel-setup-wizard-success-smoke && npm run release:channel-setup-wizard-input-file-success-smoke && npm run release:channel-edit-packet-smoke && npm run desktop:completion-audit-smoke && npm run desktop:external-distribution-gate-smoke && npm run desktop:external-remediation-smoke && npm run desktop:completion-status-smoke && npm run desktop:external-operator-runbook-smoke && npm run desktop:external-readiness-ledger-smoke && npm run desktop:completion-progress-smoke && npm run release:external-preflight && npm run release:next-actions-smoke && npm run desktop:external-operator-runbook-smoke && npm run desktop:external-readiness-ledger-smoke && npm run desktop:completion-progress-smoke && npm run release:proof-bundle-smoke && npm run desktop:external-distribution-gate-smoke && npm run release:progress-smoke && npm run release:current-blocker-smoke && npm run release:private-edit-quick-proof-smoke && npm run release:private-edit-strict-proof-blocked-smoke && npm run release:private-edit-strict-proof-success-smoke && npm run release:private-value-leak-audit-smoke && npm run release:private-value-leak-audit && npm run release:external-completion-resume-packet-smoke\"",
         "\"release:check\": \"npm run qa && npm run verify\"",
         "\"release:progress\": \"node harness/scripts/run_release_progress_report.mjs\"",
         "\"release:progress-smoke\": \"node harness/scripts/run_release_progress_report.mjs --from-existing\"",
@@ -17043,6 +17047,15 @@ TEXT_EXPECTATIONS = {
         "feedValueRecorded: false",
         "channelValueRecorded: false",
     ],
+    "electron/projectWorkspace.ts": [
+        "readBoundedProjectFile",
+        "const fileStats = await fileHandle.stat();",
+        "if (!fileStats.isFile())",
+        "const buffer = Buffer.allocUnsafe(maxBytes + 1);",
+        "if (byteLength > maxBytes)",
+        "byte native read safety limit",
+        "await fileHandle.close();",
+    ],
     "electron/main.ts": [
         "nodeIntegration: false",
         "contextIsolation: true",
@@ -17087,8 +17100,8 @@ TEXT_EXPECTATIONS = {
         "userDataIsolated",
         "maxNativeProjectFileCharacters",
         "maxNativeProjectFileBytes",
-        "await stat(filePath)",
-        "byte native read safety limit",
+        "assertTrustedProjectIpcSender(event);",
+        "readBoundedProjectFile(filePath, maxNativeProjectFileBytes, maxNativeProjectFileCharacters)",
         "installProjectIoSmoke",
         "collectProjectIoSmokeEvidence",
         "projectIoSmokeFailures",
@@ -21297,7 +21310,7 @@ TEXT_EXPECTATIONS = {
         "read the Style Goal Action Result",
         "composer-action-${action.id}",
         "project={project}",
-        "const actionContext = composerActionButtonContext(action, project)",
+        "const actionContext = composerActionButtonContext(action, project, analysis)",
         "aria-label={actionContext}",
         "title={actionContext}",
         "Run Composer Action: ${action.buttonLabel}",
@@ -30248,6 +30261,20 @@ def check_first_read_framing(errors: list[str]) -> None:
             errors.append(f"Product Definition must move sampling guardrail out of first-read section: {marker}")
 
 
+def check_completion_document_contracts(errors: list[str]) -> None:
+    # 완료 문서의 오래된 문구가 여러 시간의 GUI 검사 뒤에야 드러나지 않도록 같은 판정기를 먼저 실행한다.
+    try:
+        result = subprocess.run(
+            ["node", "harness/scripts/run_desktop_completion_audit_smoke.mjs", "--check-docs"],
+            cwd=ROOT, capture_output=True, text=True, timeout=30, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        errors.append(f"completion document contract check could not run: {error}")
+        return
+    if result.returncode != 0:
+        errors.append("completion document contract check failed: " + (result.stderr or result.stdout).strip())
+
+
 def run_checks(strict: bool = False) -> list[str]:
     # 각 검사는 즉시 종료하지 않고 같은 오류 목록에 누적한다. 한 번의 실행으로 저장소 계약의
     # 전체 위반 지점을 보여 주되, 하나라도 남으면 호출자가 성공으로 오해하지 않도록 한다.
@@ -30267,6 +30294,9 @@ def run_checks(strict: bool = False) -> list[str]:
     check_domain_sampling_boundaries(errors)
     check_composition_first_ui_copy(errors)
     check_first_read_framing(errors)
+    # 짧은 작업 안내도 실제 명령·역할·문서와 연결되어야 하며 전체 릴리스 게이트를 유지한다.
+    errors.extend(agent_navigation.validate_navigation(ROOT))
+    check_completion_document_contracts(errors)
     if strict:
         # strict 전용 TODO 검사는 템플릿·빌드 산출물을 제외한 지속 문서만 대상으로 삼는다.
         check_strict_todos(errors)

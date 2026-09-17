@@ -17,12 +17,13 @@ These rules should be enforced by the local harness where practical.
 - Do not implement, commit, or push feature work directly on `main`.
 - Use `codex/plan-NNN-<task>` branches for implementation work.
 - Use `.worktree/plan-NNN-<task>` checkouts for git repository work.
-- After QA and review, merge the task branch to `main`, push `main`, delete the merged branch with `git branch -d`, and remove the worktree.
+- After QA and review, merge the task branch to `main`, push `main`, remove the clean completed worktree, and delete the merged branch with `git branch -d`.
 
 ## QA And Review
 
 - QA and review are separate loops.
 - Long-running live Electron launch QA must stream concise phase and modal-focus substep progress without echoing its final evidence payload.
+- Actual-app playback QA must observe native audible signals across the existing 3,500ms arrangement and 3,000ms rendered-preview windows, preserve transport-advance checks, bind rendered preview observation to the native media-start event, and record observations. Fully silent output, missing media start, and closed windows remain failures; short musical rests must not fail solely because one late snapshot is silent.
 - Review starts only after QA completes.
 - Failed validation must be reported and fixed or explicitly documented.
 - `npm run sample-audio:qa` must generate the first-time-composer Guided Lo-fi and professional-producer Studio House mixes plus all four stems, one full mix for every supported style profile, and two real full mixes with distinct Korean project titles from built-in editable events; decode canonical stereo 44.1kHz signed PCM 24-bit WAV; and verify RIFF size, 6-byte block alignment, 264600 byte rate, real lower-byte activity, musical/delivered duration, tempo-aware export-tail length, full-mix post-boundary content, terminal digital zero, audibility, peak/RMS analysis agreement, ceiling safety, full-scale exclusion, stem distinction, Unicode filename distinction, and byte-identical immediate rerenders. Runtime smoke must prove project JSON, mix/stem WAV, MIDI, Handoff Sheet, and Delivery Bundle ZIP outputs use one normalized Unicode letter/mark/number-aware project stem, cap it at 120 UTF-8 bytes, preserve established English names, avoid Windows reserved basenames, provide a symbol-only fallback, and remain distinct across representative Korean/Japanese titles. It must prove non-target mixer volume/pan/mute/solo/EQ/Drive/Glue/Space-send edits, selected-Pattern UI state, and unrelated Melody edits leave the Drums stem byte-identical; target Drums mixer and relevant noise-sound edits change it; and a Drums-only solo mix equals the same-state Drums stem. Generated audio remains ignored under `build/desktop` and does not replace human listening review.
@@ -131,6 +132,12 @@ npm run desktop:completion-status-smoke
 npm run desktop:external-operator-runbook-smoke
 npm run desktop:external-readiness-ledger-smoke
 npm run desktop:completion-progress-smoke
+npm run desktop:dual-trap-qa
+npm run desktop:security-smoke
+npm run desktop:audibility-observation-smoke
+npm run composer-action:analysis-smoke
+npm run desktop:installed-app-qa-smoke
+npm run delivery:zip-memory-smoke
 npm run qa
 npm run verify
 npm run release:check
@@ -2138,3 +2145,7 @@ Global command-workflow shortcut work must recognize only modified Ctrl/Cmd+K an
 Quick Actions keyboard selection work must select only visible enabled results, begin or reset at the first visible runnable result after open, query, or scope changes, preserve search-input focus during ArrowUp, ArrowDown, Home, and End navigation, wrap ArrowUp/ArrowDown at the visible runnable boundaries, jump Home/End to the first/last visible runnable result, and run exactly the selected action on Enter. Disabled and truncated results must never become the selected target. Selection must have explicit visual state plus a polite selected-position/title announcement without invalid listbox semantics. Production Electron QA must use native ArrowUp, ArrowDown, Home, End, and Enter input, prove search focus retention, prove the selected title equals the executed result title, and prove a deterministic existing state change before restoring the original state; renderer smoke must cover disabled-first-result fallback, ARIA hooks, and selection styling hooks without changing search matching, command definitions, pinning, recents, project data, playback, save/load, export, privacy, or sampling scope. Every source, packaged, signed, extracted, and installed parent launch harness must allow more time than the production app's bounded launch-smoke timeout so it can receive either structured success or structured failure instead of masking the result with a parent timeout.
 
 Korean source-comment coverage work must run `npm run comments:ko:check` and cover every comment-capable first-party `.ts`, `.tsx`, `.cts`, `.mjs`, `.py`, `.css`, and `.html` file under `src/`, `electron/`, `harness/scripts/`, plus root `vite.config.ts` and `index.html`. Each file must begin with substantive Korean comments that explain its role, main flow, and important boundary or side effect. Comments should explain why a non-obvious decision or fail-closed guard exists rather than narrating self-evident syntax line by line. Dependencies, generated output, binaries, JSON data, and lockfiles stay excluded because comments would be unmaintainable or syntactically invalid. Comment-only maintenance must preserve shebangs, doctype and triple-slash semantics and must pass type, build, renderer, workflow, harness, and desktop-entry regressions before completion.
+
+### Composer Actions 분석 재사용 회귀
+
+`composer-action:analysis-smoke`는 실제 React 버튼 렌더와 App의 분석 준비 분기를 확인한다. 준비된 exact 분석값으로 설명을 만드는 동안 전곡 PCM 렌더가 호출되지 않아야 하며, 여섯 작업 영역의 문구와 분석값을 생략한 기존 명시적 호출의 fallback은 유지한다. 실제 설치본 정지 응답은 기존 5초 general UI 기준으로 검사한다.

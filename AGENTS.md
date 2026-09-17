@@ -48,6 +48,8 @@ Match the user's language in reports unless a referenced artifact is already in 
 
 ## Start Here
 
+- Agent ownership and handoffs: `docs/agents/workflow.md`
+- Focused QA and evidence map: `docs/quality/navigation.md`
 - Product principles: `docs/product/product.md`
 - Product architecture: `docs/architecture/product-architecture.md`
 - Harness architecture: `docs/architecture/harness.md`
@@ -100,8 +102,10 @@ Preferred completion flow:
 4. Create review mirror
 5. Merge to main
 6. Push main
-7. Delete the completed branch with `git branch -d`
-8. Remove the worktree
+7. Remove the clean completed worktree
+8. Delete the completed branch with `git branch -d`
+
+Run cleanup from the main checkout; Git refuses to delete a branch still checked out in a worktree. Preserve unfinished changes and other worktrees.
 
 ## QA Before Review
 
@@ -109,7 +113,9 @@ QA and review are separate loops.
 
 Review starts only after QA completes.
 
-Run the validation commands documented in `docs/quality/rules.md`.
+Use `python3 harness/scripts/agent_navigation.py --changed` to find relevant checks and owners; it only reads the checkout and does not run QA. Unclassified changes still require the full gate.
+
+Run the validation commands documented in `docs/quality/rules.md`. Focused checks do not replace the final `npm run release:check` gate. Follow `docs/agents/workflow.md` for exclusive file ownership and the evidence required before handing work to review.
 
 ## Root Docs
 

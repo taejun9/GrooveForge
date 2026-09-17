@@ -4,13 +4,13 @@
  * 단일 인스턴스, 창 닫기 확인, 격리된 BrowserWindow, 테스트 전용 경로/다운로드 제한과 종료 시 저장소 정리가 핵심 수명주기·보안 경계다.
  */
 import { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
-import type { DownloadItem, MenuItemConstructorOptions, Session } from "electron";
+import type { DownloadItem, IpcMainEvent, IpcMainInvokeEvent, MenuItemConstructorOptions, Session } from "electron";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { ProjectLibrary } from "./projectLibrary.js";
 import {
   createNativeOpenProjectDialogOptions,
@@ -21,6 +21,7 @@ import {
 import {
   atomicWriteUtf8File,
   ensureProjectWorkspace,
+  readBoundedProjectFile,
   resolveProjectWorkspacePaths,
   type ProjectWorkspacePaths
 } from "./projectWorkspace.js";
@@ -29,10 +30,15 @@ import {
   saveAndCloseChoiceId
 } from "./unsavedCloseDialog.js";
 import { resolveUpdateFeedConfig } from "./updateFeedConfig.js";
+import { externalBrowserUrl, isTrustedRendererUrl } from "./rendererSecurity.js";
+import { observePlaybackAudibility, type PlaybackAudibilityObservation } from "./playbackAudibilityObservation.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
 const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
+const rendererEntryUrl = isDev
+  ? process.env.VITE_DEV_SERVER_URL as string
+  : pathToFileURL(path.join(__dirname, "../dist/index.html")).href;
 const menuCommandChannel = "grooveforge:menu-command";
 const localeChannel = "grooveforge:set-locale";
 const closeWindowChannel = "grooveforge:close-window";
@@ -41,6 +47,20 @@ let allowLaunchSmokeRendererReload = false;
 const isProjectIoSmoke = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE === "1";
 const isCloseFlowSmoke = process.env.GROOVEFORGE_DESKTOP_CLOSE_FLOW_SMOKE === "1";
 const isManualQa = process.env.GROOVEFORGE_DESKTOP_MANUAL_QA === "1";
+// 설치 QA도 원본 소스는 명시된 작업 checkout에서, 실행 산출물은 앱 번들에서 독립 검증한다.
+// 일반 앱 실행에는 이 환경 변수가 영향을 주지 않는다.
+const manualQaSourceRoot = resolveManualQaSourceRoot();
+function resolveManualQaSourceRoot(): string {
+  const configured = isManualQa ? process.env.GROOVEFORGE_DESKTOP_MANUAL_QA_SOURCE_ROOT : undefined;
+  if (!configured) return projectRoot;
+  if (!path.isAbsolute(configured)) throw new Error("Manual QA source root must be absolute.");
+  const resolved = path.resolve(configured);
+  const info = lstatSync(resolved);
+  if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(resolved) !== resolved) {
+    throw new Error("Manual QA source root must be a real directory.");
+  }
+  return resolved;
+}
 const isManualQaAutoSong =
   isManualQa &&
   (process.env.GROOVEFORGE_DESKTOP_MANUAL_QA_AUTO_SONG === "1" || process.argv.includes("--auto-song-qa"));
@@ -82,6 +102,7 @@ const manualQaProvenanceMarker = "grooveforge-manual-qa-provenance-v2";
 const manualQaProvenanceSourceEntries = [
   "electron",
   "harness/scripts/run_desktop_manual_qa.mjs",
+  "harness/scripts/installed_app_qa.mjs",
   "src",
   "index.html",
   "package.json",
@@ -368,6 +389,7 @@ type ManualQaMovementZoneEvidence = ManualQaUiObservation & {
 };
 
 type ManualQaMovementReport = {
+  runtime: { packaged: boolean; executablePath: string; appPath: string };
   completedAt?: string;
   downloads: ManualQaDownloadEvidence[];
   failures: string[];
@@ -380,6 +402,8 @@ type ManualQaMovementReport = {
     arrangementAdvanced: boolean;
     arrangementAudible: boolean;
     wavPreviewAudible: boolean;
+    arrangementObservation?: PlaybackAudibilityObservation;
+    wavPreviewObservation?: PlaybackAudibilityObservation & { mediaStartedAfterMs: number | null };
   };
   project?: ManualQaAutoSongReport["project"] & {
     automation: unknown;
@@ -475,7 +499,7 @@ function requiredManualQaEnvironment(name: string): string {
 }
 
 function manualQaAllowedWorkspaceBase(workspaceRoot: string): string {
-  const repositoryQaBase = path.join(projectRoot, "build", "desktop");
+  const repositoryQaBase = path.join(manualQaSourceRoot, "build", "desktop");
   const temporaryQaBase = path.resolve(tmpdir());
   for (const base of [repositoryQaBase, temporaryQaBase]) {
     if (pathIsInsideRoot(base, workspaceRoot)) {
@@ -612,7 +636,7 @@ function buildManualQaProvenanceFileManifestSync(
 function buildManualQaProvenanceSync(): ManualQaProvenance {
   const sourceFiles: Array<{ filePath: string; modifiedAtMs: number }> = [];
   for (const entry of manualQaProvenanceSourceEntries) {
-    collectManualQaProvenanceSourceFiles(path.join(projectRoot, entry), sourceFiles);
+    collectManualQaProvenanceSourceFiles(path.join(manualQaSourceRoot, entry), sourceFiles);
   }
   sourceFiles.sort((left, right) => (left.filePath < right.filePath ? -1 : left.filePath > right.filePath ? 1 : 0));
   const sourceDigest = createHash("sha256");
@@ -620,7 +644,7 @@ function buildManualQaProvenanceSync(): ManualQaProvenance {
   let latestSourceMtimeMs = 0;
   for (const sourceFile of sourceFiles) {
     const contents = readFileSync(sourceFile.filePath);
-    const relativePath = path.relative(projectRoot, sourceFile.filePath).split(path.sep).join("/");
+    const relativePath = path.relative(manualQaSourceRoot, sourceFile.filePath).split(path.sep).join("/");
     sourceDigest.update(`${relativePath}\0${contents.byteLength}\0`);
     sourceDigest.update(contents);
     latestSourceMtimeMs = Math.max(latestSourceMtimeMs, sourceFile.modifiedAtMs);
@@ -881,14 +905,14 @@ function resolveManualQaConfiguration(): ManualQaConfiguration | null {
   }
   const configuredWorkspaceRoot = requiredManualQaEnvironment("GROOVEFORGE_DESKTOP_WORKSPACE_ROOT");
   const workspaceRoot = path.resolve(configuredWorkspaceRoot);
-  const repositoryQaBase = path.join(projectRoot, "build", "desktop");
+  const repositoryQaBase = path.join(manualQaSourceRoot, "build", "desktop");
   const temporaryQaBase = path.resolve(tmpdir());
-  if ([projectRoot, path.resolve(homedir()), repositoryQaBase, temporaryQaBase].includes(workspaceRoot)) {
+  if ([projectRoot, manualQaSourceRoot, path.resolve(homedir()), repositoryQaBase, temporaryQaBase].includes(workspaceRoot)) {
     throw new Error("Manual QA workspace root must not be HOME, the repository root, build/desktop itself, or the temp root.");
   }
   const allowedBase = manualQaAllowedWorkspaceBase(workspaceRoot);
   if (allowedBase === repositoryQaBase) {
-    assertManualQaNoSymlinkComponentsSync(projectRoot, repositoryQaBase, "Manual QA repository base");
+    assertManualQaNoSymlinkComponentsSync(manualQaSourceRoot, repositoryQaBase, "Manual QA repository base");
   }
   const allowedBaseStats = lstatOrNullSync(allowedBase);
   if (!allowedBaseStats || allowedBaseStats.isSymbolicLink() || !allowedBaseStats.isDirectory()) {
@@ -2744,11 +2768,28 @@ function createNativeCommandMenu(locale: NativeMenuLocale = nativeMenuLocale): M
   return Menu.buildFromTemplate(template);
 }
 
+function isTrustedProjectIpcSender(event: IpcMainEvent | IpcMainInvokeEvent): boolean {
+  // 같은 webContents 안의 하위 프레임도 거부한다. 정상 진입 문서를 떠난 창은 preload가 남아 있어도 파일 권한이 없다.
+  return !event.sender.isDestroyed() &&
+    Boolean(BrowserWindow.fromWebContents(event.sender)) &&
+    event.senderFrame === event.sender.mainFrame &&
+    isTrustedRendererUrl(event.senderFrame.url, rendererEntryUrl);
+}
+
+function assertTrustedProjectIpcSender(event: IpcMainInvokeEvent): void {
+  if (!isTrustedProjectIpcSender(event)) {
+    throw new Error("GrooveForge native project access requires the trusted main renderer.");
+  }
+}
+
 function registerProjectFileHandlers(): void {
   // preload가 전달한 unknown 값은 권한 있는 파일 API를 호출하기 전에 각 IPC 핸들러에서 다시 검증한다.
   const workspace = desktopProjectWorkspace();
 
   ipcMain.on(closeWindowChannel, (event) => {
+    if (!isTrustedProjectIpcSender(event)) {
+      return;
+    }
     if (isCloseFlowSmoke) {
       closeFlowSmokeState.closeRequestCount += 1;
       closeFlowSmokeState.events.push("renderer-close-request");
@@ -2757,7 +2798,7 @@ function registerProjectFileHandlers(): void {
   });
 
   ipcMain.on(localeChannel, (event, locale: unknown) => {
-    if (!BrowserWindow.fromWebContents(event.sender) || (locale !== "en" && locale !== "ko")) {
+    if (!isTrustedProjectIpcSender(event) || (locale !== "en" && locale !== "ko")) {
       return;
     }
     nativeMenuLocale = locale;
@@ -2765,6 +2806,7 @@ function registerProjectFileHandlers(): void {
   });
 
   ipcMain.handle("grooveforge:save-project", async (event, payload: unknown) => {
+    assertTrustedProjectIpcSender(event);
     if (!isSaveProjectPayload(payload)) {
       throw new Error("Invalid save project payload.");
     }
@@ -2831,6 +2873,7 @@ function registerProjectFileHandlers(): void {
   });
 
   ipcMain.handle("grooveforge:open-project", async (event) => {
+    assertTrustedProjectIpcSender(event);
     await ensureDesktopProjectWorkspace(workspace);
     const browserWindow = BrowserWindow.fromWebContents(event.sender);
     const options = createNativeOpenProjectDialogOptions(nativeMenuLocale, workspace.projects);
@@ -2848,16 +2891,13 @@ function registerProjectFileHandlers(): void {
       return { canceled: true };
     }
 
-    const fileStats = await stat(filePath);
-    if (fileStats.size > maxNativeProjectFileBytes) {
-      throw new Error(`GrooveForge project file exceeds the ${maxNativeProjectFileBytes.toLocaleString("en-US")} byte native read safety limit.`);
-    }
-    // main은 크기 제한 뒤 텍스트만 반환하고, 프로젝트 스키마 해석은 도메인 검증을 가진 렌더러가 담당한다.
-    const contents = await readFile(filePath, "utf8");
+    // 같은 파일 핸들에서 정규 파일과 실제 읽은 바이트를 제한하고 스키마 해석은 도메인 검증에 맡긴다.
+    const contents = await readBoundedProjectFile(filePath, maxNativeProjectFileBytes, maxNativeProjectFileCharacters);
     return { canceled: false, filePath, contents };
   });
 
-  ipcMain.handle("grooveforge:save-project-recovery", (_event, payload: unknown) => {
+  ipcMain.handle("grooveforge:save-project-recovery", (event, payload: unknown) => {
+    assertTrustedProjectIpcSender(event);
     if (!isRecoveryProjectPayload(payload)) {
       throw new Error("Invalid project recovery payload.");
     }
@@ -2867,20 +2907,22 @@ function registerProjectFileHandlers(): void {
     });
   });
 
-  ipcMain.handle("grooveforge:load-project-recovery", () =>
-    runRecoveryOperation(async () => {
+  ipcMain.handle("grooveforge:load-project-recovery", (event) => {
+    assertTrustedProjectIpcSender(event);
+    return runRecoveryOperation(async () => {
       const library = await existingProjectLibrary(workspace);
       return library?.loadRecovery() ?? null;
-    })
-  );
+    });
+  });
 
-  ipcMain.handle("grooveforge:clear-project-recovery", () =>
-    runRecoveryOperation(async () => {
+  ipcMain.handle("grooveforge:clear-project-recovery", (event) => {
+    assertTrustedProjectIpcSender(event);
+    return runRecoveryOperation(async () => {
       const library = await existingProjectLibrary(workspace);
       library?.clearRecovery();
       return { cleared: true };
-    })
-  );
+    });
+  });
 }
 
 function projectIoSmokePath(): string | null {
@@ -15673,6 +15715,7 @@ function installManualQaAutoMovement(win: BrowserWindow): void {
   const sourceProject = manualQaProjectPayload(sourceContents);
   const userDataPosture = manualQaUserDataPosture(activeConfiguration);
   const report: ManualQaMovementReport = {
+    runtime: { packaged: app.isPackaged, executablePath: process.execPath, appPath: app.getAppPath() },
     downloads: manualQaDownloads,
     failures: [],
     generatedAt: new Date().toISOString(),
@@ -15936,8 +15979,16 @@ function installManualQaAutoMovement(win: BrowserWindow): void {
       // 장곡 QA도 실제 오디오 출력과 transport 진행을 확인한다. WAV 수치 검사와 별개인 재생 경로 증거다.
       await clickAndWait("workflow-jump-overview", "Overview playback workspace", `document.querySelector('[data-testid="workflow-jump-overview"]')?.getAttribute('aria-selected') === 'true'`);
       await clickAndWait("overview-full-song-play", "Movement playback started", `document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'true'`);
-      await waitForManualQaDelay(3500);
-      report.playback.arrangementAudible = win.webContents.isCurrentlyAudible();
+      report.playback.arrangementObservation = await observePlaybackAudibility({
+        durationMs: 3500,
+        isPlaybackStarted: () => true,
+        isClosed: () => win.isDestroyed() || win.webContents.isDestroyed(),
+        isAudible: () => win.webContents.isCurrentlyAudible()
+      });
+      report.playback.arrangementAudible = report.playback.arrangementObservation.audibleObserved;
+      if (report.playback.arrangementObservation.status !== "complete") {
+        throw new Error(`Movement arrangement observation failed: ${report.playback.arrangementObservation.status}.`);
+      }
       const playing = await readLaunchSmokeOverviewPlaybackDomState(win);
       report.playback.arrangementAdvanced = playing.transportPlaying && playing.progressValue > 1;
       await clickAndWait("overview-full-song-play", "Movement playback stopped", `document.querySelector('[data-testid="transport-play"]')?.getAttribute('aria-pressed') === 'false'`);
@@ -15986,10 +16037,30 @@ function installManualQaAutoMovement(win: BrowserWindow): void {
           document.querySelector('[data-testid="audio-analysis-status"]')?.textContent?.trim() === 'Audio meters ready'`,
         180000
       );
-      await clickAndWait("handoff-pack-preview-wav", "Movement rendered WAV preview started", `document.querySelector('[data-testid="handoff-pack-preview-wav"]')?.getAttribute('aria-pressed') === 'true'`, 120000);
-      await waitForManualQaDelay(3000);
-      report.playback.wavPreviewAudible = win.webContents.isCurrentlyAudible();
-      await clickAndWait("handoff-pack-preview-wav", "Movement rendered WAV preview stopped", `document.querySelector('[data-testid="handoff-pack-preview-wav"]')?.getAttribute('aria-pressed') === 'false'`);
+      // aria-pressed는 audio.play() 완료 전에도 true다. 네이티브 미디어 시작을 먼저 확인한 뒤 같은 3초를 관측한다.
+      const previewRequestedAt = performance.now();
+      let mediaStartedAfterMs: number | null = null;
+      const onPreviewMediaStarted = (): void => {
+        mediaStartedAfterMs ??= performance.now() - previewRequestedAt;
+      };
+      win.webContents.on("media-started-playing", onPreviewMediaStarted);
+      try {
+        await clickAndWait("handoff-pack-preview-wav", "Movement rendered WAV preview requested", `document.querySelector('[data-testid="handoff-pack-preview-wav"]')?.getAttribute('aria-pressed') === 'true'`, 120000);
+        const observation = await observePlaybackAudibility({
+          durationMs: 3000,
+          isPlaybackStarted: () => mediaStartedAfterMs !== null,
+          isClosed: () => win.isDestroyed() || win.webContents.isDestroyed(),
+          isAudible: () => win.webContents.isCurrentlyAudible()
+        });
+        report.playback.wavPreviewObservation = { ...observation, mediaStartedAfterMs };
+        report.playback.wavPreviewAudible = observation.audibleObserved;
+        if (observation.status !== "complete") {
+          throw new Error(`Movement WAV preview observation failed: ${observation.status}.`);
+        }
+        await clickAndWait("handoff-pack-preview-wav", "Movement rendered WAV preview stopped", `document.querySelector('[data-testid="handoff-pack-preview-wav"]')?.getAttribute('aria-pressed') === 'false'`);
+      } finally {
+        win.webContents.removeListener("media-started-playing", onPreviewMediaStarted);
+      }
       if (!report.playback.wavPreviewAudible) throw new Error("Movement rendered WAV preview did not produce audible output.");
       const downloadStartIndex = manualQaDownloads.length;
       const exportInteractionStartedAt = Date.now();
@@ -16231,9 +16302,29 @@ function createWindow(): void {
   }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
-    // 새 웹 콘텐츠 창은 만들지 않고 링크만 운영체제 기본 처리기로 넘겨 앱 권한을 가진 탐색 컨텍스트를 늘리지 않는다.
-    void shell.openExternal(url);
+    // 외부 URL로 OS의 임의 프로토콜 처리기를 실행하지 않게 HTTP(S) 링크만 기본 브라우저에 전달한다.
+    const externalUrl = externalBrowserUrl(url);
+    if (externalUrl) {
+      void shell.openExternal(externalUrl).catch(() => {
+        console.warn("Unable to open external browser link.");
+      });
+    }
     return { action: "deny" };
+  });
+
+  win.webContents.on("will-navigate", (event, url) => {
+    if (!isTrustedRendererUrl(url, rendererEntryUrl)) {
+      event.preventDefault();
+    }
+  });
+  win.webContents.on("will-redirect", (event, url) => {
+    if (!isTrustedRendererUrl(url, rendererEntryUrl)) {
+      event.preventDefault();
+    }
+  });
+  win.webContents.on("will-attach-webview", (event) => {
+    // 앱은 webview를 제공하지 않으므로 동적으로 주입된 별도 preload/권한 컨텍스트도 허용하지 않는다.
+    event.preventDefault();
   });
 
   win.webContents.on("will-prevent-unload", (event) => {

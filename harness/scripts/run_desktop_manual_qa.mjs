@@ -14,6 +14,7 @@ import { homedir, tmpdir } from "node:os";
 import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveInstalledQaApp } from "./installed_app_qa.mjs";
 import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -29,6 +30,9 @@ const movementSpecArgumentIndex = argumentList.indexOf("--movement-spec");
 const configuredMovementSpecPath =
   (movementSpecArgumentIndex >= 0 ? argumentList[movementSpecArgumentIndex + 1] : undefined) ||
   process.env.GROOVEFORGE_DESKTOP_MANUAL_QA_MOVEMENT_SPEC_PATH;
+const installedAppPath = process.env.GROOVEFORGE_DESKTOP_QA_INSTALLED_APP;
+const installedLaunch = installedAppPath ? await resolveInstalledQaApp(installedAppPath, root) : null;
+const provenanceBuildRoot = installedLaunch?.appRoot ?? root;
 const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 const repositoryQaBase = path.join(root, "build", "desktop");
 const temporaryQaBase = path.resolve(tmpdir());
@@ -38,6 +42,7 @@ const manualQaProvenanceMarker = "grooveforge-manual-qa-provenance-v2";
 const provenanceSourceEntries = [
   "electron",
   "harness/scripts/run_desktop_manual_qa.mjs",
+  "harness/scripts/installed_app_qa.mjs",
   "src",
   "index.html",
   "package.json",
@@ -619,7 +624,7 @@ async function buildManualQaProvenance() {
   }
   let builtBundle;
   try {
-    builtBundle = await buildProvenanceFileManifest(root, provenanceBuildRoots);
+    builtBundle = await buildProvenanceFileManifest(provenanceBuildRoot, provenanceBuildRoots);
   } catch (error) {
     throw new Error(
       `Production bundle is missing or unsafe; run npm run build before desktop:manual-qa. ${
@@ -998,6 +1003,7 @@ const launcherManifest = {
     savePath
   },
   provenance,
+  ...(installedLaunch ? { installedApp: installedLaunch.evidence } : {}),
   safety: {
     isolatedWorkspace: true,
     networkAttempted: false,
@@ -1037,12 +1043,12 @@ if (prepareOnly) {
 
 const freshnessFailures = manualQaBuildFreshnessFailures(
   provenance,
-  await readFile(path.join(root, provenanceElectronMainPath), "utf8")
+  await readFile(path.join(provenanceBuildRoot, provenanceElectronMainPath), "utf8")
 );
 if (freshnessFailures.length > 0) {
   fail("Manual QA build provenance is stale or incomplete; run npm run build.", freshnessFailures.join("\n"));
 }
-const electronBinary = resolveElectronBinary();
+const electronBinary = installedLaunch?.executable ?? resolveElectronBinary();
 if (!electronBinary) {
   fail("Electron binary is missing; run npm install first.");
 }
@@ -1054,6 +1060,7 @@ if (blockDetails) {
 const env = {
   ...process.env,
   GROOVEFORGE_DESKTOP_MANUAL_QA: "1",
+  GROOVEFORGE_DESKTOP_MANUAL_QA_SOURCE_ROOT: root,
   ...(autoQa
     ? {
         GROOVEFORGE_DESKTOP_MANUAL_QA_AUTO_EXIT: "1"
@@ -1092,7 +1099,9 @@ if (!autoMovementQa) {
 }
 delete env.VITE_DEV_SERVER_URL;
 
-const electronArgs = autoMovementQa ? [".", "--auto-movement-qa"] : autoSongQa ? [".", "--auto-song-qa"] : ["."];
+// 설치 번들은 자체 entry를 실행한다. 개발 Electron에만 저장소 경로 인자를 전달한다.
+const entryArgs = installedLaunch ? [] : ["."];
+const electronArgs = autoMovementQa ? [...entryArgs, "--auto-movement-qa"] : autoSongQa ? [...entryArgs, "--auto-song-qa"] : entryArgs;
 const child = spawn(electronBinary, electronArgs, { cwd: root, env, stdio: "inherit" });
 const autoQaParentTimeout = autoQa
   ? setTimeout(() => {
