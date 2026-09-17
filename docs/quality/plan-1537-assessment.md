@@ -127,3 +127,5 @@
 2026-09-17에 직접 확인했다. Electron은 IPC sender 검증, 탐색·새 창 제한, context isolation·sandbox와 CSP를 보안 권고로 제시한다. 이번 네이티브 경계 수정과 남은 CSP 작업은 이 기준과 연결된다. [Electron Security](https://www.electronjs.org/docs/latest/tutorial/security)
 
 SoundCloud는 WAV 등 무손실 형식과 stereo, 16-bit/44.1kHz 이상 소스, 약 -0.5~-1 dBFS headroom을 권장한다. 이번 PCM24 stereo 44.1kHz 전달 형식은 해당 소스 권장 범위에 해당하며, 이것만으로 서비스 변환 이후 결과나 업로드 성공을 보증하지 않는다. [SoundCloud Upload Requirements](https://help.soundcloud.com/hc/en-us/articles/360039171614-Upload-Requirements)
+
+통합 후 다른 checkout에서 생성한 빌드는 source map 의존성 상대 경로와 preload 순서가 달랐다. 같은 소스가 모든 환경에서 byte 동일한 번들을 만든다고 가정하지 않는다. [완료 리뷰의 통합 후 빌드 확인](../reviews/plan-1537-harness-risk-installed-hiphop-review.md#통합-후-빌드-범위-확인)과 ignored 비교 영수증에 범위를 기록하고, 앞선 설치본 QA는 실제 검증한 번들 해시에 계속 연결한다.

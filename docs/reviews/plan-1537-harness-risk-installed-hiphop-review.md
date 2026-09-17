@@ -52,3 +52,9 @@ Electron IPC의 소유 창·최상위 frame·진입 URL을 검증하고 탐색·
 ## Integration
 
 [완료 계획](../exec_plans/completed/plan-1537-harness-risk-installed-hiphop.md)에 구현·QA·독립 리뷰를 완료 기록했다. 문서 QA 이후 전용 `codex/plan-1537-harness-risk-installed-hiphop` branch의 변경을 main에 통합·push하고, ignored 증거를 main의 `build/desktop/plan-1537-completion-evidence/`로 보존한 뒤 해당 worktree와 branch만 정리한다. 실제 commit·remote·설치본 동일성·정리 결과는 같은 폴더의 `integration-receipt.json` 및 최종 사용자 보고에 남긴다. 원본 증거에 기록된 이전 절대경로는 `relocation-map.json`으로 현재 보관 위치에 연결한다.
+
+## 통합 후 빌드 범위 확인
+
+main 통합 후 새 `npm run build`는 exit 0이었다. 같은 소스라도 기존 worktree의 공유 `node_modules`와 main의 경로 차이로 vendor source map 2개의 `sources` 상대 경로가 달랐다. 나머지 차이는 HTML의 modulepreload 순서와 entry JS의 preload 목록 순서이며, 모든 preload 호출이 가리키는 모듈 집합과 그 밖의 48개 파일은 같았다. 52개 파일의 byte 동일성 검사는 이 4개 차이를 올바르게 거부했다. 새 main 빌드가 앞선 실제 설치본 QA의 대상이었다고 주장하지 않는다.
+
+검증 당시의 `dist`·`dist-electron`은 ignored `build/desktop/plan-1537-completion-evidence/final-tested-source-build/`에 별도 보존하여 설치본 52개 파일과 다시 대조한다. 최종 소스 71개와 설치 실행 파일의 식별자도 유지한다. 설치본을 새 빌드로 바꾸거나 동일성 검사 조건을 완화하지 않았다. 구체적인 차이와 통합 확인은 `main-build-diff-explained.json` 및 `integration-receipt.json`에 기록한다.
