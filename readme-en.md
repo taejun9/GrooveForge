@@ -31,7 +31,7 @@ BPM/key/style -> pattern programming -> drums -> 808/bass -> melody/chords -> so
 
 A corrected draft passes this first-session test: a user can create a beat by choosing BPM/key/style, programming drums and 808/bass, adding melody/chords, shaping sounds, arranging sections, balancing the mix, setting a master posture, and exporting WAV/stems without importing audio.
 
-Sampling stays a later optional sound-source module, not the product spine. The first proof of GrooveForge is still a complete beat made from editable events, built-in instruments, arrangement, mixer/master, and export without imported audio.
+Optional one-shot sampling is available from Compose: import a bounded local WAV, trim it, and use it on a drum lane. The first proof of GrooveForge is still a complete beat made from editable events, built-in instruments, arrangement, mixer/master, and export without imported audio.
 
 Manual distribution QA writes a local distribution manual QA checklist artifact before final channel QA without recording private values.
 
@@ -648,7 +648,7 @@ Attached Korean brief rewrite: accept the brief's corrected product definition, 
 
 Korean concept-brief rule: when a brief says the concept is "비트(모든 장르)를 만드는" work and sampling is "부가 기능", treat every sample import, chopping, sampler, audio clip, and loop-stretching example as optional v2/v3 scope unless the user explicitly starts a sampling-phase plan. The accepted first-screen path is BPM/key/style, drum rack, synth 808/bass, melody/chords, sound design, arrangement, mixer/master, and export.
 
-Latest brief verdict: if a draft can be described as "bring in a sample, chop it, arrange it, then mix/master," reject that as the product spine. The accepted GrooveForge spine is "compose/program the beat, design the sound, arrange it, mix/master it, then export"; sampling is only a later opt-in module that can supply material inside that workstation.
+Latest brief verdict: if a draft can be described as "bring in a sample, chop it, arrange it, then mix/master," reject that as the product spine. The accepted GrooveForge spine is "compose/program the beat, design the sound, arrange it, mix/master it, then export"; optional one-shot sampling can supply material inside that workstation.
 
 ## Agent Harness
 
@@ -1054,3 +1054,7 @@ harness/
   scripts/
   templates/
 ```
+
+### Personal tools and original rap delivery
+
+`npm run pattern-library:smoke` validates persistent event-library boundaries. `npm run sampling:smoke` validates bounded local one-shots and audio roundtrips. `npm run desktop:dark-rap-qa` produces three original 90–180 second rap instrumentals through actual-app QA; set `GROOVEFORGE_DESKTOP_QA_INSTALLED_APP` to a verified installed bundle to prove the installed runtime. See [personal tools](docs/product/personal-tools.md).

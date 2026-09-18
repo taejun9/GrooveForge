@@ -31,6 +31,8 @@ import {
   sidechainGainForStep,
 } from "../domain/workstation";
 import type { ArrangementBlock, ArrangementMuteTrack, ProjectState, SoundDesign, TrackType } from "../domain/workstation";
+import { decodedDrumSample, sampleForLane, sampleFrameValue, sampleLanes } from "../domain/sampling";
+import type { DrumSample } from "../domain/sampling";
 import { downloadBlob } from "../platform/downloads";
 import { bassGlideProfile, bassVoiceProfileForProject } from "./bassVoice";
 import type { BassGlideProfile, BassVoiceProfile } from "./bassVoice";
@@ -96,7 +98,11 @@ function stepDuration(project: ProjectState): number {
 
 export function exportTailDurationSeconds(project: ProjectState): number {
   // 템포에 비례한 6스텝은 현재 가장 긴 음의 잔향을 덮고, 최소값은 빠른 프로젝트의 Space 피드백도 잘리지 않게 한다.
-  return Math.max(minimumExportTailSeconds, stepDuration(project) * exportTailSteps);
+  const sampleTail = Math.max(0, ...sampleLanes.map((lane) => {
+    const sample = sampleForLane(project, lane);
+    return sample ? sample.trimEnd - sample.trimStart + 0.75 : 0;
+  }));
+  return Math.max(minimumExportTailSeconds, stepDuration(project) * exportTailSteps, sampleTail);
 }
 
 function hasSolo(project: ProjectState): boolean {
@@ -412,6 +418,30 @@ function addNoiseWithSend(
   );
 }
 
+function addSampleWithSend(
+  buffer: AudioChannels, sendBuffer: AudioChannels, start: number, sample: DrumSample,
+  mix: ChannelMix, gainScale: number, mirrorBuffer?: AudioChannels, mirrorSendBuffer?: AudioChannels
+): void {
+  if (mix.gain <= 0) return;
+  const data = decodedDrumSample(sample);
+  const startFrame = Math.max(0, Math.floor(start * sampleRate));
+  const frames = Math.ceil((sample.trimEnd - sample.trimStart) * sampleRate);
+  const sendMix = spaceSendMix(mix);
+  const highpass = Math.exp(-2 * Math.PI * channelHighpassHz(mix) / sampleRate);
+  let previousInput = 0, previousOutput = 0;
+  for (let index = 0; index < frames && startFrame + index < buffer[0].length; index += 1) {
+    // PCM의 길이와 피치는 유지하고 채널의 저역 컷·Drive·Glue·팬·Space를 적용한다.
+    const input = sampleFrameValue(sample, data, index / sampleRate);
+    const filtered = highpass * (previousOutput + input - previousInput);
+    previousInput = input; previousOutput = filtered;
+    const value = channelGlueSample(channelDriveSample(filtered, mix) * mix.gain * gainScale * (1 + mix.air * 0.14), mix);
+    const sendValue = value * (sendMix.gain / mix.gain);
+    for (const [target, left, right] of [[buffer, value * mix.left, value * mix.right], [sendBuffer, sendValue * sendMix.left, sendValue * sendMix.right], [mirrorBuffer, value * mix.left, value * mix.right], [mirrorSendBuffer, sendValue * sendMix.left, sendValue * sendMix.right]] as const) {
+      if (target) { target[0][startFrame + index] += left; target[1][startFrame + index] += right; }
+    }
+  }
+}
+
 function applySpaceReturn(buffer: AudioChannels, sendBuffer: AudioChannels): void {
   // 좌우 지연 시간을 다르게 하고 교차 피드백을 걸어 짧은 스테레오 공간계 효과를 만든다.
   // sendBuffer 자체에 미래 피드백을 누적하므로 버퍼 끝에는 별도 export tail이 필요하다.
@@ -603,7 +633,17 @@ function renderProject(
     for (let patternStep = 0; patternStep < 16; patternStep += 1) {
       const absoluteStep = barOffset + patternStep;
       const time = projectStepStartSeconds(project, absoluteStep);
-      if (drumStepShouldPlay(pattern, "kick", patternStep, absoluteStep)) {
+      for (const lane of sampleLanes) {
+        const sample = sampleForLane(project, lane);
+        if (!sample || !drumStepShouldPlay(pattern, lane, patternStep, absoluteStep)) continue;
+        const repeatCount = lane === "hat" ? hatRepeatCount(pattern, patternStep) : 1;
+        const drumTime = time + drumStepTimingMs(pattern, lane, patternStep) / 1000;
+        for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex += 1) {
+          addSampleWithSend(buffer, sendBuffer, drumTime + repeatIndex * step / repeatCount, sample, drumMix,
+            energyGain * drumStepVelocity(pattern, lane, patternStep) * (repeatIndex === 0 ? 1 : 0.72));
+        }
+      }
+      if (!sampleForLane(project, "kick") && drumStepShouldPlay(pattern, "kick", patternStep, absoluteStep)) {
         const velocity = drumStepVelocity(pattern, "kick", patternStep);
         const drumTime = time + drumStepTimingMs(pattern, "kick", patternStep) / 1000;
         addToneWithSend(buffer, sendBuffer, drumTime, 0.18 + sound.kickPunch * 0.1, 44 + sound.kickPunch * 10, drumMix, energyGain * (0.78 + sound.kickPunch * 0.24) * velocity, "sine", {
@@ -613,7 +653,7 @@ function renderProject(
           decay: 8
         });
       }
-      if (drumStepShouldPlay(pattern, "clap", patternStep, absoluteStep)) {
+      if (!sampleForLane(project, "clap") && drumStepShouldPlay(pattern, "clap", patternStep, absoluteStep)) {
         const drumTime = time + drumStepTimingMs(pattern, "clap", patternStep) / 1000;
         const drumDuration = 0.11 + (1 - sound.snareSnap) * 0.08;
         addNoiseWithSend(
@@ -627,7 +667,7 @@ function renderProject(
           nextNoiseSeed(drumTime, drumDuration, sound.snareSnap)
         );
       }
-      if (drumStepShouldPlay(pattern, "hat", patternStep, absoluteStep)) {
+      if (!sampleForLane(project, "hat") && drumStepShouldPlay(pattern, "hat", patternStep, absoluteStep)) {
         const repeatCount = hatRepeatCount(pattern, patternStep);
         const velocity = drumStepVelocity(pattern, "hat", patternStep);
         const drumTime = time + drumStepTimingMs(pattern, "hat", patternStep) / 1000;
@@ -646,7 +686,7 @@ function renderProject(
           );
         }
       }
-      if (drumStepShouldPlay(pattern, "perc", patternStep, absoluteStep)) {
+      if (!sampleForLane(project, "perc") && drumStepShouldPlay(pattern, "perc", patternStep, absoluteStep)) {
         const drumTime = time + drumStepTimingMs(pattern, "perc", patternStep) / 1000;
         addToneWithSend(buffer, sendBuffer, drumTime, 0.08, 260 + sound.snareSnap * 190, drumMix, energyGain * 0.16 * drumStepVelocity(pattern, "perc", patternStep), "triangle", {
           filter: 0.7 + sound.hatBrightness * 0.3
@@ -854,7 +894,17 @@ function analyzeProjectExportsCombined(project: ProjectState): ProjectExportAnal
     for (let patternStep = 0; patternStep < 16; patternStep += 1) {
       const absoluteStep = barOffset + patternStep;
       const time = projectStepStartSeconds(project, absoluteStep);
-      if (drumStepShouldPlay(pattern, "kick", patternStep, absoluteStep)) {
+      for (const lane of sampleLanes) {
+        const sample = sampleForLane(project, lane);
+        if (!sample || !drumStepShouldPlay(pattern, lane, patternStep, absoluteStep)) continue;
+        const repeatCount = lane === "hat" ? hatRepeatCount(pattern, patternStep) : 1;
+        const drumTime = time + drumStepTimingMs(pattern, lane, patternStep) / 1000;
+        for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex += 1) {
+          addSampleWithSend(drumTarget.buffer, drumTarget.sendBuffer, drumTime + repeatIndex * projectStep / repeatCount, sample, drumMix,
+            energyGain * drumStepVelocity(pattern, lane, patternStep) * (repeatIndex === 0 ? 1 : 0.72), drumMirrors, drumSendMirrors);
+        }
+      }
+      if (!sampleForLane(project, "kick") && drumStepShouldPlay(pattern, "kick", patternStep, absoluteStep)) {
         const velocity = drumStepVelocity(pattern, "kick", patternStep);
         const drumTime = time + drumStepTimingMs(pattern, "kick", patternStep) / 1000;
         addToneWithSend(
@@ -884,7 +934,7 @@ function analyzeProjectExportsCombined(project: ProjectState): ProjectExportAnal
           drumSendMirrors
         );
       }
-      if (drumStepShouldPlay(pattern, "clap", patternStep, absoluteStep)) {
+      if (!sampleForLane(project, "clap") && drumStepShouldPlay(pattern, "clap", patternStep, absoluteStep)) {
         const drumTime = time + drumStepTimingMs(pattern, "clap", patternStep) / 1000;
         const drumDuration = 0.11 + (1 - sound.snareSnap) * 0.08;
         addNoiseWithSend(
@@ -900,7 +950,7 @@ function analyzeProjectExportsCombined(project: ProjectState): ProjectExportAnal
           drumSendMirrors
         );
       }
-      if (drumStepShouldPlay(pattern, "hat", patternStep, absoluteStep)) {
+      if (!sampleForLane(project, "hat") && drumStepShouldPlay(pattern, "hat", patternStep, absoluteStep)) {
         const repeatCount = hatRepeatCount(pattern, patternStep);
         const velocity = drumStepVelocity(pattern, "hat", patternStep);
         const drumTime = time + drumStepTimingMs(pattern, "hat", patternStep) / 1000;
@@ -921,7 +971,7 @@ function analyzeProjectExportsCombined(project: ProjectState): ProjectExportAnal
           );
         }
       }
-      if (drumStepShouldPlay(pattern, "perc", patternStep, absoluteStep)) {
+      if (!sampleForLane(project, "perc") && drumStepShouldPlay(pattern, "perc", patternStep, absoluteStep)) {
         const drumTime = time + drumStepTimingMs(pattern, "perc", patternStep) / 1000;
         addToneWithSend(
           drumTarget.buffer,

@@ -3365,13 +3365,13 @@ function launchSmokeCommandReferenceFailures(evidence: LaunchSmokeCommandReferen
 function launchSmokeModalFocusFailures(evidence: LaunchSmokeModalFocusEvidence): string[] {
   const failures: string[] = [];
   if (
-    evidence.closedDetails.totalCount !== 25 ||
+    evidence.closedDetails.totalCount !== 27 ||
     evidence.closedDetails.initiallyOpenCount !== 1 ||
-    evidence.closedDetails.closedCount !== 24 ||
+    evidence.closedDetails.closedCount !== 26 ||
     evidence.closedDetails.leakedContentCount !== 0 ||
     evidence.closedDetails.leakedControlCount !== 0
   ) {
-    failures.push("all 25 native disclosures should honor their initial state with zero visible or reachable content beneath the 24 closed summaries");
+    failures.push("all 27 native disclosures should honor their initial state with zero visible or reachable content beneath the 26 closed summaries");
   }
   if (
     !evidence.closedDetails.guideOpenReady ||
@@ -16164,8 +16164,17 @@ function installManualQaAutoMovement(win: BrowserWindow): void {
       throw new Error(`Saved movement BPM is invalid for WAV duration verification: ${String(savedProject.bpm)}.`);
     }
     const stepDurationSeconds = 60 / savedBpm / 4;
+    // 원샷의 trim 구간과 Space 잔향도 실제 WAV 길이에 포함된다. 샘플 없는 곡의 기존 예상값은 유지한다.
+    const sampleTailDurations = Object.values(manualQaObject(savedProject.drumSamples)).map((value) => {
+      const sample = manualQaObject(value);
+      if (typeof sample.trimStart !== "number" || typeof sample.trimEnd !== "number" ||
+        !Number.isFinite(sample.trimStart) || !Number.isFinite(sample.trimEnd) || sample.trimEnd <= sample.trimStart) {
+        throw new Error("Saved movement sample trim is invalid for WAV duration verification.");
+      }
+      return sample.trimEnd - sample.trimStart + 0.75;
+    });
     const expectedDurationSeconds =
-      expectedArrangementBars * 16 * stepDurationSeconds + Math.max(0.75, stepDurationSeconds * 6);
+      expectedArrangementBars * 16 * stepDurationSeconds + Math.max(0.75, stepDurationSeconds * 6, ...sampleTailDurations);
     const expectedFrameCount = Math.ceil(expectedDurationSeconds * wav.sampleRate);
     if (wav.frameCount !== expectedFrameCount) {
       throw new Error(
@@ -16278,7 +16287,10 @@ function createWindow(): void {
         : isCloseFlowSmoke
           ? `grooveforge-close-flow-smoke-${process.pid}`
         : isManualQa
-          ? `grooveforge-manual-qa-${isManualQaAutoMovement ? "auto-movement" : isManualQaAutoSong ? "auto-song" : isManualQaAutoExit ? "auto" : "visible"}-${process.pid}`
+          ? process.env.GROOVEFORGE_DESKTOP_MANUAL_QA_PERSISTENT_STORAGE === "1"
+            // 검증된 QA userData 아래에만 보관함 재시작 검사용 영속 partition을 만든다.
+            ? "persist:grooveforge-personal-tools-qa"
+            : `grooveforge-manual-qa-${isManualQaAutoMovement ? "auto-movement" : isManualQaAutoSong ? "auto-song" : isManualQaAutoExit ? "auto" : "visible"}-${process.pid}`
           : undefined,
       backgroundThrottling: !(isLaunchSmoke || isProjectIoSmoke || isCloseFlowSmoke || isManualQa)
     }

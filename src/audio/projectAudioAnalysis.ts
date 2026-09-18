@@ -9,6 +9,7 @@ import {
   projectStepDurationSeconds
 } from "../domain/workstation";
 import type { ProjectState } from "../domain/workstation";
+import { sampleForLane, sampleLanes } from "../domain/sampling";
 import {
   analyzeProjectExports,
   exportTailDurationSeconds,
@@ -54,7 +55,15 @@ let cachedProjectAudioAnalysis: { identity: string; analysis: ProjectAudioAnalys
  * 해당 편집 때 기존 분석을 재사용한다. 실제 렌더 Pattern 선택은 편곡 블록이 소유한다.
  */
 export function projectAudioAnalysisIdentity(project: ProjectState): string {
+  // PCM·레인·trim·gain은 미터를 바꾼다. 출처 파일명만 바뀐 경우에는 기존 분석을 재사용한다.
+  const drumSamples = Object.fromEntries(sampleLanes.flatMap((lane) => {
+    const sample = sampleForLane(project, lane);
+    if (!sample) return [];
+    const { sourceName: _sourceName, ...audio } = sample;
+    return [[lane, audio]];
+  }));
   return JSON.stringify({
+    ...(Object.keys(drumSamples).length ? { drumSamples } : {}),
     arrangement: project.arrangement,
     automation: project.automation,
     bpm: project.bpm,

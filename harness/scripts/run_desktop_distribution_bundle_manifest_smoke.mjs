@@ -346,7 +346,7 @@ function buildMarkdown(summary) {
 
 ## What GrooveForge Is
 
-${appName} is an all-genre desktop beat workstation for direct beat composition, sound design, arrangement, mixing, mastering, and local export. It supports First-time beat makers through Guided mode and Working producers through Studio mode. Sampling remains optional future scope, not the release identity.
+${appName} is an all-genre desktop beat workstation for direct beat composition, sound design, arrangement, mixing, mastering, and local export. It supports First-time beat makers through Guided mode and Working producers through Studio mode. Sampling remains optional and secondary, not the release identity.
 
 ## Bundle Status
 
@@ -514,7 +514,7 @@ check(Array.isArray(summary.externalDistributionBlockers), "distribution bundle 
 check(summary.distributionBundleManifestReady === false || summary.distributionBundleManifestBlockers.length === 0, "ready bundle manifest should not include bundle blockers");
 check(markdown.includes("all-genre desktop beat workstation"), "distribution bundle manifest should describe the direct beat workstation scope");
 check(markdown.includes("all-genre direct beat workstation"), "distribution bundle manifest should keep the product scope direct");
-check(markdown.includes("Sampling remains optional future scope"), "distribution bundle manifest should keep sampling secondary");
+check(markdown.includes("Sampling remains optional and secondary"), "distribution bundle manifest should keep sampling secondary");
 check(markdown.includes("First-time beat makers"), "distribution bundle manifest should address first-time beat makers");
 check(markdown.includes("Working producers"), "distribution bundle manifest should address working producers");
 check(markdown.includes("Bundle manifest ready:"), "distribution bundle manifest should include bundle readiness");

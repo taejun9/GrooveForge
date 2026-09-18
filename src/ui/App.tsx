@@ -42,6 +42,9 @@ import type { ChangeEvent, CSSProperties, KeyboardEvent as ReactKeyboardEvent, R
 import { Activity, startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { HeaderActionDock } from "./HeaderActionDock";
+import { PatternLibraryPanel } from "./PatternLibraryPanel";
+import { SamplingPanel } from "./SamplingPanel";
+import { readWorkspaceDensity, saveWorkspaceDensity, type WorkspaceDensity } from "./workspaceDensity";
 import {
   drumGridEntryStep,
   drumGridNavigationTarget,
@@ -1219,6 +1222,8 @@ function ProjectTitleInput({
 
 export function App(): ReactElement {
   const { locale, t } = useLocalization();
+  const [workspaceDensity, setWorkspaceDensity] = useState<WorkspaceDensity>(readWorkspaceDensity);
+  const [densityPersisted, setDensityPersisted] = useState(true);
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<EditHistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<EditHistoryEntry[]>([]);
@@ -13926,6 +13931,7 @@ export function App(): ReactElement {
   return (
     <main
       className="app-shell"
+      data-workspace-density={workspaceDensity}
       data-fixed-feedback-active={fixedFeedbackOwner !== "none"}
       data-fixed-feedback-owner={fixedFeedbackOwner}
       data-locale={locale}
@@ -14568,6 +14574,31 @@ export function App(): ReactElement {
       )}
 
       <section className="mode-row" aria-label={t("mode.label")}>
+      <div className="workspace-density-bar" role="group" aria-label={locale === "ko" ? "화면 모드" : "Screen mode"}>
+        <div className="workspace-density-copy">
+          <strong>{workspaceDensity === "simple" ? (locale === "ko" ? "간단 화면" : "Simple view") : (locale === "ko" ? "전체 화면" : "Full view")}</strong>
+          <span>{locale === "ko" ? "비트 만들기 → 편곡 → 믹싱 → 내보내기" : "Make a beat → Arrange → Mix → Export"}</span>
+        </div>
+        <div className="segmented" role="group" aria-label={locale === "ko" ? "화면 정보량" : "Screen detail"}>
+          {(["simple", "full"] as const).map((density) => (
+            <button
+              key={density}
+              type="button"
+              data-testid={`workspace-density-${density}`}
+              aria-pressed={workspaceDensity === density}
+              className={workspaceDensity === density ? "selected" : ""}
+              onClick={() => {
+                setWorkspaceDensity(density);
+                setDensityPersisted(saveWorkspaceDensity(density));
+              }}
+            >
+              {density === "simple" ? (locale === "ko" ? "간단" : "Simple") : (locale === "ko" ? "전체 도구" : "All tools")}
+            </button>
+          ))}
+        </div>
+        {!densityPersisted && <small role="status">{locale === "ko" ? "이번 실행에만 적용됩니다." : "Applied for this session only."}</small>}
+      </div>
+
         <input
           ref={importInputRef}
           className="file-input"
@@ -15070,6 +15101,20 @@ export function App(): ReactElement {
         tabIndex={activeWorkspaceZone === "compose" ? 0 : -1}
       >
         <Activity mode={workspaceActivityMode(activeWorkspaceZone === "compose")} name="workspace-compose">
+        <div className="compose-personal-tools">
+          <details className="personal-tool-drawer" data-testid="pattern-library-drawer">
+            <summary>{locale === "ko" ? "내 패턴 보관함" : "My pattern library"}</summary>
+            <PatternLibraryPanel
+              project={project}
+              onChange={(next) => updateProject(() => next, locale === "ko" ? "저장한 패턴을 불러왔습니다. 실행 취소로 되돌릴 수 있습니다." : "Pattern recalled. Undo restores the previous pattern.")}
+              onStatus={setProjectStatus}
+            />
+          </details>
+          <details className="personal-tool-drawer" data-testid="sampling-drawer">
+            <summary>{locale === "ko" ? "샘플링 · 드럼 소리 가져오기" : "Sampling · Import a drum sound"}</summary>
+            <SamplingPanel project={project} onChange={(update) => updateProject(update)} onStatus={setProjectStatus} />
+          </details>
+        </div>
         <WorkspacePageTabs
           activePage={activeComposeWorkspacePage}
           ariaLabel={t("nav.subTabsAria", { title: t("nav.compose") })}

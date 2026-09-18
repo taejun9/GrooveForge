@@ -1007,7 +1007,7 @@ const launcherManifest = {
   safety: {
     isolatedWorkspace: true,
     networkAttempted: false,
-    nonpersistentElectronPartition: true,
+    nonpersistentElectronPartition: process.env.GROOVEFORGE_DESKTOP_MANUAL_QA_PERSISTENT_STORAGE !== "1",
     sourceAndTargetDiffer: openPath !== savePath,
     userDataIsolated: launcherUserDataIsolated,
     userDataPath: electronUserDataDirectory,

@@ -220,9 +220,9 @@ function buildRequirementAudit(input) {
     hasAll(readme, [
       "여러 장르의 비트를 직접 만들기 위한 데스크톱용 이벤트 기반 미니 DAW",
       "GrooveForge의 중심은 샘플 탐색이 아니라 직접 비트를 작곡하고 소리를 설계하는 과정입니다.",
-      "샘플링은 이후 추가할 수 있는 선택형 음원 모듈입니다."
+      "선택형 원샷 샘플링은 짧은 WAV를 드럼 레인에 연결하고 구간·음량을 조절하는 부가 기능입니다."
     ]) &&
-    hasAll(readmeEn, ["making beats across genres", "direct beat composition", "Sampling stays a later optional sound-source module"]) &&
+    hasAll(readmeEn, ["making beats across genres", "direct beat composition", "Optional one-shot sampling is available from Compose", "export without imported audio"]) &&
     hasAll(readinessDoc, ["Direct beat composition is the product spine", "Sampling is secondary and optional."]) &&
     hasAll(qualityRules, ["Korean concept-brief checks must treat", "샘플링은 부가 기능"]);
   const beginnerReady =
@@ -350,7 +350,7 @@ function buildMarkdown(summary) {
 
 ## What GrooveForge Is
 
-${appName} is an all-genre desktop beat workstation for direct beat composition, sound design, arrangement, mixing, mastering, and local export. It supports First-time beat makers through guided flow and Working producers through direct editing flow. Sampling remains optional future scope, not the release identity.
+${appName} is an all-genre desktop beat workstation for direct beat composition, sound design, arrangement, mixing, mastering, and local export. It supports First-time beat makers through guided flow and Working producers through direct editing flow. Sampling remains optional and secondary, not the release identity.
 
 ## Completion Status
 
@@ -634,7 +634,7 @@ check(summary.releaseGateClaimedGatekeeperApproval === false, "completion audit 
 check(summary.releaseGateClaimedAutoUpdate === false, "completion audit should not claim auto-update");
 check(summary.releaseGateClaimedExternalDistribution === false, "completion audit should not claim external distribution completion");
 check(markdown.includes("all-genre desktop beat workstation"), "completion audit should describe the all-genre desktop beat workstation");
-check(markdown.includes("Sampling remains optional future scope"), "completion audit should keep sampling secondary");
+check(markdown.includes("Sampling remains optional and secondary"), "completion audit should keep sampling secondary");
 check(markdown.includes("First-time beat makers"), "completion audit should address first-time beat makers");
 check(markdown.includes("Working producers"), "completion audit should address working producers");
 check(markdown.includes("Local MVP evidence ready:"), "completion audit should include local MVP readiness");

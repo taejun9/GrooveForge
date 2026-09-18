@@ -20,11 +20,11 @@ For material risk, policy, or compliance claims, record the relevant source text
 
 Imported audio can contain personal data, copyrighted material, or unreleased creative work. Test fixtures should use generated tones, synthetic drum sounds, or clearly licensed assets.
 
-Sampling is an optional later module. Its implementation must include source tracking, user import boundaries, and clear export responsibility before sample packs or user audio are added to examples. This safety section does not make sampling a core product feature.
+Optional one-shot sampling accepts only explicitly selected, bounded local WAV files. It stores a sanitized source basename and embedded PCM with the project; full source paths and external references are excluded. Source tracking, user import boundaries, and clear export responsibility remain required before sample packs or user audio are added to examples. This safety section does not make sampling a core product feature.
 
 ## Local Draft Recovery
 
-Local draft recovery may store only bounded GrooveForge project JSON in renderer-local storage. It must not store media blobs, imported audio, sample packs, analytics identifiers, account data, or cloud sync state. Restore and Clear controls must be explicit user actions, and clearing a draft must not delete the current project or any saved `.grooveforge.json` file.
+Local draft recovery may store only bounded GrooveForge project JSON in renderer-local storage. The explicitly enabled one-shot sampling extension may include its strictly bounded embedded PCM and source basename inside that JSON so recovery does not silently lose the user’s sound. Arbitrary media blobs, long imported audio, sample packs, analytics identifiers, account data, and cloud sync state remain excluded. Restore and Clear controls must be explicit user actions, and clearing a draft must not delete the current project or any saved `.grooveforge.json` file.
 
 The desktop main process additionally owns one latest recovery row in the current-user-home `GrooveForge/Data/grooveforge.db` SQLite3 database. The renderer may request save/load/clear through narrow typed IPC but must never receive raw SQL or the database path. SQLite uses a versioned STRICT schema, parameter binding, WAL, FULL synchronous durability, integrity checks, and bounded transactions.
 
@@ -33,3 +33,7 @@ The SQLite catalog stores a SHA-256 location key instead of a current-user absol
 ## AI Boundary
 
 Pattern generation may be local and event-based. Remote AI calls, generated-audio services, model telemetry, or prompt logging require an explicit product rationale, privacy review, and source entry before implementation.
+
+## Personal Pattern Library
+
+Explicit Save stores at most 32 named event patterns, bounded to 750,000 JSON characters, in device-local renderer storage. No imported media, absolute file paths, account identifiers, or remote requests enter the library. Recall mutates only the selected Pattern through Undo history. Storage failure and corrupted data remain visible errors rather than successful saves.

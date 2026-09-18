@@ -1,4 +1,6 @@
 
+
+Current optional tools: [간단 화면, 내 패턴, 선택적 샘플링](personal-tools.md). Plan-1538 explicitly starts the optional one-shot sampling phase; historical future-phase guidance below continues to protect the sample-free first-run workflow.
 # GrooveForge Product
 
 ## Summary

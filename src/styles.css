@@ -36903,3 +36903,121 @@ input[type="range"] {
     grid-column: 1 / -1;
   }
 }
+
+/* 간단 화면은 기기별 표시 설정이다. 필수 편집·저장·재생은 같은 컴포넌트를 쓰며 음악 데이터는 바꾸지 않는다. */
+.workspace-density-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.workspace-density-copy { display: grid; gap: 2px; }
+.workspace-density-copy strong { color: #a6edc5; font-size: 12px; }
+.workspace-density-copy span { color: #b1baba; font-size: 11px; }
+.workspace-density-bar button { min-width: 64px; }
+.compose-personal-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 8px;
+  min-width: 0;
+  grid-column: 1 / -1;
+}
+.personal-tool-drawer {
+  min-width: 0;
+  border: 1px solid #36504b;
+  border-radius: 9px;
+  background: #14201e;
+}
+.personal-tool-drawer > summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  min-height: 38px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #c4eedd;
+}
+.personal-tool-drawer > :not(summary) {
+  max-height: 260px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+  border-top: 1px solid #36504b;
+}
+.personal-tool-drawer :is(input, select, button) { min-height: 34px; max-width: 100%; }
+.personal-tool-drawer :is(input[type="text"], select) { width: 100%; }
+.personal-tool-drawer button { padding: 6px 10px; }
+.personal-tool-drawer :is(p, small) { color: #b1c5bf; line-height: 1.5; }
+.personal-tool-drawer label { display: grid; gap: 5px; font-size: 12px; }
+.personal-tool-drawer :is(.pattern-library-panel, .sampling-panel) { display: grid; gap: 10px; }
+.app-shell[data-workspace-density="simple"] :is(
+  .first-run-launchpad,
+  .tempo-nudge-pads,
+  .time-signature-field,
+  .transport-session-tools,
+  .transport-position-readout,
+  .workflow-review-disclosure,
+  .workspace-tabs-heading,
+  .workspace-page-tabs-heading,
+  .workspace-page-tab-meta,
+  .workflow-tab-status,
+  .pattern-playback-readout,
+  .pattern-lab,
+  .capture-ideas,
+  .drum-grid-keyboard-help,
+  .note-grid-keyboard-help,
+  .groove-row,
+  .swing-feel-row
+) { display: none; }
+.app-shell[data-workspace-density="simple"] .mode-row > .segmented { display: none; }
+.app-shell[data-workspace-density="simple"] .session-meter > span:not([data-testid="project-status"]):not([data-testid="local-draft-status"]) { display: none; }
+.app-shell[data-workspace-density="simple"] .session-meter .project-safety-readout { display: none; }
+.app-shell[data-workspace-density="simple"] :is(.workspace-tabs-surface, .workspace-page-tabs) { grid-template-columns: minmax(0, 1fr); }
+.app-shell[data-workspace-density="simple"] .workflow-navigator-card { grid-template-columns: auto minmax(0, 1fr); align-items: center; }
+.app-shell[data-workspace-density="simple"] .workflow-navigator-card strong { display: none; }
+.app-shell[data-workspace-density="simple"] .workflow-tab-label { display: block; grid-column: 2; font-size: 14px; font-weight: 700; }
+.app-shell[data-workspace-density="simple"] .transport-controls { grid-template-columns: minmax(120px, 1.4fr) 64px 100px minmax(108px, 1fr); }
+.app-shell[data-workspace-density="simple"] .step-grid { gap: 8px; }
+.app-shell[data-workspace-density="simple"] .micro-controls { grid-template-columns: minmax(0, 1fr); }
+
+@media (min-width: 901px) and (min-height: 640px) {
+  .workspace-density-copy { display: none; }
+  .workspace-compose-panel:not([hidden]) { grid-template-rows: auto 54px minmax(0, 1fr); }
+  .workspace-compose-panel > .compose-personal-tools { grid-row: 1; }
+  .workspace-compose-panel > .workspace-page-tabs { grid-row: 2; }
+  .workspace-compose-panel:not([hidden]) > .workspace-page-panel:not([hidden]) { grid-row: 3; }
+  .app-shell[data-workspace-density="simple"] .transport-status-controls { display: none; }
+  .app-shell[data-workspace-density="simple"] .transport-essential-controls { grid-column: 1 / -1; }
+}
+@media (max-width: 900px) {
+  .workspace-density-copy span { display: none; }
+  .compose-personal-tools { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* 보관함과 샘플 패널의 입력/작업을 작은 화면에서도 읽을 수 있게 묶는다. */
+.personal-tool-drawer .panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.personal-tool-drawer :is(h2, h3, p) { margin: 0; }
+.personal-tool-drawer :is(h2, h3) { font-size: 17px; }
+.personal-tool-drawer .eyebrow { color: #a6c4b8; font-size: 10px; }
+.personal-tool-drawer .feature-control-row { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.personal-tool-drawer .feature-control-row > label { flex-basis: 100%; }
+.personal-tool-drawer .feature-control-row > input { flex: 1 1 150px; min-width: 0; }
+.personal-tool-drawer .feature-checkbox { display: flex; align-items: center; gap: 7px; }
+.personal-tool-drawer .feature-checkbox input { min-height: 18px; }
+.personal-tool-drawer :is(.pattern-library-recall, .sampling-assignment) { display: grid; gap: 8px; }
+.personal-tool-drawer .sampling-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.personal-tool-drawer .sampling-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.personal-tool-drawer :is(.feature-confirmation, .feature-error) { border: 1px solid #a87c55; border-radius: 6px; padding: 8px; }
+.personal-tool-drawer .feature-status { color: #b5eed3; }
+.app-shell[data-workspace-density="simple"] > .workflow-navigator { grid-template-columns: minmax(0, 1fr); }
+.personal-tool-drawer input:not([type="range"]):not([type="checkbox"]):not([type="file"]),
+.personal-tool-drawer select {
+  background: #0f1715;
+  color: #edf5f0;
+  border: 1px solid #4c685c;
+  border-radius: 6px;
+  padding: 6px 9px;
+  font: inherit;
+}
+.personal-tool-drawer input::placeholder { color: #9aafa4; }

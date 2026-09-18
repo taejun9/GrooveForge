@@ -1691,6 +1691,8 @@ function validateClosedDetailsContainment(html) {
     "workflow-review-disclosure",
     "audience-session-proof-details",
     "pattern-lab",
+    "pattern-library-drawer",
+    "sampling-drawer",
     "capture-ideas",
     "harmony-moves",
     "sound-design-tools",
@@ -6292,7 +6294,7 @@ try {
     console.log("- Drum grid keyboard: one roving Tab stop, bounded arrows/Home/End, explicit pressed state, Enter/Space toggle, and visible guidance");
     console.log("- Note-grid keyboard: one Tab stop per Bass/Synth grid, exhaustive spatial arrows/Home/End, pressed state, guarded Enter/Space, and guidance");
     console.log("- Live Overdub: Keyboard Capture exposes a direct Pattern-playhead recording mode alongside Next and Replace");
-    console.log("- Closed disclosures: 25-panel inventory shares one non-summary containment rule; only the project launchpad starts open");
+    console.log("- Closed disclosures: 27-panel inventory shares one non-summary containment rule; only the project launchpad starts open");
     console.log(
       "- Beginner path: Guide Quick Start, Audience Session Readout, Dual Audience Readiness, Audience Completion Route, Audience Delivery Proof Bridge, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator"
     );

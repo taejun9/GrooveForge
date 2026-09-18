@@ -8,8 +8,8 @@ import {
   arrangementEnergyGain,
   activePattern,
   audibleMixerChannelIds,
-  ArrangementMuteTrack,
-  ArrangementSection,
+  type ArrangementMuteTrack,
+  type ArrangementSection,
   arrangementTotalBars,
   chordPitches,
   chordEventShouldPlay,
@@ -29,21 +29,23 @@ import {
   normalizeSoundDesignControls,
   noteEventShouldPlay,
   noteToFrequency,
-  BassNote,
-  ChordEvent,
-  DrumLane,
-  MelodyNote,
-  NoteTrack,
-  PatternData,
-  PatternSlot,
+  type BassNote,
+  type ChordEvent,
+  type DrumLane,
+  type MelodyNote,
+  type NoteTrack,
+  type PatternData,
+  type PatternSlot,
   patternForSlot,
   projectStepDurationSeconds,
   projectSwingOffsetSeconds,
   projectMasterCeilingDb,
-  ProjectState,
+  type ProjectState,
   sidechainGainForStep,
-  SoundDesign
+  type SoundDesign
 } from "../domain/workstation";
+import { decodedDrumSample, drumSampleRate, sampleForLane, sampleFrameValue, sampleLanes } from "../domain/sampling";
+import type { DrumSample } from "../domain/sampling";
 import { bassGlideProfile, bassVoiceProfileForProject } from "./bassVoice";
 import type { BassGlideProfile, BassVoiceProfile, BassWaveform } from "./bassVoice";
 
@@ -300,6 +302,40 @@ function snapshotForStep(
   };
 }
 
+const sampleBufferCache = new WeakMap<AudioContext, WeakMap<DrumSample, AudioBuffer>>();
+
+function scheduleSample(
+  context: AudioContext, destination: PlaybackDestination, time: number, sample: DrumSample,
+  gainValue: number, mix: TrackMix
+): void {
+  if (gainValue <= 0) return;
+  const frames = Math.max(1, Math.ceil((sample.trimEnd - sample.trimStart) * drumSampleRate));
+  let cache = sampleBufferCache.get(context);
+  if (!cache) { cache = new WeakMap<DrumSample, AudioBuffer>(); sampleBufferCache.set(context, cache); }
+  let buffer = cache.get(sample);
+  if (!buffer) {
+    // 같은 Context 안의 반복 스텝은 불변 원샷 버퍼를 공유해 매 히트마다 PCM을 다시 할당하지 않는다.
+    const data = decodedDrumSample(sample);
+    buffer = context.createBuffer(1, frames, drumSampleRate);
+    const channel = buffer.getChannelData(0);
+    for (let index = 0; index < frames; index += 1) channel[index] = sampleFrameValue(sample, data, index / drumSampleRate);
+    cache.set(sample, buffer);
+  }
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  const filter = context.createBiquadFilter();
+  filter.type = "highpass"; filter.frequency.setValueAtTime(channelHighpassHz(mix), time);
+  const drive = context.createWaveShaper();
+  drive.curve = driveCurve(mix.drive * 0.36); drive.oversample = "2x";
+  const gain = context.createGain();
+  gain.gain.setValueAtTime(gainValue * channelAirGain(mix, 0.14) * channelGlueMakeup(mix), time);
+  const panner = context.createStereoPanner(); panner.pan.setValueAtTime(mix.pan, time);
+  source.connect(filter).connect(drive);
+  connectChannelGlue(context, drive, mix, time).connect(gain).connect(panner);
+  connectScheduledOutput(context, panner, destination, mix, time);
+  source.start(time); source.stop(time + frames / drumSampleRate);
+}
+
 function scheduleKick(
   context: AudioContext,
   destination: PlaybackDestination,
@@ -529,11 +565,21 @@ function scheduleStep(
   if (project.metronomeEnabled && patternStep % 4 === 0) {
     scheduleMetronomeClick(context, destination, time, patternStep);
   }
-  if (drumStepShouldPlay(pattern, "kick", patternStep, absoluteStep)) {
+  for (const lane of sampleLanes) {
+    const sample = sampleForLane(project, lane);
+    if (!sample || !drumStepShouldPlay(pattern, lane, patternStep, absoluteStep)) continue;
+    const repeats = lane === "hat" ? hatRepeatCount(pattern, patternStep) : 1;
+    const drumTime = time + drumStepTimingMs(pattern, lane, patternStep) / 1000;
+    for (let repeat = 0; repeat < repeats; repeat += 1) {
+      scheduleSample(context, destination, drumTime + repeat * stepDuration / repeats, sample,
+        energyGain * drumMix.gain * drumStepVelocity(pattern, lane, patternStep) * (repeat === 0 ? 1 : 0.72), drumMix);
+    }
+  }
+  if (!sampleForLane(project, "kick") && drumStepShouldPlay(pattern, "kick", patternStep, absoluteStep)) {
     const drumTime = time + drumStepTimingMs(pattern, "kick", patternStep) / 1000;
     scheduleKick(context, destination, drumTime, energyGain * drumMix.gain * drumStepVelocity(pattern, "kick", patternStep), drumMix, sound);
   }
-  if (drumStepShouldPlay(pattern, "clap", patternStep, absoluteStep)) {
+  if (!sampleForLane(project, "clap") && drumStepShouldPlay(pattern, "clap", patternStep, absoluteStep)) {
     const drumTime = time + drumStepTimingMs(pattern, "clap", patternStep) / 1000;
     scheduleNoise(
       context,
@@ -545,7 +591,7 @@ function scheduleStep(
       drumMix
     );
   }
-  if (drumStepShouldPlay(pattern, "hat", patternStep, absoluteStep)) {
+  if (!sampleForLane(project, "hat") && drumStepShouldPlay(pattern, "hat", patternStep, absoluteStep)) {
     const repeatCount = hatRepeatCount(pattern, patternStep);
     const baseVelocity = drumStepVelocity(pattern, "hat", patternStep);
     const drumTime = time + drumStepTimingMs(pattern, "hat", patternStep) / 1000;
@@ -561,7 +607,7 @@ function scheduleStep(
       );
     }
   }
-  if (drumStepShouldPlay(pattern, "perc", patternStep, absoluteStep)) {
+  if (!sampleForLane(project, "perc") && drumStepShouldPlay(pattern, "perc", patternStep, absoluteStep)) {
     const drumTime = time + drumStepTimingMs(pattern, "perc", patternStep) / 1000;
     scheduleTone(
       context,
@@ -681,7 +727,15 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
     const velocity = drumStepVelocity(pattern, target.lane, target.step);
     const drumTime = time + Math.max(0, drumStepTimingMs(pattern, target.lane, target.step) / 1000);
 
-    if (target.lane === "kick") {
+    const sample = sampleForLane(project, target.lane);
+    if (sample) {
+      const repeats = target.lane === "hat" ? hatRepeatCount(pattern, target.step) : 1;
+      for (let repeat = 0; repeat < repeats; repeat += 1) {
+        scheduleSample(context, destination, drumTime + repeat * stepDuration / repeats, sample,
+          drumMix.gain * velocity * (repeat === 0 ? 1 : 0.72), drumMix);
+      }
+      extendStop(sample.trimEnd - sample.trimStart + stepDuration + 0.75);
+    } else if (target.lane === "kick") {
       scheduleKick(context, destination, drumTime, drumMix.gain * velocity, drumMix, sound);
       extendStop(0.32);
     } else if (target.lane === "clap") {

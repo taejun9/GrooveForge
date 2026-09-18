@@ -143,6 +143,12 @@ const crossfadeMs = finiteNumber("crossfade-ms", "20");
 const dcBlockHz = finiteNumber("dc-block-hz", "15");
 const terminalFadeMs = finiteNumber("terminal-fade-ms", "80");
 const ditherSeed = Math.trunc(finiteNumber("dither-seed", "1526"));
+// 샘플 프로젝트는 각 악장에서 trim한 원샷 중 최장 길이를 선택적으로 넘긴다. 0은 기존 무샘플 계약이다.
+const sampleDurationSecondsA = finiteNumber("sample-duration-a-seconds", "0");
+const sampleDurationSecondsB = finiteNumber("sample-duration-b-seconds", "0");
+if ([sampleDurationSecondsA, sampleDurationSecondsB].some((duration) => duration < 0 || duration > 2)) {
+  throw new Error("Sample durations must be between 0 and 2 seconds after trim.");
+}
 
 if (
   bpm <= 0 ||
@@ -173,8 +179,10 @@ const channels = partA.channels;
 const musicalFramesA = Math.round((barsA * 240 * sampleRate) / bpm);
 const musicalFramesB = Math.round((barsB * 240 * sampleRate) / bpm);
 const exportTailSeconds = Math.max(0.75, 90 / bpm);
-const expectedFramesA = Math.ceil(((barsA * 240) / bpm + exportTailSeconds) * sampleRate);
-const expectedFramesB = Math.ceil(((barsB * 240) / bpm + exportTailSeconds) * sampleRate);
+const exportTailSecondsA = Math.max(exportTailSeconds, sampleDurationSecondsA > 0 ? sampleDurationSecondsA + 0.75 : 0);
+const exportTailSecondsB = Math.max(exportTailSeconds, sampleDurationSecondsB > 0 ? sampleDurationSecondsB + 0.75 : 0);
+const expectedFramesA = Math.ceil(((barsA * 240) / bpm + exportTailSecondsA) * sampleRate);
+const expectedFramesB = Math.ceil(((barsB * 240) / bpm + exportTailSecondsB) * sampleRate);
 const crossfadeFrames = Math.min(Math.round((crossfadeMs / 1000) * sampleRate), musicalFramesA, partB.frames);
 if (Math.abs(partA.frames - expectedFramesA) > 1) {
   throw new Error(`Part A frame count does not match ${barsA} bars plus the GrooveForge export tail: ${partA.frames} vs ${expectedFramesA}.`);
@@ -325,6 +333,12 @@ const report = {
     dither: "deterministic TPDF at signed PCM 24-bit quantization",
     ditherSeed,
     exportTailSeconds: rounded(exportTailSeconds),
+    ...(sampleDurationSecondsA > 0 || sampleDurationSecondsB > 0 ? {
+      exportTailSecondsA: rounded(exportTailSecondsA),
+      exportTailSecondsB: rounded(exportTailSecondsB),
+      sampleDurationSecondsA,
+      sampleDurationSecondsB
+    } : {}),
     expectedFramesA,
     expectedFramesB,
     gainDb: rounded(gainDb, 3),

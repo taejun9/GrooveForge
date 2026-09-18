@@ -2149,3 +2149,9 @@ Korean source-comment coverage work must run `npm run comments:ko:check` and cov
 ### Composer Actions 분석 재사용 회귀
 
 `composer-action:analysis-smoke`는 실제 React 버튼 렌더와 App의 분석 준비 분기를 확인한다. 준비된 exact 분석값으로 설명을 만드는 동안 전곡 PCM 렌더가 호출되지 않아야 하며, 여섯 작업 영역의 문구와 분석값을 생략한 기존 명시적 호출의 fallback은 유지한다. 실제 설치본 정지 응답은 기존 5초 general UI 기준으로 검사한다.
+
+### Personal tools and original rap delivery
+
+`npm run pattern-library:smoke` validates persistent event-library boundaries. `npm run sampling:smoke` validates bounded local one-shots and audio roundtrips. `npm run desktop:dark-rap-qa` produces three original 90–180 second rap instrumentals through actual-app QA; set `GROOVEFORGE_DESKTOP_QA_INSTALLED_APP` to a verified installed bundle to prove the installed runtime. See [personal tools](../product/personal-tools.md).
+
+`npm run movement-sampling:smoke` checks the optional per-movement sample-duration arguments in the standalone WAV assembly CLI, including unchanged sample-free output and separate sampled tails.

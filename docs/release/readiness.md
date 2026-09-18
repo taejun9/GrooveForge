@@ -570,3 +570,7 @@ npm run desktop:installed-app-qa-smoke
 npm run delivery:zip-memory-smoke
 npm run desktop:dual-trap-qa
 ```
+
+### Personal tools and original rap delivery
+
+`npm run pattern-library:smoke` validates persistent event-library boundaries. `npm run sampling:smoke` validates bounded local one-shots and audio roundtrips. `npm run desktop:dark-rap-qa` produces three original 90–180 second rap instrumentals through actual-app QA; set `GROOVEFORGE_DESKTOP_QA_INSTALLED_APP` to a verified installed bundle to prove the installed runtime. See [personal tools](../product/personal-tools.md).

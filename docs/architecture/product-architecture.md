@@ -1,5 +1,7 @@
 # GrooveForge Product Architecture
 
+Current optional extension: plan-1538 adds bounded embedded drum one-shots to the existing event tracks, alongside a device-local pattern library and independent screen-density preference. See [personal tools](../product/personal-tools.md). Historical “sampling later” statements below describe core-first sequencing, not a prohibition on this explicitly requested extension.
+
 ## Layer Map
 
 ```text

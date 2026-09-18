@@ -442,7 +442,7 @@ function buildMarkdown(summary) {
 
 ## What GrooveForge Is
 
-${appName} is an all-genre desktop beat workstation for direct beat composition, sound design, arrangement, mixing, mastering, and local export. It supports First-time beat makers through Guided mode and Working producers through Studio mode. Sampling remains optional future scope, not the release identity.
+${appName} is an all-genre desktop beat workstation for direct beat composition, sound design, arrangement, mixing, mastering, and local export. It supports First-time beat makers through Guided mode and Working producers through Studio mode. Sampling remains optional and secondary, not the release identity.
 
 ## Private Input Status
 
@@ -792,7 +792,7 @@ check(Array.isArray(summary.privateInputBlockers), "distribution private inputs 
 check(Array.isArray(summary.externalDistributionBlockers), "distribution private inputs should include external distribution blockers");
 check(summary.privateInputsReady === false || summary.privateInputBlockers.length === 0, "ready private input summary should not include private input blockers");
 check(markdown.includes("all-genre desktop beat workstation"), "distribution private inputs should describe the direct beat workstation scope");
-check(markdown.includes("Sampling remains optional future scope"), "distribution private inputs should keep sampling secondary");
+check(markdown.includes("Sampling remains optional and secondary"), "distribution private inputs should keep sampling secondary");
 check(markdown.includes("First-time beat makers"), "distribution private inputs should address first-time beat makers");
 check(markdown.includes("Working producers"), "distribution private inputs should address working producers");
 check(markdown.includes("Private inputs ready:"), "distribution private inputs should include private input readiness");

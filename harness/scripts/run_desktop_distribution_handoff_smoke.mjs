@@ -330,7 +330,7 @@ function buildMarkdown(summary) {
 
 ## What GrooveForge Is
 
-${appName} is an all-genre desktop beat workstation for direct beat composition, sound design, arrangement, mixing, mastering, and local export. It supports first-time beat makers through Guided mode and working producers through Studio mode. Sampling remains optional future scope, not the release identity.
+${appName} is an all-genre desktop beat workstation for direct beat composition, sound design, arrangement, mixing, mastering, and local export. It supports first-time beat makers through Guided mode and working producers through Studio mode. Sampling remains optional and secondary, not the release identity.
 
 ## Audience
 
@@ -520,7 +520,7 @@ check(Array.isArray(summary.distributionHandoffBlockers), "distribution handoff 
 check(Array.isArray(summary.externalDistributionBlockers), "distribution handoff should include external distribution blockers");
 check(summary.distributionHandoffReady === false || summary.distributionHandoffBlockers.length === 0, "ready handoff should not include handoff blockers");
 check(markdown.includes("all-genre desktop beat workstation"), "distribution handoff should describe the direct beat workstation scope");
-check(markdown.includes("Sampling remains optional future scope"), "distribution handoff should keep sampling secondary");
+check(markdown.includes("Sampling remains optional and secondary"), "distribution handoff should keep sampling secondary");
 check(markdown.includes("First-time beat makers"), "distribution handoff should address first-time beat makers");
 check(markdown.includes("working producers"), "distribution handoff should address working producers");
 check(markdown.includes("Distribution handoff ready:"), "distribution handoff should include handoff readiness");

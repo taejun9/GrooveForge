@@ -4,6 +4,9 @@
  * 같은 불변식을 공유하도록 한다. 이 모듈은 DOM·AudioContext·파일 시스템·네트워크 부작용을 만들지 않는다.
  */
 
+import { isDrumSamples, normalizeDrumSamples } from "./sampling";
+import type { DrumSamples } from "./sampling";
+
 // ── 프로젝트의 정규 데이터 계약 ──────────────────────────────────────────────
 // 아래 타입은 저장 파일에도 쓰이므로 필드 변경 시 parse/normalize의 이전 버전 호환 경로를 함께 검토해야 한다.
 export type SkillMode = "guided" | "studio";
@@ -194,6 +197,7 @@ export type ProjectCoreState = {
   swing: number;
   metronomeEnabled: boolean;
   sound: SoundDesign;
+  drumSamples?: DrumSamples;
   patterns: Record<PatternSlot, PatternData>;
   mixer: MixerChannel[];
   arrangement: ArrangementBlock[];
@@ -2795,6 +2799,7 @@ function cloneProjectCore(project: ProjectCoreState): ProjectCoreState {
     swing: project.swing,
     metronomeEnabled: project.metronomeEnabled,
     sound: { ...project.sound },
+    ...(project.drumSamples ? { drumSamples: normalizeDrumSamples(project.drumSamples) } : {}),
     patterns: {
       A: clonePatternData(project.patterns.A),
       B: clonePatternData(project.patterns.B),
@@ -3566,6 +3571,7 @@ function normalizeProjectCoreState(value: ProjectCoreStateInput): ProjectCoreSta
     customDeliveryTarget: normalizeCustomDeliveryTarget(value.customDeliveryTarget),
     sessionBrief: normalizeSessionBrief(value.sessionBrief),
     sound: normalizeSoundDesign(value.sound),
+    ...(value.drumSamples ? { drumSamples: normalizeDrumSamples(value.drumSamples) } : {}),
     patterns: normalizePatternMap(value.patterns),
     mixer: normalizeMixerChannels(value.mixer),
     arrangement: normalizeProjectArrangement(value.arrangement),
@@ -3771,6 +3777,7 @@ function isProjectCoreStateShape(value: unknown): value is ProjectCoreStateInput
     (value.customDeliveryTarget === undefined || isCustomDeliveryTargetInput(value.customDeliveryTarget)) &&
     (value.sessionBrief === undefined || isSessionBriefInput(value.sessionBrief)) &&
     (value.sound === undefined || isSoundDesignInput(value.sound)) &&
+    isDrumSamples(value.drumSamples) &&
     isPatternMapInput(value.patterns) &&
     Array.isArray(value.mixer) &&
     value.mixer.every(isMixerChannelInput) &&

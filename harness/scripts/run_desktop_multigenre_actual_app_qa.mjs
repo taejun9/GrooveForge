@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * 역할: 실제 Electron 앱 화면에서 대표 6장르, 전체 16장르, 요청형 7곡, 록·힙합 5곡 또는 듀얼 트랩 3+3곡 프로젝트를 순차 검수하고 SoundCloud 전달용 WAV·보고서를 조립한다.
+ * 역할: 실제 Electron 앱 화면에서 장르별·요청형·오리지널 다크 랩 프로젝트를 순차 검수하고 SoundCloud 전달용 WAV·보고서를 조립한다.
  * 흐름: 기본 90~150초 대표 모드와 opt-in 90~180초 전체 장르/요청형 힙합 팩 모드의 fixture를 준비해 visible UI QA와 PCM24·재열기 증거를 검증한다.
  * 안전 경계: 생성 음원은 로컬 원본 합성만 사용하고 외부 업로드는 하지 않으며, 경로·해시·신호 검증 실패 시 패키징을 중단한다.
  */
@@ -19,6 +19,7 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { composeDarkRapProject, createOriginalRapPercussionWav, darkRapCases, darkRapLaneContract } from "./dark_rap_track_compositions.mjs";
 import { composeDualTrapProject, dualTrapCases, dualTrapLaneContract } from "./dual_trap_track_compositions.mjs";
 import { composeRockHiphopProject, rockHiphopCases, rockHiphopLaneContract } from "./rock_hiphop_track_compositions.mjs";
 
@@ -521,18 +522,27 @@ let allGenresMode = false;
 let requestedHiphopPackMode = false;
 let rockHiphopPackMode = false;
 let dualTrapPackMode = false;
+let darkRapPackMode = false;
 let requestedPackMode = false;
 let requestedLaneContract = requestedHiphopLaneContract;
 let outputRootPrefix = "plan-1528-";
 
-function configureGenreMode(requestAllGenres, requestRequestedHiphopPack, requestRockHiphopPack, requestDualTrapPack) {
-  check([requestAllGenres, requestRequestedHiphopPack, requestRockHiphopPack, requestDualTrapPack].filter(Boolean).length <= 1, "Choose only one genre pack mode.");
+function configureGenreMode(requestAllGenres, requestRequestedHiphopPack, requestRockHiphopPack, requestDualTrapPack, requestDarkRapPack) {
+  check([requestAllGenres, requestRequestedHiphopPack, requestRockHiphopPack, requestDualTrapPack, requestDarkRapPack].filter(Boolean).length <= 1, "Choose only one genre pack mode.");
   allGenresMode = requestAllGenres;
   requestedHiphopPackMode = requestRequestedHiphopPack;
   rockHiphopPackMode = requestRockHiphopPack;
   dualTrapPackMode = requestDualTrapPack;
-  requestedPackMode = requestedHiphopPackMode || rockHiphopPackMode || dualTrapPackMode;
-  if (dualTrapPackMode) {
+  darkRapPackMode = requestDarkRapPack;
+  requestedPackMode = requestedHiphopPackMode || rockHiphopPackMode || dualTrapPackMode || darkRapPackMode;
+  if (darkRapPackMode) {
+    genreCases = darkRapCases;
+    requestedLaneContract = darkRapLaneContract;
+    planId = "plan-1538-simple-pattern-sampling";
+    ownerMarker = "GrooveForge plan-1538 dark-rap actual-app QA";
+    maximumDurationSeconds = 180;
+    outputRootPrefix = "plan-1538-";
+  } else if (dualTrapPackMode) {
     genreCases = dualTrapCases;
     requestedLaneContract = dualTrapLaneContract;
     planId = "plan-1537-harness-risk-installed-hiphop";
@@ -571,6 +581,7 @@ function expectedGenreCount() {
 }
 
 function runPlanMode() {
+  if (darkRapPackMode) return "visible-native-sequential-dark-rap-pack";
   if (dualTrapPackMode) return "visible-native-sequential-dual-trap-pack";
   if (rockHiphopPackMode) return "visible-native-sequential-rock-hiphop-pack";
   if (requestedHiphopPackMode) return "visible-native-sequential-requested-hiphop-pack";
@@ -578,6 +589,7 @@ function runPlanMode() {
 }
 
 function ownershipSentinelName() {
+  if (darkRapPackMode) return ".grooveforge-plan-1538-owned.json";
   if (dualTrapPackMode) return ".grooveforge-plan-1537-owned.json";
   if (rockHiphopPackMode) return ".grooveforge-plan-1536-owned.json";
   if (requestedHiphopPackMode) return ".grooveforge-plan-1532-owned.json";
@@ -585,6 +597,7 @@ function ownershipSentinelName() {
 }
 
 function modeLabel() {
+  if (darkRapPackMode) return "three original dark-rap instrumentals";
   if (dualTrapPackMode) return "crew-energy and low-pocket dual-trap pack";
   if (rockHiphopPackMode) return "synth-driven rock hip-hop pack";
   if (requestedHiphopPackMode) return "requested hip-hop pack";
@@ -659,6 +672,7 @@ function parseArguments(argv) {
     requestedHiphopPack: false,
     rockHiphopPack: false,
     dualTrapPack: false,
+    darkRapPack: false,
     selfTest: false,
     skipBuild: false
   };
@@ -671,6 +685,7 @@ function parseArguments(argv) {
     else if (argument === "--requested-hiphop-pack") parsed.requestedHiphopPack = true;
     else if (argument === "--rock-hiphop-pack") parsed.rockHiphopPack = true;
     else if (argument === "--dual-trap-pack") parsed.dualTrapPack = true;
+    else if (argument === "--dark-rap-pack") parsed.darkRapPack = true;
     else if (argument === "--self-test") parsed.selfTest = true;
     else if (argument === "--skip-build") parsed.skipBuild = true;
     else if (argument === "--output-root") {
@@ -684,7 +699,7 @@ function parseArguments(argv) {
   }
   const exclusiveModes = [parsed.audioSelfTest, parsed.fromExisting, parsed.prepareOnly, parsed.selfTest].filter(Boolean).length;
   check(exclusiveModes <= 1, "Choose at most one of --audio-self-test, --from-existing, --prepare-only, or --self-test.");
-  check([parsed.allGenres, parsed.requestedHiphopPack, parsed.rockHiphopPack, parsed.dualTrapPack].filter(Boolean).length <= 1, "Choose only one genre pack mode.");
+  check([parsed.allGenres, parsed.requestedHiphopPack, parsed.rockHiphopPack, parsed.dualTrapPack, parsed.darkRapPack].filter(Boolean).length <= 1, "Choose only one genre pack mode.");
   if (parsed.fromExisting) check(Boolean(parsed.outputRoot), "--from-existing requires --output-root.");
   if ((parsed.audioSelfTest || parsed.fromExisting || parsed.prepareOnly || parsed.selfTest) && parsed.skipBuild) {
     fail("--skip-build is only meaningful for a normal actual-app run.");
@@ -697,7 +712,9 @@ function timestampId() {
 }
 
 function defaultOutputRoot() {
-  const runName = dualTrapPackMode
+  const runName = darkRapPackMode
+    ? "plan-1538-dark-rap-actual-app-qa"
+    : dualTrapPackMode
     ? "plan-1537-dual-trap-actual-app-qa"
     : rockHiphopPackMode
     ? "plan-1536-rock-hiphop-actual-app-qa"
@@ -771,7 +788,8 @@ function expectedDuration(config) {
   // straddle an exact-frame integer because IEEE-754 multiplication rounds at
   // different points (R&B 40 bars / 76 BPM is the current boundary case).
   const stepDurationSeconds = 60 / config.bpm / 4;
-  return arrangementBars(config) * 16 * stepDurationSeconds + Math.max(0.75, stepDurationSeconds * 6);
+  const authoredSampleTail = darkRapPackMode && config.order === 3 ? 0.28 + 0.75 : 0;
+  return arrangementBars(config) * 16 * stepDurationSeconds + Math.max(0.75, stepDurationSeconds * 6, authoredSampleTail);
 }
 
 function expectedFrameCount(config) {
@@ -783,7 +801,7 @@ function caseDirectoryName(config) {
 }
 
 function soundCloudBatchFileName(config) {
-  const stem = rockHiphopPackMode || dualTrapPackMode
+  const stem = rockHiphopPackMode || dualTrapPackMode || darkRapPackMode
     ? `${String(config.order).padStart(2, "0")}-${workstation.projectFileStem({ title: config.title })}`
     : caseDirectoryName(config);
   return `${stem}-soundcloud.wav`;
@@ -810,7 +828,8 @@ function createSourceProject(config) {
   check(Boolean(blueprint), `${config.id}: Beat Blueprint ${config.blueprintId} is missing.`);
   const styled = workstation.applyBeatBlueprint(workstation.starterProject, config.blueprintId);
   const deliverySeed = workstation.applyDeliveryTarget(styled, "beat_store");
-  const delivered = dualTrapPackMode ? composeDualTrapProject(deliverySeed, config, workstation)
+  const delivered = darkRapPackMode ? composeDarkRapProject(deliverySeed, config, workstation)
+    : dualTrapPackMode ? composeDualTrapProject(deliverySeed, config, workstation)
     : rockHiphopPackMode ? composeRockHiphopProject(deliverySeed, config, workstation) : deliverySeed;
   const project = {
     ...delivered,
@@ -826,7 +845,7 @@ function createSourceProject(config) {
     sessionBrief: {
       artist: requestedPackMode ? "" : "GrooveForge 오리지널 QA",
       vibe: `${config.styleName} 실제 앱 장곡 QA 시드`,
-      reference: "내장 이벤트와 신시사이저만 사용",
+      reference: darkRapPackMode && config.order === 3 ? "내장 이벤트·신시사이저와 직접 합성한 금속 원샷" : "내장 이벤트와 신시사이저만 사용",
       notes: requestedPackMode
         ? "실제 앱에서 편곡, WAV 내보내기, 저장과 재열기를 검증하기 위한 외부 샘플 없는 로컬 시드 프로젝트."
         : "실제 앱에서 편곡, WAV 내보내기, 저장과 재열기를 검증하기 위한 샘플 없는 오리지널 시드 프로젝트."
@@ -944,6 +963,12 @@ function validateGenreMatrix() {
   );
   check(new Set(genreCases.map((entry) => entry.title)).size === genreCases.length, "Genre titles must be unique.");
   check(new Set(genreCases.map((entry) => entry.blueprintId)).size === genreCases.length, "Genre Beat Blueprint ids must be unique.");
+  if (darkRapPackMode) {
+    check(genreCases.length === 3, "Dark-rap pack must contain three new compositions.");
+    for (const property of ["key", "bpm", "motif", "hook", "bass", "kicks", "tone", "arrangement"]) {
+      check(new Set(genreCases.map((entry) => canonicalJson(entry[property]))).size === 3, `Dark-rap compositions must have three distinct ${property} values.`);
+    }
+  }
   if (dualTrapPackMode) {
     check(genreCases.length === 6, "Dual-trap pack must contain six new compositions.");
     for (const property of ["key", "bpm", "motif", "hook", "bass", "kicks", "tone", "arrangement"]) {
@@ -1006,9 +1031,9 @@ function validateGenreMatrix() {
     check(Boolean(profile), `${config.id}: style profile is missing.`);
     check(Boolean(blueprint), `${config.id}: dedicated Beat Blueprint ${config.blueprintId} is missing.`);
     check(blueprint?.styleId === config.id, `${config.id}: Beat Blueprint style identity does not match.`);
-    if (!rockHiphopPackMode && !dualTrapPackMode) check(blueprint?.bpm === config.bpm, `${config.id}: Beat Blueprint BPM does not match the case matrix.`);
+    if (!rockHiphopPackMode && !dualTrapPackMode && !darkRapPackMode) check(blueprint?.bpm === config.bpm, `${config.id}: Beat Blueprint BPM does not match the case matrix.`);
     check(profile.bassStyle === config.bassStyle, `${config.id}: expected ${config.bassStyle} Bass Voice, got ${profile.bassStyle}.`);
-    if (!rockHiphopPackMode && !dualTrapPackMode) check(profile.defaultBpm === config.bpm, `${config.id}: case BPM must match the style default.`);
+    if (!rockHiphopPackMode && !dualTrapPackMode && !darkRapPackMode) check(profile.defaultBpm === config.bpm, `${config.id}: case BPM must match the style default.`);
     const bars = arrangementBars(config);
     check(bars <= workstation.maxProjectArrangementBars, `${config.id}: ${bars} bars exceeds the project limit.`);
     check(config.arrangement.every((block) => block.bars >= 1 && block.bars <= 16), `${config.id}: a block exceeds 1-16 bars.`);
@@ -1031,6 +1056,14 @@ function validateGenreMatrix() {
     }
     const reopened = workstation.parseProjectFile(sourceText);
     check(reopened.styleId === config.id && reopened.bpm === config.bpm, `${config.id}: deterministic source did not reopen exactly.`);
+    if (darkRapPackMode) {
+      check(canonicalJson(reopened.drumSamples) === canonicalJson(source.drumSamples), `${config.id}: embedded original percussion changed during serialization.`);
+      check(Boolean(reopened.drumSamples?.perc) === (config.order === 3), `${config.id}: original sampling coverage differs from the plan.`);
+      check(reopened.key === config.key, `${config.id}: authored key was not preserved.`);
+      check(canonicalJson(reopened.patterns) === canonicalJson(source.patterns), `${config.id}: authored events changed during serialization.`);
+      check(canonicalJson(source.patterns) !== canonicalJson(workstation.applyBeatBlueprint(workstation.starterProject, config.blueprintId).patterns), `${config.id}: dark-rap composition must replace blueprint events.`);
+      check(["A", "B", "C"].every((slot) => source.patterns[slot].drumPattern.clap[config.snares[0]]), `${config.id}: authored backbeat was lost.`);
+    }
     if (dualTrapPackMode) {
       check(reopened.key === config.key, `${config.id}: authored key was not preserved.`);
       check(canonicalJson(reopened.patterns) === canonicalJson(source.patterns), `${config.id}: authored events changed during serialization.`);
@@ -1559,7 +1592,7 @@ function assertDeliveryTextPrivacy(contents, label) {
 function buildSoundCloudSheet(audit, project) {
   const { config, decoded, tail, wav } = audit;
   // 새 요청 팩은 복사할 문구와 실제 선택할 파일을 먼저 보여 주고 검수 수치는 아래에 둔다.
-  if (dualTrapPackMode) {
+  if (dualTrapPackMode || darkRapPackMode) {
     return `# ${config.title} — SoundCloud 업로드 텍스트\n\n` +
       `- 제목: ${config.title}\n` +
       `- 장르: Hip-Hop & Rap\n` +
@@ -1567,12 +1600,13 @@ function buildSoundCloudSheet(audit, project) {
       `- 업로드 WAV: 00-SoundCloud-WAV/${soundCloudBatchFileName(config)}\n` +
       `- BPM / Key: ${config.bpm} BPM / ${project.key}\n\n` +
       `## 설명 — 아래 문단을 복사\n\n` +
-      `${config.vibe}. ${config.bpm} BPM, ${project.key}. 외부 샘플 없이 드럼·베이스·신스·화음 이벤트와 내장 합성으로 만든 인스트루멘털입니다.\n\n` +
+      `${config.vibe}. ${config.bpm} BPM, ${project.key}. ${darkRapPackMode && config.order === 3 ? "직접 합성한 금속 원샷과 드럼·베이스·신스·화음 이벤트로 만든" : "외부 샘플 없이 드럼·베이스·신스·화음 이벤트와 내장 합성으로 만든"} 인스트루멘털입니다.\n\n` +
       `## 파일 검증\n\n` +
       `Stereo 44.1 kHz signed PCM 24-bit WAV · ${decoded.durationSeconds.toFixed(3)}초 · ${wav.bytes.toLocaleString("en-US")} bytes. ` +
       `Sample peak ${decoded.peakDb.toFixed(2)} dBFS / RMS ${decoded.rmsDb.toFixed(2)} dBFS. ` +
       `실제 앱 Open·편곡·재생·WAV 내보내기·Save·reopen과 저장 프로젝트 재렌더 일치를 확인했습니다.\n\n` +
       `SHA-256: ${wav.sha256}\n\n` +
+      `형식 참고: https://help.soundcloud.com/hc/en-us/articles/360039171614 (WAV lossless, 44.1kHz 이상). 사람이 전곡을 청취했다는 증거 또는 플랫폼 승인 보장은 포함하지 않습니다.\n\n` +
       `아티스트 이름은 업로드하는 SoundCloud 프로필을 사용하고, 아트워크와 공개 범위는 계정에서 선택하세요. 실제 업로드는 수행하지 않았습니다.\n`;
   }
   return `# SoundCloud 업로드 시트 — ${config.title}\n\n` +
@@ -1636,8 +1670,8 @@ function buildProductionBrief(audit, project) {
     `- Mix: ${config.productionBrief.mix}\n` +
     `- 독립 구성: ${config.productionBrief.originality}\n\n` +
     `## 구현 및 실제 앱 검증\n\n` +
-    `- Pattern A/B/C의 드럼, Bass, Synth, Chord 음악 이벤트와 GrooveForge 내장 합성만 사용했습니다.\n` +
-    `- 가져온 오디오, 실제 기타 녹음, 외부 샘플, 보컬, 가사와 외부 프로듀서 태그를 사용하지 않았습니다.\n` +
+    `- Pattern A/B/C의 드럼, Bass, Synth, Chord 음악 이벤트와 GrooveForge 내장 합성${darkRapPackMode && config.order === 3 ? ", 직접 합성한 금속 원샷을 사용했습니다" : "만 사용했습니다"}.\n` +
+    `- ${darkRapPackMode && config.order === 3 ? "원샷은 고정 시드로 직접 만든 0.28초 합성 타격음이며 프로젝트에 내장했습니다. 외부 녹음·보컬·가사는 사용하지 않았습니다." : "가져온 오디오, 실제 기타 녹음, 외부 샘플, 보컬, 가사와 외부 프로듀서 태그를 사용하지 않았습니다."}\n` +
     `- production Electron에서 Open/edit → Arrange → Mix 분석 → Deliver WAV → Save → reopen을 통과했습니다.\n` +
     `- WAV는 stereo 44.1 kHz signed PCM 24-bit이며 저장 프로젝트의 즉시 재렌더와 byte-identical입니다.\n\n` +
     `## 공개 전 경계\n\n` +
@@ -1674,6 +1708,11 @@ async function assembleDelivery(outputRoot, audits) {
   // 기존 delivery를 덮어쓰지 않으며, 원본과 복사본의 해시를 즉시 비교한 뒤 공개용 보고서만 sanitize한다.
   check(!(await lstatOrNull(deliveryRoot)), `Delivery root already exists: ${deliveryRoot}`);
   await mkdir(deliveryRoot, { recursive: true, mode: 0o700 });
+  if (darkRapPackMode) {
+    const sampleRoot = path.join(deliveryRoot, "01-Original-Sample");
+    await mkdir(sampleRoot, { mode: 0o700 });
+    await writeExclusive(path.join(sampleRoot, "Original-forge-metal-hit.wav"), createOriginalRapPercussionWav());
+  }
   const uploadSelectionRoot = usesExtendedDeliveryContract() ? path.join(deliveryRoot, "00-SoundCloud-WAV") : null;
   if (uploadSelectionRoot) await mkdir(uploadSelectionRoot, { recursive: true, mode: 0o700 });
   const manifestRows = [];
@@ -1873,12 +1912,12 @@ async function assembleDelivery(outputRoot, audits) {
     : `| ${String(row.order).padStart(2, "0")} | ${row.styleName} | ${row.title} | ${row.bpm} | ${row.bassStyle} | ${row.audio.durationSeconds.toFixed(3)}초 | ${row.audio.peakDb.toFixed(2)} dBFS | ${row.audio.rmsDb.toFixed(2)} dBFS | 통과 |`
   ).join("\n");
   const readmeTitle = requestedPackMode
-    ? `# GrooveForge ${dualTrapPackMode ? "크루 에너지·저역 포켓 트랩 3+3곡" : rockHiphopPackMode ? "합성 리프 록·힙합 5곡" : "샘플 없는 힙합 7곡"} 실제 앱 SoundCloud 준비 패키지\n\n`
+    ? `# GrooveForge ${darkRapPackMode ? "다크 랩 오리지널 3곡" : dualTrapPackMode ? "크루 에너지·저역 포켓 트랩 3+3곡" : rockHiphopPackMode ? "합성 리프 록·힙합 5곡" : "샘플 없는 힙합 7곡"} 실제 앱 SoundCloud 준비 패키지\n\n`
     : allGenresMode
       ? `# GrooveForge 전체 ${genreCases.length}장르 실제 앱 SoundCloud 준비 패키지\n\n`
       : `# GrooveForge 6장르 실제 앱 SoundCloud 준비 패키지\n\n`;
   const resultSummary = requestedPackMode
-    ? `실제 production Electron 앱 화면에서 ${dualTrapPackMode ? "키·템포·드럼·베이스·훅·톤이 다른 크루 에너지 3곡과 저역 포켓 3곡을 새로 저작하고" : rockHiphopPackMode ? "서로 다른 키·템포·리프·훅으로 새로 저작한 다섯 곡을 불러와" : "서로 다른 StyleProfile/Beat Blueprint 일곱 개를 3+2+2 제작 lane으로 구성하고"}, 각 곡을 Open → native UI 편곡 → 전체곡 모드 재생 확인 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 ${durationRangeLabel()}초, stereo 44.1kHz signed PCM 24-bit이며 편집 가능한 음악 이벤트와 내장 합성만 사용했습니다.\n\n`
+    ? `실제 production Electron 앱 화면에서 ${darkRapPackMode ? "키·템포·드럼·베이스·모티프·훅을 직접 저작한 세 곡을 불러와" : dualTrapPackMode ? "키·템포·드럼·베이스·훅·톤이 다른 크루 에너지 3곡과 저역 포켓 3곡을 새로 저작하고" : rockHiphopPackMode ? "서로 다른 키·템포·리프·훅으로 새로 저작한 다섯 곡을 불러와" : "서로 다른 StyleProfile/Beat Blueprint 일곱 개를 3+2+2 제작 lane으로 구성하고"}, 각 곡을 Open → native UI 편곡 → 전체곡 모드 재생 확인 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 ${durationRangeLabel()}초, stereo 44.1kHz signed PCM 24-bit이며 편집 가능한 음악 이벤트와 내장 합성${darkRapPackMode ? ", 세 번째 곡의 직접 합성 원샷을 사용했습니다" : "만 사용했습니다"}.\n\n`
     : allGenresMode
       ? `실제 production Electron 앱 화면에서 현재 지원하는 ${genreCases.length}개 StyleProfile 전체를 각각 Open → native UI 편곡 → 전체곡 모드 재생 확인 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 ${durationRangeLabel()}초, stereo 44.1kHz signed PCM 24-bit이며 여섯 Bass Voice family(808, sub, walking, pluck, reese, minimal)를 모두 다룹니다.\n\n`
       : `실제 production Electron 앱 화면에서 여섯 장르를 각각 Open → native UI 편곡 → 전체곡 모드 재생 확인 → Mix 분석 → Deliver WAV → Save → reopen했습니다. 모든 곡은 90~150초, stereo 44.1kHz signed PCM 24-bit이며 여섯 Bass Voice(808, sub, walking, pluck, reese, minimal)를 한 번씩 다룹니다.\n\n`;
@@ -1889,16 +1928,18 @@ async function assembleDelivery(outputRoot, audits) {
     ? `| 순서 | Production lane | 장르 | 제목 | BPM | 길이 | Sample peak | RMS | Actual-app |\n|---:|---|---|---|---:|---:|---:|---:|---|\n${readmeRows}\n\n`
     : `| 순서 | 장르 | 제목 | BPM | Bass Voice | 길이 | Sample peak | RMS | Actual-app |\n|---:|---|---|---:|---|---:|---:|---:|---|\n${readmeRows}\n\n`;
   const readme = readmeTitle +
+    (darkRapPackMode ? `세 곡은 보컬 없는 오리지널 인스트루멘털입니다. 실제 ${process.env.GROOVEFORGE_DESKTOP_QA_INSTALLED_APP ? "설치 " : ""}앱의 기술 검증을 수행했으며 사람이 전곡을 청취했다는 의미는 아닙니다.\n\n` : "") +
     `## 결과\n\n` +
     resultSummary +
     readmeTable +
     uploadSelectionGuide +
     `## 폴더 사용법\n\n` +
-    `각 장르 폴더에는 SoundCloud에 올릴 WAV, 다시 편집할 수 있는 GrooveForge 프로젝트, ${dualTrapPackMode ? "복사 가능한 한글 업로드 텍스트" : "한글 private-first 업로드 시트"}, 기술 QA JSON, Arrange/Mix/Deliver 실제 화면 PNG와 경로를 비식별화한 actual-app 보고서${requestedPackMode ? ", 프로덕션 브리프" : ""}가 있습니다. 전체 파일 무결성은 \`manifest.json\`과 \`checksums.sha256\`으로 확인합니다.\n\n` +
+    `각 장르 폴더에는 SoundCloud에 올릴 WAV, 다시 편집할 수 있는 GrooveForge 프로젝트, ${dualTrapPackMode || darkRapPackMode ? "복사 가능한 한글 업로드 텍스트" : "한글 private-first 업로드 시트"}, 기술 QA JSON, Arrange/Mix/Deliver 실제 화면 PNG와 경로를 비식별화한 actual-app 보고서${requestedPackMode ? ", 프로덕션 브리프" : ""}가 있습니다. 전체 파일 무결성은 \`manifest.json\`과 \`checksums.sha256\`으로 확인합니다.\n\n` +
+    (darkRapPackMode ? "`01-Original-Sample/`에는 세 번째 곡에 사용한 0.28초 오리지널 금속 원샷이 있습니다. Compose(작곡) 탭의 `샘플링 · 드럼 소리 가져오기` 패널에서 재사용할 수 있으며, 세 번째 프로젝트에는 이미 포함되어 있습니다.\n\n" : "") +
     `macOS Terminal에서 이 폴더로 이동한 뒤 \`shasum -a 256 -c checksums.sha256\`를 실행하면 모든 전달 파일을 다시 검증할 수 있습니다. 체크섬은 무결성 확인용이며 배포자 서명은 아닙니다.\n\n` +
-    (dualTrapPackMode
+    (dualTrapPackMode || darkRapPackMode
       ? `## 업로드 준비\n\n` +
-        `\`SoundCloud-업로드-텍스트.md\`에 여섯 곡의 제목·태그·설명을 모았습니다. 아트워크와 공개 범위는 SoundCloud 계정에서 선택하면 됩니다. 실제 업로드는 수행하지 않았습니다.\n\n` +
+        `\`SoundCloud-업로드-텍스트.md\`에 ${genreCases.length}곡의 제목·태그·설명을 모았습니다. 아트워크와 공개 범위는 SoundCloud 계정에서 선택하면 됩니다. 실제 업로드는 수행하지 않았습니다.\n\n` +
         `표의 수치는 sample peak/RMS이며 LUFS와 true peak를 측정한 값은 아닙니다. 음악을 조정하려면 각 곡의 GrooveForge 프로젝트를 열어 이벤트·사운드·편곡을 편집할 수 있습니다.\n`
       : `## 아직 사람이 해야 하는 확인\n\n` +
     `- 모든 곡을 헤드폰과 스피커로 처음부터 끝까지 듣고 음악적 완성도, 전환, 저역과 엔딩을 승인합니다.\n` +
@@ -1910,9 +1951,9 @@ async function assembleDelivery(outputRoot, audits) {
   assertDeliveryTextPrivacy(readme, "Delivery README");
   if (requestedPackMode) assertRequestedPublicMetadata(readme, "Delivery README");
   await writeExclusive(path.join(deliveryRoot, "README.md"), readme);
-  if (dualTrapPackMode) {
-    const uploadText = `# SoundCloud 업로드 텍스트 — 6곡\n\n` +
-      `\`00-SoundCloud-WAV/\`의 순서대로 제목·태그·설명을 복사하세요. 01~03은 크루 에너지 트랩, 04~06은 저역 포켓 트랩입니다.\n\n` +
+  if (dualTrapPackMode || darkRapPackMode) {
+    const uploadText = `# SoundCloud 업로드 텍스트 — ${genreCases.length}곡\n\n` +
+      `\`00-SoundCloud-WAV/\`의 순서대로 제목·태그·설명을 복사하세요. ${darkRapPackMode ? "세 곡은 하드 붐뱁, 미니멀 다크 트랩, 싱코페이션 랩 포켓입니다." : "01~03은 크루 에너지 트랩, 04~06은 저역 포켓 트랩입니다."}\n\n` +
       audits.map((audit) => buildSoundCloudSheet(audit, { key: audit.config.key })).join("\n---\n\n");
     assertDeliveryTextPrivacy(uploadText, "Dual-trap upload text");
     assertRequestedPublicMetadata(uploadText, "Dual-trap upload text");
@@ -1929,9 +1970,9 @@ async function assembleDelivery(outputRoot, audits) {
     },
     plan: planId,
     rows: manifestRows,
-    schemaVersion: dualTrapPackMode ? 5 : rockHiphopPackMode ? 4 : requestedPackMode ? 3 : allGenresMode ? 2 : 1,
+    schemaVersion: darkRapPackMode ? 6 : dualTrapPackMode ? 5 : rockHiphopPackMode ? 4 : requestedPackMode ? 3 : allGenresMode ? 2 : 1,
     scope: requestedPackMode
-      ? `${dualTrapPackMode ? "six-original-dual-trap-track" : rockHiphopPackMode ? "five-sample-free-synth-rock-hip-hop-track" : "seven-sample-free-hip-hop-track"} visible native actual-app QA and SoundCloud private-first preparation`
+      ? `${darkRapPackMode ? "three-original-dark-rap-track" : dualTrapPackMode ? "six-original-dual-trap-track" : rockHiphopPackMode ? "five-sample-free-synth-rock-hip-hop-track" : "seven-sample-free-hip-hop-track"} visible native actual-app QA and SoundCloud private-first preparation`
       : allGenresMode
         ? "all-current-style visible native actual-app QA and SoundCloud private-first preparation"
         : "six-genre visible native actual-app QA and SoundCloud private-first preparation",
@@ -1941,8 +1982,9 @@ async function assembleDelivery(outputRoot, audits) {
           blueprintCount: new Set(manifestRows.map((row) => row.blueprintId)).size,
           blueprintIdsInDeliveryOrder: manifestRows.map((row) => row.blueprintId),
           durationSeconds: { maximum: maximumDurationSeconds, minimum: minimumDurationSeconds },
-          importedAudioUsed: false,
-          ...(rockHiphopPackMode || dualTrapPackMode ? { originalEventCompositions: true, realGuitarRecordingUsed: false, distinctKeys: genreCases.map((config) => config.key) } : {}),
+          importedAudioUsed: darkRapPackMode,
+          ...(darkRapPackMode ? { originalSynthesizedOneShot: { trackOrder: 3, lane: "perc", seconds: 0.28, externalRecordingUsed: false }, humanFullTrackListeningPerformed: false } : {}),
+          ...(rockHiphopPackMode || dualTrapPackMode || darkRapPackMode ? { originalEventCompositions: true, realGuitarRecordingUsed: false, distinctKeys: genreCases.map((config) => config.key) } : {}),
           productionLanes: requestedLaneContract.map((lane) => ({
             ...lane,
             styleIdsInDeliveryOrder: manifestRows.filter((row) => row.productionLaneId === lane.id).map((row) => row.id)
@@ -2041,7 +2083,9 @@ function createSyntheticWav() {
 async function runSelfTest() {
   validateGenreMatrix();
   check(new Set(genreCases.map(soundCloudBatchFileName)).size === genreCases.length, "SoundCloud batch filenames must be unique.");
-  if (dualTrapPackMode) {
+  if (darkRapPackMode) {
+    check(soundCloudBatchFileName(genreCases[0]) === "01-콘크리트-문장-soundcloud.wav", "Dark-rap batch must preserve the readable song title.");
+  } else if (dualTrapPackMode) {
     check(soundCloudBatchFileName(genreCases[0]) === "01-철야-집결-soundcloud.wav", "Dual-trap batch must preserve the readable song title.");
   } else if (rockHiphopPackMode) {
     check(soundCloudBatchFileName(genreCases[0]) === "01-비가-끝난-트랙-soundcloud.wav", "Rock hip-hop batch must preserve the readable song title.");
@@ -2171,7 +2215,9 @@ function printPreparedCommands(outputRoot) {
       `  GROOVEFORGE_DESKTOP_WORKSPACE_ROOT=${workspacePath(outputRoot, config)} npm run desktop:movement-qa -- --movement-spec ${movementSpecPath(outputRoot, config)}`
     );
   }
-  const resumeCommand = dualTrapPackMode
+  const resumeCommand = darkRapPackMode
+    ? "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_multigenre_actual_app_qa.mjs --dark-rap-pack"
+    : dualTrapPackMode
     ? "npm run desktop:dual-trap-qa --"
     : rockHiphopPackMode
     ? "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_multigenre_actual_app_qa.mjs --rock-hiphop-pack"
@@ -2185,7 +2231,7 @@ function printPreparedCommands(outputRoot) {
 
 async function main() {
   const args = parseArguments(process.argv.slice(2));
-  configureGenreMode(args.allGenres, args.requestedHiphopPack, args.rockHiphopPack, args.dualTrapPack);
+  configureGenreMode(args.allGenres, args.requestedHiphopPack, args.rockHiphopPack, args.dualTrapPack, args.darkRapPack);
   if (args.selfTest) {
     await runSelfTest();
     return;

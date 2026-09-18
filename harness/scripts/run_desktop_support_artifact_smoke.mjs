@@ -148,7 +148,7 @@ function buildMarkdown(summary) {
 
 ## What GrooveForge Is
 
-${appName} is an all-genre desktop beat workstation for direct beat composition, sound design, arrangement, mixing, mastering, and local export. The core workflow uses editable musical events, built-in drums, 808/bass, melody, chords, arrangement, mixer/master, WAV/stem/MIDI export, and Handoff Sheet delivery. Sampling remains optional future scope, not the default support path.
+${appName} is an all-genre desktop beat workstation for direct beat composition, sound design, arrangement, mixing, mastering, and local export. The core workflow uses editable musical events, built-in drums, 808/bass, melody, chords, arrangement, mixer/master, WAV/stem/MIDI export, and Handoff Sheet delivery. Sampling remains optional and secondary, not the default support path.
 
 ## Who This Supports
 
@@ -313,7 +313,7 @@ check(Array.isArray(summary.supportArtifactBlockers), "support artifact summary 
 check(Array.isArray(summary.externalDistributionBlockers), "support artifact summary should include external distribution blockers");
 check(summary.supportArtifactReady === false || summary.supportArtifactBlockers.length === 0, "ready support artifact should not include support artifact blockers");
 check(markdown.includes("all-genre desktop beat workstation"), "support artifact should describe the direct beat workstation scope");
-check(markdown.includes("Sampling remains optional future scope"), "support artifact should keep sampling secondary");
+check(markdown.includes("Sampling remains optional and secondary"), "support artifact should keep sampling secondary");
 check(markdown.includes("First-time beat makers"), "support artifact should address first-time beat makers");
 check(markdown.includes("Working producers"), "support artifact should address working producers");
 check(markdown.includes("Help > Check for Updates"), "support artifact should describe update support posture");
