@@ -145,7 +145,7 @@ function expectedNativeMenuTree(locale) {
   const labels = {
     en: {
       app: ["About GrooveForge", "Services", "Hide GrooveForge", "Hide Others", "Show All", "Quit GrooveForge"],
-      edit: ["Undo", "Redo", "Cut", "Copy", "Paste", "Delete Selected Event"],
+      edit: ["Undo", "Redo", "Cut", "Copy", "Paste", "Select All", "Delete Selected Event"],
       file: ["Open Project...", "Save Project"],
       help: ["Check for Updates...", "Command Reference", "GrooveForge Local Workstation"],
       top: ["File", "Edit", "Transport", "View", "Window", "Help"],
@@ -155,7 +155,7 @@ function expectedNativeMenuTree(locale) {
     },
     ko: {
       app: ["GrooveForge 정보", "서비스", "GrooveForge 가리기", "다른 앱 가리기", "모두 보기", "GrooveForge 종료"],
-      edit: ["실행 취소", "다시 실행", "오려두기", "복사", "붙여넣기", "선택한 이벤트 삭제"],
+      edit: ["실행 취소", "다시 실행", "오려두기", "복사", "붙여넣기", "모두 선택", "선택한 이벤트 삭제"],
       file: ["프로젝트 열기...", "프로젝트 저장"],
       help: ["업데이트 확인...", "명령 도움말", "GrooveForge 로컬 워크스테이션"],
       top: ["파일", "편집", "재생", "보기", "윈도우", "도움말"],
@@ -622,6 +622,17 @@ function checkResult(result) {
       evidence?.modalFocus?.switchInitialFocus === "command-reference-search-input" &&
       evidence?.modalFocus?.switchFocusRestored === true,
     "live desktop modals should focus search, select and run Quick Actions with native arrow keys and Enter, wrap real Tab/Shift+Tab, close on Escape, restore openers, and preserve the original opener across dialog handoff"
+  );
+  check(
+    evidence?.modalFocus?.editableSelectAll?.menuRoleReady === true &&
+      evidence?.modalFocus?.editableSelectAll?.menuAcceleratorReady === true &&
+      evidence?.modalFocus?.editableSelectAll?.selectionMethod === (process.platform === "darwin" ? "macos-first-responder" : "menu-role-click") &&
+      evidence?.modalFocus?.editableSelectAll?.osShortcutTested === false &&
+      evidence?.modalFocus?.editableSelectAll?.selectedCharacters > 0 &&
+      evidence?.modalFocus?.editableSelectAll?.replacementSelectedCharacters === "Native Select All replacement check".length &&
+      evidence?.modalFocus?.editableSelectAll?.replacementReady === true &&
+      evidence?.modalFocus?.editableSelectAll?.originalRestored === true,
+    `native Select All menu action should replace and restore a populated title with the configured editing role and accelerator; OS shortcut proof is separate (${JSON.stringify(evidence?.modalFocus?.editableSelectAll ?? null)})`
   );
   check(
     evidence?.modalFocus?.dockBaselineVisible === true &&
@@ -2042,6 +2053,7 @@ child.on("exit", (code, signal) => {
     `- Fixed frames: ${["edge901", "compact", "minimum", "wide"].map((name) => `${result.evidence.layout.desktopFrames[name].viewportWidth}px/${result.evidence.layout.desktopFrames[name].documentVerticalOverflow}px vertical overflow`).join(", ")}`
   );
   console.log("- Modal focus: Quick Actions and Command Reference search entry, Tab/Shift+Tab wrap, Escape restore, and cross-dialog handoff ready");
+  console.log("- Select All: native menu action replaced and restored a populated title; English/Korean role and accelerator verified; OS shortcut proof is separate");
   console.log("- Settings locale: native Korean switch, renderer/native-menu parity, persistence reload, focus restore, project/history guard, and corrupt-value English fallback ready");
   console.log(
     `- Bottom workspace player: baseline/persistent, ${result.evidence.modalFocus.dockControlCount} controls, focusable with native Play and Actions, viewport contained`

@@ -3334,10 +3334,12 @@ export function SectionLocatorCueDecision({
 }
 
 export function ProjectAudioAnalysisGate({
+  deferred = false,
   onRetry,
   status,
   surface
 }: {
+  deferred?: boolean;
   onRetry: () => void;
   status: ProjectAudioAnalysisStatus;
   surface: "Guide" | "Mix" | "Master" | "Deliver";
@@ -3350,9 +3352,9 @@ export function ProjectAudioAnalysisGate({
     Master: t("analysis.surfaceMaster"),
     Deliver: t("analysis.surfaceDeliver")
   }[surface];
-  const title = pending ? t("analysis.analyzing") : t("analysis.metersUnavailable");
+  const title = pending ? t(deferred ? "analysis.deferred" : "analysis.analyzing") : t("analysis.metersUnavailable");
   const detail = pending
-    ? t("analysis.pendingDetail", { surface: surfaceLabel })
+    ? deferred ? t("analysis.deferredDetail") : t("analysis.pendingDetail", { surface: surfaceLabel })
     : t("analysis.unavailableDetail", { surface: surfaceLabel });
 
   return (
@@ -3622,6 +3624,7 @@ export function DeliveryTargetAlignmentResultStrip({ result }: { result: Deliver
 }
 
 export function SessionBriefPanel({
+  analysisDeferred = false,
   analysisStatus,
   authoritativeRevision,
   brief,
@@ -3642,6 +3645,7 @@ export function SessionBriefPanel({
   onFocusReferenceAlignment,
   onRetryMeters
 }: {
+  analysisDeferred?: boolean;
   analysisStatus: ProjectAudioAnalysisStatus;
   authoritativeRevision: number;
   brief: SessionBrief;
@@ -3740,7 +3744,7 @@ export function SessionBriefPanel({
         />
           </>
         ) : (
-          <ProjectAudioAnalysisGate onRetry={onRetryMeters} status={analysisStatus} surface="Guide" />
+          <ProjectAudioAnalysisGate deferred={analysisDeferred} onRetry={onRetryMeters} status={analysisStatus} surface="Guide" />
         )}
         <div className="session-brief-starters" aria-label="Session Brief Starter Pads">
           {starterPads.map((pad) => (
@@ -11801,14 +11805,15 @@ export function createWorkflowNavigatorItems(
   beatMap: BeatMapSummary,
   exportPreflight: ExportPreflightSummary,
   analysis: ExportAnalysis,
-  analysisStatus: WorkflowNavigatorAnalysisStatus = "ready"
+  analysisStatus: WorkflowNavigatorAnalysisStatus = "ready",
+  analysisDeferred = false
 ): WorkflowNavigatorItem[] {
   const composeStage = beatMap.stages.find((stage) => stage.id === "compose") ?? beatMap.stages[1];
   const arrangeStage = beatMap.stages.find((stage) => stage.id === "arrange") ?? beatMap.stages[2];
   const polishStage = beatMap.stages.find((stage) => stage.id === "polish") ?? beatMap.stages[3];
   const deliverStage = beatMap.stages.find((stage) => stage.id === "deliver") ?? beatMap.stages[4];
-  const mixAnalysisPosture = workflowNavigatorAnalysisPosture("mix", analysisStatus);
-  const deliverAnalysisPosture = workflowNavigatorAnalysisPosture("deliver", analysisStatus);
+  const mixAnalysisPosture = workflowNavigatorAnalysisPosture("mix", analysisStatus, analysisDeferred);
+  const deliverAnalysisPosture = workflowNavigatorAnalysisPosture("deliver", analysisStatus, analysisDeferred);
 
   return [
     {

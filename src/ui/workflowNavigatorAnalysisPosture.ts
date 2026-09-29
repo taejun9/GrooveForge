@@ -12,13 +12,19 @@ export type WorkflowNavigatorAnalysisPosture = {
 
 export function workflowNavigatorAnalysisPosture(
   zone: "mix" | "deliver",
-  status: WorkflowNavigatorAnalysisStatus
+  status: WorkflowNavigatorAnalysisStatus,
+  deferred = false
 ): WorkflowNavigatorAnalysisPosture | null {
   if (status === "ready") {
     return null;
   }
 
   if (status === "pending") {
+    if (deferred) {
+      return zone === "mix"
+        ? { value: "Open to analyze", detail: "Open Mix to calculate exact audio meters" }
+        : { value: "Open to analyze", detail: "Open Deliver to check export readiness" };
+    }
     return zone === "mix"
       ? { value: "Analyzing", detail: "Waiting for meters / mix signal checks deferred" }
       : { value: "Waiting for meters", detail: "Analysis in progress / export readiness deferred" };

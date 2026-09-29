@@ -346,6 +346,13 @@ function validateProjectAudioAnalysisIdentity() {
       projectAudioAnalysisHook.projectAudioAnalysisStatus(baseIdentity, true, baseIdentity, baseIdentity) === "ready",
     "project-audio-analysis: stale failures must not poison the current identity and an exact retry response must recover ready state"
   );
+  check(
+    projectAudioAnalysisHook.projectAudioAnalysisDeferred("pending", false) &&
+      !projectAudioAnalysisHook.projectAudioAnalysisDeferred("pending", true) &&
+      !projectAudioAnalysisHook.projectAudioAnalysisDeferred("ready", false) &&
+      !projectAudioAnalysisHook.projectAudioAnalysisDeferred("error", false),
+    "project-audio-analysis: creative tabs defer incomplete meters, review tabs show active pending, and ready/error take precedence"
+  );
   const snapshotTasks = savedSnapshotAudioAnalysis.createSavedSnapshotAudioAnalysisTasks([
     {
       id: "snapshot-base",
@@ -818,6 +825,16 @@ function validateWorkflowNavigatorAnalysisPosture() {
   const errorMix = workflowNavigatorAnalysisPosture.workflowNavigatorAnalysisPosture("mix", "error");
   const errorDeliver = workflowNavigatorAnalysisPosture.workflowNavigatorAnalysisPosture("deliver", "error");
   const readyMix = workflowNavigatorAnalysisPosture.workflowNavigatorAnalysisPosture("mix", "ready");
+  const deferredMix = workflowNavigatorAnalysisPosture.workflowNavigatorAnalysisPosture("mix", "pending", true);
+  const deferredDeliver = workflowNavigatorAnalysisPosture.workflowNavigatorAnalysisPosture("deliver", "pending", true);
+
+  check(
+    deferredMix?.value === "Open to analyze" && deferredMix.detail.includes("Open Mix") &&
+      deferredDeliver?.value === "Open to analyze" && deferredDeliver.detail.includes("Open Deliver") &&
+      workflowNavigatorAnalysisPosture.workflowNavigatorAnalysisPosture("mix", "ready", true) === null &&
+      workflowNavigatorAnalysisPosture.workflowNavigatorAnalysisPosture("mix", "error", true)?.value === "Meters unavailable",
+    "workflow-navigator-analysis: deferred copy should name the review route without masking ready or error"
+  );
 
   check(
     pendingMix?.value === "Analyzing" &&

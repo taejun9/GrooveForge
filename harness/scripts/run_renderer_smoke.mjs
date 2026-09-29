@@ -2487,8 +2487,8 @@ function validateProjectAudioAnalysisPerformance(html, helpers) {
   check(
     appSource.includes("projectAudioAnalysis.status") &&
       workflowNavigatorItemsSource.includes('analysisStatus: WorkflowNavigatorAnalysisStatus = "ready"') &&
-      workflowNavigatorItemsSource.includes('workflowNavigatorAnalysisPosture("mix", analysisStatus)') &&
-      workflowNavigatorItemsSource.includes('workflowNavigatorAnalysisPosture("deliver", analysisStatus)') &&
+      workflowNavigatorItemsSource.includes('workflowNavigatorAnalysisPosture("mix", analysisStatus, analysisDeferred)') &&
+      workflowNavigatorItemsSource.includes('workflowNavigatorAnalysisPosture("deliver", analysisStatus, analysisDeferred)') &&
       workflowNavigatorAnalysisPostureSource.includes('{ value: "Analyzing", detail: "Waiting for meters / mix signal checks deferred" }') &&
       workflowNavigatorAnalysisPostureSource.includes('{ value: "Waiting for meters", detail: "Analysis in progress / export readiness deferred" }') &&
       workflowNavigatorAnalysisPostureSource.includes('value: "Meters unavailable"') &&
@@ -2620,8 +2620,28 @@ function validateProjectAudioAnalysisPerformance(html, helpers) {
       surface: "Guide"
     })
   );
+  const deferredGuideGateHtml = renderToStaticMarkup(
+    React.createElement(helpers.ProjectAudioAnalysisGate, {
+      deferred: true,
+      onRetry() {},
+      status: "pending",
+      surface: "Guide"
+    })
+  );
   check(
-    analysisGateSource.includes('t("analysis.analyzing")') &&
+    deferredGuideGateHtml.includes("Open Mix or Deliver to analyze") &&
+      deferredGuideGateHtml.includes("paused while composing or arranging") &&
+      !deferredGuideGateHtml.includes("Analyzing") &&
+      !deferredGuideGateHtml.includes("Retry meters") &&
+      !/[+-]?\d+(?:\.\d+)?\s*dB\b/.test(deferredGuideGateHtml) &&
+      appSource.includes("analysisDeferred={projectAudioAnalysis.deferred}") &&
+      appSource.includes("deferred={projectAudioAnalysis.deferred}") &&
+      appSource.includes('t("analysis.deferred")') &&
+      projectAudioAnalysisHookSource.includes("deferred: projectAudioAnalysisDeferred(status, commitEnabled)"),
+    "creative-tab meter guidance should explain intentional deferral and the review route without claiming active analysis"
+  );
+  check(
+    analysisGateSource.includes('"analysis.analyzing"') &&
       analysisGateSource.includes('t("analysis.metersUnavailable")') &&
       workstationHelpersSource.includes('t("analysis.hiddenDetail")') &&
       workstationHelpersSource.includes('t("analysis.retry")') &&

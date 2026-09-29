@@ -1603,9 +1603,10 @@ export function App(): ReactElement {
         beatMapSummary,
         exportPreflightSummary,
         exportAnalysis,
-        projectAudioAnalysis.status
+        projectAudioAnalysis.status,
+        projectAudioAnalysis.deferred
       ),
-    [project, beatMapSummary, exportPreflightSummary, exportAnalysis, projectAudioAnalysis.status]
+    [project, beatMapSummary, exportPreflightSummary, exportAnalysis, projectAudioAnalysis.status, projectAudioAnalysis.deferred]
   );
   const firstBeatPathSummary = useMemo(
     () => createFirstBeatPathSummary(project, style, workflowNavigatorItems, beatMapSummary, exportPreflightSummary, exportAnalysis),
@@ -14639,6 +14640,8 @@ export function App(): ReactElement {
           <span data-testid="audio-analysis-status">
             {projectAudioAnalysis.status === "error"
               ? t("analysis.unavailable")
+              : projectAudioAnalysis.deferred
+                ? t("analysis.deferred")
               : projectAudioAnalysis.pending
                 ? t("analysis.updating")
                 : t("analysis.ready")}
@@ -14721,6 +14724,7 @@ export function App(): ReactElement {
         />
       ) : (
         <ProjectAudioAnalysisGate
+          deferred={projectAudioAnalysis.deferred}
           onRetry={retryCurrentProjectAudioAnalysis}
           status={projectAudioAnalysis.status}
           surface="Guide"
@@ -14799,6 +14803,7 @@ export function App(): ReactElement {
         </>
       ) : (
         <ProjectAudioAnalysisGate
+          deferred={projectAudioAnalysis.deferred}
           onRetry={retryCurrentProjectAudioAnalysis}
           status={projectAudioAnalysis.status}
           surface="Guide"
@@ -14884,6 +14889,7 @@ export function App(): ReactElement {
       />
 
       <SessionBriefPanel
+        analysisDeferred={projectAudioAnalysis.deferred}
         analysisStatus={projectAudioAnalysis.status}
         authoritativeRevision={metadataDraftRevision}
         brief={project.sessionBrief}

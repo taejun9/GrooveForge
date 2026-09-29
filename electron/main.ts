@@ -1151,6 +1151,7 @@ const nativeMenuLabels = {
     reload: "Reload",
     resetZoom: "Actual Size",
     saveProject: "Save Project",
+    selectAll: "Select All",
     services: "Services",
     showAll: "Show All",
     toggleDevTools: "Toggle Developer Tools",
@@ -1188,6 +1189,7 @@ const nativeMenuLabels = {
     reload: "새로고침",
     resetZoom: "실제 크기",
     saveProject: "프로젝트 저장",
+    selectAll: "모두 선택",
     services: "서비스",
     showAll: "모두 보기",
     toggleDevTools: "개발자 도구 전환",
@@ -1973,6 +1975,16 @@ type LaunchSmokeModalFocusEvidence = {
   editableFocusRestored: boolean;
   editableQuestionTyped: boolean;
   editableValuePreserved: boolean;
+  editableSelectAll: {
+    menuRoleReady: boolean;
+    menuAcceleratorReady: boolean;
+    selectionMethod: "macos-first-responder" | "menu-role-click";
+    osShortcutTested: false;
+    selectedCharacters: number;
+    replacementSelectedCharacters: number;
+    replacementReady: boolean;
+    originalRestored: boolean;
+  };
   fixedFeedbackLane: {
     afterLocalDraft: LaunchSmokeFixedFeedbackLaneSnapshot;
     afterModeSwitch: LaunchSmokeFixedFeedbackLaneSnapshot;
@@ -2721,6 +2733,8 @@ function createNativeCommandMenu(locale: NativeMenuLocale = nativeMenuLocale): M
         { label: label.cut, role: "cut" },
         { label: label.copy, role: "copy" },
         { label: label.paste, role: "paste" },
+        // macOS 기본 전체 선택 단축키는 네이티브 편집 role에 연결해야 입력값 뒤에 붙여넣는 실수를 막는다.
+        { id: "native-select-all", label: label.selectAll, role: "selectAll", accelerator: "CmdOrCtrl+A" },
         { type: "separator" },
         createRendererCommandMenuItem(label.deleteSelectedEvent, "Backspace", "delete-selected-event")
       ]
@@ -3440,6 +3454,13 @@ function launchSmokeModalFocusFailures(evidence: LaunchSmokeModalFocusEvidence):
   }
   if (!evidence.editableValuePreserved || !evidence.editableFocusRestored) {
     failures.push("editable-field command shortcut opening and handoff should preserve the field value and restore its focus after Escape");
+  }
+  if (!evidence.editableSelectAll.menuRoleReady || !evidence.editableSelectAll.menuAcceleratorReady ||
+    evidence.editableSelectAll.selectionMethod !== (process.platform === "darwin" ? "macos-first-responder" : "menu-role-click") ||
+    evidence.editableSelectAll.osShortcutTested !== false ||
+    evidence.editableSelectAll.selectedCharacters < 1 || evidence.editableSelectAll.replacementSelectedCharacters < 1 ||
+    !evidence.editableSelectAll.replacementReady || !evidence.editableSelectAll.originalRestored) {
+    failures.push("native Select All menu action should replace and restore a populated input with the configured role and accelerator; OS shortcut proof is separate");
   }
   if (evidence.quickInitialFocus !== "quick-actions-search") {
     failures.push("Quick Actions should place initial focus in command search");
@@ -10734,6 +10755,77 @@ function collectLaunchSmokeNoteGridKeyboardEvidenceWithTimeout(
   });
 }
 
+async function collectLaunchSmokeNativeSelectAllEvidence(
+  win: BrowserWindow
+): Promise<LaunchSmokeModalFocusEvidence["editableSelectAll"]> {
+  const item = Menu.getApplicationMenu()?.getMenuItemById("native-select-all");
+  const evidence: LaunchSmokeModalFocusEvidence["editableSelectAll"] = {
+    menuRoleReady: String(item?.role ?? "").toLowerCase() === "selectall",
+    menuAcceleratorReady: item?.accelerator === "CmdOrCtrl+A",
+    selectionMethod: process.platform === "darwin" ? "macos-first-responder" : "menu-role-click",
+    osShortcutTested: false,
+    selectedCharacters: 0,
+    replacementSelectedCharacters: 0,
+    replacementReady: false,
+    originalRestored: false
+  };
+  if (!item || !evidence.menuRoleReady || !evidence.menuAcceleratorReady) {
+    throw new Error("Select All native menu role or accelerator is missing.");
+  }
+  const pause = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 80));
+  const read = async (): Promise<{ focused: boolean; start: number; end: number; value: string }> =>
+    (await win.webContents.executeJavaScript(`(() => {
+      const input = document.querySelector('[data-testid="project-title-input"]');
+      return input instanceof HTMLInputElement
+        ? { focused: document.activeElement === input, start: input.selectionStart, end: input.selectionEnd, value: input.value }
+        : { focused: false, start: -1, end: -1, value: '' };
+    })()`)) as { focused: boolean; start: number; end: number; value: string };
+  const point = (await win.webContents.executeJavaScript(`(() => {
+    const rect = document.querySelector('[data-testid="project-title-input"]')?.getBoundingClientRect();
+    return rect ? { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) } : null;
+  })()`)) as { x: number; y: number } | null;
+  if (!point) throw new Error("Select All title input is missing.");
+  win.show();
+  win.focus();
+  if (process.platform === "darwin") app.focus({ steal: true });
+  win.webContents.focus();
+  await pause();
+  win.webContents.sendInputEvent({ type: "mouseDown", ...point, button: "left", clickCount: 1 });
+  win.webContents.sendInputEvent({ type: "mouseUp", ...point, button: "left", clickCount: 1 });
+  await pause();
+  const original = await read();
+  const replace = async (value: string): Promise<number> => {
+    // sendInputEvent는 페이지 이벤트이며 macOS 메뉴 accelerator를 실행하지 않는다. 실제 메뉴 action을 검사하고 OS 단축키 증거와 구분한다.
+    if (process.platform === "darwin") Menu.sendActionToFirstResponder("selectAll:");
+    else item.click({}, win, win.webContents);
+    let selection = await read();
+    const selectionDeadline = Date.now() + 5000;
+    while (Date.now() < selectionDeadline && (!selection.focused || selection.start !== 0 || selection.end !== selection.value.length)) {
+      await pause();
+      selection = await read();
+    }
+    if (!selection.focused || selection.value.length < 1 || selection.start !== 0 || selection.end !== selection.value.length) {
+      throw new Error(`Native Select All menu action did not select the complete title: ${JSON.stringify(selection)}`);
+    }
+    await win.webContents.insertText(value);
+    let actual = await read();
+    const replacementDeadline = Date.now() + 5000;
+    while (Date.now() < replacementDeadline && actual.value !== value) {
+      await pause();
+      actual = await read();
+    }
+    if (actual.value !== value) {
+      throw new Error(`Native Select All replacement mismatch: ${JSON.stringify({ expected: value, actual, selection })}`);
+    }
+    return selection.value.length;
+  };
+  evidence.selectedCharacters = await replace("Native Select All replacement check");
+  evidence.replacementReady = true;
+  evidence.replacementSelectedCharacters = await replace(original.value);
+  evidence.originalRestored = true;
+  return evidence;
+}
+
 async function collectLaunchSmokeModalFocusEvidence(
   win: BrowserWindow,
   onStep: (step: string) => void = () => {}
@@ -11176,7 +11268,7 @@ async function collectLaunchSmokeModalFocusEvidence(
           "Show All",
           "Quit GrooveForge"
         ],
-        edit: ["Undo", "Redo", "Cut", "Copy", "Paste", "Delete Selected Event"],
+        edit: ["Undo", "Redo", "Cut", "Copy", "Paste", "Select All", "Delete Selected Event"],
         file: ["Open Project...", "Save Project"],
         help: ["Check for Updates...", "Command Reference", "GrooveForge Local Workstation"],
         topLevel: ["File", "Edit", "Transport", "View", "Window", "Help"],
@@ -11193,7 +11285,7 @@ async function collectLaunchSmokeModalFocusEvidence(
           "모두 보기",
           "GrooveForge 종료"
         ],
-        edit: ["실행 취소", "다시 실행", "오려두기", "복사", "붙여넣기", "선택한 이벤트 삭제"],
+        edit: ["실행 취소", "다시 실행", "오려두기", "복사", "붙여넣기", "모두 선택", "선택한 이벤트 삭제"],
         file: ["프로젝트 열기...", "프로젝트 저장"],
         help: ["업데이트 확인...", "명령 도움말", "GrooveForge 로컬 워크스테이션"],
         topLevel: ["파일", "편집", "재생", "보기", "윈도우", "도움말"],
@@ -11427,6 +11519,8 @@ async function collectLaunchSmokeModalFocusEvidence(
       return input instanceof HTMLInputElement ? input.value : '';
     })();
   `);
+  onStep("replacing populated text through the native Select All menu action; OS shortcut evidence is separate");
+  const editableSelectAll = await collectLaunchSmokeNativeSelectAllEvidence(win);
   onStep("opening Quick Actions from editable title field");
   await sendKey("K", commandModifier);
   await waitFor(`document.activeElement?.dataset?.testid === 'quick-actions-search'`);
@@ -12298,6 +12392,7 @@ async function collectLaunchSmokeModalFocusEvidence(
     editableFocusRestored: editableFinal.activeTestId === "project-title-input",
     editableQuestionTyped,
     editableValuePreserved: editableFinal.title === editableTitleBefore,
+    editableSelectAll,
     fixedFeedbackLane: {
       afterLocalDraft: feedbackAfterLocalDraft,
       afterModeSwitch: feedbackAfterModeSwitchSequence,

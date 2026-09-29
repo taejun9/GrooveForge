@@ -56,9 +56,10 @@ export function importWavSample(contents: ArrayBuffer, sourceName: string): Drum
   const text = (offset: number, length: number): string => String.fromCharCode(...new Uint8Array(contents, offset, length));
   if (contents.byteLength < 44 || text(0, 4) !== "RIFF" || text(8, 4) !== "WAVE" || view.getUint32(4, true) + 8 !== contents.byteLength) throw new Error("Choose a valid uncompressed WAV file.");
   let format = 0, channels = 0, rate = 0, bits = 0, align = 0, dataOffset = -1, dataBytes = 0;
-  for (let offset = 12; offset + 8 <= contents.byteLength;) {
+  for (let offset = 12; offset < contents.byteLength;) {
+    if (offset + 8 > contents.byteLength) throw new Error("WAV chunk is truncated.");
     const id = text(offset, 4), size = view.getUint32(offset + 4, true), body = offset + 8;
-    if (body + size > contents.byteLength) throw new Error("WAV chunk is truncated.");
+    if (body + size + size % 2 > contents.byteLength) throw new Error("WAV chunk is truncated.");
     if (id === "fmt ") {
       if (size < 16) throw new Error("WAV format is truncated.");
       format = view.getUint16(body, true); channels = view.getUint16(body + 2, true); rate = view.getUint32(body + 4, true);
@@ -70,8 +71,9 @@ export function importWavSample(contents: ArrayBuffer, sourceName: string): Drum
   if (![1, 3].includes(format) || ![1, 2].includes(channels) || rate < 8000 || rate > 192000 ||
     !(format === 1 ? [8, 16, 24, 32].includes(bits) : bits === 32) || align !== channels * bits / 8 || dataOffset < 0 || dataBytes % align !== 0) throw new Error("Use mono/stereo PCM WAV (8–32 bit) or 32-bit float WAV.");
   const sourceFrames = dataBytes / align;
-  const outputFrames = Math.floor(sourceFrames / rate * drumSampleRate);
-  if (outputFrames < drumSampleRate * 0.01 || sourceFrames / rate > 2 || outputFrames > maxDrumSampleFrames) throw new Error("WAV one-shots must be 0.01–2 seconds long.");
+  // 원본 길이로 제한을 검사한 뒤 가장 가까운 프레임에 맞춘다. 10ms 경계와 같은 rate의 끝 프레임을 버리지 않는다.
+  const outputFrames = Math.round(sourceFrames * drumSampleRate / rate);
+  if (sourceFrames < Math.ceil(rate * 0.01) || sourceFrames > rate * 2 || outputFrames > maxDrumSampleFrames) throw new Error("WAV one-shots must be 0.01–2 seconds long.");
   // 다운샘플링이 건너뛸 위치까지 모든 입력 프레임을 읽어 NaN/Infinity를 빠짐없이 거절한다.
   const mono = new Float32Array(sourceFrames);
   for (let frame = 0; frame < sourceFrames; frame += 1) {

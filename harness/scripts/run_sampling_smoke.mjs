@@ -13,6 +13,7 @@ import { createMixWavBlob, createStemWavBlob, analyzeExport, analyzeProjectExpor
 import { analyzeProjectAudio, projectAudioAnalysisIdentity } from "../../src/audio/projectAudioAnalysis.ts";
 import { createSavedSnapshotAudioAnalysisTasks } from "../../src/ui/useSavedSnapshotAudioAnalyses.ts";
 import { playEditorAudition, startRealtimePlayback } from "../../src/audio/scheduler.ts";
+import { createSoundCloudUploadSheet } from "../../src/audio/soundcloud.ts";
 
 function fixture(seconds = 0.2, rate = 44100) {
   const frames = Math.round(seconds * rate), bytes = new ArrayBuffer(44 + frames * 2), view = new DataView(bytes);
@@ -68,9 +69,35 @@ for (const float of [false,true]) for (const channels of [1,2]) for (const frame
     const offset = 44 + (frame*channels+channel)*width;
     original[frame] += (float ? view.getFloat32(offset,true) : view.getInt16(offset,true)/32768) / channels;
   }
-  const legacyFrameCount = Math.floor(original.length / drumSampleRate * drumSampleRate);
-  assert.equal(importWavSample(source,"Same rate.wav").pcm,createDrumSample(original.subarray(0,legacyFrameCount),"Same rate.wav").pcm,"Same-rate samples must preserve the pre-resampling PCM conversion");
+  const imported = importWavSample(source,"Same rate.wav");
+  assert.equal(imported.frames,original.length,"Same-rate import must preserve every original frame");
+  assert.equal(imported.pcm,createDrumSample(original,"Same rate.wav").pcm,"Same-rate samples must preserve the PCM conversion");
 }
+// 안내에 표시한 10ms 최소 길이는 지원하는 모든 rate에서 가져와야 하며 한 프레임 짧으면 거절한다.
+for (const rate of [8000,22050,44100,48000,191999,192000]) {
+  const frames = Math.ceil(rate * 0.01);
+  const imported = importWavSample(fixture(frames / rate,rate),"Minimum length.wav");
+  assert.equal(imported.frames,Math.round(frames * drumSampleRate / rate));
+  assert.throws(()=>importWavSample(fixture((frames - 1) / rate,rate),"Too short.wav"),/0.01–2/);
+}
+// RIFF 전체 크기가 맞아도 마지막 청크 헤더나 홀수 청크 패딩이 잘리면 손상된 파일이다.
+for (const tailLength of [1,7,9]) {
+  const valid = fixture(), malformed = new Uint8Array(valid.byteLength + tailLength);
+  malformed.set(new Uint8Array(valid));
+  const view = new DataView(malformed.buffer);
+  view.setUint32(4,malformed.byteLength - 8,true);
+  if (tailLength === 9) {
+    malformed.set(new TextEncoder().encode("JUNK"),valid.byteLength);
+    view.setUint32(valid.byteLength + 4,1,true);
+  }
+  assert.throws(()=>importWavSample(malformed.buffer,"Truncated chunk.wav"),/chunk is truncated/);
+}
+const paddedSource = fixture(), paddedChunk = new Uint8Array(paddedSource.byteLength + 10);
+paddedChunk.set(new Uint8Array(paddedSource));
+paddedChunk.set(new TextEncoder().encode("JUNK"),paddedSource.byteLength);
+new DataView(paddedChunk.buffer).setUint32(4,paddedChunk.byteLength - 8,true);
+new DataView(paddedChunk.buffer).setUint32(paddedSource.byteLength + 4,1,true);
+assert.equal(importWavSample(paddedChunk.buffer,"Padded chunk.wav").pcm,importWavSample(paddedSource,"Plain.wav").pcm);
 for (const badValue of [NaN,Infinity,-Infinity]) {
   const source = toneWav(192000,1000,0.2,2), view = new DataView(source);
   // 기존 선형 변환의 첫 출력은 입력 0·1번만 읽고 다음 출력은 8·9번부터 읽어 이 위치를 놓쳤다.
@@ -99,6 +126,25 @@ assert.throws(()=>replaceDrumSample({kick:maximum},"hat",sample),/2 seconds in t
 const base = structuredClone(starterProject); base.arrangement=[{section:"Verse",pattern:"A",energy:0.8,bars:1,mutedTracks:[]}]; base.snapshots=[];
 const sampled = {...base,drumSamples:{perc:sample}};
 sampled.patterns.A.drumPattern.perc[0]=true;
+// 원샷에 음성이나 외부 저작물이 포함될 수 있으므로 업로드 초안이 원곡·연주곡임을 추정하지 않는다.
+const sampleFreeUploadSheet = createSoundCloudUploadSheet(starterProject);
+assert.equal(createHash("sha256").update(sampleFreeUploadSheet).digest("hex"),"32fe58eaef480ff70e159e6308e9cb1809fbf5ff30e95abdf00c86b522fe3cb7","Sample-free upload metadata must remain byte-identical");
+for (const drumSamples of [undefined,{}, {perc:undefined}, {perc:{}}]) {
+  assert.equal(createSoundCloudUploadSheet({...starterProject,drumSamples}),sampleFreeUploadSheet,"Empty or stale sample banks must not label synthesis-only projects as sampled");
+}
+for (const lane of ["kick","clap","hat","perc"]) {
+  const sheet = createSoundCloudUploadSheet({...base,drumSamples:{[lane]:sample}});
+  const tags = sheet.split("\n").find((line)=>line.startsWith("- Tags (English):"));
+  assert.match(tags,/Sample-based/);
+  assert.doesNotMatch(tags,/\bOriginal\b|\bInstrumental\b/);
+  assert.match(sheet,/sample-based track at/);
+  assert.match(sheet,/imported audio samples/);
+  assert.doesNotMatch(sheet,/original instrumental|built-in synthesis\./);
+  assert(!sheet.includes(sample.sourceName),"Upload draft must not expose imported source filenames");
+  assert(sheet.includes("Initial privacy: Private") && sheet.includes("Downloads: Off"));
+}
+const customBriefSheet = createSoundCloudUploadSheet({...sampled,sessionBrief:{...sampled.sessionBrief,vibe:"Late-night texture",notes:"User-provided production credits."}});
+assert(customBriefSheet.includes("Mood: Late-night texture") && customBriefSheet.includes("User-provided production credits."),"Explicit user brief metadata must remain intact for sampled projects");
 const serialized=serializeProjectFile(sampled), reopened=parseProjectFile(serialized);
 assert.deepEqual(reopened.drumSamples,sampled.drumSamples);
 assert.equal(sampled.drumSamples.perc.trimStart,0);

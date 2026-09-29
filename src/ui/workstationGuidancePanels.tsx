@@ -4133,6 +4133,7 @@ export function WorkflowNavigator({
                     .replace(/^(\d+) bars?$/u, "$1마디")
                     .replace(/^Ready$/u, "준비됨")
                     .replace(/^Analyzing$/u, "분석 중")
+                    .replace(/^Open to analyze$/u, "열어서 분석")
                 : item.value;
             return (
               <button

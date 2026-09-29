@@ -46,6 +46,7 @@ type InFlightAnalysisRequest = {
 export type ProjectAudioAnalysisStatus = "pending" | "ready" | "error";
 
 export type ProjectAudioAnalysisState = ProjectAudioAnalysis & {
+  deferred: boolean;
   error: string | null;
   identity: string;
   pending: boolean;
@@ -77,6 +78,11 @@ export function projectAudioAnalysisStatus(
     return "ready";
   }
   return failureIdentity === currentIdentity ? "error" : "pending";
+}
+
+/** 편집 탭의 의도적인 분석 보류를 실제 진행·완료·오류와 구별한다. */
+export function projectAudioAnalysisDeferred(status: ProjectAudioAnalysisStatus, commitEnabled: boolean): boolean {
+  return status === "pending" && !commitEnabled;
 }
 
 function canAnalyzeOffMainThread(): boolean {
@@ -385,6 +391,7 @@ export function useProjectAudioAnalysis(
 
   return {
     ...snapshot.analysis,
+    deferred: projectAudioAnalysisDeferred(status, commitEnabled),
     error: status === "error" ? failure?.message ?? "Audio analysis failed." : null,
     identity,
     pending: status !== "ready",

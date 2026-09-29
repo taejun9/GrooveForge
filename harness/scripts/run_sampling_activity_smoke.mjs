@@ -77,10 +77,25 @@ export async function runSamplingActivityLifecycleSmoke() {
     return undefined;
   };
   assert.match(statusText(render()), /Imported/);
+  const importedProject = changed[1](props.project);
+  props.project = importedProject;
+  render();
+  assert.match(statusText(render()), /Imported/, "Successful import feedback must survive the resulting project render");
+  find(render(), "sample-remove").props.onClick();
+  props.project = changed[2](props.project);
+  render();
+  assert.match(statusText(render()), /Sample removed/, "Successful removal feedback must survive the resulting project render");
+  props.project = importedProject;
+  render();
+  assert.equal(statusText(render()), "", "Undo must clear feedback belonging to the removed-sample state");
+  start();
   props.project = { ...props.project, title: "Restored project" };
   render();
   assert.equal(statusText(render()), "", "Project replacement or Undo must clear obsolete local feedback");
+  pending[4].resolve(fixture); await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(changed.length, 3, "An import started before project replacement must not overwrite the new project");
+  assert.match(statusText(render()), /Project changed/);
   hide();
-  return { activityReactivation: "passed", canceledImportIgnored: true, subsequentImportWorks: true, staleCompletionKeepsNewImportBusy: true, externalProjectChangeClearsFeedback: true };
+  return { activityReactivation: "passed", canceledImportIgnored: true, subsequentImportWorks: true, staleCompletionKeepsNewImportBusy: true, importAndRemovalFeedbackRetained: true, externalProjectChangeClearsFeedback: true, projectChangeCancelsImport: true };
 }
 if (process.argv[1]?.endsWith("run_sampling_activity_smoke.mjs")) console.log(JSON.stringify(await runSamplingActivityLifecycleSmoke(), null, 2));

@@ -24,6 +24,7 @@ export function SamplingPanel({ project, onChange, onStatus }: SamplingPanelProp
   const [lane, setLane] = useState<DrumLane>("perc");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const feedbackProjectRef = useRef<ProjectState | null>(null);
   const projectRef = useRef(project);
   projectRef.current = project;
   const requestRef = useRef(0);
@@ -41,15 +42,16 @@ export function SamplingPanel({ project, onChange, onStatus }: SamplingPanelProp
     };
   }, []);
   useEffect(() => {
-    // Undo·프로젝트 교체 후에도 이전 작업 완료 문구가 남아 현재 샘플 배치와 충돌하지 않게 한다.
-    setFeedback("");
+    // 성공 문구는 해당 편집 결과에서 유지하고 Undo·프로젝트 교체 후의 오래된 문구만 지운다.
+    if (feedbackProjectRef.current !== project) setFeedback("");
   }, [project]);
-  const status = (message: string): void => { setFeedback(message); onStatus(message); };
-  const updateSample = (nextSample: DrumSample | undefined): void => {
+  const status = (message: string, context = projectRef.current): void => { feedbackProjectRef.current = context; setFeedback(message); onStatus(message); };
+  const updateSample = (nextSample: DrumSample | undefined): ProjectState => {
     const current = projectRef.current;
     const next = { ...current, drumSamples: replaceDrumSample(current.drumSamples, lane, nextSample) };
     serializeProjectFile(next);
     onChange((latest) => latest === current ? next : latest);
+    return next;
   };
   const importFile = async (file: File): Promise<void> => {
     const request = ++requestRef.current;
@@ -64,7 +66,7 @@ export function SamplingPanel({ project, onChange, onStatus }: SamplingPanelProp
       // 실제 저장 상한까지 검사한 뒤에만 편집 기록으로 보내 저장 불가능한 상태를 만들지 않는다.
       serializeProjectFile(next);
       onChange((latest) => latest === captured ? next : latest);
-      status(ko ? `${labels[targetLane]}에 ${imported.sourceName} 가져옴` : `Imported ${imported.sourceName} to ${labels[targetLane]}`);
+      status(ko ? `${labels[targetLane]}에 ${imported.sourceName} 가져옴` : `Imported ${imported.sourceName} to ${labels[targetLane]}`, next);
     } catch (error) {
       if (request === requestRef.current) status(error instanceof Error ? error.message : "Unable to import WAV.");
     } finally { if (request === requestRef.current) setBusy(false); }
@@ -93,7 +95,7 @@ export function SamplingPanel({ project, onChange, onStatus }: SamplingPanelProp
       </div>
       <div className="sampling-actions">
         <button type="button" data-testid="sample-audition" onClick={() => { try { auditionRef.current?.stop(); auditionRef.current = playEditorAudition(projectRef.current, { kind: "drum", lane, step: 0 }); status(ko ? "원샷 미리듣기" : "Auditioning one-shot"); } catch { status(ko ? "오디오를 시작할 수 없습니다." : "Audio could not start."); } }}>{ko ? "미리듣기" : "Audition"}</button>
-        <button type="button" data-testid="sample-remove" onClick={() => { auditionRef.current?.stop(); try { updateSample(undefined); status(ko ? "샘플 제거됨. 기본 드럼 소리를 사용합니다." : "Sample removed. Using the built-in drum sound."); } catch (error) { status(error instanceof Error ? error.message : "Unable to remove sample."); } }}>{ko ? "샘플 제거" : "Remove sample"}</button>
+        <button type="button" data-testid="sample-remove" onClick={() => { auditionRef.current?.stop(); try { const next = updateSample(undefined); status(ko ? "샘플 제거됨. 기본 드럼 소리를 사용합니다." : "Sample removed. Using the built-in drum sound.", next); } catch (error) { status(error instanceof Error ? error.message : "Unable to remove sample."); } }}>{ko ? "샘플 제거" : "Remove sample"}</button>
       </div>
     </div> : <p data-testid="sample-empty">{ko ? "이 레인은 기본 합성 드럼 소리를 사용합니다." : "This lane uses the built-in synthesized drum sound."}</p>}
     <p role="status" aria-live="polite">{feedback}</p>

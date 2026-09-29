@@ -13,6 +13,7 @@ import {
   projectSessionBrief
 } from "../domain/workstation";
 import type { ProjectState } from "../domain/workstation";
+import { sampleForLane, sampleLanes } from "../domain/sampling";
 import { wavBitDepth, wavChannels, wavSampleRate } from "./render";
 
 function channelLabel(channels: number): string {
@@ -24,12 +25,14 @@ function uploadValue(value: string, fallback: string): string {
   return trimmed.length > 0 ? trimmed : fallback;
 }
 
-function soundCloudTags(project: ProjectState): string[] {
+function soundCloudTags(project: ProjectState, sampled: boolean): string[] {
   // 사용자가 다시 입력하지 않아도 되는 로컬 프로젝트 정보만 태그 후보로 사용한다.
   // 외부 유행어·계정 정보는 조회하거나 추정하지 않는다.
   const style = getStyle(project);
   const target = activeDeliveryTarget(project);
-  return [style.name, "Instrumental", "Beat", `${projectBpm(project)} BPM`, target.name, "Original"];
+  const tags = [style.name, sampled ? "Sample-based" : "Instrumental", "Beat", `${projectBpm(project)} BPM`, target.name];
+  if (!sampled) tags.push("Original");
+  return tags;
 }
 
 export function soundCloudUploadSheetFileName(project: ProjectState): string {
@@ -41,10 +44,14 @@ export function createSoundCloudUploadSheet(project: ProjectState): string {
   const style = getStyle(project);
   const brief = projectSessionBrief(project);
   const target = activeDeliveryTarget(project);
-  const tags = soundCloudTags(project).map((tag) => (tag.includes(" ") ? `"${tag}"` : tag)).join(" ");
+  // 유효한 현재 원샷이 있을 때만 샘플 기반으로 표시한다. 빈 bank나 제거된 레인은 합성음 전용 문구를 유지한다.
+  const sampled = sampleLanes.some((lane) => sampleForLane(project, lane) !== undefined);
+  const tags = soundCloudTags(project, sampled).map((tag) => (tag.includes(" ") ? `"${tag}"` : tag)).join(" ");
   const artist = uploadValue(brief.artist, "[ARTIST NAME — replace before upload]");
-  const mood = uploadValue(brief.vibe, `${style.name} / focused / original instrumental`);
-  const background = uploadValue(brief.notes, "Created locally from editable GrooveForge musical events and built-in synthesis.");
+  const mood = uploadValue(brief.vibe, `${style.name} / focused / ${sampled ? "sample-based" : "original instrumental"}`);
+  const background = uploadValue(brief.notes, sampled
+    ? "Created locally from editable GrooveForge musical events, built-in synthesis, and imported audio samples. Confirm sample credits and permissions before upload."
+    : "Created locally from editable GrooveForge musical events and built-in synthesis.");
 
   // 이 문서는 복사 가능한 초안이지 배포 승인이 아니다. 따라서 Private/Downloads Off를 기본 절차로 고정하고
   // 권리·아트워크·트랜스코딩 청취처럼 자동 분석으로 보증할 수 없는 항목을 사람의 확인 단계로 명시한다.
@@ -69,7 +76,7 @@ export function createSoundCloudUploadSheet(project: ProjectState): string {
     "",
     "## Description draft",
     "",
-    `${title} — ${style.name} instrumental at ${projectBpm(project)} BPM in ${projectKey(project)}.`,
+    `${title} — ${style.name} ${sampled ? "sample-based track" : "instrumental"} at ${projectBpm(project)} BPM in ${projectKey(project)}.`,
     "",
     background,
     "",
